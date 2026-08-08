@@ -1,0 +1,341 @@
+/* Jari content styles — injected into pages via manifest "css".
+   Theme variables use a light palette by default and switch to a dark
+   palette automatically via prefers-color-scheme. */
+
+:root {
+  /* Generic */
+  --jari-font-family: monospace;
+  --jari-font-family-sans: sans-serif;
+  --jari-font-size: 12pt;
+  --jari-small-font-size: calc(var(--jari-font-size) * 0.75);
+  --jari-bg: white;
+  --jari-fg: black;
+
+  /* Status pill (toast) */
+  --jari-status-font-family: var(--jari-font-family);
+  --jari-status-font-size: var(--jari-small-font-size);
+  --jari-status-bg: var(--jari-bg);
+  --jari-status-fg: var(--jari-fg);
+  --jari-status-border: 1px lightgray solid;
+
+  /* Search highlight */
+  --jari-search-highlight-color: yellow;
+  --jari-search-highlight-active-color: rgb(255 127 255);
+
+  /* Hint labels */
+  --jari-hint-font-family: var(--jari-font-family-sans);
+  --jari-hint-font-size: var(--jari-small-font-size);
+  --jari-hint-font-weight: bold;
+  --jari-hint-fg: white;
+  --jari-hint-bg: red;
+  --jari-hint-border-color: ButtonShadow;
+  --jari-hint-border-width: 0px;
+  --jari-hint-border-style: solid;
+
+  /* Command line */
+  --jari-cmdl-bg: var(--jari-bg);
+  --jari-cmdl-fg: var(--jari-fg);
+  --jari-cmdl-line-height: 1.5;
+  --jari-cmdl-font-family: monospace;
+  --jari-cmdl-font-size: calc(var(--jari-font-size) * 0.75);
+
+  /* Completion lists */
+  --jari-cmplt-option-height: 1.4em;
+  --jari-cmplt-fg: var(--jari-fg);
+  --jari-cmplt-bg: var(--jari-bg);
+  --jari-cmplt-font-size: calc(var(--jari-font-size) * 9 / 12);
+  --jari-cmplt-font-family: monospace;
+  --jari-cmplt-border-top: 1px solid grey;
+
+  --jari-header-bg: LightGray;
+  --jari-header-font-size: inherit;
+  --jari-header-font-weight: bold;
+  --jari-header-border-bottom: 1px solid grey;
+
+  --jari-url-fg: #1f9947;
+  --jari-url-bg: var(--jari-bg);
+
+  --jari-of-fg: var(--jari-fg);
+  --jari-of-bg: #ffec8b;
+}
+
+/* Dark palette, automatic. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --jari-fg: #b1b1b3;
+    --jari-bg: #2b2a33;
+    --jari-cmdl-fg: #d7d7db;
+    --jari-cmdl-bg: #2a2a2e;
+    --jari-header-bg: #333;
+    --jari-header-border-bottom: 1px solid #2a2a2e;
+    --jari-cmplt-border-top: 1px solid #2a2a2e;
+    --jari-url-fg: #86de74;
+    --jari-of-fg: #fce19f;
+    --jari-of-bg: #44391f;
+    --jari-hint-bg: #204e8a;
+  }
+}
+
+/* --- Overlay chrome: command line + completion lists pin to the bottom,
+   full width. !important keeps pages from restyling the UI. */
+.jari-overlay {
+  position: fixed !important;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2147483646 !important;
+  box-sizing: border-box;
+  background: var(--jari-cmplt-bg) !important;
+  color: var(--jari-cmplt-fg) !important;
+  font-family: var(--jari-cmplt-font-family) !important;
+  font-size: var(--jari-cmplt-font-size) !important;
+  max-height: 75vh;
+  overflow: hidden;
+}
+
+/* --- Find in page --- */
+.jari-find-bar {
+  background: var(--jari-cmdl-bg);
+  color: var(--jari-cmdl-fg);
+  font-family: var(--jari-cmdl-font-family);
+  font-size: var(--jari-cmdl-font-size);
+  line-height: var(--jari-cmdl-line-height);
+  padding-left: 0.5ex;
+  border-top: var(--jari-cmplt-border-top);
+  white-space: nowrap;
+}
+
+.jari-find-bar input {
+  width: 97%;
+  font-family: var(--jari-cmdl-font-family);
+  font-size: var(--jari-cmdl-font-size);
+  line-height: var(--jari-cmdl-line-height);
+  color: var(--jari-cmdl-fg);
+  background: var(--jari-cmdl-bg);
+  border: unset;
+  outline: none;
+  padding: 0 0.5ex 0 0;
+}
+
+.jari-find-count {
+  margin-left: 1ex;
+  opacity: 0.8;
+}
+
+.jari-find-count.jari-find-nomatch {
+  opacity: 1;
+  color: #c00;
+}
+
+/* --- Tab search (completion list) --- */
+.jari-tabsearch {
+  background: var(--jari-cmplt-bg);
+  color: var(--jari-cmplt-fg);
+  font-size: var(--jari-cmplt-font-size);
+  font-family: var(--jari-cmplt-font-family);
+}
+
+.jari-tabsearch input {
+  width: 97%;
+  font-family: var(--jari-cmdl-font-family);
+  font-size: var(--jari-cmdl-font-size);
+  line-height: var(--jari-cmdl-line-height);
+  color: var(--jari-cmdl-fg);
+  background: var(--jari-cmdl-bg);
+  border: unset;
+  outline: none;
+  padding: 0 0 0 0.5ex;
+}
+
+.jari-tabsearch-header,
+.jari-help-title {
+  background: var(--jari-header-bg);
+  font-size: var(--jari-header-font-size);
+  font-weight: var(--jari-header-font-weight);
+  border-bottom: var(--jari-header-border-bottom);
+  padding: 0 0.5ex;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.jari-tabsearch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow: auto;
+  border-top: var(--jari-cmplt-border-top);
+}
+
+.jari-tabsearch-list li,
+.jari-help-row {
+  height: var(--jari-cmplt-option-height);
+  line-height: var(--jari-cmplt-option-height);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 0.5ex;
+  cursor: pointer;
+}
+
+.jari-tabsearch-list li .url {
+  color: var(--jari-url-fg);
+  background: var(--jari-url-bg);
+  text-decoration: none;
+  margin-left: 1em;
+}
+
+.jari-tabsearch-list li.selected,
+.jari-tabsearch-list li.selected .url {
+  color: var(--jari-of-fg);
+  background: var(--jari-of-bg);
+}
+
+/* --- Help (?) --- */
+.jari-help {
+  background: var(--jari-cmplt-bg);
+  color: var(--jari-cmplt-fg);
+  font-size: var(--jari-cmplt-font-size);
+  font-family: var(--jari-cmplt-font-family);
+  border-top: var(--jari-cmplt-border-top);
+}
+
+.jari-help-list {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.jari-help-row {
+  display: flex;
+  gap: 1.5ex;
+}
+
+.jari-help-key {
+  min-width: 130px;
+  font-weight: bold;
+}
+
+.jari-help-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1ex;
+  padding: 0.25ex 0.5ex;
+  border-top: var(--jari-cmplt-border-top);
+}
+
+.jari-help-footer button {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--jari-cmplt-fg);
+  background: var(--jari-cmplt-bg);
+  border: 1px solid var(--jari-cmplt-fg);
+  border-radius: 0;
+  padding: 0 1ex;
+  cursor: pointer;
+}
+
+.jari-help-footer button:hover {
+  background: var(--jari-of-bg);
+  color: var(--jari-of-fg);
+}
+
+/* --- Toast (status pill), flush in the bottom-right corner --- */
+.jari-toast {
+  left: auto;
+  right: 0;
+  bottom: 0;
+  max-height: none;
+  width: auto;
+  padding: 0.25ex 1ex;
+  font-family: var(--jari-status-font-family);
+  font-size: var(--jari-status-font-size);
+  background: var(--jari-status-bg);
+  color: var(--jari-status-fg);
+  border: var(--jari-status-border);
+  border-radius: 0;
+  pointer-events: none;
+}
+
+/* --- Ignore-mode pill (I): persistent while active, flush in the top-right
+   corner. Hidden in fullscreen so it never covers fullscreen content. --- */
+.jari-ignore-pill {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 2147483646;
+  font-family: var(--jari-status-font-family);
+  font-size: var(--jari-status-font-size);
+  background: var(--jari-status-bg);
+  color: var(--jari-status-fg);
+  border: 0;
+  border-bottom: 1px solid var(--jari-status-fg);
+  border-left: 1px solid var(--jari-status-fg);
+  padding: 0.25ex 1ex;
+  pointer-events: none;
+}
+
+/* --- Link hints --- */
+.jari-hint {
+  position: absolute !important;
+  font-family: var(--jari-hint-font-family) !important;
+  font-size: var(--jari-hint-font-size) !important;
+  font-weight: var(--jari-hint-font-weight) !important;
+  color: var(--jari-hint-fg) !important;
+  background: var(--jari-hint-bg) !important;
+  border-color: var(--jari-hint-border-color);
+  border-width: var(--jari-hint-border-width);
+  border-style: var(--jari-hint-border-style);
+  min-width: 0.75em;
+  padding: 2pt;
+  text-align: center;
+  z-index: 2147483647 !important;
+  text-transform: uppercase !important;
+  line-height: 1;
+  pointer-events: none;
+  cursor: default;
+}
+
+.jari-hint.jari-hint-dim {
+  display: none;
+}
+
+/* Hints: classic yellow labels, in both themes. */
+:root {
+  --jari-hint-fg: #111;
+  --jari-hint-bg: #ffd76e;
+  --jari-hint-border-color: #d4a52a;
+  --jari-hint-border-width: 1px;
+}
+
+/* --- Showcmd readout (Neovim-style key echo), flush bottom-left --- */
+.jari-showcmd {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: 2147483646;
+  font-family: var(--jari-cmdl-font-family);
+  font-size: var(--jari-cmdl-font-size);
+  line-height: 1.4;
+  background: var(--jari-cmdl-bg);
+  color: var(--jari-cmdl-fg);
+  border: var(--jari-status-border);
+  padding: 0.125ex 0.75ex;
+  pointer-events: none;
+}
+
+/* Plain single-key presses echo muted, so the readout stays subtle. */
+.jari-showcmd.muted {
+  opacity: 0.5;
+}
+
+/* --- Find marks --- */
+.jari-find-mark {
+  background: var(--jari-search-highlight-color) !important;
+  color: #000 !important;
+  border-radius: 1px;
+}
+
+.jari-find-mark.jari-find-current {
+  background: var(--jari-search-highlight-active-color) !important;
+}

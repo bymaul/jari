@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Jari",
+  "version": "0.2",
+  "description": "Keyboard-driven navigation for Chrome and Firefox.",
+  "permissions": ["tabs", "storage", "sessions"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "content/keymap.js",
+        "content/settings.js",
+        "content/ui.js",
+        "content/commands.js",
+        "content/hints.js",
+        "content/find.js",
+        "content/tabsearch.js",
+        "content/help.js",
+        "content/content.js"
+      ],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

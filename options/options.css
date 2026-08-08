@@ -1,0 +1,289 @@
+/* Jari options page. Dark, monospace, square, compact. */
+
+:root {
+  --bg: #15171a;
+  --card: #1e2126;
+  --border: #33383f;
+  --fg: #d6d9de;
+  --muted: #8a9098;
+  --accent: #86de74;
+  --chord-bg: #223325;
+  --rec-bg: #ffd76e;
+  --mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* Header */
+header {
+  background: #0e1012;
+  border-bottom: 2px solid var(--accent);
+}
+
+header .wrap {
+  padding: 10px 20px 8px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+  color: #fff;
+}
+
+.subtitle {
+  margin: 1px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+main {
+  padding: 12px 20px;
+}
+
+section.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 12px 16px;
+  margin-bottom: 10px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+p.hint {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* The intro hint on the keybindings card sits between the heading and table. */
+section.card > p.hint {
+  margin-bottom: 8px;
+}
+
+code {
+  background: #2a2e33;
+  padding: 0 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg);
+}
+
+/* Behavior fields: side by side when there's room, hint beside the control. */
+#behavior-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 300px;
+  min-height: 30px;
+}
+
+.field label {
+  flex: 0 0 110px;
+}
+
+.control {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.control input[type="number"] {
+  padding: 3px 6px;
+  background: #14161a;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.control input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.unit {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Keybindings: three columns of category tables, tight rows. */
+.jari-keymap-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 24px;
+  align-items: start;
+}
+
+.jari-keymap-column {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .jari-keymap-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .jari-keymap-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+#keymap-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+#keymap-table th,
+#keymap-table td {
+  text-align: left;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+#keymap-table td:last-child {
+  width: 96px;
+}
+
+#keymap-table tr.cat-header th {
+  background: #16181c;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 8px 3px;
+}
+
+#keymap-table tr:not(.cat-header):hover {
+  background: #17191d;
+}
+
+#keymap-table td input {
+  width: 100%;
+  min-width: 60px;
+  padding: 2px 6px;
+  background: #14161a;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+#keymap-table td input.recording {
+  background: var(--rec-bg);
+  border-color: #b9a23a;
+  color: #111;
+}
+
+#keymap-table td input.chord {
+  background: var(--chord-bg);
+  border-color: #3a5a40;
+  color: var(--accent);
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+button {
+  padding: 3px 10px;
+  background: #14161a;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #20242a;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0c1a10;
+}
+
+button.primary:hover {
+  background: #9ae88a;
+}
+
+#status {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+/* Disabled sites */
+#disabled-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#disabled-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+#disabled-list li.empty {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+#disabled-list button {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+/* Footer */
+footer {
+  padding: 0 20px 16px;
+  color: var(--muted);
+  font-size: 10px;
+}
