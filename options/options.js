@@ -1,6 +1,7 @@
 // Jari options page: edit behavior options, keybindings and manage per-site
 // disabling. Relies on window.Jari.keymapDefaults, Jari.settingsDefaults,
-// Jari.prefixes and Jari.commands (loaded via script tags).
+// Jari.prefixes, Jari.commands and the shared helpers in keymap.js (all
+// loaded via script tags).
 (() => {
   const DEFAULTS = window.Jari.keymapDefaults;
   const SETTINGS_DEFAULTS = window.Jari.settingsDefaults;
@@ -9,12 +10,7 @@
   // Fixed prefixes ("gg", "gt", ...) live in Jari.prefixes. They are shown
   // in the key fields so the user can see them, but they cannot be rebound —
   // Backspace only clears the single-key binding.
-  const PREFIXES = {};
-  for (const [prefix, subs] of Object.entries(window.Jari.prefixes || {})) {
-    for (const [suffix, name] of Object.entries(subs)) {
-      PREFIXES[name] = prefix + suffix;
-    }
-  }
+  const PREFIXES = window.Jari.flattenPrefixes();
 
   const tableEl = document.querySelector("#keymap-table");
   const saveBtn = document.querySelector("#save");
@@ -26,17 +22,8 @@
   const timeoutEl = document.querySelector("#timeout");
   const accentEl = document.querySelector("#accent");
 
-  // Display order and titles for the command categories (shared with the
-  // help overlay; defined in keymap.js).
-  const CATEGORIES = window.Jari.categories || [];
-
   const STORAGE_KEY = "settings";
   const RESERVED_KEYS = /^[0-9]$/;
-
-  // Modifier keys on their own are not bindable and must not end a recording:
-  // holding Ctrl to type "ctrl+a" first fires keydown("Control"), which would
-  // otherwise be recorded as "ctrl+Control".
-  const MODIFIER_ONLY = new Set(["Control", "Alt", "Shift", "Meta", "CapsLock", "NumLock", "ScrollLock", "Fn", "AltGraph"]);
 
   let keymap = {};
   let disabledSites = [];
@@ -45,24 +32,10 @@
   let timeoutMs = SETTINGS_DEFAULTS.timeoutMs;
   let accentColor = SETTINGS_DEFAULTS.accentColor;
 
-  function isColor(value) {
-    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-  }
-
   // Push the chosen accent into the page's stylesheet variable so h2, code,
   // buttons and the primary button all follow it live.
   function applyAccent() {
     document.documentElement.style.setProperty("--accent", accentColor);
-  }
-
-  // Mirror of the content-script canonical key format: [ctrl/alt/meta] + key.
-  function canonicalKey(event) {
-    const parts = [];
-    if (event.ctrlKey) parts.push("ctrl");
-    if (event.altKey) parts.push("alt");
-    if (event.metaKey) parts.push("meta");
-    parts.push(event.key);
-    return parts.join("+");
   }
 
   async function load() {
@@ -71,21 +44,13 @@
       const data = await chrome.storage.sync.get(STORAGE_KEY);
       saved = data[STORAGE_KEY] || {};
     } catch {}
-    keymap = { ...DEFAULTS, ...(saved.keymap || {}) };
-    for (const key of window.Jari.unboundKeys) delete keymap[key];
-    disabledSites = saved.disabledSites || [];
-    scrollStep = Number.isFinite(saved.scrollStep)
-      ? saved.scrollStep
-      : SETTINGS_DEFAULTS.scrollStep;
-    smoothScroll = typeof saved.smoothScroll === "boolean"
-      ? saved.smoothScroll
-      : SETTINGS_DEFAULTS.smoothScroll;
-    timeoutMs = Number.isFinite(saved.timeoutMs) && saved.timeoutMs > 0
-      ? saved.timeoutMs
-      : SETTINGS_DEFAULTS.timeoutMs;
-    accentColor = isColor(saved.accentColor)
-      ? saved.accentColor
-      : SETTINGS_DEFAULTS.accentColor;
+    const s = window.Jari.normalizeSettings(saved);
+    keymap = s.keymap;
+    disabledSites = s.disabledSites;
+    scrollStep = s.scrollStep;
+    smoothScroll = s.smoothScroll;
+    timeoutMs = s.timeoutMs;
+    accentColor = s.accentColor;
     scrollStepEl.value = scrollStep;
     smoothScrollEl.checked = smoothScroll;
     timeoutEl.value = timeoutMs;
@@ -107,18 +72,7 @@
 
     // Split the categories across three columns, keeping each category whole
     // and balancing by row count (category header + one row per command).
-    const COLUMNS = 3;
-    const columns = Array.from({ length: COLUMNS }, () => []);
-    const columnRows = columns.map(() => 0);
-    for (const cat of CATEGORIES) {
-      if (!byCategory.has(cat.id)) continue;
-      let best = 0;
-      for (let i = 1; i < COLUMNS; i++) {
-        if (columnRows[i] < columnRows[best]) best = i;
-      }
-      columns[best].push(cat);
-      columnRows[best] += 1 + byCategory.get(cat.id).length;
-    }
+    const columns = window.Jari.balanceCategories(byCategory, 3);
 
     const grid = document.createElement("div");
     grid.className = "jari-keymap-columns";
@@ -193,7 +147,7 @@
     const handler = (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (MODIFIER_ONLY.has(event.key)) return; // keep waiting for the real key
+      if (window.Jari.modifierKeys.has(event.key)) return; // keep waiting for the real key
       input.removeEventListener("keydown", handler);
       input.classList.remove("recording");
 
@@ -201,7 +155,7 @@
         keymap = Object.fromEntries(Object.entries(keymap).filter(([, cmd]) => cmd !== name));
         status("Binding cleared");
       } else {
-        const combo = canonicalKey(event);
+        const combo = window.Jari.canonicalKey(event);
         if (RESERVED_KEYS.test(combo)) {
           input.value = previous;
           status("Digits 0-9 are reserved for the repeat count");
@@ -231,7 +185,7 @@
     const tRaw = parseInt(timeoutEl.value, 10);
     timeoutMs = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
     timeoutEl.value = timeoutMs;
-    accentColor = isColor(accentEl.value) ? accentEl.value : SETTINGS_DEFAULTS.accentColor;
+    accentColor = window.Jari.isColor(accentEl.value) ? accentEl.value : SETTINGS_DEFAULTS.accentColor;
     accentEl.value = accentColor;
     applyAccent();
   }

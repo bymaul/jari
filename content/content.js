@@ -17,15 +17,6 @@
   let ignoreMode = false;
   let ignorePill = null;
 
-  function canonicalKey(event) {
-    const parts = [];
-    if (event.ctrlKey) parts.push("ctrl");
-    if (event.altKey) parts.push("alt");
-    if (event.metaKey) parts.push("meta");
-    parts.push(event.key);
-    return parts.join("+");
-  }
-
   // The user stopped mid-composition (Escape, dead key, ignore toggle, or
   // inactivity timeout): drop count/prefix state and the echo.
   function clearPending() {
@@ -111,19 +102,6 @@
 
   // --- Dispatcher ---------------------------------------------------------
 
-  function isModifierKey(key) {
-    return (
-      key === "Shift" ||
-      key === "Control" ||
-      key === "Alt" ||
-      key === "Meta" ||
-      key === "OS" ||
-      key === "CapsLock" ||
-      key === "NumLock" ||
-      key === "ScrollLock"
-    );
-  }
-
   function handleKeydown(event) {
     // Ignore synthetic events: pages must not be able to trigger commands
     // by dispatching fake KeyboardEvents.
@@ -132,7 +110,7 @@
     // A bare modifier press (Shift/Ctrl/Alt/...) is only ever a prefix of the
     // real key. Let it pass and keep any pending composition: "g" followed by
     // Shift+u must complete "gU", not cancel the prefix on the Shift keydown.
-    if (isModifierKey(event.key)) return;
+    if (Jari.modifierKeys.has(event.key)) return;
 
     // Ignore mode: everything passes through except the toggle itself and
     // Escape, both of which leave the mode.
@@ -151,7 +129,7 @@
     if (Jari.Find.isActive()) return Jari.Find.onKeyDown(event);
     if (Jari.TabSearch.isActive()) return Jari.TabSearch.onKeyDown(event);
 
-    const key = canonicalKey(event);
+    const key = Jari.canonicalKey(event);
 
     // Resolve a pending prefix, e.g. "gt", "gg". The composed keys stay
     // in typedSeq so the showcmd readout can echo them on execution.
