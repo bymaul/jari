@@ -102,6 +102,44 @@ const handlers = {
     return { ok: true };
   },
 
+  // Split the active tab into its own window. In a single-tab window, return
+  // the OTHER windows (with their active tab's title) so the page can offer
+  // to merge back into one of them.
+  splitOrMerge: async (sender) => {
+    const tab = sender.tab;
+    if (!tab || !tab.id) return { ok: false };
+    const myTabs = await chrome.tabs.query({ windowId: tab.windowId });
+    if (myTabs.length > 1) {
+      await chrome.windows.create({ tabId: tab.id });
+      return { ok: true, split: true };
+    }
+    const windows = await chrome.windows.getAll({ populate: true });
+    const others = windows
+      .filter((win) => win.id !== tab.windowId)
+      .map((win) => {
+        const wtab = win.tabs && win.tabs.length
+          ? win.tabs.find((t) => t.active) || win.tabs[0]
+          : null;
+        return {
+          windowId: win.id,
+          title: wtab && wtab.title ? wtab.title : "Window",
+          url: `${win.tabs ? win.tabs.length : 0} tabs`,
+        };
+      });
+    if (others.length === 0) return { ok: true, needMerge: false };
+    return { ok: true, needMerge: true, ownTabId: tab.id, ownWindowId: tab.windowId, tabs: others };
+  },
+
+  // Move the sender's tab to the end of another window's strip; the emptied
+  // window closes itself. Optionally activate a specific tab in the target.
+  mergeTab: async (sender, { targetWindowId, targetTabId } = {}) => {
+    const tab = sender.tab;
+    if (!tab || !tab.id || !targetWindowId) return { ok: false };
+    await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
+    if (targetTabId) await chrome.tabs.update(targetTabId, { active: true });
+    return { ok: true };
+  },
+
   moveTabLeft: async (sender) => {
     const tab = sender.tab;
     if (tab && tab.id) {

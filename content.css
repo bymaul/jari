@@ -1,6 +1,7 @@
 /* Jari content styles — injected into pages via manifest "css".
-   Theme variables use a light palette by default and switch to a dark
-   palette automatically via prefers-color-scheme. */
+   Jari's own UI (help overlay, tab search, find bar, toast) follows the
+   site's light/dark scheme, with both palettes styled to match the settings
+   page: warm neutrals, tight borders, amber accent. */
 
 :root {
   /* Generic */
@@ -8,23 +9,27 @@
   --jari-font-family-sans: sans-serif;
   --jari-font-size: 12pt;
   --jari-small-font-size: calc(var(--jari-font-size) * 0.75);
-  --jari-bg: white;
-  --jari-fg: black;
+  /* Light palette: cool paper, the light suit of the vague dark scheme. */
+  --jari-bg: #f5f5f7;
+  --jari-fg: #333738;
+  /* Live accent: set from settings (Jari.settings.getAccentColor()).
+     Default is vague Amber. */
+  --jari-accent: #e8b589;
 
   /* Status pill (toast) */
   --jari-status-font-family: var(--jari-font-family);
   --jari-status-font-size: var(--jari-small-font-size);
   --jari-status-bg: var(--jari-bg);
   --jari-status-fg: var(--jari-fg);
-  --jari-status-border: 1px lightgray solid;
+  --jari-status-border: 1px solid #c5c5cf;
 
   /* Search highlight */
-  --jari-search-highlight-color: yellow;
-  --jari-search-highlight-active-color: rgb(255 127 255);
+  --jari-search-highlight-color: #405065;
+  --jari-search-highlight-active-color: #e0a363;
 
   /* Hint labels */
   --jari-hint-font-family: var(--jari-font-family-sans);
-  --jari-hint-font-size: var(--jari-small-font-size);
+  --jari-hint-font-size: calc(var(--jari-font-size) * 0.6);
   --jari-hint-font-weight: bold;
   --jari-hint-fg: white;
   --jari-hint-bg: red;
@@ -45,34 +50,31 @@
   --jari-cmplt-bg: var(--jari-bg);
   --jari-cmplt-font-size: calc(var(--jari-font-size) * 9 / 12);
   --jari-cmplt-font-family: monospace;
-  --jari-cmplt-border-top: 1px solid grey;
+  --jari-cmplt-border-top: 1px solid #c5c5cf;
 
-  --jari-header-bg: LightGray;
+  --jari-header-bg: #e8e8ec;
   --jari-header-font-size: inherit;
   --jari-header-font-weight: bold;
-  --jari-header-border-bottom: 1px solid grey;
+  --jari-header-border-bottom: 1px solid #c5c5cf;
 
-  --jari-url-fg: #1f9947;
+  --jari-url-fg: var(--jari-accent);
   --jari-url-bg: var(--jari-bg);
 
-  --jari-of-fg: var(--jari-fg);
-  --jari-of-bg: #ffec8b;
+  --jari-of-fg: #141415;
+  --jari-of-bg: var(--jari-accent);
 }
 
-/* Dark palette, automatic. */
+/* Dark palette: the vague colorscheme's colors, lifted a few notches
+   brighter. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --jari-fg: #b1b1b3;
-    --jari-bg: #2b2a33;
-    --jari-cmdl-fg: #d7d7db;
-    --jari-cmdl-bg: #2a2a2e;
-    --jari-header-bg: #333;
-    --jari-header-border-bottom: 1px solid #2a2a2e;
-    --jari-cmplt-border-top: 1px solid #2a2a2e;
-    --jari-url-fg: #86de74;
-    --jari-of-fg: #fce19f;
-    --jari-of-bg: #44391f;
-    --jari-hint-bg: #204e8a;
+    --jari-bg: #1e1e26;
+    --jari-fg: #d9d9de;
+    --jari-status-border: 1px solid #3f4346;
+    --jari-cmdl-fg: #d9d9de;
+    --jari-cmplt-border-top: 1px solid #3f4346;
+    --jari-header-bg: #262630;
+    --jari-header-border-bottom: 1px solid #3f4346;
   }
 }
 
@@ -94,27 +96,42 @@
 }
 
 /* --- Find in page --- */
+/* Self-contained floating pill in the bottom-right corner: does not reuse
+   .jari-overlay so it never spans the full page width. Right-anchored so
+   the browser's link-preview status bar (bottom-left) cannot cover it. */
 .jari-find-bar {
-  background: var(--jari-cmdl-bg);
-  color: var(--jari-cmdl-fg);
+  position: fixed !important;
+  right: 1em;
+  bottom: 2em;
+  z-index: 2147483647 !important;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  padding: 0.4em 1em;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
-  line-height: var(--jari-cmdl-line-height);
-  padding-left: 0.5ex;
-  border-top: var(--jari-cmplt-border-top);
+  line-height: 1.4;
+  background: var(--jari-cmdl-bg);
+  color: var(--jari-cmdl-fg);
+  border: var(--jari-status-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
 }
 
 .jari-find-bar input {
-  width: 97%;
+  flex: 1 1 auto;
+  min-width: 12ch;
+  max-width: 45ch;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
   line-height: var(--jari-cmdl-line-height);
   color: var(--jari-cmdl-fg);
-  background: var(--jari-cmdl-bg);
+  background: transparent;
   border: unset;
   outline: none;
-  padding: 0 0.5ex 0 0;
+  padding: 0;
 }
 
 .jari-find-count {
@@ -124,15 +141,16 @@
 
 .jari-find-count.jari-find-nomatch {
   opacity: 1;
-  color: #c00;
+  color: #d8647e;
 }
 
-/* --- Tab search (completion list) --- */
+/* --- Tab search (completion list) — also the merge picker --- */
 .jari-tabsearch {
   background: var(--jari-cmplt-bg);
   color: var(--jari-cmplt-fg);
   font-size: var(--jari-cmplt-font-size);
   font-family: var(--jari-cmplt-font-family);
+  padding: 0 1em;
 }
 
 .jari-tabsearch input {
@@ -150,6 +168,7 @@
 .jari-tabsearch-header,
 .jari-help-title {
   background: var(--jari-header-bg);
+  color: var(--jari-accent);
   font-size: var(--jari-header-font-size);
   font-weight: var(--jari-header-font-weight);
   border-bottom: var(--jari-header-border-bottom);
@@ -167,8 +186,7 @@
   border-top: var(--jari-cmplt-border-top);
 }
 
-.jari-tabsearch-list li,
-.jari-help-row {
+.jari-tabsearch-list li {
   height: var(--jari-cmplt-option-height);
   line-height: var(--jari-cmplt-option-height);
   white-space: nowrap;
@@ -192,12 +210,19 @@
 }
 
 /* --- Help (?) --- */
+/* Bottom bar (inherits .jari-overlay's pinning). The overlay is focused on
+   open; the ring is suppressed so no ugly outline shows. */
 .jari-help {
   background: var(--jari-cmplt-bg);
   color: var(--jari-cmplt-fg);
   font-size: var(--jari-cmplt-font-size);
   font-family: var(--jari-cmplt-font-family);
   border-top: var(--jari-cmplt-border-top);
+  outline: none;
+}
+
+.jari-help:focus {
+  outline: none;
 }
 
 .jari-help-list {
@@ -205,14 +230,48 @@
   overflow: auto;
 }
 
-.jari-help-row {
-  display: flex;
-  gap: 1.5ex;
+.jari-help-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0 3ex;
+  align-items: start;
 }
 
-.jari-help-key {
-  min-width: 130px;
+.jari-help-column {
+  min-width: 0;
+}
+
+.jari-help table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-bottom: 2ex;
+}
+
+.jari-help tr.jari-help-cat-header th {
+  background: var(--jari-header-bg);
+  font-size: var(--jari-header-font-size);
+  font-weight: var(--jari-header-font-weight);
+  color: var(--jari-accent);
+  text-align: left;
+  border-bottom: var(--jari-cmplt-border-top);
+  padding: 0.25ex 0.5ex;
+}
+
+.jari-help td {
+  padding: 0 0.5ex;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: var(--jari-cmplt-option-height);
+  line-height: var(--jari-cmplt-option-height);
+}
+
+.jari-help td.jari-help-key {
+  width: 40%;
   font-weight: bold;
+  color: var(--jari-accent);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
 }
 
 .jari-help-footer {
@@ -240,36 +299,39 @@
   color: var(--jari-of-fg);
 }
 
-/* --- Toast (status pill), flush in the bottom-right corner --- */
+/* --- Toast (status pill), flush in the bottom-right corner.
+   Self-contained: does not reuse .jari-overlay so the completion palette's
+   !important background/color/font cannot bleed into it. --- */
 .jari-toast {
-  left: auto;
+  position: fixed !important;
   right: 0;
   bottom: 0;
-  max-height: none;
-  width: auto;
+  z-index: 2147483647 !important;
+  box-sizing: border-box;
+  max-width: 60vw;
   padding: 0.25ex 1ex;
   font-family: var(--jari-status-font-family);
   font-size: var(--jari-status-font-size);
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: var(--jari-status-border);
-  border-radius: 0;
+  padding: 0.25ex 1em;
   pointer-events: none;
 }
 
-/* --- Ignore-mode pill (I): persistent while active, flush in the top-right
+/* --- Ignore-mode pill (I): persistent while active, flush in the bottom-right
    corner. Hidden in fullscreen so it never covers fullscreen content. --- */
 .jari-ignore-pill {
   position: fixed;
-  top: 0;
-  right: 0;
+  bottom: 0;
+  right: 0.75ex;
   z-index: 2147483646;
   font-family: var(--jari-status-font-family);
   font-size: var(--jari-status-font-size);
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: 0;
-  border-bottom: 1px solid var(--jari-status-fg);
+  border-top: 1px solid var(--jari-status-fg);
   border-left: 1px solid var(--jari-status-fg);
   padding: 0.25ex 1ex;
   pointer-events: none;
@@ -300,18 +362,19 @@
   display: none;
 }
 
-/* Hints: classic yellow labels, in both themes. */
+/* Hints: labels take the configured accent color. */
 :root {
-  --jari-hint-fg: #111;
-  --jari-hint-bg: #ffd76e;
-  --jari-hint-border-color: #d4a52a;
+  --jari-hint-fg: #141415;
+  --jari-hint-bg: var(--jari-accent);
+  --jari-hint-border-color: var(--jari-accent);
   --jari-hint-border-width: 1px;
 }
 
-/* --- Showcmd readout (Neovim-style key echo), flush bottom-left --- */
+/* --- Showcmd readout (Neovim-style key echo), bottom-right with a little
+   right spacing so it never sits flush against the page edge. --- */
 .jari-showcmd {
   position: fixed;
-  left: 0;
+  right: 0.75ex;
   bottom: 0;
   z-index: 2147483646;
   font-family: var(--jari-cmdl-font-family);
@@ -324,18 +387,16 @@
   pointer-events: none;
 }
 
-/* Plain single-key presses echo muted, so the readout stays subtle. */
-.jari-showcmd.muted {
-  opacity: 0.5;
-}
-
 /* --- Find marks --- */
+/* Storm (normal) and Gold (current) background with forced text colors so
+   marks stay readable on both light and dark pages. */
 .jari-find-mark {
   background: var(--jari-search-highlight-color) !important;
-  color: #000 !important;
+  color: #cdcdcd !important;
   border-radius: 1px;
 }
 
 .jari-find-mark.jari-find-current {
   background: var(--jari-search-highlight-active-color) !important;
+  color: #141415 !important;
 }

@@ -1,15 +1,14 @@
 // Jari: content-script entry point.
 // Boots settings and installs the capture-phase keydown dispatcher that
 // routes keys to active modes (hints/find/tabsearch), the count prefix, the
-// "g" chord, and the user keymap. A Neovim-style showcmd
-// readout echoes counts and chord prefixes while they are being composed.
+// "g" prefix, and the user keymap. A Neovim-style showcmd
+// readout echoes counts and prefix keys while they are being composed; an
+// inactivity timeout drops the composition if it is never completed.
 //
 // "I" toggles ignore mode: Jari stops reacting to every key (except the
 // toggle itself) until it is pressed again, with a persistent status pill.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
-
-  const TIMEOUT_MS = 1200;
 
   let pendingCount = "";
   let pendingPrefix = null;
@@ -27,7 +26,8 @@
     return parts.join("+");
   }
 
-  // The user stopped mid-composition: drop count/chord state and the echo.
+  // The user stopped mid-composition (Escape, dead key, ignore toggle, or
+  // inactivity timeout): drop count/prefix state and the echo.
   function clearPending() {
     pendingCount = "";
     pendingPrefix = null;
@@ -37,7 +37,7 @@
 
   function restartTimer() {
     clearTimeout(timer);
-    timer = setTimeout(clearPending, TIMEOUT_MS);
+    timer = setTimeout(clearPending, Jari.settings.getTimeoutMs());
   }
 
   function isTypingTarget(el) {
@@ -89,7 +89,7 @@
     if (ignorePill || isFullscreen()) return;
     ignorePill = document.createElement("div");
     ignorePill.className = "jari-ignore-pill";
-    ignorePill.textContent = "Ignore mode — press I or Esc to exit";
+    ignorePill.textContent = "Ignore mode";
     document.body.appendChild(ignorePill);
   }
 
@@ -111,10 +111,28 @@
 
   // --- Dispatcher ---------------------------------------------------------
 
+  function isModifierKey(key) {
+    return (
+      key === "Shift" ||
+      key === "Control" ||
+      key === "Alt" ||
+      key === "Meta" ||
+      key === "OS" ||
+      key === "CapsLock" ||
+      key === "NumLock" ||
+      key === "ScrollLock"
+    );
+  }
+
   function handleKeydown(event) {
     // Ignore synthetic events: pages must not be able to trigger commands
     // by dispatching fake KeyboardEvents.
     if (!event.isTrusted) return;
+
+    // A bare modifier press (Shift/Ctrl/Alt/...) is only ever a prefix of the
+    // real key. Let it pass and keep any pending composition: "g" followed by
+    // Shift+u must complete "gU", not cancel the prefix on the Shift keydown.
+    if (isModifierKey(event.key)) return;
 
     // Ignore mode: everything passes through except the toggle itself and
     // Escape, both of which leave the mode.
@@ -135,12 +153,12 @@
 
     const key = canonicalKey(event);
 
-    // Resolve a pending chord, e.g. "gt", "gg". The composed keys stay
+    // Resolve a pending prefix, e.g. "gt", "gg". The composed keys stay
     // in typedSeq so the showcmd readout can echo them on execution.
     const prefixWasPending = pendingPrefix !== null;
     let commandName = null;
     if (prefixWasPending) {
-      const sub = Jari.chords[pendingPrefix] || {};
+      const sub = Jari.prefixes[pendingPrefix] || {};
       if (key in sub) commandName = sub[key];
       pendingPrefix = null;
       Jari.ui.showcmd(null);
@@ -155,14 +173,24 @@
       return;
     }
 
+    // Strict prefix composition: while a prefix is pending, a key that does
+    // not complete it is a dead key, not a single-key command — "gi" must
+    // never fall through to run "i". (Form fields were handled above, so
+    // typing in an input still passes through normally.)
+    if (prefixWasPending && !commandName) {
+      clearPending();
+      return;
+    }
+
     // Escape with no form field focused clears any composition in progress.
     if (event.key === "Escape") {
       clearPending();
       return;
     }
 
-    // Count prefix: digits 0-9 accumulate an unlimited repeat count.
-    if (/^[0-9]$/.test(key)) {
+    // Count prefix: digits 0-9 accumulate an unlimited repeat count. Only
+    // when no prefix already claimed the key — "g0" is firstTab, not a count.
+    if (!commandName && /^[0-9]$/.test(key)) {
       pendingCount += key;
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
@@ -171,8 +199,8 @@
       return;
     }
 
-    // Start a new chord prefix (e.g. "g", "y").
-    if (!commandName && Jari.chords[key]) {
+    // Start a new prefix (e.g. "g", "y").
+    if (!commandName && Jari.prefixes[key]) {
       pendingPrefix = key;
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
@@ -194,13 +222,14 @@
     const count = pendingCount ? parseInt(pendingCount, 10) : 1;
     const hadCount = pendingCount !== "";
     pendingCount = "";
-    if (!prefixWasPending) typedSeq += key;
+    // Append the completing key even when it finished a prefix, so the echo
+    // shows the full sequence ("g$", "gg", ";s") rather than just the prefix.
+    typedSeq += key;
     const seq = typedSeq || key;
     typedSeq = "";
-    // Echo composed counts/chords prominently; plain keys echo muted so the
-    // readout still shows what was pressed without being loud.
+    // Echo only compositions: a count or a finished prefix. Plain single-key
+    // commands show nothing — the readout exists to track what is pending.
     if (hadCount || prefixWasPending) Jari.ui.flash(seq);
-    else Jari.ui.flash(seq, 600, { muted: true });
     restartTimer();
 
     run(commandName, count, event);

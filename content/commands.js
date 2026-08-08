@@ -100,6 +100,75 @@
     Jari.ui.toast(message);
   }
 
+  // Read the clipboard. A hidden textarea + execCommand("paste") is the
+  // reliable path from a content script (needs the "clipboardRead" permission
+  // in the manifest); navigator.clipboard.readText() is the fallback on
+  // secure pages. The caller treats the result as a URL — background
+  // normalizeUrl turns bare hostnames into https.
+  function pasteClipboard() {
+    const ta = document.createElement("textarea");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    let text = "";
+    try {
+      if (document.execCommand("paste")) text = ta.value.trim();
+    } catch {}
+    ta.remove();
+    if (text) return Promise.resolve(text);
+    try {
+      return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
+    } catch {
+      return Promise.resolve("");
+    }
+  }
+
+  // "gu": go one path segment up, keeping the current origin.
+  //   acme.com/1/2/3  ->  acme.com/1/2
+  //   acme.com/1/2/   ->  acme.com/1
+  //   acme.com/1/2/3.html -> acme.com/1/2
+  //   acme.com/       ->  acme.com/  (already root: caller shows a toast)
+  function parentUrlOf(href) {
+    try {
+      const url = new URL(href);
+      let path = url.pathname;
+      if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+      const idx = path.lastIndexOf("/");
+      path = idx > 0 ? path.slice(0, idx) : "/";
+      url.pathname = path;
+      url.search = "";
+      url.hash = "";
+      return url.href;
+    } catch {
+      return href;
+    }
+  }
+
+  // "gU": go to the root of the current URL hierarchy (the origin).
+  //   acme.com/1/2/3  ->  acme.com/
+  function rootUrlOf(href) {
+    try {
+      const url = new URL(href);
+      url.pathname = "/";
+      url.search = "";
+      url.hash = "";
+      return url.href;
+    } catch {
+      return href;
+    }
+  }
+
+  // Same path, ignoring query/hash: "https://x.com/?ref=1" counts as root for
+  // the already-there check, otherwise navigation with a stale query reloads.
+  function isSamePath(a, b) {
+    try {
+      return new URL(a).pathname === new URL(b).pathname;
+    } catch {
+      return a === b;
+    }
+  }
+
   const commands = {
     // Scrolling
     scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true, run: (c) => scrollBy({ y: Jari.settings.getScrollStep(), count: c.count }) },
@@ -156,11 +225,39 @@
     newTab: { category: "tabs", label: "New tab", run: () => Jari.sendMessage("createTab") },
     closeTab: { category: "tabs", label: "Close tab", repeatable: true, run: (c) => Jari.sendMessage("closeTab", { count: c.count }) },
     restoreTab: { category: "tabs", label: "Reopen closed tab", run: () => Jari.sendMessage("restoreTab") },
+    pasteOpenTab: {
+      category: "tabs",
+      label: "Open clipboard URL in new tab",
+      run: async () => {
+        const text = await pasteClipboard();
+        if (!text) return Jari.ui.toast("Clipboard empty");
+        const res = await Jari.sendMessage("createTab", { url: text });
+        if (res && !res.ok) Jari.ui.toast("Not a URL");
+      },
+    },
+    pasteOpenTabBackground: {
+      category: "tabs",
+      label: "Open clipboard URL in background tab",
+      run: async () => {
+        const text = await pasteClipboard();
+        if (!text) return Jari.ui.toast("Clipboard empty");
+        const res = await Jari.sendMessage("openInBackgroundTab", { url: text });
+        if (res && !res.ok) Jari.ui.toast("Not a URL");
+      },
+    },
     previousTab: { category: "tabs", label: "Previous tab", repeatable: true, run: (c) => Jari.sendMessage("previousTab", { count: c.count }) },
     nextTab: { category: "tabs", label: "Next tab", repeatable: true, run: (c) => Jari.sendMessage("nextTab", { count: c.count }) },
     firstTab: { category: "tabs", label: "Jump to first tab", run: () => Jari.sendMessage("firstTab") },
     lastTab: { category: "tabs", label: "Jump to last tab", run: () => Jari.sendMessage("lastTab") },
     splitTab: { category: "tabActions", label: "Move tab to new window", run: () => Jari.sendMessage("splitTab") },
+    splitOrMergeTab: {
+      category: "tabActions",
+      label: "Split tab / merge window",
+      run: async () => {
+        const res = await Jari.sendMessage("splitOrMerge");
+        if (res && res.needMerge) Jari.TabSearch.openMerge(res);
+      },
+    },
     moveTabLeft: { category: "tabActions", label: "Move tab left", run: () => Jari.sendMessage("moveTabLeft") },
     moveTabRight: { category: "tabActions", label: "Move tab right", run: () => Jari.sendMessage("moveTabRight") },
     duplicateTab: { category: "tabActions", label: "Duplicate tab", run: () => Jari.sendMessage("duplicateTab") },
@@ -169,6 +266,24 @@
     tabSearch: { category: "tabs", label: "Tab search", run: () => Jari.TabSearch.open() },
     reloadTab: { category: "page", label: "Reload", run: () => Jari.sendMessage("reloadTab", { bypassCache: false }) },
     hardReload: { category: "page", label: "Hard reload", run: () => Jari.sendMessage("reloadTab", { bypassCache: true }) },
+    goParentUrl: {
+      category: "page",
+      label: "Go to parent path",
+      run: () => {
+        const target = parentUrlOf(location.href);
+        if (isSamePath(target, location.href)) return Jari.ui.toast("Already at root");
+        Jari.sendMessage("navigate", { url: target });
+      },
+    },
+    goUrlRoot: {
+      category: "page",
+      label: "Go to site root",
+      run: () => {
+        const target = rootUrlOf(location.href);
+        if (isSamePath(target, location.href)) return Jari.ui.toast("Already at root");
+        Jari.sendMessage("navigate", { url: target });
+      },
+    },
 
     // Hints
     linkHints: { category: "hints", label: "Link hints", run: () => Jari.Hints.start("click") },

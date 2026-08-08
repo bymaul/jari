@@ -3,7 +3,7 @@
   "name": "Jari",
   "version": "0.2",
   "description": "Keyboard-driven navigation for Chrome and Firefox.",
-  "permissions": ["tabs", "storage", "sessions", "clipboardWrite"],
+  "permissions": ["tabs", "storage", "sessions", "clipboardWrite", "clipboardRead"],
   "background": {
     "scripts": ["background.js"]
   },

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jari — Settings</title>
     <link rel="stylesheet" href="options.css" />
+    <!-- content.css styles Jari's own UI (help overlay, hints, showcmd) on
+         this page too. -->
+    <link rel="stylesheet" href="../content.css" />
   </head>
   <body>
     <header>
@@ -35,6 +38,25 @@
               <p class="hint">Animate scrolling instead of jumping straight to the position.</p>
             </div>
           </div>
+          <div class="field">
+            <label for="timeout">Timeout</label>
+            <div class="control">
+              <div class="control-row">
+                <input id="timeout" type="number" min="100" max="10000" step="100" />
+                <span class="unit">ms</span>
+              </div>
+              <p class="hint">How long a half-typed <code>g</code> prefix or count waits before clearing.</p>
+            </div>
+          </div>
+          <div class="field">
+            <label for="accent">Accent color</label>
+            <div class="control">
+              <div class="control-row">
+                <input id="accent" type="color" />
+              </div>
+              <p class="hint">Used for highlights: link hints, headings, the primary button and the showcmd edge.</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -43,7 +65,7 @@
         <p class="hint">
           Click a key field, then press the key (or key combination) to bind it.
           Backspace clears a binding. Digits <code>0-9</code> are reserved for
-          the repeat count and cannot be bound. Fixed chords such as
+          the repeat count and cannot be bound. Fixed prefixes such as
           <code>gg</code>, <code>gt</code> and <code>;s</code> are shown in
           green and can only be cleared.
         </p>
@@ -68,8 +90,7 @@
     <footer>
       <div class="wrap">
         To open these settings anytime, press <code>; s</code> on any page
-        (or <code>?</code> and use "Open settings"), or find Jari under
-        <code>chrome://extensions</code>.
+        (or find Jari under <code>chrome://extensions</code>).
       </div>
     </footer>
 

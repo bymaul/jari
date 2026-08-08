@@ -1,15 +1,19 @@
-/* Jari options page. Dark, monospace, square, compact. */
+/* Jari options page — monospace, compact, colored with the vague
+   colorscheme (github.com/vague-theme/vague): cool, dark, low contrast. */
 
 :root {
-  --bg: #15171a;
-  --card: #1e2126;
-  --border: #33383f;
-  --fg: #d6d9de;
-  --muted: #8a9098;
-  --accent: #86de74;
-  --chord-bg: #223325;
-  --rec-bg: #ffd76e;
+  /* Vague colorscheme (github.com/vague-theme/vague), lifted a few notches
+     brighter: cool, dark, low contrast. */
+  --bg: #1e1e26;
+  --panel: #262630;
+  --border: #3f4346;
+  --fg: #d9d9de;
+  --muted: #606079;
+  --accent: #e8b589;
+  --accent-dim: #2c2c36;
+  --link: #7e98e8;
   --mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+  --page-width: 1080px;
 }
 
 * {
@@ -21,94 +25,106 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 
-/* Header */
-header {
-  background: #0e1012;
-  border-bottom: 2px solid var(--accent);
+a {
+  color: var(--link);
 }
 
+a:visited {
+  color: #bb9dbd;
+}
+
+/* Header — no hard line under it, just air. */
 header .wrap {
-  padding: 10px 20px 8px;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 18px 20px 6px;
 }
 
 h1 {
   margin: 0;
-  font-size: 15px;
-  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--accent);
 }
 
 .subtitle {
-  margin: 1px 0 0;
-  font-size: 11px;
+  margin: 2px 0 0;
+  font-size: 12px;
   color: var(--muted);
 }
 
 main {
-  padding: 12px 20px;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 12px 20px 20px;
 }
 
 section.card {
-  background: var(--card);
+  background: var(--panel);
   border: 1px solid var(--border);
   padding: 12px 16px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 h2 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--muted);
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
 }
 
 p.hint {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin: 0;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 /* The intro hint on the keybindings card sits between the heading and table. */
 section.card > p.hint {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 code {
-  background: #2a2e33;
+  background: #2c2c36;
   padding: 0 4px;
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--fg);
+  font-size: 12px;
+  color: var(--accent);
 }
 
-/* Behavior fields: side by side when there's room, hint beside the control. */
+/* Behavior fields: label on the left, hint stacked UNDER the input. */
 #behavior-fields {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 28px;
+  gap: 16px 28px;
 }
 
 .field {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
   flex: 1 1 300px;
   min-height: 30px;
 }
 
 .field label {
   flex: 0 0 110px;
+  padding-top: 3px;
 }
 
 .control {
   flex: 1;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .control-row {
@@ -119,11 +135,30 @@ code {
 
 .control input[type="number"] {
   padding: 3px 6px;
-  background: #14161a;
+  background: #1e1e26;
   border: 1px solid var(--border);
   color: var(--fg);
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.control input[type="number"]:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.control input[type="color"] {
+  width: 42px;
+  height: 24px;
+  padding: 1px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.control input[type="color"]:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .control input[type="checkbox"] {
@@ -135,7 +170,7 @@ code {
 
 .unit {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* Keybindings: three columns of category tables, tight rows. */
@@ -180,40 +215,41 @@ code {
 }
 
 #keymap-table tr.cat-header th {
-  background: #16181c;
-  font-size: 10px;
+  background: #2c2c36;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--muted);
+  color: var(--accent);
   border-bottom: 1px solid var(--border);
   padding: 5px 8px 3px;
 }
 
 #keymap-table tr:not(.cat-header):hover {
-  background: #17191d;
+  background: #3f4346;
 }
 
 #keymap-table td input {
   width: 100%;
   min-width: 60px;
   padding: 2px 6px;
-  background: #14161a;
+  background: #1e1e26;
   border: 1px solid var(--border);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 #keymap-table td input.recording {
-  background: var(--rec-bg);
-  border-color: #b9a23a;
-  color: #111;
+  background: #f3be7c;
+  border-color: #e0a363;
+  color: #1e1e26;
 }
 
-#keymap-table td input.chord {
-  background: var(--chord-bg);
-  border-color: #3a5a40;
+#keymap-table td input.prefix {
+  background: var(--accent-dim);
+  border-color: var(--accent);
   color: var(--accent);
+  text-shadow: 0 0 4px rgba(232, 181, 137, 0.35);
 }
 
 /* Actions */
@@ -221,12 +257,12 @@ code {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 button {
-  padding: 3px 10px;
-  background: #14161a;
+  padding: 3px 12px;
+  background: var(--panel);
   border: 1px solid var(--border);
   color: var(--fg);
   font-family: var(--mono);
@@ -235,22 +271,29 @@ button {
 }
 
 button:hover {
-  background: #20242a;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+button:active {
+  border-style: inset;
 }
 
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #0c1a10;
+  color: #1e1e26;
+  font-weight: bold;
 }
 
 button.primary:hover {
-  background: #9ae88a;
+  background: #f3be7c;
+  color: #1e1e26;
 }
 
 #status {
   color: var(--accent);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* Disabled sites */
@@ -268,7 +311,7 @@ button.primary:hover {
   padding: 3px 8px;
   border: 1px solid var(--border);
   margin-bottom: 4px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 #disabled-list li.empty {
@@ -283,7 +326,9 @@ button.primary:hover {
 
 /* Footer */
 footer {
+  max-width: var(--page-width);
+  margin: 0 auto;
   padding: 0 20px 16px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
