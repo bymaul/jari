@@ -3,7 +3,7 @@
 // label resolves it. Modes:
 //   click  - activate the element (same tab)
 //   newtab - open anchors in a background tab, otherwise click
-//   yank   - copy the link URL to the clipboard (unbound by default)
+//   yank   - copy the link URL to the clipboard (yf)
 //   focus  - focus inputs; auto-focuses when exactly one match exists
 (() => {
   const Jari = window.Jari || (window.Jari = {});
@@ -53,7 +53,11 @@
     `input:not([type]), input[type="${TEXT_INPUT_TYPES.join('"], input[type="')}"]`,
     "textarea",
     "[contenteditable='true']",
+    "[contenteditable='plaintext-only']",
     "[role='textbox']",
+    "[role='searchbox']",
+    "[role='combobox']",
+    "[role='spinbutton']",
   ].join(",");
 
   const MODES = {
@@ -90,6 +94,11 @@
     }
 
     mode = nextMode;
+    // Multiple focus targets: hint labels appear on each input so the user
+    // can pick one; tell them the hints are up.
+    if (nextMode === "focus") {
+      Jari.ui.toast(`${elements.length} inputs — pick one`);
+    }
     const hintLabels = generateLabels(elements.length);
     elements.forEach((el, i) => {
       const label = hintLabels[i];

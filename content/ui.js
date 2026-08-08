@@ -19,7 +19,7 @@
 
   function toast(message) {
     const el = document.createElement("div");
-    el.className = "jari-overlay jari-toast";
+    el.className = "jari-toast";
     el.textContent = message;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1500);
@@ -43,7 +43,7 @@
   }
 
   // Neovim-style showcmd readout: echoes the keys currently being composed
-  // (count digits, chord prefixes) in the bottom-left corner.
+  // (count digits, prefix keys) in the bottom-right corner.
   let showcmdEl = null;
   let flashTimer = null;
 
@@ -63,11 +63,9 @@
     showcmdEl.textContent = text;
   }
 
-  // Show the composed key sequence for a moment after a command runs. Plain
-  // single keys may be echoed muted so they stay subtle.
-  function flash(text, ms = 600, { muted = false } = {}) {
+  // Show the composed key sequence for a moment after a command runs.
+  function flash(text, ms = 600) {
     showcmd(text);
-    if (showcmdEl) showcmdEl.classList.toggle("muted", muted);
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => showcmd(null), ms);
   }

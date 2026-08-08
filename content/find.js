@@ -1,13 +1,12 @@
 // Jari: find-in-page mode (/ , n, N).
 // A bottom overlay bar collects the query and live-highlights matches with
 // <span> marks; the bar shows a "current/total" counter. n/N cycle matches.
-// Escape closes the bar but keeps the highlights and the last query, so n/N
-// keep working until the next search or a full reset.
+// Escape clears the search entirely: bar, highlights and query are gone.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
   const SKIP_SELECTOR =
-    "script, style, noscript, .jari-overlay, .jari-hint, input, textarea, select, [contenteditable]";
+    "script, style, noscript, .jari-overlay, .jari-find-bar, .jari-hint, input, textarea, select, [contenteditable]";
 
   let active = false;
   let bar = null;
@@ -40,7 +39,7 @@
 
   function createBar() {
     const el = document.createElement("div");
-    el.className = "jari-overlay jari-find-bar";
+    el.className = "jari-find-bar";
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "Find in page";
@@ -57,7 +56,7 @@
   function onKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
-      close();
+      cancel();
       return;
     }
     const input = bar.querySelector("input");
@@ -189,6 +188,12 @@
     }
     marks = [];
     current = -1;
+    // Restoring the marks leaves adjacent text-node fragments behind
+    // ("h" + "ell" + "o world"). Re-merge them so the next, longer query can
+    // match across the whole text again — without this, "hello" never matches
+    // after a previous search split the node, so multi-character searches
+    // only ever worked for the first character typed.
+    document.body.normalize();
   }
 
   // Escape: close the bar but keep highlights and the query, Vim-style.

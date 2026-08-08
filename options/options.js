@@ -1,18 +1,18 @@
 // Jari options page: edit behavior options, keybindings and manage per-site
 // disabling. Relies on window.Jari.keymapDefaults, Jari.settingsDefaults,
-// Jari.chords and Jari.commands (loaded via script tags).
+// Jari.prefixes and Jari.commands (loaded via script tags).
 (() => {
   const DEFAULTS = window.Jari.keymapDefaults;
   const SETTINGS_DEFAULTS = window.Jari.settingsDefaults;
   const COMMANDS = window.Jari.commands;
 
-  // Fixed chords ("gg", "gt", ...) live in Jari.chords. They are shown
+  // Fixed prefixes ("gg", "gt", ...) live in Jari.prefixes. They are shown
   // in the key fields so the user can see them, but they cannot be rebound —
   // Backspace only clears the single-key binding.
-  const CHORDS = {};
-  for (const [prefix, subs] of Object.entries(window.Jari.chords || {})) {
+  const PREFIXES = {};
+  for (const [prefix, subs] of Object.entries(window.Jari.prefixes || {})) {
     for (const [suffix, name] of Object.entries(subs)) {
-      CHORDS[name] = prefix + suffix;
+      PREFIXES[name] = prefix + suffix;
     }
   }
 
@@ -23,29 +23,37 @@
   const disabledList = document.querySelector("#disabled-list");
   const scrollStepEl = document.querySelector("#scroll-step");
   const smoothScrollEl = document.querySelector("#smooth-scroll");
+  const timeoutEl = document.querySelector("#timeout");
+  const accentEl = document.querySelector("#accent");
 
-  // Display order and titles for the command categories.
-  const CATEGORIES = [
-    { id: "scrolling", label: "Scrolling" },
-    { id: "view", label: "View & zoom" },
-    { id: "tabs", label: "Tabs" },
-    { id: "tabActions", label: "Tab actions" },
-    { id: "history", label: "History" },
-    { id: "hints", label: "Hints" },
-    { id: "find", label: "Find in page" },
-    { id: "page", label: "Page" },
-    { id: "clipboard", label: "Clipboard" },
-    { id: "modes", label: "Modes" },
-    { id: "help", label: "Help" },
-  ];
+  // Display order and titles for the command categories (shared with the
+  // help overlay; defined in keymap.js).
+  const CATEGORIES = window.Jari.categories || [];
 
   const STORAGE_KEY = "settings";
   const RESERVED_KEYS = /^[0-9]$/;
+
+  // Modifier keys on their own are not bindable and must not end a recording:
+  // holding Ctrl to type "ctrl+a" first fires keydown("Control"), which would
+  // otherwise be recorded as "ctrl+Control".
+  const MODIFIER_ONLY = new Set(["Control", "Alt", "Shift", "Meta", "CapsLock", "NumLock", "ScrollLock", "Fn", "AltGraph"]);
 
   let keymap = {};
   let disabledSites = [];
   let scrollStep = SETTINGS_DEFAULTS.scrollStep;
   let smoothScroll = SETTINGS_DEFAULTS.smoothScroll;
+  let timeoutMs = SETTINGS_DEFAULTS.timeoutMs;
+  let accentColor = SETTINGS_DEFAULTS.accentColor;
+
+  function isColor(value) {
+    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+  }
+
+  // Push the chosen accent into the page's stylesheet variable so h2, code,
+  // buttons and the primary button all follow it live.
+  function applyAccent() {
+    document.documentElement.style.setProperty("--accent", accentColor);
+  }
 
   // Mirror of the content-script canonical key format: [ctrl/alt/meta] + key.
   function canonicalKey(event) {
@@ -72,8 +80,17 @@
     smoothScroll = typeof saved.smoothScroll === "boolean"
       ? saved.smoothScroll
       : SETTINGS_DEFAULTS.smoothScroll;
+    timeoutMs = Number.isFinite(saved.timeoutMs) && saved.timeoutMs > 0
+      ? saved.timeoutMs
+      : SETTINGS_DEFAULTS.timeoutMs;
+    accentColor = isColor(saved.accentColor)
+      ? saved.accentColor
+      : SETTINGS_DEFAULTS.accentColor;
     scrollStepEl.value = scrollStep;
     smoothScrollEl.checked = smoothScroll;
+    timeoutEl.value = timeoutMs;
+    accentEl.value = accentColor;
+    applyAccent();
     renderKeymap();
     renderDisabled();
   }
@@ -138,10 +155,10 @@
       input.type = "text";
       input.readOnly = true;
       input.value = keyFor(name);
-      const isChord = !hasKeyBinding(name) && Boolean(CHORDS[name]);
-      if (isChord) {
-        input.classList.add("chord");
-        input.title = "Fixed chord, cannot be rebound";
+      const isPrefix = !hasKeyBinding(name) && Boolean(PREFIXES[name]);
+      if (isPrefix) {
+        input.classList.add("prefix");
+        input.title = "Fixed prefix, cannot be rebound";
       } else {
         input.title = "Click, then press a key to rebind. Backspace clears.";
       }
@@ -165,7 +182,7 @@
     for (const [key, name] of Object.entries(keymap)) {
       if (name === commandName) return key;
     }
-    return CHORDS[commandName] || "";
+    return PREFIXES[commandName] || "";
   }
 
   function startRecording(input, name) {
@@ -176,6 +193,7 @@
     const handler = (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (MODIFIER_ONLY.has(event.key)) return; // keep waiting for the real key
       input.removeEventListener("keydown", handler);
       input.classList.remove("recording");
 
@@ -190,8 +208,13 @@
           renderKeymap();
           return;
         }
-        // Remove any other binding that uses the same key.
-        delete keymap[combo];
+        // Drop this command's old key(s) and any other command that already
+        // uses the new key, then bind. Without this, the command keeps its
+        // previous key and keyFor() would show that instead of what was
+        // just pressed.
+        keymap = Object.fromEntries(
+          Object.entries(keymap).filter(([key, cmd]) => key !== combo && cmd !== name)
+        );
         keymap[combo] = name;
         status("Binding set");
       }
@@ -205,6 +228,12 @@
     scrollStep = Number.isFinite(raw) && raw > 0 ? raw : SETTINGS_DEFAULTS.scrollStep;
     scrollStepEl.value = scrollStep;
     smoothScroll = smoothScrollEl.checked;
+    const tRaw = parseInt(timeoutEl.value, 10);
+    timeoutMs = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
+    timeoutEl.value = timeoutMs;
+    accentColor = isColor(accentEl.value) ? accentEl.value : SETTINGS_DEFAULTS.accentColor;
+    accentEl.value = accentColor;
+    applyAccent();
   }
 
   function save() {
@@ -214,12 +243,12 @@
       if (cmd.hidden) continue;
       const row = tableEl.querySelector(`tr[data-command="${name}"]`);
       const input = row && row.querySelector("input");
-      if (input && input.value && !input.classList.contains("chord")) next[input.value] = name;
+      if (input && input.value && !input.classList.contains("prefix")) next[input.value] = name;
     }
     keymap = next;
     chrome.storage.sync
       .set({
-        [STORAGE_KEY]: { keymap: next, disabledSites, scrollStep, smoothScroll },
+        [STORAGE_KEY]: { keymap: next, disabledSites, scrollStep, smoothScroll, timeoutMs, accentColor },
       })
       .then(() => status("Saved"))
       .catch(() => status("Save failed"));
@@ -230,8 +259,13 @@
     keymap = { ...DEFAULTS };
     scrollStep = SETTINGS_DEFAULTS.scrollStep;
     smoothScroll = SETTINGS_DEFAULTS.smoothScroll;
+    timeoutMs = SETTINGS_DEFAULTS.timeoutMs;
+    accentColor = SETTINGS_DEFAULTS.accentColor;
     scrollStepEl.value = scrollStep;
     smoothScrollEl.checked = smoothScroll;
+    timeoutEl.value = timeoutMs;
+    accentEl.value = accentColor;
+    applyAccent();
     renderKeymap();
     status("Reset to defaults");
   }

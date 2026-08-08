@@ -1,5 +1,5 @@
 // Jari: keybinding help overlay (?).
-// Flat bottom bar listing every bound key and its command.
+// Categorized three-column modal listing every bound key and its command.
 // Rendered from the live keymap, so rebinds are reflected immediately.
 // On open the overlay takes focus and the help list owns the scroll:
 // j/k, gg/G and ctrl+d/u/f/b move through it.
@@ -7,6 +7,7 @@
   const Jari = window.Jari || (window.Jari = {});
 
   const STEP = 50;
+  const COLUMNS = 3;
 
   let active = false;
   let overlay = null;
@@ -21,7 +22,8 @@
     if (active) return;
     active = true;
     render();
-    // Give the overlay focus so the list owns the scroll (j/k etc.).
+    // Give the overlay focus so the list owns the scroll (j/k etc.). The
+    // focus ring is suppressed in CSS — the modal must not show an outline.
     overlay.tabIndex = -1;
     overlay.focus();
   }
@@ -35,51 +37,93 @@
     title.textContent = "Jari keybindings";
     overlay.appendChild(title);
 
-    listEl = document.createElement("div");
-    listEl.className = "jari-help-list";
-    // Single keys from the keymap, then multi-key chords ("gg", "gt").
-    const rows = new Map();
+    // Collect every binding: single keys from the keymap, then the fixed
+    // multi-key prefixes ("gg", "gt").
+    const byCommand = new Map();
     for (const [key, commandName] of Object.entries(Jari.settings.getKeymap())) {
-      rows.set(key, commandName);
+      byCommand.set(commandName, key);
     }
-    for (const [prefix, subs] of Object.entries(Jari.chords || {})) {
+    for (const [prefix, subs] of Object.entries(Jari.prefixes || {})) {
       for (const [suffix, commandName] of Object.entries(subs)) {
-        rows.set(prefix + suffix, commandName);
+        if (!byCommand.has(commandName)) byCommand.set(commandName, prefix + suffix);
       }
     }
-    for (const [key, commandName] of rows) {
+
+    const byCategory = new Map();
+    for (const [commandName, key] of byCommand) {
       const cmd = Jari.commands[commandName];
       if (!cmd) continue;
-      const row = document.createElement("div");
-      row.className = "jari-help-row";
-      const keyEl = document.createElement("span");
-      keyEl.className = "jari-help-key";
-      keyEl.textContent = key;
-      const labelEl = document.createElement("span");
-      labelEl.className = "jari-help-label";
-      labelEl.textContent = cmd.label;
-      row.appendChild(keyEl);
-      row.appendChild(labelEl);
-      listEl.appendChild(row);
+      const id = cmd.category || "other";
+      if (!byCategory.has(id)) byCategory.set(id, []);
+      byCategory.get(id).push({ key, label: cmd.label });
     }
+
+    // Split the categories across three columns, keeping each category whole
+    // and balancing by row count (category header + one row per command).
+    const columns = Array.from({ length: COLUMNS }, () => []);
+    const columnRows = columns.map(() => 0);
+    const categories = Jari.categories || [];
+    for (const cat of categories) {
+      const rows = byCategory.get(cat.id);
+      if (!rows) continue;
+      let best = 0;
+      for (let i = 1; i < COLUMNS; i++) {
+        if (columnRows[i] < columnRows[best]) best = i;
+      }
+      columns[best].push({ cat, rows });
+      columnRows[best] += 1 + rows.length;
+    }
+
+    listEl = document.createElement("div");
+    listEl.className = "jari-help-list";
+    const grid = document.createElement("div");
+    grid.className = "jari-help-columns";
+    for (const col of columns) {
+      const colEl = document.createElement("div");
+      colEl.className = "jari-help-column";
+      for (const { cat, rows } of col) colEl.appendChild(buildCategoryTable(cat, rows));
+      grid.appendChild(colEl);
+    }
+    listEl.appendChild(grid);
     overlay.appendChild(listEl);
 
     const footer = document.createElement("div");
     footer.className = "jari-help-footer";
     const hint = document.createElement("span");
-    hint.textContent = "j/k scroll  |  g chords  |  ;s settings  |  0-9 count  |  esc close";
-    const settingsBtn = document.createElement("button");
-    settingsBtn.type = "button";
-    settingsBtn.textContent = "Open settings";
-    settingsBtn.addEventListener("click", () => {
-      Jari.sendMessage("openOptions");
-      close();
-    });
+    hint.textContent = "j/k scroll  |  g prefixes  |  ;s settings  |  0-9 count  |  esc close";
     footer.appendChild(hint);
-    footer.appendChild(settingsBtn);
     overlay.appendChild(footer);
 
     document.body.appendChild(overlay);
+  }
+
+  function buildCategoryTable(cat, rows) {
+    const table = document.createElement("table");
+    const tbody = document.createElement("tbody");
+
+    const headerRow = document.createElement("tr");
+    headerRow.className = "jari-help-cat-header";
+    const th = document.createElement("th");
+    th.colSpan = 2;
+    th.textContent = cat.label;
+    headerRow.appendChild(th);
+    tbody.appendChild(headerRow);
+
+    for (const { key, label } of rows) {
+      const tr = document.createElement("tr");
+      const keyTd = document.createElement("td");
+      keyTd.className = "jari-help-key";
+      keyTd.textContent = key;
+      const labelTd = document.createElement("td");
+      labelTd.className = "jari-help-label";
+      labelTd.textContent = label;
+      tr.appendChild(keyTd);
+      tr.appendChild(labelTd);
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    return table;
   }
 
   function onKeyDown(event) {
