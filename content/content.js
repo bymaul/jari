@@ -42,10 +42,15 @@
     );
   }
 
+  // A command consumes its key: preventDefault stops the browser default
+  // action and stopPropagation (capture phase, document) keeps the page from
+  // ever seeing the keydown — a Jari shortcut must not also trigger the
+  // site's own handler.
   function run(commandName, count, event) {
     const cmd = Jari.commands[commandName];
     if (!cmd) return;
     event.preventDefault();
+    event.stopPropagation();
     cmd.run({ count, event });
   }
 
@@ -118,12 +123,22 @@
       const plainI = event.key === "I" && !event.ctrlKey && !event.altKey && !event.metaKey;
       if (plainI || event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         toggleIgnore();
       }
       return;
     }
 
-    // Active overlays own every key.
+    // Disabled sites: Jari is off — only the key bound to the toggle is
+    // intercepted, every other key reaches the page untouched.
+    if (Jari.settings.isDisabled()) {
+      const key = Jari.canonicalKey(event);
+      if (Jari.settings.getKeymap()[key] === "toggleDisabled") run("toggleDisabled", 1, event);
+      return;
+    }
+
+    // Active overlays own every key; each overlay blocks the keys it
+    // consumes from reaching the page.
     if (Jari.Help.isActive()) return Jari.Help.onKeyDown(event);
     if (Jari.Hints.isActive()) return Jari.Hints.onKeyDown(event);
     if (Jari.Find.isActive()) return Jari.Find.onKeyDown(event);
@@ -147,7 +162,11 @@
     const activeEl = document.activeElement;
     if (isTypingTarget(activeEl)) {
       if (commandName === "toggleDisabled") run(commandName, 1, event);
-      else if (event.key === "Escape") activeEl.blur();
+      else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        activeEl.blur();
+      }
       return;
     }
 
@@ -160,9 +179,15 @@
       return;
     }
 
-    // Escape with no form field focused clears any composition in progress.
+    // Escape with no form field focused cancels a pending count. When idle,
+    // leave Escape to the page — sites use it to close dialogs, and Jari has
+    // nothing to clear.
     if (event.key === "Escape") {
-      clearPending();
+      if (pendingCount) {
+        event.preventDefault();
+        event.stopPropagation();
+        clearPending();
+      }
       return;
     }
 
@@ -173,6 +198,7 @@
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();
+      event.stopPropagation();
       restartTimer();
       return;
     }
@@ -183,19 +209,18 @@
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();
+      event.stopPropagation();
       restartTimer();
       return;
     }
 
     if (!commandName) commandName = Jari.settings.getKeymap()[key];
     if (!commandName) {
-      // Dead key: nothing runs, drop any composed prefix.
+      // Dead key: nothing runs, drop any composed prefix and let the page
+      // see the key.
       clearPending();
       return;
     }
-
-    // Disabled sites only allow the toggle command.
-    if (Jari.settings.isDisabled() && commandName !== "toggleDisabled") return;
 
     const count = pendingCount ? parseInt(pendingCount, 10) : 1;
     const hadCount = pendingCount !== "";

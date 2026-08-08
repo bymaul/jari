@@ -224,7 +224,7 @@
     // Tabs
     newTab: { category: "tabs", label: "New tab", run: () => Jari.sendMessage("createTab") },
     closeTab: { category: "tabs", label: "Close tab", repeatable: true, run: (c) => Jari.sendMessage("closeTab", { count: c.count }) },
-    restoreTab: { category: "tabs", label: "Reopen closed tab", run: () => Jari.sendMessage("restoreTab") },
+    restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true, run: (c) => Jari.sendMessage("restoreTab", { count: c.count }) },
     pasteOpenTab: {
       category: "tabs",
       label: "Open clipboard URL in new tab",

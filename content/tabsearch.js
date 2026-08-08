@@ -101,33 +101,41 @@
   }
 
   // Capture-phase key handler. The search box owns printable keys; Escape,
-  // Enter, Tab and the arrow keys are intercepted here.
+  // Enter, Tab and the arrow keys are intercepted here and stopped so the
+  // page never sees them.
   function onKeyDown(event) {
     const inInput = document.activeElement === inputEl;
     if (inInput) {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         close();
       } else if (event.key === "Enter") {
         event.preventDefault();
+        event.stopPropagation();
         activate();
       } else if (event.key === "Tab") {
         event.preventDefault();
+        event.stopPropagation();
         move(event.shiftKey ? -1 : 1);
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
+        event.stopPropagation();
         move(1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
+        event.stopPropagation();
         move(-1);
       }
       return;
     }
     if (event.key === "Escape" || event.key === "Enter") {
       event.preventDefault();
+      event.stopPropagation();
       close();
     } else if (event.key === "Tab") {
       event.preventDefault();
+      event.stopPropagation();
       move(event.shiftKey ? -1 : 1);
     }
   }
@@ -136,8 +144,8 @@
     const tab = filtered[selected];
     if (tab) {
       if (mergeData) {
-        // Merge mode: entries are windows; dropping the tab into the window
-        // makes it active there (tabs.move does that automatically).
+        // Merge mode: entries are windows; the background moves this tab into
+        // the picked window and focuses it there.
         Jari.sendMessage("mergeTab", { targetWindowId: tab.windowId });
       } else {
         Jari.sendMessage("activateTab", { id: tab.id });
