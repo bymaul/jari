@@ -73,8 +73,10 @@ const handlers = {
     if (!tab || !tab.id) return { ok: false };
     const ids = [tab.id];
     let prev = tab;
+    // Walk count-1 tabs to the right, one after the previous. prev.index + i
+    // would skip tabs (i grows while prev already advances).
     for (let i = 1; i < clampCount(count); i++) {
-      const next = await getTabAt(prev.index + i);
+      const next = await getTabAt(prev.index + 1);
       if (!next) break;
       ids.push(next.id);
       prev = next;
@@ -83,8 +85,16 @@ const handlers = {
     return { ok: true, closed: ids.length };
   },
 
-  restoreTab: async () => {
-    await chrome.sessions.restore();
+  restoreTab: async (_, { count = 1 } = {}) => {
+    // chrome.sessions.restore() reopens the most recently closed tab or
+    // window; repeat it so a count prefix ("5X") reopens several.
+    for (let i = 0; i < clampCount(count); i++) {
+      try {
+        await chrome.sessions.restore();
+      } catch {
+        break; // nothing left to restore
+      }
+    }
     return { ok: true };
   },
 
@@ -130,13 +140,21 @@ const handlers = {
     return { ok: true, needMerge: true, ownTabId: tab.id, ownWindowId: tab.windowId, tabs: others };
   },
 
-  // Move the sender's tab to the end of another window's strip; the emptied
-  // window closes itself. Optionally activate a specific tab in the target.
-  mergeTab: async (sender, { targetWindowId, targetTabId } = {}) => {
+  // Move the sender's tab to the end of another window's strip and focus it
+  // there; the emptied window closes itself. The moved tab is appended at the
+  // end, so activating the window's last tab focuses the merged tab — the
+  // sender's tab object can go stale once its old window closes, so the last
+  // tab is re-queried fresh instead of trusting its id.
+  mergeTab: async (sender, { targetWindowId } = {}) => {
     const tab = sender.tab;
     if (!tab || !tab.id || !targetWindowId) return { ok: false };
     await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
-    if (targetTabId) await chrome.tabs.update(targetTabId, { active: true });
+    const tabs = await chrome.tabs.query({ windowId: targetWindowId });
+    const last = tabs[tabs.length - 1];
+    if (last) {
+      await chrome.windows.update(targetWindowId, { focused: true });
+      await chrome.tabs.update(last.id, { active: true });
+    }
     return { ok: true };
   },
 

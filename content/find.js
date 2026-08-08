@@ -52,10 +52,12 @@
   }
 
   // Capture-phase key handler. While the search box is focused, printable
-  // keys pass through to it; after Enter (blur), n/N navigate matches.
+  // keys pass through to it; after Enter (blur), n/N navigate matches. Keys
+  // Jari consumes are stopped so the page never sees them.
   function onKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       cancel();
       return;
     }
@@ -63,6 +65,7 @@
     if (document.activeElement === input) {
       if (event.key === "Enter") {
         event.preventDefault();
+        event.stopPropagation();
         input.blur();
         next();
       }
@@ -70,9 +73,11 @@
     }
     if (event.key === "n") {
       event.preventDefault();
+      event.stopPropagation();
       next();
     } else if (event.key === "N") {
       event.preventDefault();
+      event.stopPropagation();
       prev();
     }
   }
