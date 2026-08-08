@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jari — Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <h1>Jari</h1>
+        <p class="subtitle">Keyboard-driven navigation settings</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Behavior</h2>
+        <div id="behavior-fields">
+          <div class="field">
+            <label for="scroll-step">Scroll step</label>
+            <div class="control">
+              <div class="control-row">
+                <input id="scroll-step" type="number" min="1" max="500" step="5" />
+                <span class="unit">px</span>
+              </div>
+              <p class="hint">Distance covered by one <code>j</code>/<code>k</code> or <code>h</code>/<code>l</code> press.</p>
+            </div>
+          </div>
+          <div class="field">
+            <label for="smooth-scroll">Smooth scroll</label>
+            <div class="control">
+              <input id="smooth-scroll" type="checkbox" />
+              <p class="hint">Animate scrolling instead of jumping straight to the position.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Keybindings</h2>
+        <p class="hint">
+          Click a key field, then press the key (or key combination) to bind it.
+          Backspace clears a binding. Digits <code>0-9</code> are reserved for
+          the repeat count and cannot be bound. Fixed chords such as
+          <code>gg</code>, <code>gt</code> and <code>;s</code> are shown in
+          green and can only be cleared.
+        </p>
+        <div id="keymap-table"></div>
+        <div class="actions">
+          <button id="save" type="button" class="primary">Save</button>
+          <button id="reset" type="button">Reset to defaults</button>
+          <span id="status" role="status"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Disabled sites</h2>
+        <p class="hint">
+          Jari is turned off on these sites. Press
+          <code>ctrl+alt+v</code> on a page to toggle it there.
+        </p>
+        <ul id="disabled-list"></ul>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        To open these settings anytime, press <code>; s</code> on any page
+        (or <code>?</code> and use "Open settings"), or find Jari under
+        <code>chrome://extensions</code>.
+      </div>
+    </footer>
+
+    <!-- Content scripts are loaded here too so Jari works on the settings
+         page itself (scroll, hints, help, ignore mode, ...). -->
+    <script src="../content/keymap.js"></script>
+    <script src="../content/settings.js"></script>
+    <script src="../content/ui.js"></script>
+    <script src="../content/commands.js"></script>
+    <script src="../content/hints.js"></script>
+    <script src="../content/find.js"></script>
+    <script src="../content/tabsearch.js"></script>
+    <script src="../content/help.js"></script>
+    <script src="../content/content.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

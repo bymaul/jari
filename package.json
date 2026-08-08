@@ -1,0 +1,10 @@
+{
+  "name": "jari",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Keyboard-driven navigation extension for Chrome and Firefox.",
+  "scripts": {
+    "build:chrome": "node build.js chrome",
+    "build:firefox": "node build.js firefox"
+  }
+}
