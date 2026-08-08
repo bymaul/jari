@@ -1,5 +1,6 @@
-// Jari: default key bindings, fixed prefixes, non-key defaults and a tiny
-// event bus.
+// Jari: default key bindings, fixed prefixes, non-key defaults, a tiny event
+// bus and the shared helpers used by both the content scripts and the options
+// page (which loads this file first via script tags).
 //
 // Keys use the exact `event.key` value, optionally prefixed with modifier
 // names ("ctrl+", "alt+", "meta+"). Shift is NOT part of the string — a
@@ -125,4 +126,98 @@
     ':',
     'S',
   ];
+
+  // --- Shared helpers ------------------------------------------------------
+  // Loaded by the content scripts and the options page; both must agree on
+  // these so bindings and settings behave identically in each context.
+
+  // Bare modifier keys never complete a composition or a keybinding by
+  // themselves. "OS" is the Windows/Super key, "Fn" and "AltGraph" laptop
+  // extras.
+  Jari.modifierKeys = new Set([
+    'Control',
+    'Alt',
+    'Shift',
+    'Meta',
+    'OS',
+    'CapsLock',
+    'NumLock',
+    'ScrollLock',
+    'Fn',
+    'AltGraph',
+  ]);
+
+  // Canonical key string: modifiers in ctrl/alt/meta order, then the key.
+  // "Shift" is deliberately absent — a capital letter is its own key.
+  Jari.canonicalKey = function canonicalKey(event) {
+    const parts = [];
+    if (event.ctrlKey) parts.push('ctrl');
+    if (event.altKey) parts.push('alt');
+    if (event.metaKey) parts.push('meta');
+    parts.push(event.key);
+    return parts.join('+');
+  };
+
+  Jari.isColor = function isColor(value) {
+    return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+  };
+
+  // Flatten the fixed prefixes ("gg", "gt", ";s", ...) into a
+  // commandName -> combined-key lookup, e.g. { scrollTop: 'gg', ... }.
+  Jari.flattenPrefixes = function flattenPrefixes() {
+    const flat = {};
+    for (const [prefix, subs] of Object.entries(Jari.prefixes || {})) {
+      for (const [suffix, commandName] of Object.entries(subs)) {
+        flat[commandName] = prefix + suffix;
+      }
+    }
+    return flat;
+  };
+
+  // Sanitize a raw storage blob into a complete settings object with defaults
+  // filled in and invalid values dropped. Shared by the content-script
+  // settings layer and the options page so both interpret stored values the
+  // same way.
+  Jari.normalizeSettings = function normalizeSettings(data) {
+    const d = data || {};
+    const keymap = { ...Jari.keymapDefaults, ...(d.keymap || {}) };
+    for (const key of Jari.unboundKeys) delete keymap[key];
+    return {
+      keymap,
+      disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
+      scrollStep: Number.isFinite(d.scrollStep)
+        ? d.scrollStep
+        : Jari.settingsDefaults.scrollStep,
+      smoothScroll: typeof d.smoothScroll === 'boolean'
+        ? d.smoothScroll
+        : Jari.settingsDefaults.smoothScroll,
+      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
+        ? d.timeoutMs
+        : Jari.settingsDefaults.timeoutMs,
+      accentColor: Jari.isColor(d.accentColor)
+        ? d.accentColor
+        : Jari.settingsDefaults.accentColor,
+    };
+  };
+
+  // Greedy column balance for the help overlay and the options keymap grid:
+  // assign each category to the currently shortest column so the columns end
+  // up roughly equal (a category header counts one row + one row per command).
+  // byCategory: Map of category id -> array of entries; returns columns as
+  // arrays of category objects from Jari.categories.
+  Jari.balanceCategories = function balanceCategories(byCategory, columnCount = 3) {
+    const columns = Array.from({ length: columnCount }, () => []);
+    const columnRows = columns.map(() => 0);
+    for (const cat of Jari.categories || []) {
+      const rows = byCategory.get(cat.id);
+      if (!rows) continue;
+      let best = 0;
+      for (let i = 1; i < columnCount; i++) {
+        if (columnRows[i] < columnRows[best]) best = i;
+      }
+      columns[best].push(cat);
+      columnRows[best] += 1 + rows.length;
+    }
+    return columns;
+  };
 })();

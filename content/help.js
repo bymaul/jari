@@ -38,15 +38,13 @@
     overlay.appendChild(title);
 
     // Collect every binding: single keys from the keymap, then the fixed
-    // multi-key prefixes ("gg", "gt").
+    // multi-key prefixes ("gg", "gt"). A bound single key wins over a prefix.
     const byCommand = new Map();
     for (const [key, commandName] of Object.entries(Jari.settings.getKeymap())) {
       byCommand.set(commandName, key);
     }
-    for (const [prefix, subs] of Object.entries(Jari.prefixes || {})) {
-      for (const [suffix, commandName] of Object.entries(subs)) {
-        if (!byCommand.has(commandName)) byCommand.set(commandName, prefix + suffix);
-      }
+    for (const [commandName, key] of Object.entries(Jari.flattenPrefixes())) {
+      if (!byCommand.has(commandName)) byCommand.set(commandName, key);
     }
 
     const byCategory = new Map();
@@ -60,19 +58,7 @@
 
     // Split the categories across three columns, keeping each category whole
     // and balancing by row count (category header + one row per command).
-    const columns = Array.from({ length: COLUMNS }, () => []);
-    const columnRows = columns.map(() => 0);
-    const categories = Jari.categories || [];
-    for (const cat of categories) {
-      const rows = byCategory.get(cat.id);
-      if (!rows) continue;
-      let best = 0;
-      for (let i = 1; i < COLUMNS; i++) {
-        if (columnRows[i] < columnRows[best]) best = i;
-      }
-      columns[best].push({ cat, rows });
-      columnRows[best] += 1 + rows.length;
-    }
+    const columns = Jari.balanceCategories(byCategory, COLUMNS);
 
     listEl = document.createElement("div");
     listEl.className = "jari-help-list";
@@ -81,7 +67,7 @@
     for (const col of columns) {
       const colEl = document.createElement("div");
       colEl.className = "jari-help-column";
-      for (const { cat, rows } of col) colEl.appendChild(buildCategoryTable(cat, rows));
+      for (const cat of col) colEl.appendChild(buildCategoryTable(cat, byCategory.get(cat.id)));
       grid.appendChild(colEl);
     }
     listEl.appendChild(grid);

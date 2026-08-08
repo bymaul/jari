@@ -16,26 +16,14 @@
     accentColor: Jari.settingsDefaults.accentColor,
   };
 
-  function isColor(value) {
-    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-  }
-
   function merge(data) {
-    state.keymap = { ...Jari.keymapDefaults, ...(data.keymap || {}) };
-    for (const key of Jari.unboundKeys) delete state.keymap[key];
-    state.disabledSites = Array.isArray(data.disabledSites) ? data.disabledSites : [];
-    state.scrollStep = Number.isFinite(data.scrollStep)
-      ? data.scrollStep
-      : Jari.settingsDefaults.scrollStep;
-    state.smoothScroll = typeof data.smoothScroll === "boolean"
-      ? data.smoothScroll
-      : Jari.settingsDefaults.smoothScroll;
-    state.timeoutMs = Number.isFinite(data.timeoutMs) && data.timeoutMs > 0
-      ? data.timeoutMs
-      : Jari.settingsDefaults.timeoutMs;
-    state.accentColor = isColor(data.accentColor)
-      ? data.accentColor
-      : Jari.settingsDefaults.accentColor;
+    const s = Jari.normalizeSettings(data);
+    state.keymap = s.keymap;
+    state.disabledSites = s.disabledSites;
+    state.scrollStep = s.scrollStep;
+    state.smoothScroll = s.smoothScroll;
+    state.timeoutMs = s.timeoutMs;
+    state.accentColor = s.accentColor;
     applyAccent();
   }
 
