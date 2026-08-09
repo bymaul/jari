@@ -62,24 +62,32 @@
 
   // Focus a text target with the caret at the end of its content — "i" should
   // drop you at the end of the line, not the start. Inputs/textarea use the
-  // selection API; editable elements get a collapsed range at the end.
+  // selection API; editable elements get a collapsed range at the end. The
+  // caret is placed again after the focus event settles, because page focus
+  // handlers (React/Vue controlled inputs, search boxes) can reset it.
   function focusAndPlaceCaret(el) {
     el.focus();
-    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
-      try {
-        const len = el.value ? el.value.length : 0;
-        el.setSelectionRange(len, len);
-      } catch {
-        // Some input types (number, date, ...) reject selection ranges.
+    const place = () => {
+      if (document.activeElement !== el) return;
+      if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+        try {
+          const len = el.value ? el.value.length : 0;
+          el.setSelectionRange(len, len);
+        } catch {
+          // Some input types (number, date, ...) reject selection ranges.
+        }
+        return;
       }
-      return;
-    }
-    const sel = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    };
+    place();
+    requestAnimationFrame(place);
+    setTimeout(place, 0);
   }
 
   const MODES = {
