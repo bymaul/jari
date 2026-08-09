@@ -41,12 +41,36 @@
     return target === null ? window : target;
   }
 
+  // findScrollableElements() walks the whole DOM and reads layout on every
+  // call, which is the most expensive work in this module. The result only
+  // changes when the DOM changes, so the scan is cached and invalidated by a
+  // MutationObserver watching document.documentElement for node changes and
+  // for class/style mutations that can turn an element scrollable or not.
+  // Callers only read the returned array, so returning the cache directly is
+  // safe.
+  let scanEpoch = 0;
+  let cachedEpoch = -1;
+  let cachedAreas = null;
+
+  if (typeof window.MutationObserver !== 'undefined') {
+    new window.MutationObserver(() => {
+      scanEpoch++;
+    }).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+  }
+
   // Elements that can actually scroll in either axis: overflow allows it and
   // the content overflows the box. Form fields (textarea/select/input) are
   // their own scrollable widgets, not page scroll areas, so they are skipped.
   // The html/body pair is the document's own scroll root — that is the
   // "global" target, so it is skipped too. Jari's overlays are excluded.
   function findScrollableElements() {
+    if (cachedEpoch === scanEpoch && cachedAreas) return cachedAreas;
+    cachedEpoch = scanEpoch;
     const areas = [];
     const roots = new Set([document.documentElement, document.body]);
     for (const el of document.querySelectorAll('*')) {
@@ -67,6 +91,7 @@
         (overflowX === 'auto' || overflowX === 'scroll' || overflowX === 'overlay') && canX;
       if (scrollableY || scrollableX) areas.push(el);
     }
+    cachedAreas = areas;
     return areas;
   }
 
