@@ -3,7 +3,7 @@
   "name": "Jari",
   "version": "0.2",
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
-  "permissions": ["tabs", "storage", "sessions", "clipboardRead"],
+  "permissions": ["tabs", "storage", "sessions", "clipboardRead", "history", "bookmarks", "search"],
   "background": {
     "service_worker": "background.js"
   },
