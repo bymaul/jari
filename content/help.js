@@ -42,9 +42,6 @@
     for (const [key, commandName] of Object.entries(Jari.settings.getKeymap())) {
       byCommand.set(commandName, key);
     }
-    for (const [commandName, key] of Object.entries(Jari.flattenPrefixes())) {
-      if (!byCommand.has(commandName)) byCommand.set(commandName, key);
-    }
 
     const byCategory = new Map();
     for (const [commandName, key] of byCommand) {
