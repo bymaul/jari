@@ -7,6 +7,8 @@
 //
 // "I" toggles ignore mode: Jari stops reacting to every key (except the
 // toggle itself) until it is pressed again, with a persistent status pill.
+// "o" enters passthrough mode: every key reaches the page until the timeout
+// expires or Escape is pressed, with a transient status pill.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
@@ -15,7 +17,9 @@
   let typedSeq = "";
   let timer = null;
   let ignoreMode = false;
-  let ignorePill = null;
+  let passthroughMode = false;
+  let passthroughTimer = null;
+  const pills = {}; // mode name -> pill element
 
   // The user stopped mid-composition (Escape, dead key, ignore toggle, or
   // inactivity timeout): drop count/prefix state and the echo.
@@ -54,7 +58,7 @@
     cmd.run({ count, event });
   }
 
-  // --- Ignore mode --------------------------------------------------------
+  // --- Modes: ignore ("I") and passthrough ("o") --------------------------
 
   function setIgnore(on) {
     ignoreMode = on;
@@ -65,44 +69,76 @@
       Jari.Hints.cancel();
       Jari.Find.cancel();
       Jari.TabSearch.close();
-      showIgnorePill();
+      showPill("ignore", "Ignore mode");
     } else {
-      hideIgnorePill();
+      hidePill("ignore");
     }
   }
 
   function toggleIgnore() {
+    exitPassthrough();
     setIgnore(!ignoreMode);
     Jari.ui.toast(ignoreMode ? "Ignore mode on" : "Ignore mode off");
     return ignoreMode;
+  }
+
+  // Passthrough is enter-only: while it is active the "o" key passes through
+  // to the page (the user may be typing it), so only Escape — which is always
+  // intercepted — and the timeout leave the mode.
+  function enterPassthrough() {
+    setIgnore(false);
+    clearPending();
+    // No overlay may stay open while keys pass through.
+    Jari.Help.close();
+    Jari.Hints.cancel();
+    Jari.Find.cancel();
+    Jari.TabSearch.close();
+    passthroughMode = true;
+    showPill("passthrough", "Passthrough");
+    clearTimeout(passthroughTimer);
+    passthroughTimer = setTimeout(exitPassthrough, Jari.settings.getTimeoutMs());
+  }
+
+  function exitPassthrough() {
+    if (!passthroughMode) return;
+    clearTimeout(passthroughTimer);
+    passthroughMode = false;
+    hidePill("passthrough");
   }
 
   function isFullscreen() {
     return !!document.fullscreenElement;
   }
 
-  function showIgnorePill() {
-    if (ignorePill || isFullscreen()) return;
-    ignorePill = document.createElement("div");
-    ignorePill.className = "jari-ignore-pill";
-    ignorePill.textContent = "Ignore mode";
-    document.body.appendChild(ignorePill);
+  function showPill(name, text) {
+    if (pills[name] || isFullscreen()) return;
+    const el = document.createElement("div");
+    el.className = "jari-pill";
+    el.textContent = text;
+    document.body.appendChild(el);
+    pills[name] = el;
   }
 
-  function hideIgnorePill() {
-    if (ignorePill) {
-      ignorePill.remove();
-      ignorePill = null;
+  function hidePill(name) {
+    const el = pills[name];
+    if (el) {
+      el.remove();
+      delete pills[name];
     }
   }
 
-  // Entering fullscreen (e.g. a video) hides the pill so it never covers
-  // fullscreen content; leaving fullscreen brings it back while the mode is
+  // Entering fullscreen (e.g. a video) hides the pills so they never cover
+  // fullscreen content; leaving fullscreen brings them back while the mode is
   // still active.
   function handleFullscreenChange() {
-    if (!ignoreMode) return;
-    if (isFullscreen()) hideIgnorePill();
-    else showIgnorePill();
+    if (!ignoreMode && !passthroughMode) return;
+    if (isFullscreen()) {
+      hidePill("ignore");
+      hidePill("passthrough");
+    } else {
+      if (ignoreMode) showPill("ignore", "Ignore mode");
+      if (passthroughMode) showPill("passthrough", "Passthrough");
+    }
   }
 
   // --- Dispatcher ---------------------------------------------------------
@@ -116,6 +152,17 @@
     // real key. Let it pass and keep any pending composition: "g" followed by
     // Shift+u must complete "gU", not cancel the prefix on the Shift keydown.
     if (Jari.modifierKeys.has(event.key)) return;
+
+    // Passthrough mode: the page owns every key except Escape, which leaves
+    // the mode early; the timeout exits it on its own.
+    if (passthroughMode) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        exitPassthrough();
+      }
+      return;
+    }
 
     // Ignore mode: everything passes through except the toggle itself and
     // Escape, both of which leave the mode.
@@ -244,6 +291,7 @@
     Jari.Events.on("settingsChanged", () => {
       if (Jari.settings.isDisabled()) {
         setIgnore(false);
+        exitPassthrough();
         Jari.Help.close();
         Jari.Hints.cancel();
         Jari.Find.cancel();
@@ -256,6 +304,7 @@
   }
 
   Jari.Ignore = { toggle: toggleIgnore, isActive: () => ignoreMode };
+  Jari.Passthrough = { enter: enterPassthrough, isActive: () => passthroughMode };
 
   boot();
 })();
