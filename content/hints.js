@@ -62,32 +62,47 @@
 
   // Focus a text target with the caret at the end of its content — "i" should
   // drop you at the end of the line, not the start. Inputs/textarea use the
-  // selection API; editable elements get a collapsed range at the end. The
-  // caret is placed again after the focus event settles, because page focus
-  // handlers (React/Vue controlled inputs, search boxes) can reset it.
-  function focusAndPlaceCaret(el) {
-    el.focus();
-    const place = () => {
-      if (document.activeElement !== el) return;
-      if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
-        try {
-          const len = el.value ? el.value.length : 0;
-          el.setSelectionRange(len, len);
-        } catch {
-          // Some input types (number, date, ...) reject selection ranges.
-        }
-        return;
+  // selection API; editable elements get a collapsed range at the end.
+  // Browsers apply their own focus default (caret at start) after a
+  // programmatic focus, and some sites re-place the caret in focus or
+  // autocomplete handlers — so placement is retried until it sticks.
+  function placeCaretAtEnd(el) {
+    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+      try {
+        const len = el.value ? el.value.length : 0;
+        el.setSelectionRange(len, len);
+      } catch {
+        // Some input types (number, date, ...) reject selection ranges.
       }
+      return;
+    }
+    try {
       const sel = window.getSelection();
       const range = document.createRange();
       range.selectNodeContents(el);
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-    };
-    place();
-    requestAnimationFrame(place);
-    setTimeout(place, 0);
+    } catch {
+      // Not a real text entry (custom widget); focusing is all we can do.
+    }
+  }
+
+  function focusAndPlaceCaret(el) {
+    el.focus();
+    // Place the caret immediately, then again across a window of ticks:
+    // Chrome finalizes its focus default selection after the keydown, and
+    // page handlers (React, autocomplete) can re-place the caret even later.
+    // Each attempt re-verifies the element still owns focus; a fixed shot
+    // count stops early so a page that keeps fighting the caret wins in the
+    // end rather than Jari re-placing forever.
+    const shots = [0, 16, 32, 64, 128, 256];
+    for (const delay of shots) {
+      setTimeout(() => {
+        if (document.activeElement !== el) return;
+        placeCaretAtEnd(el);
+      }, delay);
+    }
   }
 
   const MODES = {
