@@ -6,7 +6,9 @@
   const Jari = window.Jari || (window.Jari = {});
 
   const SKIP_SELECTOR =
-    "script, style, noscript, .jari-overlay, .jari-find-bar, .jari-hint, input, textarea, select, [contenteditable]";
+    "script, style, noscript, " +
+    Jari.overlaySelectors +
+    ", input, textarea, select, [contenteditable]";
 
   let active = false;
   let bar = null;
@@ -14,6 +16,7 @@
   let marks = [];
   let current = -1;
   let lastQuery = "";
+  let searchTimer = null;
 
   function isActive() {
     return active;
@@ -43,12 +46,20 @@
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "Find in page";
-    input.addEventListener("input", () => search(input.value, { scroll: false }));
+    input.addEventListener("input", () => scheduleSearch(input.value));
     countEl = document.createElement("span");
     countEl.className = "jari-find-count";
     el.appendChild(input);
     el.appendChild(countEl);
     return el;
+  }
+
+  // Typing fires one input event per keystroke, and search() walks the whole
+  // document body to collect text nodes. Debounce so a fast typist does not
+  // re-walk the tree on every key.
+  function scheduleSearch(query) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => search(query, { scroll: false }), 80);
   }
 
   // Capture-phase key handler. While the search box is focused, printable
@@ -213,6 +224,7 @@
 
   // Full reset (e.g. Jari disabled): bar, highlights and query all gone.
   function cancel() {
+    clearTimeout(searchTimer);
     close();
     clearMarks();
     lastQuery = "";
