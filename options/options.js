@@ -174,8 +174,9 @@
     // A prefix key ("g", ";", "y") can't be bound on its own — it starts a
     // two-key sequence. Pressing one makes the recorder wait for the next key
     // and binds the pair ("g" then "o" binds "go"); Escape/Backspace cancels
-    // the wait and returns to "press a key...". Sequences that collide with a
-    // fixed prefix ("gg", ";s", "yy", ...) are refused — the fixed one wins.
+    // the wait and returns to "press a key...". Any second key works — even
+    // one that forms a fixed prefix sequence ("gt", "gg") — the custom
+    // binding overrides it.
     let waitingPrefix = null;
 
     const commit = (combo) => {
@@ -219,17 +220,9 @@
       const combo = window.Jari.canonicalKey(event);
 
       if (waitingPrefix) {
-        // Second key of a two-key binding. Refuse digits (reserved for the
-        // repeat count) and fixed prefix sequences ("gg", ";s") — those
-        // always win over a user binding.
-        if (RESERVED_KEYS.test(combo)) {
-          status("Digits 0-9 are reserved for the repeat count");
-          return;
-        }
-        if (window.Jari.prefixes[waitingPrefix] && combo in window.Jari.prefixes[waitingPrefix]) {
-          status(waitingPrefix + combo + " is already a fixed prefix sequence");
-          return;
-        }
+        // Second key of a two-key binding. Any key binds, including digits
+        // and keys that form a fixed prefix sequence — the custom binding
+        // overrides the fixed one.
         commit(waitingPrefix + combo);
         return;
       }
