@@ -37,6 +37,12 @@
       : { x: el.scrollLeft, y: el.scrollTop };
   }
 
+  // Respect the OS-level reduced-motion preference: when set, skip the smooth
+  // animation and jump instantly even if smoothScroll is enabled.
+  function prefersReducedMotion() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
   function smoothScrollBy(el, x, y) {
     if (smoothState === null || smoothState.el !== el) {
       smoothState = { el, x: 0, y: 0, rafId: null };
@@ -88,7 +94,7 @@
 
   function scrollBy({ x = 0, y = 0, count = 1 }) {
     const el = getScrollElement();
-    if (Jari.settings.isSmoothScroll()) {
+    if (Jari.settings.isSmoothScroll() && !prefersReducedMotion()) {
       smoothScrollBy(el, x * count, y * count);
     } else {
       el.scrollBy({ left: x * count, top: y * count, behavior: "auto" });
@@ -180,7 +186,7 @@
       label: "Scroll to top",
       run: () => {
         const el = getScrollElement();
-        if (Jari.settings.isSmoothScroll()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
+        if (Jari.settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
         else el.scrollTo({ top: 0, behavior: "auto" });
       },
     },
@@ -190,7 +196,7 @@
       run: () => {
         const el = getScrollElement();
         const target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
-        if (Jari.settings.isSmoothScroll()) smoothScrollBy(el, 0, target - scrollPosOf(el).y);
+        if (Jari.settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target - scrollPosOf(el).y);
         else el.scrollTo({ top: target, behavior: "auto" });
       },
     },
