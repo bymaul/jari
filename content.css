@@ -253,7 +253,7 @@
    it. --- */
 .jari-status-stack {
   position: fixed;
-  right: 0.5em;
+  right: 5em;
   bottom: 0;
   z-index: 2147483647;
   display: flex;
@@ -263,10 +263,11 @@
   pointer-events: none;
 }
 
-/* order fixes the row regardless of DOM insertion order: pill leftmost,
-   showcmd center, toast at the corner. */
+/* order fixes the row regardless of DOM insertion order: the mode pill is
+   anchored to the corner (rightmost) so transient feedback never moves it —
+   showcmd and toasts grow to the left instead. */
 .jari-toast {
-  order: 2;
+  order: 1;
   box-sizing: border-box;
   max-width: 60vw;
   font-family: var(--jari-status-font-family);
@@ -274,21 +275,21 @@
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: var(--jari-status-border);
+  border-bottom: 0;
   padding: 0.25ex 1em;
   pointer-events: none;
 }
 
-/* --- Mode pill (I / o): persistent while a mode is active. Hidden in
-   fullscreen so it never covers fullscreen content. --- */
+/* --- Mode pill (I / o): persistent while a mode is active, anchored to the
+   corner. Hidden in fullscreen so it never covers fullscreen content. --- */
 .jari-pill {
-  order: 0;
+  order: 2;
   font-family: var(--jari-status-font-family);
   font-size: var(--jari-status-font-size);
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
-  border: 0;
-  border-top: 1px solid var(--jari-status-fg);
-  border-left: 1px solid var(--jari-status-fg);
+  border: var(--jari-status-border);
+  border-bottom: 0;
   padding: 0.25ex 1ex;
   pointer-events: none;
 }
@@ -326,15 +327,16 @@
   --jari-hint-border-width: 1px;
 }
 
-/* --- Showcmd readout (Neovim-style key echo), center of the corner row. --- */
+/* --- Showcmd readout (Neovim-style key echo), left of the corner row. --- */
 .jari-showcmd {
-  order: 1;
+  order: 0;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
   line-height: 1.4;
   background: var(--jari-cmdl-bg);
   color: var(--jari-cmdl-fg);
   border: var(--jari-status-border);
+  border-bottom: 0;
   padding: 0.125ex 0.75ex;
   pointer-events: none;
 }

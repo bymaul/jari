@@ -30,12 +30,23 @@
     return statusStack;
   }
 
+  // A single toast element, reused: a new message replaces the old one
+  // instead of stacking another pill in the row.
+  let toastEl = null;
+  let toastTimer = null;
+
   function toast(message) {
-    const el = document.createElement("div");
-    el.className = "jari-toast";
-    el.textContent = message;
-    statusContainer().appendChild(el);
-    setTimeout(() => el.remove(), 1500);
+    if (!toastEl) {
+      toastEl = document.createElement("div");
+      toastEl.className = "jari-toast";
+      statusContainer().appendChild(toastEl);
+    }
+    toastEl.textContent = message;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toastEl.remove();
+      toastEl = null;
+    }, 1500);
   }
 
   // Copy text to the clipboard, with a fallback for contexts without async
