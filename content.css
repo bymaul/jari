@@ -149,6 +149,11 @@
   margin-left: 1em;
 }
 
+.jari-tabsearch-list li .jari-win-tag {
+  opacity: 0.7;
+  margin-right: 1em;
+}
+
 .jari-tabsearch-list li.selected,
 .jari-tabsearch-list li.selected .url {
   color: var(--jari-of-fg);
