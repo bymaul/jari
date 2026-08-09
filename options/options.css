@@ -12,7 +12,7 @@
   --accent: #e8b589;
   --accent-dim: #2c2c36;
   --link: #7e98e8;
-  --mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+  --mono: ui-monospace, 'Cascadia Code', Consolas, Menlo, monospace;
   --page-width: 1080px;
 }
 
@@ -133,7 +133,7 @@ code {
   gap: 6px;
 }
 
-.control input[type="number"] {
+.control input[type='number'] {
   padding: 3px 6px;
   background: #1e1e26;
   border: 1px solid var(--border);
@@ -142,12 +142,12 @@ code {
   font-size: 12px;
 }
 
-.control input[type="number"]:focus {
+.control input[type='number']:focus {
   border-color: var(--accent);
   outline: none;
 }
 
-.control input[type="color"] {
+.control input[type='color'] {
   width: 42px;
   height: 24px;
   padding: 1px;
@@ -156,12 +156,12 @@ code {
   cursor: pointer;
 }
 
-.control input[type="color"]:focus {
+.control input[type='color']:focus {
   border-color: var(--accent);
   outline: none;
 }
 
-.control input[type="checkbox"] {
+.control input[type='checkbox'] {
   width: 14px;
   height: 14px;
   margin: 0;
@@ -222,10 +222,6 @@ code {
   color: var(--accent);
   border-bottom: 1px solid var(--border);
   padding: 5px 8px 3px;
-}
-
-#keymap-table tr:not(.cat-header):hover {
-  background: #3f4346;
 }
 
 #keymap-table td input {
