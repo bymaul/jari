@@ -190,10 +190,10 @@
 
     const key = Jari.canonicalKey(event);
 
-    // Resolve a pending prefix, e.g. a user-bound "go" = "g" then "o". The
-    // composed keys stay in typedSeq so the showcmd readout can echo them on
-    // execution. Sequences are entirely user-defined; unbound pairs resolve
-    // to nothing and become dead keys.
+    // Resolve a pending prefix: the composed pair (e.g. "go" = "g" then "o")
+    // is looked up in the keymap like any binding. Unbound pairs resolve to
+    // nothing and become dead keys below. The keys stay in typedSeq so the
+    // showcmd readout can echo them on execution.
     const prefixWasPending = pendingPrefix !== null;
     let commandName = null;
     if (prefixWasPending) {
@@ -228,7 +228,7 @@
     // leave Escape to the page — sites use it to close dialogs, and Jari has
     // nothing to clear.
     if (event.key === 'Escape') {
-      if (pendingCount || pendingPrefix !== null) {
+      if (pendingCount) {
         event.preventDefault();
         event.stopImmediatePropagation();
         clearPending();
