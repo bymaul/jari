@@ -46,8 +46,8 @@
     W: 'splitOrMergeTab',
 
     // History
-    J: 'historyBack',
-    K: 'historyForward',
+    S: 'historyBack',
+    D: 'historyForward',
 
     // Hints
     f: 'linkHints',
@@ -82,7 +82,7 @@
     gS: 'resetScrollArea',
     g0: 'firstTab',
     g$: 'lastTab',
-    ';s': 'openOptions',
+    ';e': 'openOptions',
     yf: 'linkHintsYank',
     yy: 'copyUrl',
   };
@@ -121,19 +121,8 @@
   };
 
   // Bindings removed from the defaults after a keybind overhaul. Stripped from
-  // any stored keymap so old saved configs stop showing them. ":" was the
-  // removed command line, "S" the removed scroll-focus highlight.
-  Jari.unboundKeys = [
-    'ctrl+alt+d',
-    'ctrl+alt+m',
-    'ctrl+alt+p',
-    'ctrl+b',
-    'ctrl+d',
-    'ctrl+f',
-    'ctrl+u',
-    ':',
-    'S',
-  ];
+  // any stored keymap so old saved configs stop showing them.
+  Jari.unboundKeys = [];
 
   // Prefix keys ("g", ";", "y") must never double as single-key bindings —
   // the dispatcher resolves a prefix before the single-key keymap, so a lone
