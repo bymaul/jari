@@ -72,17 +72,6 @@
     render("Merge into", "Choose a window...");
   }
 
-  // A bare query that is a URL — scheme, protocol-relative, localhost, or a
-  // dotted hostname (with an optional path/port). Everything else is search
-  // terms. The background's normalizeUrl turns bare hosts into https.
-  function looksLikeUrl(text) {
-    const s = text.trim();
-    if (!s || /\s/.test(s)) return false;
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith("//")) return true;
-    if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
-    return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
-  }
-
   // Omnibar input: row 0 is always the typed query — labeled as an open or a
   // search depending on looksLikeUrl — and the suggestions arrive async,
   // debounced, replacing that row's list. A stale response (query changed or
@@ -97,7 +86,7 @@
       renderList();
       return;
     }
-    const row = looksLikeUrl(q)
+    const row = Jari.Url.looksLikeUrl(q)
       ? { kind: "url", title: q, url: q }
       : { kind: "search", title: q, url: null };
     filtered = [row];
