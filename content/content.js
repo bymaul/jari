@@ -227,7 +227,7 @@
     // leave Escape to the page — sites use it to close dialogs, and Jari has
     // nothing to clear.
     if (event.key === 'Escape') {
-      if (pendingCount) {
+      if (pendingCount || pendingPrefix !== null) {
         event.preventDefault();
         event.stopImmediatePropagation();
         clearPending();
