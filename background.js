@@ -152,7 +152,15 @@ const handlers = {
     const tabs = await chrome.tabs.query({ windowId: targetWindowId });
     const last = tabs[tabs.length - 1];
     if (last) {
-      await chrome.windows.update(targetWindowId, { focused: true });
+      // Focus the target window (restoring it if minimized), then activate the
+      // merged tab. The moved tab is appended at the end, so the window's last
+      // tab is the merged one — re-queried fresh, since the sender's tab object
+      // can go stale once its old window closes.
+      try {
+        await chrome.windows.update(targetWindowId, { focused: true, state: "normal" });
+      } catch (err) {
+        console.error("[jari] mergeTab window focus failed", err);
+      }
       await chrome.tabs.update(last.id, { active: true });
     }
     return { ok: true };
@@ -234,17 +242,31 @@ const handlers = {
 
   activateTab: async (_, { id } = {}) => {
     if (!id) return { ok: false };
-    // The tab may live in another window: focus that window first, then
-    // activate the tab, so choosing it actually switches to it.
     let windowId = null;
     try {
       const tab = await chrome.tabs.get(id);
       windowId = tab && tab.windowId;
     } catch {
-      // Tab closed since the list was drawn; fall through to activate.
+      // Tab closed since the list was drawn; the update below will fail too.
     }
-    if (windowId) await chrome.windows.update(windowId, { focused: true });
-    await chrome.tabs.update(id, { active: true });
+    // Activate the tab first, then bring its window forward. tabs.update
+    // alone does not focus the window, and windows.update needs state
+    // "normal" to also restore a minimized target window. Each step is
+    // independent so one failure cannot block the other.
+    if (id) {
+      try {
+        await chrome.tabs.update(id, { active: true });
+      } catch (err) {
+        return { ok: false, error: String(err) };
+      }
+    }
+    if (windowId) {
+      try {
+        await chrome.windows.update(windowId, { focused: true, state: "normal" });
+      } catch (err) {
+        console.error("[jari] activateTab window focus failed", err);
+      }
+    }
     return { ok: true };
   },
 
