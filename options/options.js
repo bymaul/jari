@@ -20,6 +20,7 @@
   const scrollStepEl = document.querySelector("#scroll-step");
   const smoothScrollEl = document.querySelector("#smooth-scroll");
   const timeoutEl = document.querySelector("#timeout");
+  const passthroughEl = document.querySelector("#passthrough-timeout");
   const accentEl = document.querySelector("#accent");
 
   const STORAGE_KEY = "settings";
@@ -30,6 +31,7 @@
   let scrollStep = SETTINGS_DEFAULTS.scrollStep;
   let smoothScroll = SETTINGS_DEFAULTS.smoothScroll;
   let timeoutMs = SETTINGS_DEFAULTS.timeoutMs;
+  let passthroughMs = SETTINGS_DEFAULTS.passthroughMs;
   let accentColor = SETTINGS_DEFAULTS.accentColor;
 
   // Push the chosen accent into the page's stylesheet variable so h2, code,
@@ -50,10 +52,12 @@
     scrollStep = s.scrollStep;
     smoothScroll = s.smoothScroll;
     timeoutMs = s.timeoutMs;
+    passthroughMs = s.passthroughMs;
     accentColor = s.accentColor;
     scrollStepEl.value = scrollStep;
     smoothScrollEl.checked = smoothScroll;
     timeoutEl.value = timeoutMs;
+    passthroughEl.value = passthroughMs;
     accentEl.value = accentColor;
     applyAccent();
     renderKeymap();
@@ -185,6 +189,9 @@
     const tRaw = parseInt(timeoutEl.value, 10);
     timeoutMs = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
     timeoutEl.value = timeoutMs;
+    const pRaw = parseInt(passthroughEl.value, 10);
+    passthroughMs = Number.isFinite(pRaw) && pRaw > 0 ? pRaw : SETTINGS_DEFAULTS.passthroughMs;
+    passthroughEl.value = passthroughMs;
     accentColor = window.Jari.isColor(accentEl.value) ? accentEl.value : SETTINGS_DEFAULTS.accentColor;
     accentEl.value = accentColor;
     applyAccent();
@@ -197,7 +204,7 @@
     // re-reading the DOM (which could store empty keys from stale inputs).
     chrome.storage.sync
       .set({
-        [STORAGE_KEY]: { keymap, disabledSites, scrollStep, smoothScroll, timeoutMs, accentColor },
+        [STORAGE_KEY]: { keymap, disabledSites, scrollStep, smoothScroll, timeoutMs, passthroughMs, accentColor },
       })
       .then(() => status("Saved"))
       .catch(() => status("Save failed"));
@@ -208,10 +215,12 @@
     scrollStep = SETTINGS_DEFAULTS.scrollStep;
     smoothScroll = SETTINGS_DEFAULTS.smoothScroll;
     timeoutMs = SETTINGS_DEFAULTS.timeoutMs;
+    passthroughMs = SETTINGS_DEFAULTS.passthroughMs;
     accentColor = SETTINGS_DEFAULTS.accentColor;
     scrollStepEl.value = scrollStep;
     smoothScrollEl.checked = smoothScroll;
     timeoutEl.value = timeoutMs;
+    passthroughEl.value = passthroughMs;
     accentEl.value = accentColor;
     applyAccent();
     renderKeymap();

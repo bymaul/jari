@@ -1,6 +1,6 @@
 // Jari: settings layer over chrome.storage.sync.
 // Holds the user keymap, the list of per-site disabled hosts, and the
-// behavior options (scroll step, smooth scrolling).
+// behavior options (scroll step, smooth scrolling, timeouts).
 // Emits "settingsChanged" when storage changes so live tabs react instantly.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
@@ -13,6 +13,7 @@
     scrollStep: Jari.settingsDefaults.scrollStep,
     smoothScroll: Jari.settingsDefaults.smoothScroll,
     timeoutMs: Jari.settingsDefaults.timeoutMs,
+    passthroughMs: Jari.settingsDefaults.passthroughMs,
     accentColor: Jari.settingsDefaults.accentColor,
   };
 
@@ -23,6 +24,7 @@
     state.scrollStep = s.scrollStep;
     state.smoothScroll = s.smoothScroll;
     state.timeoutMs = s.timeoutMs;
+    state.passthroughMs = s.passthroughMs;
     state.accentColor = s.accentColor;
     applyAccent();
   }
@@ -50,6 +52,7 @@
           scrollStep: state.scrollStep,
           smoothScroll: state.smoothScroll,
           timeoutMs: state.timeoutMs,
+          passthroughMs: state.passthroughMs,
           accentColor: state.accentColor,
         },
       })
@@ -80,6 +83,10 @@
     return state.timeoutMs;
   }
 
+  function getPassthroughMs() {
+    return state.passthroughMs;
+  }
+
   function getAccentColor() {
     return state.accentColor;
   }
@@ -106,6 +113,7 @@
     getScrollStep,
     isSmoothScroll,
     getTimeoutMs,
+    getPassthroughMs,
     getAccentColor,
     toggleDisabled,
   };
