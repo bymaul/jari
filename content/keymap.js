@@ -78,6 +78,7 @@
     gg: 'scrollTop',
     gu: 'goParentUrl',
     gU: 'goUrlRoot',
+    ge: 'editUrl',
     gs: 'cycleScrollArea',
     gS: 'resetScrollArea',
     g0: 'firstTab',

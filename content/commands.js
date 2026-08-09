@@ -294,6 +294,11 @@
         Jari.sendMessage("navigate", { url: target });
       },
     },
+    editUrl: {
+      category: "page",
+      label: "Edit current URL",
+      run: () => Jari.TabSearch.openEditUrl(),
+    },
 
     // Hints
     linkHints: { category: "hints", label: "Link hints", run: () => Jari.Hints.start("click") },
