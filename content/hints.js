@@ -231,7 +231,12 @@
     const rect = el.getBoundingClientRect();
     const box = document.createElement("div");
     box.className = "jari-hint";
-    box.textContent = label;
+    // One span per character so updateHighlight can mute the typed prefix.
+    for (const ch of label) {
+      const span = document.createElement("span");
+      span.textContent = ch;
+      box.appendChild(span);
+    }
     box.style.left = window.scrollX + rect.left + "px";
     box.style.top = window.scrollY + rect.top + "px";
     document.body.appendChild(box);
@@ -288,7 +293,11 @@
 
   function updateHighlight() {
     for (const [label, box] of overlays) {
-      box.classList.toggle("jari-hint-dim", !label.toLowerCase().startsWith(typed));
+      const matches = label.toLowerCase().startsWith(typed);
+      box.classList.toggle("jari-hint-dim", !matches);
+      for (let i = 0; i < box.children.length; i++) {
+        box.children[i].classList.toggle("muted", matches && i < typed.length);
+      }
     }
   }
 
