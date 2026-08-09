@@ -7,6 +7,9 @@
 // searched with the default engine), below it come autocomplete matches from
 // the browser (history, bookmarks, open tabs).
 //
+// "ge" edits the current page URL: the same omnibar prefilled with the
+// current URL, and Enter navigates this tab instead of opening a new one.
+//
 // Both are modes over one overlay; tabsearch also serves as the merge
 // picker for splitOrMergeTab: in a single-tab window it lists the tabs of
 // the other windows and Enter moves this tab into the chosen one.
@@ -20,7 +23,7 @@
   let tabs = [];
   let filtered = [];
   let selected = 0;
-  let mode = "tabs"; // "tabs" | "merge" | "open"
+  let mode = "tabs"; // "tabs" | "merge" | "open" | "edit"
   let suggestSeq = 0; // invalidates in-flight suggestion fetches
   let suggestTimer = null;
 
@@ -45,6 +48,18 @@
     mode = "open";
     active = true;
     render("Open", "Search or type URL");
+  }
+
+  // "ge": edit the current page URL. Same omnibar as "t", but prefilled with
+  // the current URL and Enter navigates this tab instead of opening a new one.
+  function openEditUrl() {
+    if (active) return;
+    tabs = [];
+    mode = "edit";
+    active = true;
+    render("Edit URL", "Search or type URL");
+    inputEl.value = location.href;
+    handleOpenInput(inputEl.value);
   }
 
   // Merge picker: entries are the OTHER windows (title = active tab, subtitle
@@ -109,7 +124,7 @@
     inputEl.placeholder = placeholder;
     inputEl.addEventListener("input", () => {
       const query = inputEl.value;
-      if (mode === "open") {
+      if (mode === "open" || mode === "edit") {
         handleOpenInput(query);
       } else {
         const q = query.toLowerCase();
@@ -253,9 +268,11 @@
       // Merge mode: entries are windows; the background moves this tab into
       // the picked window and focuses it there.
       Jari.sendMessage("mergeTab", { targetWindowId: item.windowId });
-    } else if (mode === "open") {
-      if (item.kind === "search") Jari.sendMessage("search", { query: inputEl.value });
-      else if (item.url) Jari.sendMessage("createTab", { url: item.url });
+    } else if (mode === "open" || mode === "edit") {
+      // "t" opens a new tab; "ge" edits the current page, so it navigates
+      // this tab instead.
+      if (item.kind === "search") Jari.sendMessage("search", { query: inputEl.value, newTab: mode === "open" });
+      else if (item.url) Jari.sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
     } else {
       Jari.sendMessage("activateTab", { id: item.id });
     }
@@ -278,5 +295,5 @@
     active = false;
   }
 
-  Jari.TabSearch = { open, openOmnibar, openMerge, close, onKeyDown, isActive };
+  Jari.TabSearch = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
 })();

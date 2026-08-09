@@ -283,19 +283,23 @@ const handlers = {
     return items.slice(0, 15);
   },
 
-  // Search with the browser's default engine in a new foreground tab.
+  // Search with the browser's default engine, in a new foreground tab by
+  // default ("ge" edits the current page, so it searches in the current tab).
   // chrome.search.query is cross-browser (Chrome + Firefox 111+); fall back
   // to a plain search URL if the API is unavailable.
-  search: async (_, { query = "" } = {}) => {
+  search: async (sender, { query = "", newTab = true } = {}) => {
     const text = query.trim();
     if (!text) return { ok: false };
     if (typeof chrome.search?.query === "function") {
-      await chrome.search.query({ text, disposition: "NEW_TAB" });
+      await chrome.search.query({ text, disposition: newTab ? "NEW_TAB" : "CURRENT_TAB" });
       return { ok: true };
     }
-    await chrome.tabs.create({
-      url: "https://www.google.com/search?q=" + encodeURIComponent(text),
-    });
+    const url = "https://www.google.com/search?q=" + encodeURIComponent(text);
+    if (newTab) {
+      await chrome.tabs.create({ url });
+    } else if (sender.tab && sender.tab.id) {
+      await chrome.tabs.update(sender.tab.id, { url });
+    }
     return { ok: true };
   },
 
