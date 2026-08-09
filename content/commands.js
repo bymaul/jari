@@ -264,7 +264,7 @@
       label: "Split tab / merge window",
       run: async () => {
         const res = await Jari.sendMessage("splitOrMerge");
-        if (res && res.needMerge) Jari.TabSearch.openMerge(res);
+        if (res && res.needMerge) Jari.Prompt.openMerge(res);
       },
     },
     moveTabLeft: { category: "tabActions", label: "Move tab left", run: () => Jari.sendMessage("moveTabLeft") },
@@ -272,8 +272,8 @@
     duplicateTab: { category: "tabActions", label: "Duplicate tab", run: () => Jari.sendMessage("duplicateTab") },
     togglePin: { category: "tabActions", label: "Pin/unpin tab", run: () => Jari.sendMessage("togglePin") },
     toggleMute: { category: "tabActions", label: "Mute/unmute tab", run: () => Jari.sendMessage("toggleMute") },
-    tabSearch: { category: "tabs", label: "Tab search", run: () => Jari.TabSearch.open() },
-    omnibar: { category: "tabs", label: "Open URL or search", run: () => Jari.TabSearch.openOmnibar() },
+    tabSearch: { category: "tabs", label: "Tab search", run: () => Jari.Prompt.open() },
+    omnibar: { category: "tabs", label: "Open URL or search", run: () => Jari.Prompt.openOmnibar() },
     reloadTab: { category: "page", label: "Reload", run: () => Jari.sendMessage("reloadTab", { bypassCache: false }) },
     hardReload: { category: "page", label: "Hard reload", run: () => Jari.sendMessage("reloadTab", { bypassCache: true }) },
     goParentUrl: {
@@ -297,7 +297,7 @@
     editUrl: {
       category: "page",
       label: "Edit current URL",
-      run: () => Jari.TabSearch.openEditUrl(),
+      run: () => Jari.Prompt.openEditUrl(),
     },
 
     // Hints

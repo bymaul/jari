@@ -1,6 +1,6 @@
 // Jari: content-script entry point.
 // Boots settings and installs the capture-phase keydown dispatcher that
-// routes keys to active modes (hints/tabsearch), the count prefix, the
+// routes keys to active modes (hints/prompt), the count prefix, the
 // "g" prefix, and the user keymap. A Neovim-style showcmd
 // readout echoes counts and prefix keys while they are being composed; an
 // inactivity timeout drops the composition if it is never completed.
@@ -68,7 +68,7 @@
       // No overlay may stay open while keys pass through.
       Jari.Help.close();
       Jari.Hints.cancel();
-      Jari.TabSearch.close();
+      Jari.Prompt.close();
       showPill('ignore', 'Ignore mode');
     } else {
       hidePill('ignore');
@@ -90,7 +90,7 @@
     // No overlay may stay open while keys pass through.
     Jari.Help.close();
     Jari.Hints.cancel();
-    Jari.TabSearch.close();
+    Jari.Prompt.close();
     passthroughMode = true;
     showPill('passthrough', 'Passthrough (' + Jari.settings.getPassthroughMs() + 'ms)');
     clearTimeout(passthroughTimer);
@@ -186,7 +186,7 @@
     // consumes from reaching the page.
     if (Jari.Help.isActive()) return Jari.Help.onKeyDown(event);
     if (Jari.Hints.isActive()) return Jari.Hints.onKeyDown(event);
-    if (Jari.TabSearch.isActive()) return Jari.TabSearch.onKeyDown(event);
+    if (Jari.Prompt.isActive()) return Jari.Prompt.onKeyDown(event);
 
     const key = Jari.canonicalKey(event);
 
@@ -292,7 +292,7 @@
         exitPassthrough();
         Jari.Help.close();
         Jari.Hints.cancel();
-        Jari.TabSearch.close();
+        Jari.Prompt.close();
       }
     });
 
