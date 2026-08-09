@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -13,7 +13,7 @@
     <header>
       <div class="wrap">
         <h1>Jari</h1>
-        <p class="subtitle">Keyboard-driven navigation settings</p>
+        <p class="subtitle">Simple keyboard-driven navigation settings</p>
       </div>
     </header>
 
@@ -28,7 +28,12 @@
                 <input id="scroll-step" type="number" min="1" max="500" step="5" />
                 <span class="unit">px</span>
               </div>
-              <p class="hint">Distance covered by one <code>j</code>/<code>k</code> or <code>h</code>/<code>l</code> press.</p>
+              <p class="hint">
+                Distance covered by one <code>j</code>/<code>k</code> or <code>h</code>/<code
+                  >l</code
+                >
+                press.
+              </p>
             </div>
           </div>
           <div class="field">
@@ -45,7 +50,9 @@
                 <input id="timeout" type="number" min="100" max="10000" step="100" />
                 <span class="unit">ms</span>
               </div>
-              <p class="hint">How long a half-typed <code>g</code> prefix or count waits before clearing.</p>
+              <p class="hint">
+                How long a half-typed <code>g</code> prefix or count waits before clearing.
+              </p>
             </div>
           </div>
           <div class="field">
@@ -55,7 +62,10 @@
                 <input id="passthrough-timeout" type="number" min="100" max="30000" step="100" />
                 <span class="unit">ms</span>
               </div>
-              <p class="hint">How long <code>o</code> passes keys to the page before Jari takes over again. Escape exits sooner.</p>
+              <p class="hint">
+                How long <code>o</code> passes keys to the page before Jari takes over again. Escape
+                exits sooner.
+              </p>
             </div>
           </div>
           <div class="field">
@@ -64,7 +74,9 @@
               <div class="control-row">
                 <input id="accent" type="color" />
               </div>
-              <p class="hint">Used for highlights: link hints, headings, the primary button and the showcmd edge.</p>
+              <p class="hint">
+                Used for highlights: link hints, headings, the primary button and the showcmd edge.
+              </p>
             </div>
           </div>
         </div>
@@ -73,10 +85,9 @@
       <section class="card">
         <h2>Keybindings</h2>
         <p class="hint">
-          Click a key field, then press the key (or key combination) to bind it.
-          Backspace clears a binding. Digits <code>0-9</code> are reserved for
-          the repeat count and cannot be bound. Fixed prefixes such as
-          <code>gg</code>, <code>gt</code> and <code>;s</code> are shown in
+          Click a key field, then press the key (or key combination) to bind it. Backspace clears a
+          binding. Digits <code>0-9</code> are reserved for the repeat count and cannot be bound.
+          Fixed prefixes such as <code>gg</code>, <code>gt</code> and <code>;s</code> are shown in
           green and can only be cleared.
         </p>
         <div id="keymap-table"></div>
@@ -99,8 +110,8 @@
 
     <footer>
       <div class="wrap">
-        To open these settings anytime, press <code>; s</code> on any page
-        (or find Jari under <code>chrome://extensions</code>).
+        To open these settings anytime, press <code>; s</code> on any page (or find Jari under
+        <code>chrome://extensions</code>).
       </div>
     </footer>
 

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Jari",
   "version": "0.2",
-  "description": "Keyboard-driven navigation for Chrome and Firefox.",
+  "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "permissions": ["tabs", "storage", "sessions", "clipboardRead"],
   "background": {
     "service_worker": "background.js"
