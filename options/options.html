@@ -89,7 +89,8 @@
           binding. Digits <code>0-9</code> are reserved for the repeat count and cannot be bound.
           Fixed prefixes such as <code>gg</code>, <code>gt</code> and <code>;s</code> are shown in
           green and can only be cleared. Prefix keys (<code>g</code>, <code>;</code>,
-          <code>y</code>) can be bound too — the command runs when the two-key sequence times out.
+          <code>y</code>) can be bound too — the command runs when the next key doesn't complete
+          the sequence; Escape or Backspace cancels.
         </p>
         <input id="keymap-filter" type="search" placeholder="Filter commands by name or key..." />
         <div id="keymap-table"></div>

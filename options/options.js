@@ -190,11 +190,8 @@
           return;
         }
         // Prefix keys ("g", ";", "y") start a two-key sequence; a binding on
-        // one still works — it runs when the composition times out without a
-        // completing second key.
-        if (window.Jari.prefixKeys.has(combo)) {
-          status("Prefix key bound — fires when the two-key sequence times out");
-        }
+        // one still works — it runs when the next key does not complete the
+        // sequence.
         // Drop this command's old key(s) and any other command that already
         // uses the new key, then bind. Without this, the command keeps its
         // previous key and keyFor() would show that instead of what was
@@ -203,7 +200,11 @@
           Object.entries(keymap).filter(([key, cmd]) => key !== combo && cmd !== name)
         );
         keymap[combo] = name;
-        status("Binding set");
+        status(
+          window.Jari.prefixKeys.has(combo)
+            ? "Prefix key bound — runs when the next key doesn't complete the sequence"
+            : "Binding set"
+        );
       }
       renderKeymap();
     };
