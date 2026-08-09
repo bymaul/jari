@@ -1,11 +1,12 @@
 // Jari options page: edit behavior options, keybindings and manage per-site
-// disabling. Relies on window.Jari.keymapDefaults, Jari.settingsDefaults,
+// disabling. Relies on Jari.settings (the shared settings store from
+// content/settings.js), Jari.keymapDefaults, Jari.settingsDefaults,
 // Jari.prefixes, Jari.commands and the shared helpers in keymap.js (all
 // loaded via script tags).
 (() => {
-  const DEFAULTS = window.Jari.keymapDefaults;
-  const SETTINGS_DEFAULTS = window.Jari.settingsDefaults;
-  const COMMANDS = window.Jari.commands;
+  const Jari = window.Jari;
+  const SETTINGS_DEFAULTS = Jari.settingsDefaults;
+  const COMMANDS = Jari.commands;
 
   const tableEl = document.querySelector("#keymap-table");
   const saveBtn = document.querySelector("#save");
@@ -20,33 +21,14 @@
   const siteInputEl = document.querySelector("#disabled-site-input");
   const addSiteBtn = document.querySelector("#add-disabled-site");
 
-  const STORAGE_KEY = "settings";
   const RESERVED_KEYS = /^[0-9]$/;
 
-  let keymap = {};
-  let disabledSites = [];
-  let scrollStep = SETTINGS_DEFAULTS.scrollStep;
-  let smoothScroll = SETTINGS_DEFAULTS.smoothScroll;
-  let timeoutMs = SETTINGS_DEFAULTS.timeoutMs;
-  let passthroughMs = SETTINGS_DEFAULTS.passthroughMs;
-
   async function load() {
-    let saved = {};
-    try {
-      const data = await chrome.storage.sync.get(STORAGE_KEY);
-      saved = data[STORAGE_KEY] || {};
-    } catch {}
-    const s = window.Jari.normalizeSettings(saved);
-    keymap = s.keymap;
-    disabledSites = s.disabledSites;
-    scrollStep = s.scrollStep;
-    smoothScroll = s.smoothScroll;
-    timeoutMs = s.timeoutMs;
-    passthroughMs = s.passthroughMs;
-    scrollStepEl.value = scrollStep;
-    smoothScrollEl.checked = smoothScroll;
-    timeoutEl.value = timeoutMs;
-    passthroughEl.value = passthroughMs;
+    await Jari.settings.load();
+    scrollStepEl.value = Jari.settings.getScrollStep();
+    smoothScrollEl.checked = Jari.settings.isSmoothScroll();
+    timeoutEl.value = Jari.settings.getTimeoutMs();
+    passthroughEl.value = Jari.settings.getPassthroughMs();
     renderKeymap();
     renderDisabled();
   }
@@ -83,7 +65,7 @@
 
     // Split the categories across three columns, keeping each category whole
     // and balancing by row count (category header + one row per command).
-    const columns = window.Jari.balanceCategories(byCategory, 3);
+    const columns = Jari.balanceCategories(byCategory, 3);
 
     const grid = document.createElement("div");
     grid.className = "jari-keymap-columns";
@@ -134,7 +116,7 @@
   }
 
   function keyFor(commandName) {
-    for (const [key, name] of Object.entries(keymap)) {
+    for (const [key, name] of Object.entries(Jari.settings.getKeymap())) {
       if (name === commandName) return key;
     }
     return "";
@@ -159,10 +141,12 @@
       // Drop this command's old key(s) and any other command that already
       // uses the new key, then bind. Without this, the command keeps its
       // previous key and keyFor() would show that instead of what was
-      // just pressed.
-      keymap = Object.fromEntries(
-        Object.entries(keymap).filter(([key, cmd]) => key !== combo && cmd !== name)
-      );
+      // just pressed. The live keymap object is mutated so Save persists
+      // exactly what the recorder produced.
+      const keymap = Jari.settings.getKeymap();
+      for (const [k, cmd] of Object.entries(keymap)) {
+        if (k === combo || cmd === name) delete keymap[k];
+      }
       keymap[combo] = name;
       status("Binding set");
       renderKeymap();
@@ -171,7 +155,7 @@
     const handler = (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (window.Jari.modifierKeys.has(event.key)) return; // keep waiting for the real key
+      if (Jari.modifierKeys.has(event.key)) return; // keep waiting for the real key
 
       if (event.key === "Escape" || event.key === "Backspace") {
         if (waitingPrefix) {
@@ -184,13 +168,16 @@
         }
         input.removeEventListener("keydown", handler);
         input.classList.remove("recording");
-        keymap = Object.fromEntries(Object.entries(keymap).filter(([, cmd]) => cmd !== name));
+        const keymap = Jari.settings.getKeymap();
+        for (const [k, cmd] of Object.entries(keymap)) {
+          if (cmd === name) delete keymap[k];
+        }
         status("Binding cleared");
         renderKeymap();
         return;
       }
 
-      const combo = window.Jari.canonicalKey(event);
+      const combo = Jari.canonicalKey(event);
 
       if (waitingPrefix) {
         // Second key of a two-key binding; any key binds, digits included.
@@ -198,7 +185,7 @@
         return;
       }
 
-      if (window.Jari.prefixKeys.has(combo)) {
+      if (Jari.prefixKeys.has(combo)) {
         waitingPrefix = combo;
         input.value = combo + " — press the next key, or Esc/Backspace to cancel";
         status("Prefix keys can't be bound alone; press the next key of the sequence");
@@ -219,56 +206,65 @@
     input.addEventListener("keydown", handler);
   }
 
+  // Read the scroll/behavior fields, snapping invalid values back to their
+  // defaults in the DOM, and return them as a patch for the settings store.
   function collectScrollSettings() {
     const raw = parseInt(scrollStepEl.value, 10);
-    scrollStep = Number.isFinite(raw) && raw > 0 ? raw : SETTINGS_DEFAULTS.scrollStep;
-    scrollStepEl.value = scrollStep;
-    smoothScroll = smoothScrollEl.checked;
+    scrollStepEl.value = Number.isFinite(raw) && raw > 0 ? raw : SETTINGS_DEFAULTS.scrollStep;
     const tRaw = parseInt(timeoutEl.value, 10);
-    timeoutMs = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
-    timeoutEl.value = timeoutMs;
+    timeoutEl.value = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
     const pRaw = parseInt(passthroughEl.value, 10);
-    passthroughMs = Number.isFinite(pRaw) && pRaw > 0 ? pRaw : SETTINGS_DEFAULTS.passthroughMs;
-    passthroughEl.value = passthroughMs;
+    passthroughEl.value = Number.isFinite(pRaw) && pRaw > 0 ? pRaw : SETTINGS_DEFAULTS.passthroughMs;
+    return {
+      scrollStep: parseInt(scrollStepEl.value, 10),
+      smoothScroll: smoothScrollEl.checked,
+      timeoutMs: parseInt(timeoutEl.value, 10),
+      passthroughMs: parseInt(passthroughEl.value, 10),
+    };
   }
 
   function save() {
-    collectScrollSettings();
-    // keymap state is authoritative — the recording handler mutates it and
-    // the inputs only mirror it — so persist it directly instead of
-    // re-reading the DOM (which could store empty keys from stale inputs).
-    chrome.storage.sync
-      .set({
-        [STORAGE_KEY]: { keymap, disabledSites, scrollStep, smoothScroll, timeoutMs, passthroughMs },
-      })
+    const patch = collectScrollSettings();
+    // keymap and disabledSites were already mutated in the live store (the
+    // recorder and list buttons edit in place) — include snapshots so the
+    // write persists exactly what the user sees.
+    patch.keymap = { ...Jari.settings.getKeymap() };
+    patch.disabledSites = Jari.settings.getDisabledSites();
+    Jari.settings
+      .update(patch)
       .then(() => status("Saved"))
       .catch(() => status("Save failed"));
   }
 
   function reset() {
-    keymap = { ...DEFAULTS };
-    scrollStep = SETTINGS_DEFAULTS.scrollStep;
-    smoothScroll = SETTINGS_DEFAULTS.smoothScroll;
-    timeoutMs = SETTINGS_DEFAULTS.timeoutMs;
-    passthroughMs = SETTINGS_DEFAULTS.passthroughMs;
-    scrollStepEl.value = scrollStep;
-    smoothScrollEl.checked = smoothScroll;
-    timeoutEl.value = timeoutMs;
-    passthroughEl.value = passthroughMs;
+    // Restore defaults for the keymap and behavior options; the disabled
+    // sites list is per-user data and is left untouched.
+    Jari.settings.set({
+      keymap: { ...Jari.keymapDefaults },
+      scrollStep: SETTINGS_DEFAULTS.scrollStep,
+      smoothScroll: SETTINGS_DEFAULTS.smoothScroll,
+      timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
+      passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
+    });
+    scrollStepEl.value = SETTINGS_DEFAULTS.scrollStep;
+    smoothScrollEl.checked = SETTINGS_DEFAULTS.smoothScroll;
+    timeoutEl.value = SETTINGS_DEFAULTS.timeoutMs;
+    passthroughEl.value = SETTINGS_DEFAULTS.passthroughMs;
     renderKeymap();
     status("Reset to defaults");
   }
 
   function renderDisabled() {
     disabledList.textContent = "";
-    if (disabledSites.length === 0) {
+    const sites = Jari.settings.getDisabledSites();
+    if (sites.length === 0) {
       const li = document.createElement("li");
       li.className = "empty";
       li.textContent = "No disabled sites.";
       disabledList.appendChild(li);
       return;
     }
-    for (const site of disabledSites) {
+    for (const site of sites) {
       const li = document.createElement("li");
       const siteSpan = document.createElement("span");
       siteSpan.textContent = site;
@@ -276,7 +272,7 @@
       btn.type = "button";
       btn.textContent = "Enable";
       btn.addEventListener("click", () => {
-        disabledSites = disabledSites.filter((s) => s !== site);
+        Jari.settings.set({ disabledSites: sites.filter((s) => s !== site) });
         renderDisabled();
       });
       li.appendChild(siteSpan);
@@ -311,10 +307,11 @@
       siteInputEl.focus();
       return;
     }
-    if (disabledSites.includes(host)) {
+    const sites = Jari.settings.getDisabledSites();
+    if (sites.includes(host)) {
       status("Already disabled: " + host);
     } else {
-      disabledSites.push(host);
+      Jari.settings.set({ disabledSites: [...sites, host] });
       status("Disabled: " + host);
     }
     siteInputEl.value = "";

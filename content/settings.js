@@ -36,18 +36,29 @@
   }
 
   function persist() {
-    chrome.storage.sync
-      .set({
-        [STORAGE_KEY]: {
-          keymap: state.keymap,
-          disabledSites: state.disabledSites,
-          scrollStep: state.scrollStep,
-          smoothScroll: state.smoothScroll,
-          timeoutMs: state.timeoutMs,
-          passthroughMs: state.passthroughMs,
-        },
-      })
-      .catch(() => {});
+    return chrome.storage.sync.set({
+      [STORAGE_KEY]: {
+        keymap: state.keymap,
+        disabledSites: state.disabledSites,
+        scrollStep: state.scrollStep,
+        smoothScroll: state.smoothScroll,
+        timeoutMs: state.timeoutMs,
+        passthroughMs: state.passthroughMs,
+      },
+    });
+  }
+
+  // Mutate the in-memory state without touching storage. The options page
+  // edits this way and only writes on Save; the content script persists
+  // immediately via update().
+  function set(patch) {
+    merge(Jari.normalizeSettings({ ...state, ...patch }));
+  }
+
+  // Mutate and persist. Awaitable so callers can report write failures.
+  async function update(patch) {
+    set(patch);
+    await persist();
   }
 
   function getKeymap() {
@@ -83,7 +94,7 @@
     const idx = state.disabledSites.indexOf(host);
     if (idx >= 0) state.disabledSites.splice(idx, 1);
     else state.disabledSites.push(host);
-    persist();
+    persist().catch(() => {});
   }
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -94,6 +105,7 @@
 
   Jari.settings = {
     load,
+    update,
     getKeymap,
     isDisabled,
     getDisabledSites,
