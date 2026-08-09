@@ -192,6 +192,67 @@
     };
   };
 
+  // URL helpers shared by the page-navigation commands ("gu"/"gU") and the
+  // omnibar's URL-vs-search guess.
+  Jari.Url = {
+    // "gu": go one path segment up, keeping the current origin.
+    //   acme.com/1/2/3  ->  acme.com/1/2
+    //   acme.com/1/2/   ->  acme.com/1
+    //   acme.com/1/2/3.html -> acme.com/1/2
+    //   acme.com/       ->  acme.com/  (already root: caller shows a toast)
+    parentUrlOf(href) {
+      try {
+        const url = new URL(href);
+        let path = url.pathname;
+        if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+        const idx = path.lastIndexOf('/');
+        path = idx > 0 ? path.slice(0, idx) : '/';
+        url.pathname = path;
+        url.search = '';
+        url.hash = '';
+        return url.href;
+      } catch {
+        return href;
+      }
+    },
+
+    // "gU": go to the root of the current URL hierarchy (the origin).
+    //   acme.com/1/2/3  ->  acme.com/
+    rootUrlOf(href) {
+      try {
+        const url = new URL(href);
+        url.pathname = '/';
+        url.search = '';
+        url.hash = '';
+        return url.href;
+      } catch {
+        return href;
+      }
+    },
+
+    // Same path, ignoring query/hash: "https://x.com/?ref=1" counts as root
+    // for the already-there check, otherwise navigation with a stale query
+    // reloads.
+    isSamePath(a, b) {
+      try {
+        return new URL(a).pathname === new URL(b).pathname;
+      } catch {
+        return a === b;
+      }
+    },
+
+    // A bare query that is a URL — scheme, protocol-relative, localhost, or a
+    // dotted hostname (with an optional path/port). Everything else is search
+    // terms. The background's normalizeUrl turns bare hosts into https.
+    looksLikeUrl(text) {
+      const s = text.trim();
+      if (!s || /\s/.test(s)) return false;
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith('//')) return true;
+      if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
+      return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
+    },
+  };
+
   // Greedy column balance for the help overlay and the options keymap grid:
   // assign each category to the currently shortest column so the columns end
   // up roughly equal (a category header counts one row + one row per command).

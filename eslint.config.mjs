@@ -23,6 +23,20 @@ export default [
     },
   },
   {
+    // The node:test suites run under Node, not in a browser.
+    files: ["tests/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: {
+        require: "readonly",
+        module: "readonly",
+        __dirname: "readonly",
+        process: "readonly",
+        console: "readonly",
+      },
+    },
+  },
+  {
     files: ["**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,

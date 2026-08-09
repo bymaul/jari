@@ -5,6 +5,7 @@
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "scripts": {
     "lint": "eslint .",
+    "test": "node --test",
     "build:chrome": "node build.js chrome",
     "build:firefox": "node build.js firefox"
   },
