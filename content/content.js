@@ -77,7 +77,6 @@
   function toggleIgnore() {
     exitPassthrough();
     setIgnore(!ignoreMode);
-    Jari.ui.toast(ignoreMode ? 'Ignore mode on' : 'Ignore mode off');
     return ignoreMode;
   }
 
