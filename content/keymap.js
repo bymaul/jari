@@ -52,11 +52,6 @@
     F: 'linkHintsNewTab',
     i: 'focusInput',
 
-    // Find in page
-    '/': 'find',
-    n: 'findNext',
-    N: 'findPrev',
-
     // Page navigation
     r: 'reloadTab',
     R: 'hardReload',
@@ -98,7 +93,6 @@
     { id: 'tabActions', label: 'Tab actions' },
     { id: 'history', label: 'History' },
     { id: 'hints', label: 'Hints' },
-    { id: 'find', label: 'Find in page' },
     { id: 'page', label: 'Page' },
     { id: 'clipboard', label: 'Clipboard' },
     { id: 'modes', label: 'Modes' },
@@ -130,6 +124,13 @@
     ':',
     'S',
   ];
+
+  // Prefix keys ("gg", ";s", "yy", ...) must never double as single-key
+  // bindings — the dispatcher resolves a prefix before the single-key keymap,
+  // so a lone "g" binding would be shadowed and conflict with the prefix
+  // group. Stripped from stored keymaps like unboundKeys, and rejected by the
+  // options-page recorder.
+  Jari.prefixKeys = new Set(Object.keys(Jari.prefixes || {}));
 
   // --- Shared helpers ------------------------------------------------------
   // Loaded by the content scripts and the options page; both must agree on
@@ -167,8 +168,8 @@
   };
 
   // Elements Jari's own overlays create. Content features must not touch
-  // them: find skips their text nodes, hints must not label them.
-  Jari.overlaySelectors = '.jari-overlay, .jari-find-bar, .jari-hint';
+  // them: hints must not label them.
+  Jari.overlaySelectors = '.jari-overlay, .jari-hint';
 
   // Flatten the fixed prefixes ("gg", "gt", ";s", ...) into a
   // commandName -> combined-key lookup, e.g. { scrollTop: 'gg', ... }.
@@ -190,6 +191,7 @@
     const d = data || {};
     const keymap = { ...Jari.keymapDefaults, ...(d.keymap || {}) };
     for (const key of Jari.unboundKeys) delete keymap[key];
+    for (const key of Jari.prefixKeys) delete keymap[key];
     return {
       keymap,
       disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],

@@ -20,7 +20,6 @@
         "content/ui.js",
         "content/commands.js",
         "content/hints.js",
-        "content/find.js",
         "content/tabsearch.js",
         "content/help.js",
         "content/content.js"

@@ -166,6 +166,15 @@
           renderKeymap();
           return;
         }
+        // Prefix keys ("g", ";", "y") start a two-key sequence; the dispatcher
+        // resolves prefixes before the single-key keymap, so a lone binding on
+        // one would be shadowed and conflict with the prefix group.
+        if (window.Jari.prefixKeys.has(combo)) {
+          input.value = previous;
+          status("Prefix key reserved: " + combo + " starts a two-key sequence");
+          renderKeymap();
+          return;
+        }
         // Drop this command's old key(s) and any other command that already
         // uses the new key, then bind. Without this, the command keeps its
         // previous key and keyFor() would show that instead of what was
