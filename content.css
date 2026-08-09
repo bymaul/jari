@@ -323,12 +323,32 @@
   display: none;
 }
 
-/* Hints: labels take the configured accent color. */
-:root {
-  --jari-hint-fg: #141415;
-  --jari-hint-bg: var(--jari-accent);
-  --jari-hint-border-color: var(--jari-accent);
-  --jari-hint-border-width: 1px;
+/* --- Scroll-area highlight (w / gs / gS): translucent wash over the active
+   scroll container with a "current scroll area" label, auto-dismissing. --- */
+.jari-scroll-highlight {
+  position: fixed;
+  z-index: 2147483646 !important;
+  box-sizing: border-box;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0.5ex;
+  background: rgba(245, 184, 0, 0.18);
+  border: 1px solid rgba(245, 184, 0, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.jari-scroll-highlight-label {
+  font-family: var(--jari-font-family);
+  font-size: var(--jari-small-font-size);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #2b2100;
+  background: linear-gradient(to bottom, #ffe98a 0%, #ffd84d 45%, #f5b800 100%);
+  border: 1px solid #9a6d00;
+  padding: 0.25ex 1ex;
 }
 
 /* --- Showcmd readout (Neovim-style key echo), rightmost at the corner. --- */

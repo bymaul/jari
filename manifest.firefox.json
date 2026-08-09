@@ -19,6 +19,7 @@
         "content/settings.js",
         "content/ui.js",
         "content/commands.js",
+        "content/scroll.js",
         "content/hints.js",
         "content/tabsearch.js",
         "content/help.js",
