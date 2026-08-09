@@ -203,8 +203,11 @@
     if (prefixWasPending) {
       const sub = Jari.prefixes[pendingPrefix] || {};
       if (key in sub) commandName = sub[key];
+      // Keep pendingFallback when the sequence does not complete: the dead-key
+      // path below runs the prefix key's own binding. Only a completing key
+      // discards it, since the sequence's command runs instead.
+      if (commandName) pendingFallback = null;
       pendingPrefix = null;
-      pendingFallback = null;
       Jari.ui.showcmd(null);
     }
 
