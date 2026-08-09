@@ -171,55 +171,17 @@
     input.value = "press a key...";
     input.classList.add("recording");
 
-    // A prefix key ("g", ";", "y") cannot be a binding — the dispatcher
-    // treats it as the start of a two-key sequence. Instead of rejecting
-    // outright, the recorder waits for the next real key; Escape or
-    // Backspace cancels the whole attempt.
-    let waitingForKey = false;
+    // A prefix key ("g", ";", "y") can't be bound on its own — it starts a
+    // two-key sequence. Pressing one makes the recorder wait for the next key
+    // and binds the pair ("g" then "o" binds "go"); Escape/Backspace cancels
+    // the wait and returns to "press a key...". Sequences that collide with a
+    // fixed prefix ("gg", ";s", "yy", ...) are refused — the fixed one wins.
+    let waitingPrefix = null;
 
-    const handler = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (window.Jari.modifierKeys.has(event.key)) return; // keep waiting for the real key
-
-      if (event.key === "Escape" || event.key === "Backspace") {
-        input.removeEventListener("keydown", handler);
-        input.classList.remove("recording");
-        if (waitingForKey) {
-          // Cancel a prefix attempt; the existing binding is untouched.
-          input.value = previous;
-          status("Binding cancelled");
-        } else {
-          keymap = Object.fromEntries(Object.entries(keymap).filter(([, cmd]) => cmd !== name));
-          status("Binding cleared");
-        }
-        renderKeymap();
-        return;
-      }
-
-      const combo = window.Jari.canonicalKey(event);
-      if (window.Jari.prefixKeys.has(combo)) {
-        // A prefix key can't be bound; wait for the next key instead. Keep
-        // listening (no renderKeymap — it would replace this input).
-        waitingForKey = true;
-        input.value = "prefix can't be bound — press another key";
-        status("Prefix key " + combo + " can't be bound; press another key, or Esc/Backspace to cancel");
-        return;
-      }
-
-      if (RESERVED_KEYS.test(combo)) {
-        status("Digits 0-9 are reserved for the repeat count");
-        if (waitingForKey) return; // keep waiting for a real key
-        input.removeEventListener("keydown", handler);
-        input.classList.remove("recording");
-        input.value = previous;
-        renderKeymap();
-        return;
-      }
-
+    const commit = (combo) => {
       input.removeEventListener("keydown", handler);
       input.classList.remove("recording");
-      waitingForKey = false;
+      waitingPrefix = null;
       // Drop this command's old key(s) and any other command that already
       // uses the new key, then bind. Without this, the command keeps its
       // previous key and keyFor() would show that instead of what was
@@ -230,6 +192,65 @@
       keymap[combo] = name;
       status("Binding set");
       renderKeymap();
+    };
+
+    const handler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (window.Jari.modifierKeys.has(event.key)) return; // keep waiting for the real key
+
+      if (event.key === "Escape" || event.key === "Backspace") {
+        if (waitingPrefix) {
+          // Cancel the pending prefix and go back to recording; the existing
+          // binding (if any) is untouched.
+          waitingPrefix = null;
+          input.value = "press a key...";
+          status("Prefix cancelled — press a key, or Esc/Backspace to clear the binding");
+          return;
+        }
+        input.removeEventListener("keydown", handler);
+        input.classList.remove("recording");
+        keymap = Object.fromEntries(Object.entries(keymap).filter(([, cmd]) => cmd !== name));
+        status("Binding cleared");
+        renderKeymap();
+        return;
+      }
+
+      const combo = window.Jari.canonicalKey(event);
+
+      if (waitingPrefix) {
+        // Second key of a two-key binding. Refuse digits (reserved for the
+        // repeat count) and fixed prefix sequences ("gg", ";s") — those
+        // always win over a user binding.
+        if (RESERVED_KEYS.test(combo)) {
+          status("Digits 0-9 are reserved for the repeat count");
+          return;
+        }
+        if (window.Jari.prefixes[waitingPrefix] && combo in window.Jari.prefixes[waitingPrefix]) {
+          status(waitingPrefix + combo + " is already a fixed prefix sequence");
+          return;
+        }
+        commit(waitingPrefix + combo);
+        return;
+      }
+
+      if (window.Jari.prefixKeys.has(combo)) {
+        waitingPrefix = combo;
+        input.value = combo + " — press the next key, or Esc/Backspace to cancel";
+        status("Prefix keys can't be bound alone; press the next key of the sequence");
+        return;
+      }
+
+      if (RESERVED_KEYS.test(combo)) {
+        input.removeEventListener("keydown", handler);
+        input.classList.remove("recording");
+        input.value = previous;
+        status("Digits 0-9 are reserved for the repeat count");
+        renderKeymap();
+        return;
+      }
+
+      commit(combo);
     };
     input.addEventListener("keydown", handler);
   }
