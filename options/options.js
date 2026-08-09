@@ -189,14 +189,11 @@
           renderKeymap();
           return;
         }
-        // Prefix keys ("g", ";", "y") start a two-key sequence; the dispatcher
-        // resolves prefixes before the single-key keymap, so a lone binding on
-        // one would be shadowed and conflict with the prefix group.
+        // Prefix keys ("g", ";", "y") start a two-key sequence; a binding on
+        // one still works — it runs when the composition times out without a
+        // completing second key.
         if (window.Jari.prefixKeys.has(combo)) {
-          input.value = previous;
-          status("Prefix key reserved: " + combo + " starts a two-key sequence");
-          renderKeymap();
-          return;
+          status("Prefix key bound — fires when the two-key sequence times out");
         }
         // Drop this command's old key(s) and any other command that already
         // uses the new key, then bind. Without this, the command keeps its

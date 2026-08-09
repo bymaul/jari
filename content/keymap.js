@@ -125,11 +125,9 @@
     'S',
   ];
 
-  // Prefix keys ("gg", ";s", "yy", ...) must never double as single-key
-  // bindings — the dispatcher resolves a prefix before the single-key keymap,
-  // so a lone "g" binding would be shadowed and conflict with the prefix
-  // group. Stripped from stored keymaps like unboundKeys, and rejected by the
-  // options-page recorder.
+  // Prefix keys ("gg", ";s", "yy", ...) double as single-key bindings: the
+  // dispatcher resolves a prefix first, and a bound prefix key runs as a
+  // plain command when the composition times out without a second key.
   Jari.prefixKeys = new Set(Object.keys(Jari.prefixes || {}));
 
   // --- Shared helpers ------------------------------------------------------
@@ -191,7 +189,6 @@
     const d = data || {};
     const keymap = { ...Jari.keymapDefaults, ...(d.keymap || {}) };
     for (const key of Jari.unboundKeys) delete keymap[key];
-    for (const key of Jari.prefixKeys) delete keymap[key];
     return {
       keymap,
       disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],

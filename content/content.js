@@ -14,6 +14,9 @@
 
   let pendingCount = '';
   let pendingPrefix = null;
+  // Single-key command bound to the pending prefix key, if any. It runs only
+  // when the composition times out without a completing second key.
+  let pendingFallback = null;
   let typedSeq = '';
   let timer = null;
   let ignoreMode = false;
@@ -26,13 +29,29 @@
   function clearPending() {
     pendingCount = '';
     pendingPrefix = null;
+    pendingFallback = null;
     typedSeq = '';
     Jari.ui.showcmd(null);
   }
 
   function restartTimer() {
     clearTimeout(timer);
-    timer = setTimeout(clearPending, Jari.settings.getTimeoutMs());
+    timer = setTimeout(expirePending, Jari.settings.getTimeoutMs());
+  }
+
+  // The composition timed out without completing. If the pending prefix key
+  // is also bound as a single-key command, run it now with the pending count
+  // — a bound prefix key works both as a prefix and, when never completed,
+  // as a plain command.
+  function expirePending() {
+    const fallback = pendingFallback;
+    const count = pendingCount ? parseInt(pendingCount, 10) : 1;
+    const seq = typedSeq || pendingPrefix || '';
+    clearPending();
+    if (fallback && Jari.commands[fallback]) {
+      Jari.ui.flash(seq);
+      Jari.commands[fallback].run({ count });
+    }
   }
 
   function isTypingTarget(el) {
@@ -198,6 +217,7 @@
       const sub = Jari.prefixes[pendingPrefix] || {};
       if (key in sub) commandName = sub[key];
       pendingPrefix = null;
+      pendingFallback = null;
       Jari.ui.showcmd(null);
     }
 
@@ -247,9 +267,12 @@
       return;
     }
 
-    // Start a new prefix (e.g. "g", "y").
+    // Start a new prefix (e.g. "g", "y"). A prefix key may also be bound as a
+    // single-key command; it runs only if the composition times out without a
+    // completing second key.
     if (!commandName && Jari.prefixes[key]) {
       pendingPrefix = key;
+      pendingFallback = Jari.settings.getKeymap()[key] || null;
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();
