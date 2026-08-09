@@ -1,6 +1,4 @@
-# Jari
-
-A simple keyboard-driven navigation extension for modern browsers (MV3).
+**Jari** _/ja·ri/_ <ins>noun</ins> 1. The web at your control. 2. A tool to keep your hands firmly on the home row. 2. Simple keyboard-driven navigation for modern browsers.
 
 ## Features
 
@@ -20,8 +18,8 @@ All bindings are rebindable (including multi-key `g`/`;`/`y` prefixes) from the 
 ## Install
 
 1. Load the extension unpacked:
-   - Chrome/Edge: `chrome://extensions` → enable *Developer mode* → *Load unpacked* → select this folder.
-   - Firefox: `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on*.
+   - Chrome/Edge: `chrome://extensions` → enable _Developer mode_ → _Load unpacked_ → select this folder.
+   - Firefox: `about:debugging#/runtime/this-firefox` → _Load Temporary Add-on_.
 2. Build the target manifest first (see below) — the checked-in `manifest.json` targets Chrome.
 
 ## Build
