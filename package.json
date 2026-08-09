@@ -4,7 +4,12 @@
   "private": true,
   "description": "Keyboard-driven navigation extension for Chrome and Firefox.",
   "scripts": {
+    "lint": "eslint .",
     "build:chrome": "node build.js chrome",
     "build:firefox": "node build.js firefox"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1"
   }
 }
