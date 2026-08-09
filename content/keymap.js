@@ -106,7 +106,7 @@
     timeoutMs: 2000,
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
-    passthroughMs: 3000,
+    passthroughMs: 1500,
     accentColor: '#e8b589',
   };
 
@@ -127,7 +127,7 @@
 
   // Prefix keys ("gg", ";s", "yy", ...) double as single-key bindings: the
   // dispatcher resolves a prefix first, and a bound prefix key runs as a
-  // plain command when the composition times out without a second key.
+  // plain command when the next key does not complete the two-key sequence.
   Jari.prefixKeys = new Set(Object.keys(Jari.prefixes || {}));
 
   // --- Shared helpers ------------------------------------------------------
