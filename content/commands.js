@@ -233,11 +233,11 @@
     restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true, run: (c) => Jari.sendMessage("restoreTab", { count: c.count }) },
     pasteOpenTab: {
       category: "tabs",
-      label: "Open clipboard URL in new tab",
+      label: "Open clipboard URL in current tab",
       run: async () => {
         const text = await pasteClipboard();
         if (!text) return Jari.ui.toast("Clipboard empty");
-        const res = await Jari.sendMessage("createTab", { url: text });
+        const res = await Jari.sendMessage("navigate", { url: text });
         if (res && !res.ok) Jari.ui.toast("Not a URL");
       },
     },
