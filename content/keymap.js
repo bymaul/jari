@@ -106,7 +106,7 @@
     timeoutMs: 2000,
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
-    passthroughMs: 1500,
+    passthroughMs: 3000,
     accentColor: '#e8b589',
   };
 
@@ -125,9 +125,11 @@
     'S',
   ];
 
-  // Prefix keys ("gg", ";s", "yy", ...) double as single-key bindings: the
-  // dispatcher resolves a prefix first, and a bound prefix key runs as a
-  // plain command when the next key does not complete the two-key sequence.
+  // Prefix keys ("gg", ";s", "yy", ...) must never double as single-key
+  // bindings — the dispatcher resolves a prefix before the single-key keymap,
+  // so a lone "g" binding would be shadowed and conflict with the prefix
+  // group. Stripped from stored keymaps like unboundKeys, and rejected by the
+  // options-page recorder.
   Jari.prefixKeys = new Set(Object.keys(Jari.prefixes || {}));
 
   // --- Shared helpers ------------------------------------------------------
@@ -189,6 +191,7 @@
     const d = data || {};
     const keymap = { ...Jari.keymapDefaults, ...(d.keymap || {}) };
     for (const key of Jari.unboundKeys) delete keymap[key];
+    for (const key of Jari.prefixKeys) delete keymap[key];
     return {
       keymap,
       disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
