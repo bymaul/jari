@@ -152,7 +152,7 @@
   }
 
   function renderList() {
-    if (mode === "open") {
+    if (mode === "open" || mode === "edit") {
       listEl.textContent = "";
       for (const row of filtered.slice(0, 50)) {
         const li = document.createElement("li");
