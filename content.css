@@ -263,11 +263,10 @@
   pointer-events: none;
 }
 
-/* order fixes the row regardless of DOM insertion order: the mode pill is
-   anchored to the corner (rightmost) so transient feedback never moves it —
-   showcmd and toasts grow to the left instead. */
+/* order fixes the row regardless of DOM insertion order, left to right:
+   toast, mode pill, showcmd (at the corner). */
 .jari-toast {
-  order: 1;
+  order: 0;
   box-sizing: border-box;
   max-width: 60vw;
   font-family: var(--jari-status-font-family);
@@ -280,10 +279,10 @@
   pointer-events: none;
 }
 
-/* --- Mode pill (I / o): persistent while a mode is active, anchored to the
-   corner. Hidden in fullscreen so it never covers fullscreen content. --- */
+/* --- Mode pill (I / o): persistent while a mode is active. Hidden in
+   fullscreen so it never covers fullscreen content. --- */
 .jari-pill {
-  order: 2;
+  order: 1;
   font-family: var(--jari-status-font-family);
   font-size: var(--jari-status-font-size);
   background: var(--jari-status-bg);
@@ -327,9 +326,9 @@
   --jari-hint-border-width: 1px;
 }
 
-/* --- Showcmd readout (Neovim-style key echo), left of the corner row. --- */
+/* --- Showcmd readout (Neovim-style key echo), rightmost at the corner. --- */
 .jari-showcmd {
-  order: 0;
+  order: 2;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
   line-height: 1.4;
