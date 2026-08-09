@@ -221,9 +221,11 @@ const handlers = {
   historyForward: async (sender) => goHistory(sender.tab, 1),
 
   listTabs: async () => {
-    const tabs = await chrome.tabs.query({ currentWindow: true });
+    // Search every window, not just the current one.
+    const tabs = await chrome.tabs.query({});
     return tabs.map((tab) => ({
       id: tab.id,
+      windowId: tab.windowId,
       title: tab.title || "",
       url: tab.url || "",
       active: !!tab.active,
@@ -231,9 +233,18 @@ const handlers = {
   },
 
   activateTab: async (_, { id } = {}) => {
-    if (id) {
-      await chrome.tabs.update(id, { active: true });
+    if (!id) return { ok: false };
+    // The tab may live in another window: focus that window first, then
+    // activate the tab, so choosing it actually switches to it.
+    let windowId = null;
+    try {
+      const tab = await chrome.tabs.get(id);
+      windowId = tab && tab.windowId;
+    } catch {
+      // Tab closed since the list was drawn; fall through to activate.
     }
+    if (windowId) await chrome.windows.update(windowId, { focused: true });
+    await chrome.tabs.update(id, { active: true });
     return { ok: true };
   },
 

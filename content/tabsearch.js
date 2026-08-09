@@ -73,14 +73,26 @@
 
   function renderList() {
     listEl.textContent = "";
-    for (const tab of filtered.slice(0, 50)) {
+    // Label windows #1, #2, ... in order of first appearance so tabs from
+    // different windows are distinguishable in the list.
+    const winLabels = new Map();
+    let winIndex = 0;
+    const rows = filtered.slice(0, 50);
+    for (const tab of rows) {
+      if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
+    }
+    for (const tab of rows) {
       const li = document.createElement("li");
+      const win = document.createElement("span");
+      win.className = "jari-win-tag";
+      win.textContent = "#" + winLabels.get(tab.windowId);
       const title = document.createElement("span");
       title.className = "title";
       title.textContent = tab.title || "(untitled)";
       const url = document.createElement("span");
       url.className = "url";
       url.textContent = tab.url || "";
+      li.appendChild(win);
       li.appendChild(title);
       li.appendChild(url);
       listEl.appendChild(li);
