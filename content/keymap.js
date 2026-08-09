@@ -118,7 +118,6 @@
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
     passthroughMs: 3000,
-    accentColor: '#e8b589',
   };
 
   // Bindings removed from the defaults after a keybind overhaul. Stripped from
@@ -174,10 +173,6 @@
     return parts.join('+');
   };
 
-  Jari.isColor = function isColor(value) {
-    return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
-  };
-
   // Elements Jari's own overlays create. Content features must not touch
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
@@ -193,21 +188,17 @@
     return {
       keymap,
       disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
-      scrollStep: Number.isFinite(d.scrollStep)
-        ? d.scrollStep
-        : Jari.settingsDefaults.scrollStep,
-      smoothScroll: typeof d.smoothScroll === 'boolean'
-        ? d.smoothScroll
-        : Jari.settingsDefaults.smoothScroll,
-      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
-        ? d.timeoutMs
-        : Jari.settingsDefaults.timeoutMs,
-      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
-        ? d.passthroughMs
-        : Jari.settingsDefaults.passthroughMs,
-      accentColor: Jari.isColor(d.accentColor)
-        ? d.accentColor
-        : Jari.settingsDefaults.accentColor,
+      scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : Jari.settingsDefaults.scrollStep,
+      smoothScroll:
+        typeof d.smoothScroll === 'boolean' ? d.smoothScroll : Jari.settingsDefaults.smoothScroll,
+      timeoutMs:
+        Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
+          ? d.timeoutMs
+          : Jari.settingsDefaults.timeoutMs,
+      passthroughMs:
+        Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
+          ? d.passthroughMs
+          : Jari.settingsDefaults.passthroughMs,
     };
   };
 

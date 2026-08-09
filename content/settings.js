@@ -14,7 +14,6 @@
     smoothScroll: Jari.settingsDefaults.smoothScroll,
     timeoutMs: Jari.settingsDefaults.timeoutMs,
     passthroughMs: Jari.settingsDefaults.passthroughMs,
-    accentColor: Jari.settingsDefaults.accentColor,
   };
 
   function merge(data) {
@@ -25,13 +24,6 @@
     state.smoothScroll = s.smoothScroll;
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
-    state.accentColor = s.accentColor;
-    applyAccent();
-  }
-
-  // Live theme: pages pick the accent up from this CSS variable.
-  function applyAccent() {
-    document.documentElement.style.setProperty("--jari-accent", state.accentColor);
   }
 
   async function load() {
@@ -53,7 +45,6 @@
           smoothScroll: state.smoothScroll,
           timeoutMs: state.timeoutMs,
           passthroughMs: state.passthroughMs,
-          accentColor: state.accentColor,
         },
       })
       .catch(() => {});
@@ -87,10 +78,6 @@
     return state.passthroughMs;
   }
 
-  function getAccentColor() {
-    return state.accentColor;
-  }
-
   function toggleDisabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -114,7 +101,6 @@
     isSmoothScroll,
     getTimeoutMs,
     getPassthroughMs,
-    getAccentColor,
     toggleDisabled,
   };
 })();

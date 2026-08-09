@@ -1,20 +1,17 @@
 /* Jari content styles — injected into pages via manifest "css".
    Jari's own UI (help overlay, tab search, toast) follows the
    site's light/dark scheme, with both palettes styled to match the settings
-   page: warm neutrals, tight borders, amber accent. */
+   page: warm neutrals, tight borders, gold hint labels. */
 
 :root {
   /* Generic */
   --jari-font-family: monospace;
-  --jari-font-family-sans: sans-serif;
   --jari-font-size: 12pt;
   --jari-small-font-size: calc(var(--jari-font-size) * 0.75);
   /* Light palette: cool paper, the light suit of the vague dark scheme. */
   --jari-bg: #f5f5f7;
   --jari-fg: #333738;
-  /* Live accent: set from settings (Jari.settings.getAccentColor()).
-     Default is vague Amber. */
-  --jari-accent: #e8b589;
+  --jari-muted: #606079;
 
   /* Status pill (toast) */
   --jari-status-font-family: var(--jari-font-family);
@@ -22,16 +19,6 @@
   --jari-status-bg: var(--jari-bg);
   --jari-status-fg: var(--jari-fg);
   --jari-status-border: 1px solid #c5c5cf;
-
-  /* Hint labels */
-  --jari-hint-font-family: var(--jari-font-family-sans);
-  --jari-hint-font-size: calc(var(--jari-font-size) * 0.6);
-  --jari-hint-font-weight: bold;
-  --jari-hint-fg: white;
-  --jari-hint-bg: red;
-  --jari-hint-border-color: ButtonShadow;
-  --jari-hint-border-width: 0px;
-  --jari-hint-border-style: solid;
 
   /* Command line */
   --jari-cmdl-bg: var(--jari-bg);
@@ -53,11 +40,11 @@
   --jari-header-font-weight: bold;
   --jari-header-border-bottom: 1px solid #c5c5cf;
 
-  --jari-url-fg: var(--jari-accent);
+  --jari-url-fg: var(--jari-muted);
   --jari-url-bg: var(--jari-bg);
 
-  --jari-of-fg: #141415;
-  --jari-of-bg: var(--jari-accent);
+  --jari-of-fg: var(--jari-bg);
+  --jari-of-bg: var(--jari-fg);
 }
 
 /* Dark palette: the vague colorscheme's colors, lifted a few notches
@@ -66,6 +53,7 @@
   :root {
     --jari-bg: #1e1e26;
     --jari-fg: #d9d9de;
+    --jari-muted: #606079;
     --jari-status-border: 1px solid #3f4346;
     --jari-cmdl-fg: #d9d9de;
     --jari-cmplt-border-top: 1px solid #3f4346;
@@ -114,7 +102,7 @@
 .jari-tabsearch-header,
 .jari-help-title {
   background: var(--jari-header-bg);
-  color: var(--jari-accent);
+  color: var(--jari-fg);
   font-size: var(--jari-header-font-size);
   font-weight: var(--jari-header-font-weight);
   border-bottom: var(--jari-header-border-bottom);
@@ -203,7 +191,7 @@
   background: var(--jari-header-bg);
   font-size: var(--jari-header-font-size);
   font-weight: var(--jari-header-font-weight);
-  color: var(--jari-accent);
+  color: var(--jari-fg);
   text-align: left;
   border-bottom: var(--jari-cmplt-border-top);
   padding: 0.25ex 0.5ex;
@@ -221,7 +209,7 @@
 .jari-help td.jari-help-key {
   width: 40%;
   font-weight: bold;
-  color: var(--jari-accent);
+  color: var(--jari-fg);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
 }
 
