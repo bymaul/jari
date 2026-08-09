@@ -159,18 +159,18 @@ const handlers = {
     await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
     const tabs = await chrome.tabs.query({ windowId: targetWindowId });
     const last = tabs[tabs.length - 1];
-    if (last) {
-      // Focus the target window (restoring it if minimized), then activate the
-      // merged tab. The moved tab is appended at the end, so the window's last
-      // tab is the merged one — re-queried fresh, since the sender's tab object
-      // can go stale once its old window closes.
-      try {
-        await chrome.windows.update(targetWindowId, { focused: true, state: "normal" });
-      } catch (err) {
-        console.error("[jari] mergeTab window focus failed", err);
+      if (last) {
+        // Focus the target window (restoring it if minimized), then activate
+        // the merged tab. The moved tab is appended at the end, so the
+        // window's last tab is the merged one — re-queried fresh, since the
+        // sender's tab object can go stale once its old window closes.
+        try {
+          await focusWindow(targetWindowId);
+        } catch (err) {
+          console.error("[jari] mergeTab window focus failed", err);
+        }
+        await chrome.tabs.update(last.id, { active: true });
       }
-      await chrome.tabs.update(last.id, { active: true });
-    }
     return { ok: true };
   },
 
@@ -258,9 +258,9 @@ const handlers = {
       // Tab closed since the list was drawn; the update below will fail too.
     }
     // Activate the tab first, then bring its window forward. tabs.update
-    // alone does not focus the window, and windows.update needs state
-    // "normal" to also restore a minimized target window. Each step is
-    // independent so one failure cannot block the other.
+    // alone does not focus the window, and a minimized window must be
+    // restored too. Each step is independent so one failure cannot block the
+    // other.
     if (id) {
       try {
         await chrome.tabs.update(id, { active: true });
@@ -270,7 +270,7 @@ const handlers = {
     }
     if (windowId) {
       try {
-        await chrome.windows.update(windowId, { focused: true, state: "normal" });
+        await focusWindow(windowId);
       } catch (err) {
         console.error("[jari] activateTab window focus failed", err);
       }
@@ -345,6 +345,18 @@ async function switchTab(current, delta) {
   const nextIndex = (((index + delta) % tabs.length) + tabs.length) % tabs.length;
   await chrome.tabs.update(tabs[nextIndex].id, { active: true });
   return { ok: true };
+}
+
+// Bring a window forward without wrecking its size. Passing state: "normal"
+// unconditionally un-maximizes maximized windows and exits fullscreen, so
+// only request it when the window is actually minimized.
+async function focusWindow(windowId) {
+  const win = await chrome.windows.get(windowId);
+  if (win && win.state === "minimized") {
+    await chrome.windows.update(windowId, { focused: true, state: "normal" });
+  } else {
+    await chrome.windows.update(windowId, { focused: true });
+  }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
