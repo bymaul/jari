@@ -1,10 +1,15 @@
-// Jari: tab-search mode (g t).
-// Shows a filterable list of tabs. Typing filters by title/URL, arrows move
-// the selection, Enter activates, Escape closes.
+// Jari: tab-search mode (g t) and the "t" omnibar.
+// "gt" shows a filterable list of tabs: typing filters by title/URL, arrows
+// move the selection, Enter activates, Escape closes.
 //
-// Also serves as the merge picker for splitOrMergeTab: in a single-tab window
-// it lists the tabs of the other windows and Enter moves this tab into the
-// chosen one.
+// "t" (omnibar) reuses the same overlay to open a URL or search: the first
+// row is the typed query (opened as a URL when it looks like one, otherwise
+// searched with the default engine), below it come autocomplete matches from
+// the browser (history, bookmarks, open tabs).
+//
+// Both are modes over one overlay; tabsearch also serves as the merge
+// picker for splitOrMergeTab: in a single-tab window it lists the tabs of
+// the other windows and Enter moves this tab into the chosen one.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
@@ -15,7 +20,9 @@
   let tabs = [];
   let filtered = [];
   let selected = 0;
-  let mergeData = null; // { ownTabId, ownWindowId } when in merge mode
+  let mode = "tabs"; // "tabs" | "merge" | "open"
+  let suggestSeq = 0; // invalidates in-flight suggestion fetches
+  let suggestTimer = null;
 
   function isActive() {
     return active;
@@ -25,9 +32,19 @@
     if (active) return;
     tabs = (await Jari.sendMessage("listTabs")) || [];
     if (tabs.length === 0) return;
-    mergeData = null;
+    mode = "tabs";
     active = true;
     render("Tabs", "Search tabs...");
+  }
+
+  // "t": open a URL or search. The omnibar needs no initial data — the list
+  // is built from the typed query as it comes in.
+  function openOmnibar() {
+    if (active) return;
+    tabs = [];
+    mode = "open";
+    active = true;
+    render("Open", "Search or type URL");
   }
 
   // Merge picker: entries are the OTHER windows (title = active tab, subtitle
@@ -35,9 +52,52 @@
   function openMerge(data) {
     if (active) return;
     tabs = (data && data.tabs) || [];
-    mergeData = data || null;
+    mode = "merge";
     active = true;
     render("Merge into", "Choose a window...");
+  }
+
+  // A bare query that is a URL — scheme, protocol-relative, localhost, or a
+  // dotted hostname (with an optional path/port). Everything else is search
+  // terms. The background's normalizeUrl turns bare hosts into https.
+  function looksLikeUrl(text) {
+    const s = text.trim();
+    if (!s || /\s/.test(s)) return false;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith("//")) return true;
+    if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
+  }
+
+  // Omnibar input: row 0 is always the typed query — labeled as an open or a
+  // search depending on looksLikeUrl — and the suggestions arrive async,
+  // debounced, replacing that row's list. A stale response (query changed or
+  // overlay closed) is dropped via suggestSeq.
+  function handleOpenInput(query) {
+    const q = query.trim();
+    if (!q) {
+      clearTimeout(suggestTimer);
+      suggestSeq++;
+      filtered = [];
+      selected = 0;
+      renderList();
+      return;
+    }
+    const row = looksLikeUrl(q)
+      ? { kind: "url", title: q, url: q }
+      : { kind: "search", title: q, url: null };
+    filtered = [row];
+    selected = 0;
+    renderList();
+    clearTimeout(suggestTimer);
+    const seq = ++suggestSeq;
+    suggestTimer = setTimeout(async () => {
+      if (!active || seq !== suggestSeq) return;
+      const res = (await Jari.sendMessage("suggest", { query: q })) || [];
+      if (!active || seq !== suggestSeq) return;
+      filtered = [row, ...res.map((r) => ({ kind: "suggestion", title: r.title, url: r.url }))];
+      selected = 0;
+      renderList();
+    }, 130);
   }
 
   function render(title, placeholder) {
@@ -48,10 +108,15 @@
     inputEl.type = "text";
     inputEl.placeholder = placeholder;
     inputEl.addEventListener("input", () => {
-      const query = inputEl.value.toLowerCase();
-      filtered = tabs.filter((tab) => (tab.title + " " + tab.url).toLowerCase().includes(query));
-      selected = 0;
-      renderList();
+      const query = inputEl.value;
+      if (mode === "open") {
+        handleOpenInput(query);
+      } else {
+        const q = query.toLowerCase();
+        filtered = tabs.filter((tab) => (tab.title + " " + tab.url).toLowerCase().includes(q));
+        selected = 0;
+        renderList();
+      }
     });
 
     listEl = document.createElement("ul");
@@ -72,6 +137,29 @@
   }
 
   function renderList() {
+    if (mode === "open") {
+      listEl.textContent = "";
+      for (const row of filtered.slice(0, 50)) {
+        const li = document.createElement("li");
+        const title = document.createElement("span");
+        title.className = "title";
+        title.textContent =
+          row.kind === "search"
+            ? `Search for "${row.title}"`
+            : row.kind === "url"
+              ? `Open ${row.title}`
+              : row.title || "(untitled)";
+        const url = document.createElement("span");
+        url.className = "url";
+        url.textContent = row.kind === "suggestion" ? row.url || "" : "";
+        li.appendChild(title);
+        li.appendChild(url);
+        listEl.appendChild(li);
+      }
+      highlight();
+      return;
+    }
+
     listEl.textContent = "";
     // Label windows #1, #2, ... in order of first appearance so tabs from
     // different windows are distinguishable in the list.
@@ -153,20 +241,30 @@
   }
 
   function activate() {
-    const tab = filtered[selected];
-    if (tab) {
-      if (mergeData) {
-        // Merge mode: entries are windows; the background moves this tab into
-        // the picked window and focuses it there.
-        Jari.sendMessage("mergeTab", { targetWindowId: tab.windowId });
-      } else {
-        Jari.sendMessage("activateTab", { id: tab.id });
-      }
+    const item = filtered[selected];
+    if (!item) {
+      // Nothing selected: in the omnibar an empty query still opens a blank
+      // new tab, preserving the old "t" behavior.
+      if (mode === "open" && !inputEl.value.trim()) Jari.sendMessage("createTab");
+      close();
+      return;
+    }
+    if (mode === "merge") {
+      // Merge mode: entries are windows; the background moves this tab into
+      // the picked window and focuses it there.
+      Jari.sendMessage("mergeTab", { targetWindowId: item.windowId });
+    } else if (mode === "open") {
+      if (item.kind === "search") Jari.sendMessage("search", { query: inputEl.value });
+      else if (item.url) Jari.sendMessage("createTab", { url: item.url });
+    } else {
+      Jari.sendMessage("activateTab", { id: item.id });
     }
     close();
   }
 
   function close() {
+    clearTimeout(suggestTimer);
+    suggestSeq++;
     if (overlay) {
       overlay.remove();
       overlay = null;
@@ -176,9 +274,9 @@
     tabs = [];
     filtered = [];
     selected = 0;
-    mergeData = null;
+    mode = "tabs";
     active = false;
   }
 
-  Jari.TabSearch = { open, openMerge, close, onKeyDown, isActive };
+  Jari.TabSearch = { open, openOmnibar, openMerge, close, onKeyDown, isActive };
 })();

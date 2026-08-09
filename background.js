@@ -248,6 +248,57 @@ const handlers = {
     }));
   },
 
+  // Autocomplete for the "t" omnibar: matching history, bookmarks and open
+  // tabs, deduped by URL (history wins). Each source is best-effort — a
+  // missing permission just skips it.
+  suggest: async (_, { query = "" } = {}) => {
+    const q = query.trim().toLowerCase();
+    const items = [];
+    const seen = new Set();
+    function push(title, url, source) {
+      if (!url || seen.has(url)) return;
+      seen.add(url);
+      items.push({ title: title || url, url, source });
+    }
+    if (q) {
+      try {
+        const results = await chrome.history.search({ text: q, maxResults: 12, startTime: 0 });
+        for (const item of results) push(item.title, item.url, "history");
+      } catch {}
+      try {
+        const bms = await chrome.bookmarks.search(q);
+        for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark");
+      } catch {}
+    }
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        const title = tab.title || "";
+        const url = tab.url || "";
+        if (!q || title.toLowerCase().includes(q) || url.toLowerCase().includes(q)) {
+          push(title, url, "tab");
+        }
+      }
+    } catch {}
+    return items.slice(0, 15);
+  },
+
+  // Search with the browser's default engine in a new foreground tab.
+  // chrome.search.query is cross-browser (Chrome + Firefox 111+); fall back
+  // to a plain search URL if the API is unavailable.
+  search: async (_, { query = "" } = {}) => {
+    const text = query.trim();
+    if (!text) return { ok: false };
+    if (typeof chrome.search?.query === "function") {
+      await chrome.search.query({ text, disposition: "NEW_TAB" });
+      return { ok: true };
+    }
+    await chrome.tabs.create({
+      url: "https://www.google.com/search?q=" + encodeURIComponent(text),
+    });
+    return { ok: true };
+  },
+
   activateTab: async (_, { id } = {}) => {
     if (!id) return { ok: false };
     let windowId = null;

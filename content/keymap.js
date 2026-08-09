@@ -36,7 +36,7 @@
     '-': 'zoomOut',
 
     // Tabs
-    t: 'newTab',
+    t: 'omnibar',
     x: 'closeTab',
     X: 'restoreTab',
     H: 'previousTab',
