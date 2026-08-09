@@ -1970,9 +1970,13 @@
 
     // Strict prefix composition: while a prefix is pending, a key that does
     // not complete it is a dead key, not a single-key command — "gi" must
-    // never fall through to run "i". (Form fields were handled above, so
-    // typing in an input still passes through normally.)
+    // never fall through to run "i", and the completing key must not reach
+    // the page either (an unbound "g/" must not fire a site's "/" shortcut).
+    // (Form fields were handled above, so typing in an input still passes
+    // through normally.)
     if (prefixWasPending && !commandName) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       clearPending();
       return;
     }
