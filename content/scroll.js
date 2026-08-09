@@ -58,7 +58,7 @@
       const canY = el.scrollHeight > el.clientHeight + 1;
       const canX = el.scrollWidth > el.clientWidth + 1;
       if (!canY && !canX) continue;
-      const style = getComputedStyle(el);
+      const style = window.getComputedStyle(el);
       const overflowY = style.overflowY;
       const overflowX = style.overflowX;
       const scrollableY =
@@ -79,10 +79,10 @@
   function pageCanScroll() {
     const el = document.scrollingElement || document.documentElement;
     if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
-    const y = getComputedStyle(el).overflowY;
+    const y = window.getComputedStyle(el).overflowY;
     if (y === 'hidden' || y === 'clip') return false;
     if (y === 'visible' && document.body) {
-      const bodyY = getComputedStyle(document.body).overflowY;
+      const bodyY = window.getComputedStyle(document.body).overflowY;
       if (bodyY === 'hidden' || bodyY === 'clip') return false;
     }
     return true;

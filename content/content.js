@@ -304,8 +304,8 @@
     document.addEventListener('fullscreenchange', handleFullscreenChange);
   }
 
-  Jari.Ignore = { toggle: toggleIgnore, isActive: () => ignoreMode };
-  Jari.Passthrough = { enter: enterPassthrough, isActive: () => passthroughMode };
+  Jari.Ignore = { toggle: toggleIgnore };
+  Jari.Passthrough = { enter: enterPassthrough };
 
   boot();
 })();
