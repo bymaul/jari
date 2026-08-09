@@ -17,11 +17,24 @@
     });
   }
 
+  // Shared fixed container for the corner UI (toast, showcmd, mode pill): a
+  // single flex row pinned flush to the bottom-right so the three sit side by
+  // side instead of stacking. Lazy — created on first use.
+  let statusStack = null;
+  function statusContainer() {
+    if (!statusStack) {
+      statusStack = document.createElement("div");
+      statusStack.className = "jari-status-stack";
+      document.body.appendChild(statusStack);
+    }
+    return statusStack;
+  }
+
   function toast(message) {
     const el = document.createElement("div");
     el.className = "jari-toast";
     el.textContent = message;
-    document.body.appendChild(el);
+    statusContainer().appendChild(el);
     setTimeout(() => el.remove(), 1500);
   }
 
@@ -58,7 +71,7 @@
     if (!showcmdEl) {
       showcmdEl = document.createElement("div");
       showcmdEl.className = "jari-showcmd";
-      document.body.appendChild(showcmdEl);
+      statusContainer().appendChild(showcmdEl);
     }
     showcmdEl.textContent = text;
   }
@@ -71,5 +84,5 @@
   }
 
   Jari.sendMessage = sendMessage;
-  Jari.ui = { toast, showcmd, flash, copyText };
+  Jari.ui = { toast, showcmd, flash, copyText, statusContainer };
 })();

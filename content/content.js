@@ -12,9 +12,9 @@
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
-  let pendingCount = "";
+  let pendingCount = '';
   let pendingPrefix = null;
-  let typedSeq = "";
+  let typedSeq = '';
   let timer = null;
   let ignoreMode = false;
   let passthroughMode = false;
@@ -24,9 +24,9 @@
   // The user stopped mid-composition (Escape, dead key, ignore toggle, or
   // inactivity timeout): drop count/prefix state and the echo.
   function clearPending() {
-    pendingCount = "";
+    pendingCount = '';
     pendingPrefix = null;
-    typedSeq = "";
+    typedSeq = '';
     Jari.ui.showcmd(null);
   }
 
@@ -38,11 +38,11 @@
   function isTypingTarget(el) {
     return (
       !!el &&
-      (el.tagName === "INPUT" ||
-        el.tagName === "TEXTAREA" ||
-        el.tagName === "SELECT" ||
+      (el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.tagName === 'SELECT' ||
         el.isContentEditable ||
-        el.getAttribute("role") === "textbox")
+        el.getAttribute('role') === 'textbox')
     );
   }
 
@@ -68,16 +68,16 @@
       Jari.Help.close();
       Jari.Hints.cancel();
       Jari.TabSearch.close();
-      showPill("ignore", "Ignore mode");
+      showPill('ignore', 'Ignore mode');
     } else {
-      hidePill("ignore");
+      hidePill('ignore');
     }
   }
 
   function toggleIgnore() {
     exitPassthrough();
     setIgnore(!ignoreMode);
-    Jari.ui.toast(ignoreMode ? "Ignore mode on" : "Ignore mode off");
+    Jari.ui.toast(ignoreMode ? 'Ignore mode on' : 'Ignore mode off');
     return ignoreMode;
   }
 
@@ -92,7 +92,7 @@
     Jari.Hints.cancel();
     Jari.TabSearch.close();
     passthroughMode = true;
-    showPill("passthrough", "Passthrough");
+    showPill('passthrough', 'Passthrough (' + Jari.settings.getPassthroughMs() + 'ms)');
     clearTimeout(passthroughTimer);
     passthroughTimer = setTimeout(exitPassthrough, Jari.settings.getPassthroughMs());
   }
@@ -101,7 +101,7 @@
     if (!passthroughMode) return;
     clearTimeout(passthroughTimer);
     passthroughMode = false;
-    hidePill("passthrough");
+    hidePill('passthrough');
   }
 
   function isFullscreen() {
@@ -113,7 +113,7 @@
     const el = document.createElement("div");
     el.className = "jari-pill";
     el.textContent = text;
-    document.body.appendChild(el);
+    Jari.ui.statusContainer().appendChild(el);
     pills[name] = el;
   }
 
@@ -131,11 +131,11 @@
   function handleFullscreenChange() {
     if (!ignoreMode && !passthroughMode) return;
     if (isFullscreen()) {
-      hidePill("ignore");
-      hidePill("passthrough");
+      hidePill('ignore');
+      hidePill('passthrough');
     } else {
-      if (ignoreMode) showPill("ignore", "Ignore mode");
-      if (passthroughMode) showPill("passthrough", "Passthrough");
+      if (ignoreMode) showPill('ignore', 'Ignore mode');
+      if (passthroughMode) showPill('passthrough', 'Passthrough');
     }
   }
 
@@ -154,7 +154,7 @@
     // Passthrough mode: the page owns every key except Escape, which leaves
     // the mode early; the timeout exits it on its own.
     if (passthroughMode) {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         exitPassthrough();
@@ -165,8 +165,8 @@
     // Ignore mode: everything passes through except the toggle itself and
     // Escape, both of which leave the mode.
     if (ignoreMode) {
-      const plainI = event.key === "I" && !event.ctrlKey && !event.altKey && !event.metaKey;
-      if (plainI || event.key === "Escape") {
+      const plainI = event.key === 'I' && !event.ctrlKey && !event.altKey && !event.metaKey;
+      if (plainI || event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         toggleIgnore();
@@ -178,7 +178,7 @@
     // intercepted, every other key reaches the page untouched.
     if (Jari.settings.isDisabled()) {
       const key = Jari.canonicalKey(event);
-      if (Jari.settings.getKeymap()[key] === "toggleDisabled") run("toggleDisabled", 1, event);
+      if (Jari.settings.getKeymap()[key] === 'toggleDisabled') run('toggleDisabled', 1, event);
       return;
     }
 
@@ -205,8 +205,8 @@
     // site-toggle shortcut.
     const activeEl = document.activeElement;
     if (isTypingTarget(activeEl)) {
-      if (commandName === "toggleDisabled") run(commandName, 1, event);
-      else if (event.key === "Escape") {
+      if (commandName === 'toggleDisabled') run(commandName, 1, event);
+      else if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         activeEl.blur();
@@ -226,7 +226,7 @@
     // Escape with no form field focused cancels a pending count. When idle,
     // leave Escape to the page — sites use it to close dialogs, and Jari has
     // nothing to clear.
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       if (pendingCount) {
         event.preventDefault();
         event.stopPropagation();
@@ -267,13 +267,13 @@
     }
 
     const count = pendingCount ? parseInt(pendingCount, 10) : 1;
-    const hadCount = pendingCount !== "";
-    pendingCount = "";
+    const hadCount = pendingCount !== '';
+    pendingCount = '';
     // Append the completing key even when it finished a prefix, so the echo
     // shows the full sequence ("g$", "gg", ";s") rather than just the prefix.
     typedSeq += key;
     const seq = typedSeq || key;
-    typedSeq = "";
+    typedSeq = '';
     // Echo only compositions: a count or a finished prefix. Plain single-key
     // commands show nothing — the readout exists to track what is pending.
     if (hadCount || prefixWasPending) Jari.ui.flash(seq);
@@ -285,7 +285,7 @@
   async function boot() {
     await Jari.settings.load();
 
-    Jari.Events.on("settingsChanged", () => {
+    Jari.Events.on('settingsChanged', () => {
       if (Jari.settings.isDisabled()) {
         setIgnore(false);
         exitPassthrough();
@@ -295,8 +295,8 @@
       }
     });
 
-    document.addEventListener("keydown", handleKeydown, true);
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener('keydown', handleKeydown, true);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
   }
 
   Jari.Ignore = { toggle: toggleIgnore, isActive: () => ignoreMode };
