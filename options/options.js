@@ -192,21 +192,15 @@
 
   function save() {
     collectScrollSettings();
-    const next = {};
-    for (const [name, cmd] of Object.entries(COMMANDS)) {
-      if (cmd.hidden) continue;
-      const row = tableEl.querySelector(`tr[data-command="${name}"]`);
-      const input = row && row.querySelector("input");
-      if (input && input.value && !input.classList.contains("prefix")) next[input.value] = name;
-    }
-    keymap = next;
+    // keymap state is authoritative — the recording handler mutates it and
+    // the inputs only mirror it — so persist it directly instead of
+    // re-reading the DOM (which could store empty keys from stale inputs).
     chrome.storage.sync
       .set({
-        [STORAGE_KEY]: { keymap: next, disabledSites, scrollStep, smoothScroll, timeoutMs, accentColor },
+        [STORAGE_KEY]: { keymap, disabledSites, scrollStep, smoothScroll, timeoutMs, accentColor },
       })
       .then(() => status("Saved"))
       .catch(() => status("Save failed"));
-    renderKeymap();
   }
 
   function reset() {

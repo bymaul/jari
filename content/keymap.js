@@ -162,6 +162,10 @@
     return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
   };
 
+  // Elements Jari's own overlays create. Content features must not touch
+  // them: find skips their text nodes, hints must not label them.
+  Jari.overlaySelectors = '.jari-overlay, .jari-find-bar, .jari-hint';
+
   // Flatten the fixed prefixes ("gg", "gt", ";s", ...) into a
   // commandName -> combined-key lookup, e.g. { scrollTop: 'gg', ... }.
   Jari.flattenPrefixes = function flattenPrefixes() {

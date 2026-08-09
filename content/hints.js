@@ -111,7 +111,7 @@
   // not hidden, and not an anchor without a usable href.
   function isInteractive(el) {
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
-    if (el.closest(".jari-overlay, .jari-hint")) return false;
+    if (el.closest(Jari.overlaySelectors)) return false;
     if (el.tagName === "A" || el.tagName === "AREA") {
       const href = el.getAttribute("href");
       if (href === null || href.trim() === "") return false;
