@@ -1,4 +1,4 @@
-// Jari: tab-search mode (gt).
+// Jari: tab-search mode (g t).
 // Shows a filterable list of tabs. Typing filters by title/URL, arrows move
 // the selection, Enter activates, Escape closes.
 //

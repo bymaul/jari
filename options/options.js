@@ -7,11 +7,6 @@
   const SETTINGS_DEFAULTS = window.Jari.settingsDefaults;
   const COMMANDS = window.Jari.commands;
 
-  // Fixed prefixes ("gg", "gt", ...) live in Jari.prefixes. They are shown
-  // in the key fields so the user can see them, but they cannot be rebound —
-  // Backspace only clears the single-key binding.
-  const PREFIXES = window.Jari.flattenPrefixes();
-
   const tableEl = document.querySelector("#keymap-table");
   const saveBtn = document.querySelector("#save");
   const resetBtn = document.querySelector("#reset");
@@ -136,13 +131,7 @@
       input.type = "text";
       input.readOnly = true;
       input.value = keyFor(name);
-      const isPrefix = !hasKeyBinding(name) && Boolean(PREFIXES[name]);
-      if (isPrefix) {
-        input.classList.add("prefix");
-        input.title = "Fixed prefix, cannot be rebound";
-      } else {
-        input.title = "Click, then press a key to rebind. Backspace clears.";
-      }
+      input.title = "Click, then press a key to rebind. Backspace clears.";
       input.addEventListener("focus", () => startRecording(input, name));
 
       keyTd.appendChild(input);
@@ -155,15 +144,11 @@
     return table;
   }
 
-  function hasKeyBinding(commandName) {
-    return Object.values(keymap).includes(commandName);
-  }
-
   function keyFor(commandName) {
     for (const [key, name] of Object.entries(keymap)) {
       if (name === commandName) return key;
     }
-    return PREFIXES[commandName] || "";
+    return "";
   }
 
   function startRecording(input, name) {
