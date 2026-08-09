@@ -1,6 +1,6 @@
 {
   "name": "jari",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "scripts": {

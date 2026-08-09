@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jari",
-  "version": "0.2",
+  "version": "0.3",
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "permissions": ["tabs", "storage", "sessions", "clipboardWrite", "clipboardRead", "history", "bookmarks", "search"],
   "background": {
