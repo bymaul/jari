@@ -241,13 +241,6 @@ code {
   color: #1e1e26;
 }
 
-#keymap-table td input.prefix {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  color: var(--accent);
-  text-shadow: 0 0 4px rgba(232, 181, 137, 0.35);
-}
-
 /* Keymap filter */
 #keymap-filter {
   width: 100%;

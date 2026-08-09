@@ -190,16 +190,14 @@
 
     const key = Jari.canonicalKey(event);
 
-    // Resolve a pending prefix, e.g. "gt", "gg". The composed keys stay
-    // in typedSeq so the showcmd readout can echo them on execution. A
-    // custom two-key binding from the user keymap ("go" = "g" then "o")
-    // overrides a fixed sequence ("gt" = tab search), falling back to the
-    // fixed prefixes when the key is not bound.
+    // Resolve a pending prefix, e.g. a user-bound "go" = "g" then "o". The
+    // composed keys stay in typedSeq so the showcmd readout can echo them on
+    // execution. Sequences are entirely user-defined; unbound pairs resolve
+    // to nothing and become dead keys.
     const prefixWasPending = pendingPrefix !== null;
     let commandName = null;
     if (prefixWasPending) {
-      const sub = Jari.prefixes[pendingPrefix] || {};
-      commandName = Jari.settings.getKeymap()[pendingPrefix + key] || sub[key] || null;
+      commandName = Jari.settings.getKeymap()[pendingPrefix + key] || null;
       pendingPrefix = null;
       Jari.ui.showcmd(null);
     }
@@ -273,7 +271,7 @@
     const hadCount = pendingCount !== '';
     pendingCount = '';
     // Append the completing key even when it finished a prefix, so the echo
-    // shows the full sequence ("g$", "gg", ";s") rather than just the prefix.
+    // shows the full sequence ("go", "gu") rather than just the prefix.
     typedSeq += key;
     const seq = typedSeq || key;
     typedSeq = '';

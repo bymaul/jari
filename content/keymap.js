@@ -1,4 +1,4 @@
-// Jari: default key bindings, fixed prefixes, non-key defaults, a tiny event
+// Jari: default key bindings, prefix keys, non-key defaults, a tiny event
 // bus and the shared helpers used by both the content scripts and the options
 // page (which loads this file first via script tags).
 //
@@ -6,9 +6,10 @@
 // names ("ctrl+", "alt+", "meta+"). Shift is NOT part of the string — a
 // capital letter is its own key ("G", "X"), so H/h and L/l are distinct.
 //
-// Multi-key prefixes ("gg", "gt") are composed from a prefix key ("g") via
+// Multi-key prefixes ("go", "gu") are composed from a prefix key ("g") via
 // Jari.prefixes. The dispatcher in content.js resolves a prefix before
-// consulting the single-key keymap.
+// consulting the single-key keymap. No fixed sequences ship by default —
+// every pair is user-bound from the options page.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
@@ -70,19 +71,13 @@
     '?': 'showHelp',
   };
 
-  // Fixed multi-key prefixes. Add more prefixes here without touching the
-  // dispatcher.
+  // Prefix keys: the first key of a two-key binding ("go" = "g" then "o").
+  // No fixed sequences ship by default — every pair is user-bound from the
+  // options page. Add more prefix keys here without touching the dispatcher.
   Jari.prefixes = {
-    g: {
-      g: 'scrollTop',
-      u: 'goParentUrl',
-      U: 'goUrlRoot',
-      0: 'firstTab',
-      $: 'lastTab',
-      t: 'tabSearch',
-    },
-    ';': { s: 'openOptions' },
-    y: { f: 'linkHintsYank', y: 'copyUrl' },
+    g: {},
+    ';': {},
+    y: {},
   };
 
   // Command categories, shared by the help overlay and the options page.
@@ -125,11 +120,11 @@
     'S',
   ];
 
-  // Prefix keys ("gg", ";s", "yy", ...) must never double as single-key
-  // bindings — the dispatcher resolves a prefix before the single-key keymap,
-  // so a lone "g" binding would be shadowed and conflict with the prefix
-  // group. Stripped from stored keymaps like unboundKeys, and rejected by the
-  // options-page recorder.
+  // Prefix keys ("g", ";", "y") must never double as single-key bindings —
+  // the dispatcher resolves a prefix before the single-key keymap, so a lone
+  // "g" binding would be shadowed and conflict with the prefix group. Stripped
+  // from stored keymaps like unboundKeys, and rejected by the options-page
+  // recorder.
   Jari.prefixKeys = new Set(Object.keys(Jari.prefixes || {}));
 
   // --- Shared helpers ------------------------------------------------------
@@ -171,8 +166,9 @@
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint';
 
-  // Flatten the fixed prefixes ("gg", "gt", ";s", ...) into a
-  // commandName -> combined-key lookup, e.g. { scrollTop: 'gg', ... }.
+  // Flatten the prefix sequences ("go", "gu", ...) into a
+  // commandName -> combined-key lookup. No fixed sequences ship by default,
+  // so this returns {} until the user binds pairs.
   Jari.flattenPrefixes = function flattenPrefixes() {
     const flat = {};
     for (const [prefix, subs] of Object.entries(Jari.prefixes || {})) {

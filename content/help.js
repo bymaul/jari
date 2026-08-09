@@ -2,7 +2,7 @@
 // Categorized three-column modal listing every bound key and its command.
 // Rendered from the live keymap, so rebinds are reflected immediately.
 // On open the overlay takes focus and the help list owns the scroll:
-// j/k, gg/G and ctrl+d/u/f/b move through it.
+// j/k, G and ctrl+d/u/f/b move through it.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
@@ -37,8 +37,7 @@
     title.textContent = "Jari keybindings";
     overlay.appendChild(title);
 
-    // Collect every binding: single keys from the keymap, then the fixed
-    // multi-key prefixes ("gg", "gt"). A bound single key wins over a prefix.
+    // Collect every binding: single keys and two-key pairs from the keymap.
     const byCommand = new Map();
     for (const [key, commandName] of Object.entries(Jari.settings.getKeymap())) {
       byCommand.set(commandName, key);
@@ -76,7 +75,7 @@
     const footer = document.createElement("div");
     footer.className = "jari-help-footer";
     const hint = document.createElement("span");
-    hint.textContent = "j/k scroll  |  g prefixes  |  ;s settings  |  0-9 count  |  esc close";
+    hint.textContent = "j/k scroll  |  G bottom  |  two-key bindings  |  0-9 count  |  esc close";
     footer.appendChild(hint);
     overlay.appendChild(footer);
 
