@@ -9,8 +9,6 @@
   --border: #3f4346;
   --fg: #d9d9de;
   --muted: #606079;
-  --accent: #e8b589;
-  --accent-dim: #2c2c36;
   --link: #7e98e8;
   --mono: ui-monospace, 'Cascadia Code', Consolas, Menlo, monospace;
   --page-width: 1080px;
@@ -47,7 +45,7 @@ h1 {
   margin: 0;
   font-size: 18px;
   font-weight: bold;
-  color: var(--accent);
+  color: var(--fg);
 }
 
 .subtitle {
@@ -74,7 +72,7 @@ h2 {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: var(--accent);
+  color: var(--fg);
   border-bottom: 1px solid var(--border);
   padding-bottom: 6px;
 }
@@ -96,7 +94,7 @@ code {
   padding: 0 4px;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--accent);
+  color: var(--fg);
 }
 
 /* Behavior fields: label on the left, hint stacked UNDER the input. */
@@ -143,21 +141,7 @@ code {
 }
 
 .control input[type='number']:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.control input[type='color'] {
-  width: 42px;
-  height: 24px;
-  padding: 1px;
-  background: #1e1e26;
-  border: 1px solid var(--border);
-  cursor: pointer;
-}
-
-.control input[type='color']:focus {
-  border-color: var(--accent);
+  border-color: var(--fg);
   outline: none;
 }
 
@@ -165,7 +149,7 @@ code {
   width: 14px;
   height: 14px;
   margin: 0;
-  accent-color: var(--accent);
+  accent-color: var(--link);
 }
 
 .unit {
@@ -219,7 +203,7 @@ code {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--accent);
+  color: var(--fg);
   border-bottom: 1px solid var(--border);
   padding: 5px 8px 3px;
 }
@@ -236,9 +220,9 @@ code {
 }
 
 #keymap-table td input.recording {
-  background: #f3be7c;
-  border-color: #e0a363;
-  color: #1e1e26;
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
 }
 
 /* Keymap filter */
@@ -254,7 +238,7 @@ code {
 }
 
 #keymap-filter:focus {
-  border-color: var(--accent);
+  border-color: var(--fg);
   outline: none;
 }
 
@@ -283,8 +267,8 @@ button {
 }
 
 button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--fg);
+  color: var(--fg);
 }
 
 button:active {
@@ -292,19 +276,19 @@ button:active {
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #1e1e26;
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
   font-weight: bold;
 }
 
 button.primary:hover {
-  background: #f3be7c;
-  color: #1e1e26;
+  background: var(--panel);
+  color: var(--fg);
 }
 
 #status {
-  color: var(--accent);
+  color: var(--fg);
   font-size: 12px;
 }
 
@@ -326,7 +310,7 @@ button.primary:hover {
 }
 
 .add-site input:focus {
-  border-color: var(--accent);
+  border-color: var(--fg);
   outline: none;
 }
 
