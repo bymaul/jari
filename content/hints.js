@@ -213,7 +213,7 @@
 
   function onKeyDown(event) {
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
 
     if (event.key === "Escape") {
       cancel();

@@ -47,14 +47,15 @@
   }
 
   // A command consumes its key: preventDefault stops the browser default
-  // action and stopPropagation (capture phase, document) keeps the page from
-  // ever seeing the keydown — a Jari shortcut must not also trigger the
-  // site's own handler.
+  // action and stopImmediatePropagation (capture phase, window) keeps the
+  // keydown from reaching the page or other extensions — a Jari shortcut
+  // must not also trigger the site's own handler or another extension's
+  // shortcut (e.g. SponsorBlock's ";" segment skip).
   function run(commandName, count, event) {
     const cmd = Jari.commands[commandName];
     if (!cmd) return;
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     cmd.run({ count, event });
   }
 
@@ -155,7 +156,7 @@
     if (passthroughMode) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         exitPassthrough();
       }
       return;
@@ -167,7 +168,7 @@
       const plainI = event.key === 'I' && !event.ctrlKey && !event.altKey && !event.metaKey;
       if (plainI || event.key === 'Escape') {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         toggleIgnore();
       }
       return;
@@ -207,7 +208,7 @@
       if (commandName === 'toggleDisabled') run(commandName, 1, event);
       else if (event.key === 'Escape') {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         activeEl.blur();
       }
       return;
@@ -228,7 +229,7 @@
     if (event.key === 'Escape') {
       if (pendingCount) {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         clearPending();
       }
       return;
@@ -241,7 +242,7 @@
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       restartTimer();
       return;
     }
@@ -252,7 +253,7 @@
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       restartTimer();
       return;
     }
@@ -294,7 +295,11 @@
       }
     });
 
-    document.addEventListener('keydown', handleKeydown, true);
+    // window (not document) capture: the window is the outermost node in the
+    // event path, so Jari claims its keys before any document-level listener
+    // from the page or other extensions (e.g. SponsorBlock's ";" shortcut),
+    // regardless of content-script injection order.
+    window.addEventListener('keydown', handleKeydown, true);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
   }
 
