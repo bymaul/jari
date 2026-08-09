@@ -120,34 +120,34 @@
     if (inInput) {
       if (event.key === "Escape") {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         close();
       } else if (event.key === "Enter") {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         activate();
       } else if (event.key === "Tab") {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         move(event.shiftKey ? -1 : 1);
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         move(1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         move(-1);
       }
       return;
     }
     if (event.key === "Escape" || event.key === "Enter") {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       close();
     } else if (event.key === "Tab") {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       move(event.shiftKey ? -1 : 1);
     }
   }
