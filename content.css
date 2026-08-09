@@ -97,7 +97,6 @@
   color: var(--jari-cmplt-fg);
   font-size: var(--jari-cmplt-font-size);
   font-family: var(--jari-cmplt-font-family);
-  padding: 0 1em;
 }
 
 .jari-tabsearch input {
@@ -246,17 +245,28 @@
   color: var(--jari-of-fg);
 }
 
-/* --- Toast (status pill): floats above the showcmd echo, which in turn
-   floats above the mode pill — a fixed bottom-right stack with room between
-   so transient feedback never covers the persistent mode indicator and they
-   never collapse onto one another. Self-contained: does not reuse
-   .jari-overlay so the completion palette's !important
-   background/color/font cannot bleed into it. --- */
+/* --- Bottom-right corner UI: one flex row pinned flush to the bottom so the
+   mode pill, showcmd echo and toasts sit side by side instead of stacking.
+   The container is pointer-transparent; the children paint their own
+   backgrounds. Self-contained: does not reuse .jari-overlay so the
+   completion palette's !important background/color/font cannot bleed into
+   it. --- */
+.jari-status-stack {
+  position: fixed;
+  right: 0.5em;
+  bottom: 0;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 0.5em;
+  pointer-events: none;
+}
+
+/* order fixes the row regardless of DOM insertion order: pill leftmost,
+   showcmd center, toast at the corner. */
 .jari-toast {
-  position: fixed !important;
-  right: 1em;
-  bottom: 4.25em;
-  z-index: 2147483647 !important;
+  order: 2;
   box-sizing: border-box;
   max-width: 60vw;
   font-family: var(--jari-status-font-family);
@@ -268,13 +278,10 @@
   pointer-events: none;
 }
 
-/* --- Mode pills (I / o): persistent while a mode is active, bottom-right.
-   Hidden in fullscreen so they never cover fullscreen content. --- */
+/* --- Mode pill (I / o): persistent while a mode is active. Hidden in
+   fullscreen so it never covers fullscreen content. --- */
 .jari-pill {
-  position: fixed;
-  bottom: 0.75em;
-  right: 1em;
-  z-index: 2147483646;
+  order: 0;
   font-family: var(--jari-status-font-family);
   font-size: var(--jari-status-font-size);
   background: var(--jari-status-bg);
@@ -319,14 +326,9 @@
   --jari-hint-border-width: 1px;
 }
 
-/* --- Showcmd readout (Neovim-style key echo): bottom-right, above the mode
-   pill with a little right spacing so it never sits flush against the page
-   edge. --- */
+/* --- Showcmd readout (Neovim-style key echo), center of the corner row. --- */
 .jari-showcmd {
-  position: fixed;
-  right: 1em;
-  bottom: 2.5em;
-  z-index: 2147483646;
+  order: 1;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
   line-height: 1.4;
