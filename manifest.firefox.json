@@ -21,7 +21,7 @@
         "content/commands.js",
         "content/scroll.js",
         "content/hints.js",
-        "content/tabsearch.js",
+        "content/prompt.js",
         "content/help.js",
         "content/content.js"
       ],

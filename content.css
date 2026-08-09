@@ -79,15 +79,15 @@
   overflow: hidden;
 }
 
-/* --- Tab search (completion list) — also the merge picker --- */
-.jari-tabsearch {
+/* --- Prompt overlay (completion list) — tabs, omnibar, merge picker --- */
+.jari-prompt {
   background: var(--jari-cmplt-bg);
   color: var(--jari-cmplt-fg);
   font-size: var(--jari-cmplt-font-size);
   font-family: var(--jari-cmplt-font-family);
 }
 
-.jari-tabsearch input {
+.jari-prompt input {
   width: 97%;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
@@ -99,7 +99,7 @@
   padding: 0 0 0 0.5ex;
 }
 
-.jari-tabsearch-header,
+.jari-prompt-header,
 .jari-help-title {
   background: var(--jari-header-bg);
   color: var(--jari-fg);
@@ -111,7 +111,7 @@
   overflow: hidden;
 }
 
-.jari-tabsearch-list {
+.jari-prompt-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -120,7 +120,7 @@
   border-top: var(--jari-cmplt-border-top);
 }
 
-.jari-tabsearch-list li {
+.jari-prompt-list li {
   height: var(--jari-cmplt-option-height);
   line-height: var(--jari-cmplt-option-height);
   white-space: nowrap;
@@ -130,20 +130,20 @@
   cursor: pointer;
 }
 
-.jari-tabsearch-list li .url {
+.jari-prompt-list li .url {
   color: var(--jari-url-fg);
   background: var(--jari-url-bg);
   text-decoration: none;
   margin-left: 1em;
 }
 
-.jari-tabsearch-list li .jari-win-tag {
+.jari-prompt-list li .jari-win-tag {
   opacity: 0.7;
   margin-right: 1em;
 }
 
-.jari-tabsearch-list li.selected,
-.jari-tabsearch-list li.selected .url {
+.jari-prompt-list li.selected,
+.jari-prompt-list li.selected .url {
   color: var(--jari-of-fg);
   background: var(--jari-of-bg);
 }

@@ -1,5 +1,5 @@
-// Jari: tab-search mode (g t) and the "t" omnibar.
-// "gt" shows a filterable list of tabs: typing filters by title/URL, arrows
+// Jari: the prompt overlay — a filterable list owned by a search box.
+// "gt" (tab search) lists the open tabs: typing filters by title/URL, arrows
 // move the selection, Enter activates, Escape closes.
 //
 // "t" (omnibar) reuses the same overlay to open a URL or search: the first
@@ -10,9 +10,9 @@
 // "ge" edits the current page URL: the same omnibar prefilled with the
 // current URL, and Enter navigates this tab instead of opening a new one.
 //
-// Both are modes over one overlay; tabsearch also serves as the merge
-// picker for splitOrMergeTab: in a single-tab window it lists the tabs of
-// the other windows and Enter moves this tab into the chosen one.
+// The overlay also serves as the merge picker for splitOrMergeTab: in a
+// single-tab window it lists the tabs of the other windows and Enter moves
+// this tab into the chosen one. Each feature is a mode over the one overlay.
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
@@ -117,7 +117,7 @@
 
   function render(title, placeholder) {
     overlay = document.createElement("div");
-    overlay.className = "jari-overlay jari-tabsearch";
+    overlay.className = "jari-overlay jari-prompt";
 
     inputEl = document.createElement("input");
     inputEl.type = "text";
@@ -135,10 +135,10 @@
     });
 
     listEl = document.createElement("ul");
-    listEl.className = "jari-tabsearch-list";
+    listEl.className = "jari-prompt-list";
 
     const header = document.createElement("div");
-    header.className = "jari-tabsearch-header";
+    header.className = "jari-prompt-header";
     header.textContent = title;
 
     overlay.appendChild(inputEl);
@@ -295,5 +295,5 @@
     active = false;
   }
 
-  Jari.TabSearch = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
+  Jari.Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
 })();
