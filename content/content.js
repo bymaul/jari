@@ -96,7 +96,7 @@
     passthroughMode = true;
     showPill("passthrough", "Passthrough");
     clearTimeout(passthroughTimer);
-    passthroughTimer = setTimeout(exitPassthrough, Jari.settings.getTimeoutMs());
+    passthroughTimer = setTimeout(exitPassthrough, Jari.settings.getPassthroughMs());
   }
 
   function exitPassthrough() {

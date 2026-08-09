@@ -49,6 +49,16 @@
             </div>
           </div>
           <div class="field">
+            <label for="passthrough-timeout">Passthrough timeout</label>
+            <div class="control">
+              <div class="control-row">
+                <input id="passthrough-timeout" type="number" min="100" max="30000" step="100" />
+                <span class="unit">ms</span>
+              </div>
+              <p class="hint">How long <code>o</code> passes keys to the page before Jari takes over again. Escape exits sooner.</p>
+            </div>
+          </div>
+          <div class="field">
             <label for="accent">Accent color</label>
             <div class="control">
               <div class="control-row">

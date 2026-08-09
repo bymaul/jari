@@ -110,6 +110,9 @@
     scrollStep: 200,
     smoothScroll: false,
     timeoutMs: 2000,
+    // "o" passthrough duration: how long keys reach the page before Jari
+    // takes over again (Escape exits sooner).
+    passthroughMs: 3000,
     accentColor: '#e8b589',
   };
 
@@ -199,6 +202,9 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
         ? d.timeoutMs
         : Jari.settingsDefaults.timeoutMs,
+      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
+        ? d.passthroughMs
+        : Jari.settingsDefaults.passthroughMs,
       accentColor: Jari.isColor(d.accentColor)
         ? d.accentColor
         : Jari.settingsDefaults.accentColor,
