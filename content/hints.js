@@ -60,11 +60,33 @@
     "[role='spinbutton']",
   ].join(",");
 
+  // Focus a text target with the caret at the end of its content — "i" should
+  // drop you at the end of the line, not the start. Inputs/textarea use the
+  // selection API; editable elements get a collapsed range at the end.
+  function focusAndPlaceCaret(el) {
+    el.focus();
+    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+      try {
+        const len = el.value ? el.value.length : 0;
+        el.setSelectionRange(len, len);
+      } catch {
+        // Some input types (number, date, ...) reject selection ranges.
+      }
+      return;
+    }
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
   const MODES = {
     click: { selector: CLICKABLE_SELECTOR, activate: (el) => el.click() },
     newtab: { selector: CLICKABLE_SELECTOR, activate: openInNewTab },
     yank: { selector: CLICKABLE_SELECTOR, activate: yankLink },
-    focus: { selector: FOCUS_SELECTOR, activate: (el) => el.focus() },
+    focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
   };
 
   let mode = null;
@@ -85,7 +107,7 @@
       Array.from(document.querySelectorAll(config.selector)).filter(isInteractive),
     );
     if (nextMode === "focus" && elements.length === 1) {
-      elements[0].focus();
+      focusAndPlaceCaret(elements[0]);
       return;
     }
     if (elements.length === 0) {
