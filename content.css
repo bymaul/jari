@@ -1,5 +1,5 @@
 /* Jari content styles — injected into pages via manifest "css".
-   Jari's own UI (help overlay, tab search, find bar, toast) follows the
+   Jari's own UI (help overlay, tab search, toast) follows the
    site's light/dark scheme, with both palettes styled to match the settings
    page: warm neutrals, tight borders, amber accent. */
 
@@ -22,10 +22,6 @@
   --jari-status-bg: var(--jari-bg);
   --jari-status-fg: var(--jari-fg);
   --jari-status-border: 1px solid #c5c5cf;
-
-  /* Search highlight */
-  --jari-search-highlight-color: #405065;
-  --jari-search-highlight-active-color: #e0a363;
 
   /* Hint labels */
   --jari-hint-font-family: var(--jari-font-family-sans);
@@ -93,55 +89,6 @@
   font-size: var(--jari-cmplt-font-size) !important;
   max-height: 75vh;
   overflow: hidden;
-}
-
-/* --- Find in page --- */
-/* Self-contained floating pill in the bottom-right corner: does not reuse
-   .jari-overlay so it never spans the full page width. Right-anchored so
-   the browser's link-preview status bar (bottom-left) cannot cover it. */
-.jari-find-bar {
-  position: fixed !important;
-  right: 1em;
-  bottom: 2em;
-  z-index: 2147483647 !important;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 0.75em;
-  padding: 0.4em 1em;
-  font-family: var(--jari-cmdl-font-family);
-  font-size: var(--jari-cmdl-font-size);
-  line-height: 1.4;
-  background: var(--jari-cmdl-bg);
-  color: var(--jari-cmdl-fg);
-  border: var(--jari-status-border);
-  border-radius: 6px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  white-space: nowrap;
-}
-
-.jari-find-bar input {
-  flex: 1 1 auto;
-  min-width: 12ch;
-  max-width: 45ch;
-  font-family: var(--jari-cmdl-font-family);
-  font-size: var(--jari-cmdl-font-size);
-  line-height: var(--jari-cmdl-line-height);
-  color: var(--jari-cmdl-fg);
-  background: transparent;
-  border: unset;
-  outline: none;
-  padding: 0;
-}
-
-.jari-find-count {
-  margin-left: 1ex;
-  opacity: 0.8;
-}
-
-.jari-find-count.jari-find-nomatch {
-  opacity: 1;
-  color: #d8647e;
 }
 
 /* --- Tab search (completion list) — also the merge picker --- */
@@ -299,17 +246,19 @@
   color: var(--jari-of-fg);
 }
 
-/* --- Toast (status pill), flush in the bottom-right corner.
-   Self-contained: does not reuse .jari-overlay so the completion palette's
-   !important background/color/font cannot bleed into it. --- */
+/* --- Toast (status pill): floats above the showcmd echo, which in turn
+   floats above the mode pill — a fixed bottom-right stack with room between
+   so transient feedback never covers the persistent mode indicator and they
+   never collapse onto one another. Self-contained: does not reuse
+   .jari-overlay so the completion palette's !important
+   background/color/font cannot bleed into it. --- */
 .jari-toast {
   position: fixed !important;
-  right: 0;
-  bottom: 0;
+  right: 1em;
+  bottom: 4.25em;
   z-index: 2147483647 !important;
   box-sizing: border-box;
   max-width: 60vw;
-  padding: 0.25ex 1ex;
   font-family: var(--jari-status-font-family);
   font-size: var(--jari-status-font-size);
   background: var(--jari-status-bg);
@@ -319,13 +268,12 @@
   pointer-events: none;
 }
 
-/* --- Mode pills (I / o): persistent while a mode is active, flush in the
-   bottom-right corner. Hidden in fullscreen so they never cover fullscreen
-   content. --- */
+/* --- Mode pills (I / o): persistent while a mode is active, bottom-right.
+   Hidden in fullscreen so they never cover fullscreen content. --- */
 .jari-pill {
   position: fixed;
-  bottom: 0;
-  right: 0.75ex;
+  bottom: 0.75em;
+  right: 1em;
   z-index: 2147483646;
   font-family: var(--jari-status-font-family);
   font-size: var(--jari-status-font-size);
@@ -371,12 +319,13 @@
   --jari-hint-border-width: 1px;
 }
 
-/* --- Showcmd readout (Neovim-style key echo), bottom-right with a little
-   right spacing so it never sits flush against the page edge. --- */
+/* --- Showcmd readout (Neovim-style key echo): bottom-right, above the mode
+   pill with a little right spacing so it never sits flush against the page
+   edge. --- */
 .jari-showcmd {
   position: fixed;
-  right: 0.75ex;
-  bottom: 0;
+  right: 1em;
+  bottom: 2.5em;
   z-index: 2147483646;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
@@ -386,18 +335,4 @@
   border: var(--jari-status-border);
   padding: 0.125ex 0.75ex;
   pointer-events: none;
-}
-
-/* --- Find marks --- */
-/* Storm (normal) and Gold (current) background with forced text colors so
-   marks stay readable on both light and dark pages. */
-.jari-find-mark {
-  background: var(--jari-search-highlight-color) !important;
-  color: #cdcdcd !important;
-  border-radius: 1px;
-}
-
-.jari-find-mark.jari-find-current {
-  background: var(--jari-search-highlight-active-color) !important;
-  color: #141415 !important;
 }

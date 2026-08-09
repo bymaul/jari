@@ -297,11 +297,6 @@
     linkHintsYank: { category: "hints", label: "Copy link URL", run: () => Jari.Hints.start("yank") },
     focusInput: { category: "hints", label: "Focus input", run: () => Jari.Hints.start("focus") },
 
-    // Find in page
-    find: { category: "find", label: "Find in page", run: () => Jari.Find.start() },
-    findNext: { category: "find", label: "Find next", run: () => Jari.Find.next() },
-    findPrev: { category: "find", label: "Find previous", run: () => Jari.Find.prev() },
-
     // Page navigation
     historyBack: { category: "history", label: "Back", run: () => Jari.sendMessage("historyBack") },
     historyForward: { category: "history", label: "Forward", run: () => Jari.sendMessage("historyForward") },
