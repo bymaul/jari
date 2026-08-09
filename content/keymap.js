@@ -69,11 +69,24 @@
 
     // Help
     '?': 'showHelp',
+
+    // Two-key sequences, composed via the prefix keys (g, ;, y) below.
+    // Stored like any other binding: rebindable, overridable, and visible in
+    // the options table and help overlay.
+    gt: 'tabSearch',
+    gg: 'scrollTop',
+    gu: 'goParentUrl',
+    gU: 'goUrlRoot',
+    g0: 'firstTab',
+    g$: 'lastTab',
+    ';s': 'openOptions',
+    yf: 'linkHintsYank',
+    yy: 'copyUrl',
   };
 
   // Prefix keys: the first key of a two-key binding ("go" = "g" then "o").
-  // No fixed sequences ship by default — every pair is user-bound from the
-  // options page. Add more prefix keys here without touching the dispatcher.
+  // The pairs themselves are plain keymap entries (see keymapDefaults). Add
+  // more prefix keys here without touching the dispatcher.
   Jari.prefixes = {
     g: {},
     ';': {},
@@ -165,19 +178,6 @@
   // Elements Jari's own overlays create. Content features must not touch
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint';
-
-  // Flatten the prefix sequences ("go", "gu", ...) into a
-  // commandName -> combined-key lookup. No fixed sequences ship by default,
-  // so this returns {} until the user binds pairs.
-  Jari.flattenPrefixes = function flattenPrefixes() {
-    const flat = {};
-    for (const [prefix, subs] of Object.entries(Jari.prefixes || {})) {
-      for (const [suffix, commandName] of Object.entries(subs)) {
-        flat[commandName] = prefix + suffix;
-      }
-    }
-    return flat;
-  };
 
   // Sanitize a raw storage blob into a complete settings object with defaults
   // filled in and invalid values dropped. Shared by the content-script
