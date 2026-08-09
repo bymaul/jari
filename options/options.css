@@ -248,6 +248,29 @@ code {
   text-shadow: 0 0 4px rgba(232, 181, 137, 0.35);
 }
 
+/* Keymap filter */
+#keymap-filter {
+  width: 100%;
+  padding: 4px 8px;
+  margin-bottom: 10px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+#keymap-filter:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.jari-keymap-filter-empty {
+  padding: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* Actions */
 .actions {
   display: flex;
@@ -293,6 +316,27 @@ button.primary:hover {
 }
 
 /* Disabled sites */
+.add-site {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.add-site input {
+  flex: 1;
+  padding: 3px 8px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.add-site input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 #disabled-list {
   list-style: none;
   padding: 0;

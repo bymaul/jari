@@ -90,6 +90,7 @@
           Fixed prefixes such as <code>gg</code>, <code>gt</code> and <code>;s</code> are shown in
           green and can only be cleared.
         </p>
+        <input id="keymap-filter" type="search" placeholder="Filter commands by name or key..." />
         <div id="keymap-table"></div>
         <div class="actions">
           <button id="save" type="button" class="primary">Save</button>
@@ -102,8 +103,12 @@
         <h2>Disabled sites</h2>
         <p class="hint">
           Jari is turned off on these sites. Press
-          <code>ctrl+alt+v</code> on a page to toggle it there.
+          <code>ctrl+alt+v</code> on a page to toggle it there, or add a host here.
         </p>
+        <div class="add-site">
+          <input id="disabled-site-input" type="text" placeholder="example.com" />
+          <button id="add-disabled-site" type="button">Add</button>
+        </div>
         <ul id="disabled-list"></ul>
       </section>
     </main>

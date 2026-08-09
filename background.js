@@ -86,11 +86,19 @@ const handlers = {
   },
 
   restoreTab: async (_, { count = 1 } = {}) => {
-    // chrome.sessions.restore() reopens the most recently closed tab or
-    // window; repeat it so a count prefix ("5X") reopens several.
-    for (let i = 0; i < clampCount(count); i++) {
+    // Only reopen tabs, never whole windows: chrome.sessions.restore() with no
+    // sessionId can bring back a closed window. getRecentlyClosed lists both
+    // kinds; the tab sessions carry a tab.sessionId to restore individually.
+    let sessions;
+    try {
+      sessions = await chrome.sessions.getRecentlyClosed();
+    } catch {
+      return { ok: true };
+    }
+    const tabs = (sessions || []).filter((s) => s.tab && s.tab.sessionId);
+    for (let i = 0; i < Math.min(clampCount(count), tabs.length); i++) {
       try {
-        await chrome.sessions.restore();
+        await chrome.sessions.restore(tabs[i].tab.sessionId);
       } catch {
         break; // nothing left to restore
       }

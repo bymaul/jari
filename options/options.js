@@ -22,6 +22,9 @@
   const timeoutEl = document.querySelector("#timeout");
   const passthroughEl = document.querySelector("#passthrough-timeout");
   const accentEl = document.querySelector("#accent");
+  const keymapFilterEl = document.querySelector("#keymap-filter");
+  const siteInputEl = document.querySelector("#disabled-site-input");
+  const addSiteBtn = document.querySelector("#add-disabled-site");
 
   const STORAGE_KEY = "settings";
   const RESERVED_KEYS = /^[0-9]$/;
@@ -64,14 +67,34 @@
     renderDisabled();
   }
 
+  // Case-insensitive filter match on the command name, its label, or the key
+  // it is currently bound to.
+  function matchesFilter(name, cmd, filter) {
+    return (
+      name.toLowerCase().includes(filter) ||
+      cmd.label.toLowerCase().includes(filter) ||
+      keyFor(name).toLowerCase().includes(filter)
+    );
+  }
+
   function renderKeymap() {
     tableEl.textContent = "";
+    const filter = keymapFilterEl.value.trim().toLowerCase();
     const byCategory = new Map();
     for (const [name, cmd] of Object.entries(COMMANDS)) {
       if (cmd.hidden) continue;
       const id = cmd.category || "other";
+      if (filter && !matchesFilter(name, cmd, filter)) continue;
       if (!byCategory.has(id)) byCategory.set(id, []);
       byCategory.get(id).push([name, cmd]);
+    }
+
+    if (byCategory.size === 0) {
+      const empty = document.createElement("div");
+      empty.className = "jari-keymap-filter-empty";
+      empty.textContent = `No commands match "${keymapFilterEl.value.trim()}".`;
+      tableEl.appendChild(empty);
+      return;
     }
 
     // Split the categories across three columns, keeping each category whole
@@ -262,6 +285,42 @@
     }
   }
 
+  // Reduce a typed site to a plain hostname, matching location.hostname so
+  // settings.isDisabled() finds it: accept a full URL or a bare host, drop
+  // scheme/port/path. Unparseable input returns "".
+  function normalizeHost(raw) {
+    let host = raw.trim().toLowerCase();
+    if (!host) return "";
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
+      try {
+        host = new URL(host).hostname;
+      } catch {
+        return "";
+      }
+    }
+    host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(host)
+      ? host
+      : "";
+  }
+
+  function addDisabledSite() {
+    const host = normalizeHost(siteInputEl.value);
+    if (!host) {
+      status("Enter a hostname like example.com");
+      siteInputEl.focus();
+      return;
+    }
+    if (disabledSites.includes(host)) {
+      status("Already disabled: " + host);
+    } else {
+      disabledSites.push(host);
+      status("Disabled: " + host);
+    }
+    siteInputEl.value = "";
+    renderDisabled();
+  }
+
   function status(message) {
     statusEl.textContent = message;
     clearTimeout(statusEl._timer);
@@ -272,5 +331,10 @@
 
   saveBtn.addEventListener("click", save);
   resetBtn.addEventListener("click", reset);
+  keymapFilterEl.addEventListener("input", renderKeymap);
+  addSiteBtn.addEventListener("click", addDisabledSite);
+  siteInputEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") addDisabledSite();
+  });
   load();
 })();
