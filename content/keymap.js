@@ -30,6 +30,7 @@
     h: 'scrollLeft',
     l: 'scrollRight',
     G: 'scrollBottom',
+    w: 'showScrollArea',
     '+': 'zoomIn',
     '=': 'zoomIn',
     '-': 'zoomOut',
@@ -77,6 +78,8 @@
     gg: 'scrollTop',
     gu: 'goParentUrl',
     gU: 'goUrlRoot',
+    gs: 'cycleScrollArea',
+    gS: 'resetScrollArea',
     g0: 'firstTab',
     g$: 'lastTab',
     ';s': 'openOptions',
@@ -177,8 +180,7 @@
 
   // Elements Jari's own overlays create. Content features must not touch
   // them: hints must not label them.
-  Jari.overlaySelectors = '.jari-overlay, .jari-hint';
-
+  Jari.overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
   // Sanitize a raw storage blob into a complete settings object with defaults
   // filled in and invalid values dropped. Shared by the content-script
   // settings layer and the options page so both interpret stored values the

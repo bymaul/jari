@@ -9,10 +9,10 @@
   const PAGE_RATIO = 0.9;
   const HALF_RATIO = 0.5;
 
-  // Scrolling always targets the window; there is no per-element scroll focus
-  // anymore.
+  // Scrolling targets the window by default; "gs"/"gS" retarget it to a
+  // page's nested scroll container (or back to the window).
   function getScrollElement() {
-    return window;
+    return Jari.Scroll.getTarget();
   }
 
   function scrollHeightOf(el) {
@@ -224,6 +224,9 @@
       repeatable: true,
       run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
     },
+    cycleScrollArea: { category: "scrolling", label: "Cycle scroll area", run: () => Jari.Scroll.cycle() },
+    resetScrollArea: { category: "scrolling", label: "Scroll area: global", run: () => Jari.Scroll.resetToGlobal() },
+    showScrollArea: { category: "scrolling", label: "Show scroll area", run: () => Jari.Scroll.showHighlight() },
     zoomIn: { category: "view", label: "Zoom in", run: () => Jari.sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { category: "view", label: "Zoom out", run: () => Jari.sendMessage("zoomBy", { delta: -0.1 }) },
 
