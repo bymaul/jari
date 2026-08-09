@@ -32,7 +32,6 @@
     G: 'scrollBottom',
     w: 'showScrollArea',
     '+': 'zoomIn',
-    '=': 'zoomIn',
     '-': 'zoomOut',
 
     // Tabs
@@ -41,6 +40,8 @@
     X: 'restoreTab',
     H: 'previousTab',
     L: 'nextTab',
+    '<<': 'moveTabLeft',
+    '>>': 'moveTabRight',
 
     // Window: split this tab into its own window; again, merge back.
     W: 'splitOrMergeTab',
@@ -95,6 +96,8 @@
     g: {},
     ';': {},
     y: {},
+    '<': {},
+    '>': {},
   };
 
   // Command categories, shared by the help overlay and the options page.
@@ -195,11 +198,6 @@
   // URL helpers shared by the page-navigation commands ("gu"/"gU") and the
   // omnibar's URL-vs-search guess.
   Jari.Url = {
-    // "gu": go one path segment up, keeping the current origin.
-    //   acme.com/1/2/3  ->  acme.com/1/2
-    //   acme.com/1/2/   ->  acme.com/1
-    //   acme.com/1/2/3.html -> acme.com/1/2
-    //   acme.com/       ->  acme.com/  (already root: caller shows a toast)
     parentUrlOf(href) {
       try {
         const url = new URL(href);
@@ -216,8 +214,6 @@
       }
     },
 
-    // "gU": go to the root of the current URL hierarchy (the origin).
-    //   acme.com/1/2/3  ->  acme.com/
     rootUrlOf(href) {
       try {
         const url = new URL(href);
@@ -230,9 +226,6 @@
       }
     },
 
-    // Same path, ignoring query/hash: "https://x.com/?ref=1" counts as root
-    // for the already-there check, otherwise navigation with a stale query
-    // reloads.
     isSamePath(a, b) {
       try {
         return new URL(a).pathname === new URL(b).pathname;

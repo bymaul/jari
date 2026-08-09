@@ -6,6 +6,7 @@
 :root {
   /* Generic */
   --jari-font-family: monospace;
+  --jari-font-family-sans: sans-serif;
   --jari-font-size: 12pt;
   --jari-small-font-size: calc(var(--jari-font-size) * 0.75);
   /* Light palette: cool paper, the light suit of the vague dark scheme. */
@@ -289,9 +290,9 @@
 /* --- Link hints --- */
 .jari-hint {
   position: absolute !important;
-  font-family: var(--jari-font-family) !important;
+  font-family: var(--jari-font-family-sans) !important;
   font-size: 11px !important;
-  font-weight: 900 !important;
+  font-weight: 700 !important;
   color: #2b2100 !important;
   background: linear-gradient(to bottom, #ffe98a 0%, #ffd84d 45%, #f5b800 100%) !important;
   border: 1px solid #9a6d00;
