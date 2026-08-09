@@ -14,9 +14,6 @@
 
   let pendingCount = '';
   let pendingPrefix = null;
-  // Single-key command bound to the pending prefix key, if any. It runs when
-  // the next key does not complete the two-key sequence.
-  let pendingFallback = null;
   let typedSeq = '';
   let timer = null;
   let ignoreMode = false;
@@ -24,18 +21,15 @@
   let passthroughTimer = null;
   const pills = {}; // mode name -> pill element
 
-  // The user stopped mid-composition (Escape, Backspace, dead key, ignore
-  // toggle, or the count timeout): drop count/prefix state and the echo.
+  // The user stopped mid-composition (Escape, dead key, ignore toggle, or
+  // inactivity timeout): drop count/prefix state and the echo.
   function clearPending() {
     pendingCount = '';
     pendingPrefix = null;
-    pendingFallback = null;
     typedSeq = '';
     Jari.ui.showcmd(null);
   }
 
-  // Only a bare count prefix times out; a pending prefix waits for the next
-  // key until it is completed, replaced, or cancelled with Escape/Backspace.
   function restartTimer() {
     clearTimeout(timer);
     timer = setTimeout(clearPending, Jari.settings.getTimeoutMs());
@@ -203,10 +197,6 @@
     if (prefixWasPending) {
       const sub = Jari.prefixes[pendingPrefix] || {};
       if (key in sub) commandName = sub[key];
-      // Keep pendingFallback when the sequence does not complete: the dead-key
-      // path below runs the prefix key's own binding. Only a completing key
-      // discards it, since the sequence's command runs instead.
-      if (commandName) pendingFallback = null;
       pendingPrefix = null;
       Jari.ui.showcmd(null);
     }
@@ -224,38 +214,20 @@
       return;
     }
 
-    // A pending prefix waits for the next key: a key that does not complete it
-    // is a dead key, not a single-key command — "gi" must never fall through
-    // to "i". If the prefix key itself is bound as a command, the dead key
-    // runs it instead; that is what makes a bound "g"/";"/"y" work. Escape and
-    // Backspace cancel the wait. (Form fields were handled above, so typing in
-    // an input still passes through normally.)
+    // Strict prefix composition: while a prefix is pending, a key that does
+    // not complete it is a dead key, not a single-key command — "gi" must
+    // never fall through to run "i". (Form fields were handled above, so
+    // typing in an input still passes through normally.)
     if (prefixWasPending && !commandName) {
-      const cancelling = event.key === 'Escape' || event.key === 'Backspace';
-      if (!cancelling && pendingFallback && Jari.commands[pendingFallback]) {
-        const fallback = pendingFallback;
-        const count = pendingCount ? parseInt(pendingCount, 10) : 1;
-        const seq = typedSeq;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        clearPending();
-        Jari.ui.flash(seq);
-        Jari.commands[fallback].run({ count });
-      } else {
-        clearPending();
-        if (cancelling) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-        }
-      }
+      clearPending();
       return;
     }
 
-    // Escape or Backspace with no form field focused cancels a pending count.
-    // When idle, leave them to the page — sites use Escape to close dialogs
-    // and Backspace to go back, and Jari has nothing to clear.
-    if (event.key === 'Escape' || event.key === 'Backspace') {
-      if (pendingCount) {
+    // Escape with no form field focused cancels a pending count. When idle,
+    // leave Escape to the page — sites use it to close dialogs, and Jari has
+    // nothing to clear.
+    if (event.key === 'Escape') {
+      if (pendingCount || pendingPrefix !== null) {
         event.preventDefault();
         event.stopImmediatePropagation();
         clearPending();
@@ -275,18 +247,14 @@
       return;
     }
 
-    // Start a new prefix (e.g. "g", "y"). The composition then waits for the
-    // next key (Escape/Backspace cancels) instead of timing out. A prefix key
-    // may also be bound as a single-key command: it runs when the next key
-    // does not complete the sequence.
+    // Start a new prefix (e.g. "g", "y").
     if (!commandName && Jari.prefixes[key]) {
       pendingPrefix = key;
-      pendingFallback = Jari.settings.getKeymap()[key] || null;
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();
       event.stopImmediatePropagation();
-      clearTimeout(timer);
+      restartTimer();
       return;
     }
 
