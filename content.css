@@ -319,9 +319,10 @@
   pointer-events: none;
 }
 
-/* --- Ignore-mode pill (I): persistent while active, flush in the bottom-right
-   corner. Hidden in fullscreen so it never covers fullscreen content. --- */
-.jari-ignore-pill {
+/* --- Mode pills (I / o): persistent while a mode is active, flush in the
+   bottom-right corner. Hidden in fullscreen so they never cover fullscreen
+   content. --- */
+.jari-pill {
   position: fixed;
   bottom: 0;
   right: 0.75ex;

@@ -312,6 +312,7 @@
 
     // Site-level control
     toggleIgnore: { category: "modes", label: "Ignore mode", run: () => Jari.Ignore.toggle() },
+    passthrough: { category: "modes", label: "Passthrough keys (timed)", run: () => Jari.Passthrough.enter() },
     toggleDisabled: { category: "modes", label: "Enable/disable on this site", run: () => Jari.settings.toggleDisabled() },
 
     // Help & settings

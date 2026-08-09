@@ -68,6 +68,7 @@
 
     // Site-level control
     I: 'toggleIgnore',
+    o: 'passthrough',
     'ctrl+alt+v': 'toggleDisabled',
 
     // Help
