@@ -55,6 +55,11 @@
   if (typeof window.MutationObserver !== 'undefined') {
     new window.MutationObserver(() => {
       scanEpoch++;
+      // The one-shot pageCanScroll decision may be stale after a DOM change
+      // (an SPA can turn a scrolling page into a fixed shell or back), so the
+      // next scroll command re-evaluates it. Cheap: pageCanScroll reads only
+      // computed styles and the area scan is epoch-cached.
+      resolved = false;
     }).observe(document.documentElement, {
       childList: true,
       subtree: true,
