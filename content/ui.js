@@ -25,7 +25,9 @@
     if (!statusStack) {
       statusStack = document.createElement("div");
       statusStack.className = "jari-status-stack";
-      document.body.appendChild(statusStack);
+      // The scripts run at document_start; document.body may not exist for a
+      // key press in the first moments, so fall back to the root element.
+      (document.body || document.documentElement).appendChild(statusStack);
     }
     return statusStack;
   }

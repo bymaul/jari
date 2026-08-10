@@ -44,8 +44,11 @@
   // findScrollableElements() walks the whole DOM and reads layout on every
   // call, which is the most expensive work in this module. The result only
   // changes when the DOM changes, so the scan is cached and invalidated by a
-  // MutationObserver watching document.documentElement for node changes and
-  // for class/style mutations that can turn an element scrollable or not.
+  // MutationObserver watching the document for node changes and for
+  // class/style mutations that can turn an element scrollable or not.
+  // The document (rather than documentElement) is observed because this runs
+  // at document_start, when the root element may not exist yet; subtree
+  // observation of the document covers the root and everything below it.
   // Callers only read the returned array, so returning the cache directly is
   // safe.
   let scanEpoch = 0;
@@ -60,7 +63,7 @@
       // next scroll command re-evaluates it. Cheap: pageCanScroll reads only
       // computed styles and the area scan is epoch-cached.
       resolved = false;
-    }).observe(document.documentElement, {
+    }).observe(document, {
       childList: true,
       subtree: true,
       attributes: true,
