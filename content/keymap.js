@@ -61,8 +61,8 @@
 
     // Clipboard
     Y: 'copyTitleUrl',
-    p: 'pasteOpen',
-    P: 'pasteOpenBackground',
+    gp: 'pasteOpen',
+    gP: 'pasteOpenBackground',
 
     // Site-level control
     I: 'toggleIgnore',
