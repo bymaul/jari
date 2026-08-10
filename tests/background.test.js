@@ -13,12 +13,20 @@ test("normalizeUrl assumes https for bare hosts", () => {
   assert.equal(normalizeUrl("//acme.com"), "https://acme.com");
 });
 
-test("normalizeUrl keeps explicit http(s) and rejects unsafe schemes", () => {
+test("normalizeUrl rejects unsafe schemes", () => {
   assert.equal(normalizeUrl("http://acme.com"), "http://acme.com");
   assert.equal(normalizeUrl("https://acme.com"), "https://acme.com");
   assert.equal(normalizeUrl("javascript:alert(1)"), null);
   assert.equal(normalizeUrl("data:text/html,x"), null);
   assert.equal(normalizeUrl("chrome://settings"), null);
+});
+
+test("normalizeUrl keeps host:port but rejects unknown schemes", () => {
+  assert.equal(normalizeUrl("localhost:8080"), "https://localhost:8080");
+  assert.equal(normalizeUrl("localhost:8080/path"), "https://localhost:8080/path");
+  assert.equal(normalizeUrl("mailto:foo@bar.com"), null);
+  assert.equal(normalizeUrl("tel:+123"), null);
+  assert.equal(normalizeUrl("steam:run/xyz"), null);
 });
 
 test("normalizeUrl rejects junk input", () => {
