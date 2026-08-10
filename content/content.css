@@ -342,7 +342,7 @@
 
 .jari-scroll-highlight-label {
   font-family: var(--jari-font-family);
-  font-size: var(--jari-small-font-size);
+  font-size: var(--jari-font-size);
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.1em;
