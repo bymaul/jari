@@ -309,22 +309,27 @@
     return { score, indices };
   }
 
+  // Shared per-term results for a query against text; results[i] is null when
+  // terms[i] is absent from text.
+  function matchTerms(query, text) {
+    const terms = queryTerms(query);
+    const t = String(text).toLowerCase();
+    return { terms, results: terms.map((term) => matchTerm(term, t, text)) };
+  }
+
   // Fuzzy subsequence matcher for the prompt lists. Every query term must
   // appear in text in order; the returned score ranks results so consecutive
   // runs, word starts, camel-case boundaries and early positions win. Returns
   // null on no match.
   Jari.fuzzyMatch = function fuzzyMatch(query, text) {
-    const terms = queryTerms(query);
-    if (terms.length === 0) return null;
-    const t = String(text).toLowerCase();
-    let total = 0;
+    const { terms, results } = matchTerms(query, text);
+    if (terms.length === 0 || results.some((r) => !r)) return null;
     const indices = [];
-    for (const term of terms) {
-      const matched = matchTerm(term, t, text);
-      if (!matched) return null;
-      total += matched.score;
-      indices.push(...matched.indices);
-    }
+    let total = 0;
+    results.forEach((r) => {
+      total += r.score;
+      indices.push(...r.indices);
+    });
     indices.sort((a, b) => a - b);
     return { score: total, indices };
   };
@@ -334,13 +339,9 @@
   // skipped, so a multi-term query can highlight "pria" in the title and
   // "youtube" in the URL even though neither field contains both.
   Jari.fuzzyIndices = function fuzzyIndices(query, text) {
-    const terms = queryTerms(query);
-    const t = String(text).toLowerCase();
+    const { results } = matchTerms(query, text);
     const indices = [];
-    for (const term of terms) {
-      const matched = matchTerm(term, t, text);
-      if (matched) indices.push(...matched.indices);
-    }
+    for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
   };
 

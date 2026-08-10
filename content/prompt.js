@@ -101,43 +101,38 @@
       if (!active || seq !== suggestSeq) return;
       const res = (await Jari.sendMessage("suggest", { query: term })) || [];
       if (!active || seq !== suggestSeq) return;
-      const fuzzy = Jari.settings.isFuzzyMatching();
-      const suggestions = res
-        .map((r) => {
-          const hay = r.title + " " + (r.url || "");
-          const match = fuzzy
-            ? Jari.fuzzyMatch(term, hay)
-            : Jari.substringMatch(term, hay)
-              ? { score: 0, indices: null }
-              : null;
-          return { kind: "suggestion", title: r.title, url: r.url, match };
-        })
-        .filter((r) => r.match)
-        .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0));
+      const suggestions = rank(res, term).map(({ item, match }) => ({
+        kind: "suggestion",
+        title: item.title,
+        url: item.url,
+        match,
+      }));
       filtered = [row, ...suggestions];
       selected = 0;
       renderList();
     }, 130);
   }
 
-  // Rank a list against the query; entries that don't match at all are
-  // dropped. With fuzzy matching off this falls back to a plain substring
-  // filter that keeps the original order.
-  function rankTabs(q, list) {
+  // Map a list to { item, match } pairs, dropping non-matches and sorting by
+  // score (fuzzy) or original order (substring mode).
+  function rank(list, query) {
     const fuzzy = Jari.settings.isFuzzyMatching();
     return list
       .map((item) => {
         const hay = item.title + " " + (item.url || "");
         const match = fuzzy
-          ? Jari.fuzzyMatch(q, hay)
-          : Jari.substringMatch(q, hay)
+          ? Jari.fuzzyMatch(query, hay)
+          : Jari.substringMatch(query, hay)
             ? { score: 0, indices: null }
             : null;
-        return { item, match };
+        return match ? { item, match } : null;
       })
-      .filter((x) => x.match)
-      .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0))
-      .map((x) => x.item);
+      .filter(Boolean)
+      .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0));
+  }
+
+  function rankTabs(q, list) {
+    return rank(list, q).map((x) => x.item);
   }
 
   function render(title, placeholder) {
