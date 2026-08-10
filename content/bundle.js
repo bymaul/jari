@@ -266,6 +266,16 @@
       if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
       return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
     },
+
+    // The term suggestions are matched against. When the query is a URL token
+    // followed by words (an edited omnibar URL like "https://youtube.com/ pria"),
+    // the URL is the anchor and the trailing words are the real filter term.
+    // Returns the trailing words, or the whole query when it has no leading URL.
+    suggestionTerm(query) {
+      const idx = query.search(/\s/);
+      if (idx === -1) return query;
+      return Jari.Url.looksLikeUrl(query.slice(0, idx)) ? query.slice(idx).trim() : query;
+    },
   };
 
   // Fuzzy subsequence matcher for the prompt lists. Every query char must
@@ -1462,7 +1472,8 @@
   // overlay closed) is dropped via suggestSeq.
   function handleOpenInput(queryText) {
     const q = queryText.trim();
-    query = q;
+    const term = Jari.Url.suggestionTerm(q);
+    query = term;
     if (!q) {
       clearTimeout(suggestTimer);
       suggestSeq++;
@@ -1481,15 +1492,15 @@
     const seq = ++suggestSeq;
     suggestTimer = setTimeout(async () => {
       if (!active || seq !== suggestSeq) return;
-      const res = (await Jari.sendMessage("suggest", { query: q })) || [];
+      const res = (await Jari.sendMessage("suggest", { query: term })) || [];
       if (!active || seq !== suggestSeq) return;
       const fuzzy = Jari.settings.isFuzzyMatching();
       const suggestions = res
         .map((r) => {
           const hay = r.title + " " + (r.url || "");
           const match = fuzzy
-            ? Jari.fuzzyMatch(q, hay)
-            : hay.toLowerCase().includes(q)
+            ? Jari.fuzzyMatch(term, hay)
+            : hay.toLowerCase().includes(term)
               ? { score: 0, indices: null }
               : null;
           return { kind: "suggestion", title: r.title, url: r.url, match };

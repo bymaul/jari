@@ -79,7 +79,8 @@
   // overlay closed) is dropped via suggestSeq.
   function handleOpenInput(queryText) {
     const q = queryText.trim();
-    query = q;
+    const term = Jari.Url.suggestionTerm(q);
+    query = term;
     if (!q) {
       clearTimeout(suggestTimer);
       suggestSeq++;
@@ -98,15 +99,15 @@
     const seq = ++suggestSeq;
     suggestTimer = setTimeout(async () => {
       if (!active || seq !== suggestSeq) return;
-      const res = (await Jari.sendMessage("suggest", { query: q })) || [];
+      const res = (await Jari.sendMessage("suggest", { query: term })) || [];
       if (!active || seq !== suggestSeq) return;
       const fuzzy = Jari.settings.isFuzzyMatching();
       const suggestions = res
         .map((r) => {
           const hay = r.title + " " + (r.url || "");
           const match = fuzzy
-            ? Jari.fuzzyMatch(q, hay)
-            : hay.toLowerCase().includes(q)
+            ? Jari.fuzzyMatch(term, hay)
+            : hay.toLowerCase().includes(term)
               ? { score: 0, indices: null }
               : null;
           return { kind: "suggestion", title: r.title, url: r.url, match };
