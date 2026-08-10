@@ -89,7 +89,8 @@
 }
 
 .jari-prompt input {
-  width: 97%;
+  width: 100%;
+  box-sizing: border-box;
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
   line-height: var(--jari-cmdl-line-height);
@@ -98,6 +99,11 @@
   border: unset;
   outline: none;
   padding: 0 0 0 0.5ex;
+}
+
+.jari-prompt input:focus,
+.jari-prompt input:focus-visible {
+  outline: none;
 }
 
 .jari-prompt-header {
@@ -157,6 +163,15 @@
 .jari-prompt-list li.selected .url {
   color: var(--jari-of-fg);
   background: var(--jari-of-bg);
+}
+
+/* Fuzzy-matched characters in completion rows: gold, bold, readable on both
+   the plain row and the dark selected bar (declared after .selected so it
+   wins the specificity tie on selected rows). */
+.jari-prompt-list li .jari-match,
+.jari-prompt-list li.selected .jari-match {
+  color: #e0a363;
+  font-weight: bold;
 }
 
 /* --- Help (?) --- */
