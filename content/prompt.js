@@ -107,7 +107,7 @@
           const hay = r.title + " " + (r.url || "");
           const match = fuzzy
             ? Jari.fuzzyMatch(term, hay)
-            : hay.toLowerCase().includes(term)
+            : Jari.substringMatch(term, hay)
               ? { score: 0, indices: null }
               : null;
           return { kind: "suggestion", title: r.title, url: r.url, match };
@@ -130,7 +130,7 @@
         const hay = item.title + " " + (item.url || "");
         const match = fuzzy
           ? Jari.fuzzyMatch(q, hay)
-          : hay.toLowerCase().includes(q)
+          : Jari.substringMatch(q, hay)
             ? { score: 0, indices: null }
             : null;
         return { item, match };
@@ -177,7 +177,7 @@
   }
 
   // Fill a span with text, wrapping the fuzzy-matched characters in a
-  // .jari-match element. indices come from fuzzyMatch against the same text.
+  // .jari-match element. indices come from fuzzyIndices against the same text.
   function renderText(el, text, indices) {
     if (!indices || indices.length === 0) {
       el.textContent = text;
@@ -225,8 +225,8 @@
         // fuzzy matching — substring mode renders plain text.
         const highlight = row.kind === "suggestion" && query && Jari.settings.isFuzzyMatching();
         if (highlight) {
-          renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
-          renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
+          renderText(title, titleText, Jari.fuzzyIndices(query, titleText));
+          renderText(url, urlText, Jari.fuzzyIndices(query, urlText));
         } else {
           title.textContent = titleText;
           url.textContent = urlText;
@@ -260,8 +260,8 @@
       url.className = "url";
       const urlText = tab.url || "";
       if (query && Jari.settings.isFuzzyMatching()) {
-        renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
-        renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
+        renderText(title, titleText, Jari.fuzzyIndices(query, titleText));
+        renderText(url, urlText, Jari.fuzzyIndices(query, urlText));
       } else {
         title.textContent = titleText;
         url.textContent = urlText;
