@@ -172,17 +172,6 @@
   // this to decide whether an <a> href may open in a background tab.
   Jari.allowedUrlSchemes = new Set(['http', 'https', 'file', 'about']);
 
-  // Command renames, old id -> new id. Stored keymaps may reference the old
-  // names; normalizeSettings remaps them so existing bindings keep working.
-  Jari.renamedCommands = {
-    scrollHalfDown: 'scrollHalfPageDown',
-    scrollHalfUp: 'scrollHalfPageUp',
-    goParentUrl: 'goUp',
-    goUrlRoot: 'goToRoot',
-    pasteOpenTab: 'pasteOpen',
-    pasteOpenTabBackground: 'pasteOpenBackground',
-  };
-
   // Sanitize a raw storage blob into a complete settings object with defaults
   // filled in and invalid values dropped. Shared by the content-script
   // settings layer and the options page so both interpret stored values the
@@ -191,7 +180,7 @@
     const d = data || {};
     const storedKeymap = {};
     for (const [key, command] of Object.entries(d.keymap || {})) {
-      storedKeymap[key] = Jari.renamedCommands[command] || command;
+      storedKeymap[key] = command;
     }
     const keymap = { ...Jari.keymapDefaults, ...storedKeymap };
     for (const key of Jari.prefixKeys) delete keymap[key];
