@@ -264,6 +264,16 @@
       if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
       return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
     },
+
+    // The term suggestions are matched against. When the query is a URL token
+    // followed by words (an edited omnibar URL like "https://youtube.com/ pria"),
+    // the URL is the anchor and the trailing words are the real filter term.
+    // Returns the trailing words, or the whole query when it has no leading URL.
+    suggestionTerm(query) {
+      const idx = query.search(/\s/);
+      if (idx === -1) return query;
+      return Jari.Url.looksLikeUrl(query.slice(0, idx)) ? query.slice(idx).trim() : query;
+    },
   };
 
   // Fuzzy subsequence matcher for the prompt lists. Every query char must

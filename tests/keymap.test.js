@@ -122,3 +122,14 @@ test("Url.looksLikeUrl classifies bare queries", () => {
   assert.ok(!looksLikeUrl("acme"));
   assert.ok(!looksLikeUrl(""));
 });
+
+test("Url.suggestionTerm strips a leading URL token", () => {
+  const { suggestionTerm } = Jari.Url;
+  assert.equal(suggestionTerm("https://youtube.com/ pria"), "pria");
+  assert.equal(suggestionTerm("youtube.com/watch?v=1 foo bar"), "foo bar");
+  assert.equal(suggestionTerm("//acme.com/a query"), "query");
+  assert.equal(suggestionTerm("https://youtube.com/"), "https://youtube.com/");
+  assert.equal(suggestionTerm("pria"), "pria");
+  assert.equal(suggestionTerm("pria videos"), "pria videos");
+  assert.equal(suggestionTerm(""), "");
+});
