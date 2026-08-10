@@ -27,8 +27,12 @@ function normalizeUrl(raw) {
   const scheme = m[1].toLowerCase();
   if (ALLOWED_URL_SCHEMES.has(scheme)) return url;
   if (BLOCKED_URL_SCHEMES.has(scheme)) return null;
-  // Unknown scheme is probably a hostname (e.g. "localhost:8080").
-  return "https://" + url;
+  // Unknown scheme: a bare "host:port" (e.g. "localhost:8080") is a hostname,
+  // so keep the https fallback for it. Anything else (mailto:, tel:, ...) is
+  // rejected rather than mangled into a fake host.
+  const rest = url.slice(m[0].length);
+  if (/^(\d+)(\/.*)?$/.test(rest)) return "https://" + url;
+  return null;
 }
 
 function clampCount(count, max = 20) {
@@ -58,29 +62,14 @@ const handlers = {
     return { ok: true };
   },
 
-  setZoom: async (sender, { level = 1 } = {}) => {
-    const tab = sender.tab;
-    if (!tab || !tab.id || typeof chrome.tabs.setZoom !== "function") {
-      // Firefox does not implement tabs.setZoom.
-      return { ok: false };
-    }
-    await chrome.tabs.setZoom(tab.id, Math.min(5, Math.max(0.25, level)));
-    return { ok: true, zoom: level };
-  },
-
   closeTab: async (sender, { count = 1 } = {}) => {
     const tab = sender.tab;
     if (!tab || !tab.id) return { ok: false };
-    const ids = [tab.id];
-    let prev = tab;
-    // Walk count-1 tabs to the right, one after the previous. prev.index + i
-    // would skip tabs (i grows while prev already advances).
-    for (let i = 1; i < clampCount(count); i++) {
-      const next = await getTabAt(prev.index + 1);
-      if (!next) break;
-      ids.push(next.id);
-      prev = next;
-    }
+    // One query for the whole window, then walk count tabs to the right.
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const index = tabs.findIndex((t) => t.id === tab.id);
+    if (index === -1) return { ok: false };
+    const ids = tabs.slice(index, index + clampCount(count)).map((t) => t.id);
     await chrome.tabs.remove(ids);
     return { ok: true, closed: ids.length };
   },
@@ -247,8 +236,9 @@ const handlers = {
   },
 
   // Autocomplete for the "t" omnibar: matching history, bookmarks and open
-  // tabs, deduped by URL (history wins). Each source is best-effort — a
-  // missing permission just skips it.
+  // tabs, deduped by URL. Open tabs come first — they are usually the first
+  // pick and must not be cut off by the 40-item cap — then history, then
+  // bookmarks. Each source is best-effort — a missing permission just skips it.
   suggest: async (_, { query = "" } = {}) => {
     const q = query.trim().toLowerCase();
     const items = [];
@@ -258,6 +248,13 @@ const handlers = {
       seen.add(url);
       items.push({ title: title || url, url, source });
     }
+    try {
+      const tabs = await chrome.tabs.query({});
+      // Push every open tab as a candidate — the prompt's fuzzy matcher
+      // filters and ranks them client-side, so substring pre-filtering here
+      // would hide matches like "ytb" for "YouTube".
+      for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
+    } catch {}
     if (q) {
       try {
         const results = await chrome.history.search({ text: q, maxResults: 12, startTime: 0 });
@@ -268,13 +265,6 @@ const handlers = {
         for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark");
       } catch {}
     }
-    try {
-      const tabs = await chrome.tabs.query({});
-      // Push every open tab as a candidate — the prompt's fuzzy matcher
-      // filters and ranks them client-side, so substring pre-filtering here
-      // would hide matches like "ytb" for "YouTube".
-      for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
-    } catch {}
     return items.slice(0, 40);
   },
 
@@ -357,11 +347,6 @@ const handlers = {
     return { ok: true };
   },
 };
-
-async function getTabAt(index) {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-  return tabs.find((tab) => tab.index === index) || null;
-}
 
 // Navigate the tab's history. Chrome no-ops when there is nothing to go to,
 // but Firefox rejects — treat "no history" as success so K in a fresh tab
