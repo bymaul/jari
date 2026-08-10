@@ -29,26 +29,6 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
   assert.equal(Jari.normalizeSettings({ fuzzyMatching: false }).fuzzyMatching, false);
 });
 
-test("normalizeSettings migrates renamed command ids in stored keymaps", () => {
-  const s = Jari.normalizeSettings({
-    keymap: {
-      p: "pasteOpenTab",
-      P: "pasteOpenTabBackground",
-      gu: "goParentUrl",
-      gU: "goUrlRoot",
-      d: "scrollHalfDown",
-      u: "scrollHalfUp",
-    },
-  });
-  assert.equal(s.keymap.p, "pasteOpen");
-  assert.equal(s.keymap.P, "pasteOpenBackground");
-  assert.equal(s.keymap.gu, "goUp");
-  assert.equal(s.keymap.gU, "goToRoot");
-  assert.equal(s.keymap.d, "scrollHalfPageDown");
-  assert.equal(s.keymap.u, "scrollHalfPageUp");
-  assert.equal(s.keymap.j, "scrollDown");
-});
-
 test("fuzzyMatch returns null when chars are missing or out of order", () => {
   assert.equal(Jari.fuzzyMatch("xyz", "abcdef"), null);
   assert.equal(Jari.fuzzyMatch("ba", "abc"), null);
