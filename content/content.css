@@ -44,8 +44,8 @@
   --jari-url-fg: var(--jari-muted);
   --jari-url-bg: var(--jari-bg);
 
-  --jari-of-fg: var(--jari-bg);
-  --jari-of-bg: var(--jari-fg);
+  --jari-of-fg: #2b2100;
+  --jari-of-bg: #f5b800;
 }
 
 /* Dark palette: the vague colorscheme's colors, lifted a few notches
@@ -82,6 +82,8 @@
 
 /* --- Prompt overlay (completion list) — tabs, omnibar, merge picker --- */
 .jari-prompt {
+  top: 0;
+  bottom: auto;
   background: var(--jari-cmplt-bg);
   color: var(--jari-cmplt-fg);
   font-size: var(--jari-cmplt-font-size);
