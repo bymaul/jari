@@ -167,20 +167,20 @@
       repeatable: true,
       run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count }),
     },
-    scrollHalfDown: {
+    scrollHalfPageDown: {
       category: "scrolling",
       label: "Scroll half page down",
       repeatable: true,
       run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
     },
-    scrollHalfUp: {
+    scrollHalfPageUp: {
       category: "scrolling",
       label: "Scroll half page up",
       repeatable: true,
       run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
     },
-    cycleScrollArea: { category: "scrolling", label: "Cycle scroll area", run: () => Jari.Scroll.cycle() },
-    resetScrollArea: { category: "scrolling", label: "Scroll area: global", run: () => Jari.Scroll.resetToGlobal() },
+    cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas", run: () => Jari.Scroll.cycle() },
+    resetScrollArea: { category: "scrolling", label: "Reset to page scroll", run: () => Jari.Scroll.resetToGlobal() },
     showScrollArea: { category: "scrolling", label: "Show scroll area", run: () => Jari.Scroll.showHighlight() },
     zoomIn: { category: "view", label: "Zoom in", run: () => Jari.sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { category: "view", label: "Zoom out", run: () => Jari.sendMessage("zoomBy", { delta: -0.1 }) },
@@ -189,7 +189,7 @@
     newTab: { category: "tabs", label: "New tab", run: () => Jari.sendMessage("createTab") },
     closeTab: { category: "tabs", label: "Close tab", repeatable: true, run: (c) => Jari.sendMessage("closeTab", { count: c.count }) },
     restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true, run: (c) => Jari.sendMessage("restoreTab", { count: c.count }) },
-    pasteOpenTab: {
+    pasteOpen: {
       category: "tabs",
       label: "Open clipboard URL in current tab",
       run: async () => {
@@ -199,7 +199,7 @@
         if (res && !res.ok) Jari.ui.toast("Not a URL");
       },
     },
-    pasteOpenTabBackground: {
+    pasteOpenBackground: {
       category: "tabs",
       label: "Open clipboard URL in background tab",
       run: async () => {
@@ -230,8 +230,8 @@
     tabSearch: { category: "tabs", label: "Tab search", run: () => Jari.Prompt.open() },
     omnibar: { category: "tabs", label: "Open URL or search", run: () => Jari.Prompt.openOmnibar() },
     reloadTab: { category: "page", label: "Reload", run: () => Jari.sendMessage("reloadTab", { bypassCache: false }) },
-    hardReload: { category: "page", label: "Hard reload", run: () => Jari.sendMessage("reloadTab", { bypassCache: true }) },
-    goParentUrl: {
+    hardReload: { category: "page", label: "Reload (bypass cache)", run: () => Jari.sendMessage("reloadTab", { bypassCache: true }) },
+    goUp: {
       category: "page",
       label: "Go to parent path",
       run: () => {
@@ -240,7 +240,7 @@
         Jari.sendMessage("navigate", { url: target });
       },
     },
-    goUrlRoot: {
+    goToRoot: {
       category: "page",
       label: "Go to site root",
       run: () => {
@@ -262,8 +262,8 @@
     focusInput: { category: "hints", label: "Focus input", run: () => Jari.Hints.start("focus") },
 
     // Page navigation
-    historyBack: { category: "history", label: "Back", run: () => Jari.sendMessage("historyBack") },
-    historyForward: { category: "history", label: "Forward", run: () => Jari.sendMessage("historyForward") },
+    historyBack: { category: "history", label: "Go back in history", run: () => Jari.sendMessage("historyBack") },
+    historyForward: { category: "history", label: "Go forward in history", run: () => Jari.sendMessage("historyForward") },
 
     // Clipboard
     copyUrl: { category: "clipboard", label: "Copy URL", run: () => copyToClipboard(location.href, "Copied") },
