@@ -241,10 +241,11 @@
       return;
     }
 
-    // Count prefix: digits 0-9 accumulate an unlimited repeat count. Only
-    // when no prefix already claimed the key — "g0" is firstTab, not a count.
+    // Count prefix: digits 0-9 accumulate a repeat count, capped so an
+    // unlimited string cannot grow. Only when no prefix already claimed the
+    // key — "g0" is firstTab, not a count. Consumers clamp the value anyway.
     if (!commandName && /^[0-9]$/.test(key)) {
-      pendingCount += key;
+      if (pendingCount.length < 9) pendingCount += key;
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();

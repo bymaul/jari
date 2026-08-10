@@ -38,18 +38,20 @@
     overlay.appendChild(title);
 
     // Collect every binding: single keys and two-key pairs from the keymap.
+    // A command may be bound to more than one key, so keys accumulate.
     const byCommand = new Map();
     for (const [key, commandName] of Object.entries(Jari.settings.getKeymap())) {
-      byCommand.set(commandName, key);
+      if (!byCommand.has(commandName)) byCommand.set(commandName, []);
+      byCommand.get(commandName).push(key);
     }
 
     const byCategory = new Map();
-    for (const [commandName, key] of byCommand) {
+    for (const [commandName, keys] of byCommand) {
       const cmd = Jari.commands[commandName];
       if (!cmd) continue;
       const id = cmd.category || 'other';
       if (!byCategory.has(id)) byCategory.set(id, []);
-      byCategory.get(id).push({ key, label: cmd.label });
+      byCategory.get(id).push({ keys, label: cmd.label });
     }
 
     // Split the categories across three columns, keeping each category whole
@@ -66,11 +68,11 @@
       for (const cat of col) {
         colEl.appendChild(
           Jari.ui.buildCategoryTable(cat, 'jari-help-cat-header', (tbody) => {
-            for (const { key, label } of byCategory.get(cat.id)) {
+            for (const { keys, label } of byCategory.get(cat.id)) {
               const tr = document.createElement('tr');
               const keyTd = document.createElement('td');
               keyTd.className = 'jari-help-key';
-              keyTd.textContent = key;
+              keyTd.textContent = keys.join(', ');
               const labelTd = document.createElement('td');
               labelTd.className = 'jari-help-label';
               labelTd.textContent = label;

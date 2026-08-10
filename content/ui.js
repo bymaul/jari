@@ -55,13 +55,25 @@
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
+      withHiddenTextarea((ta) => {
+        ta.value = text;
+        ta.select();
+        document.execCommand("copy");
+      });
+    }
+  }
+
+  // Run fn with a focused, invisible textarea on the page — the execCommand
+  // copy/paste fallback used by copyText and pasteClipboard.
+  function withHiddenTextarea(fn) {
+    const ta = document.createElement("textarea");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    try {
+      return fn(ta);
+    } finally {
       ta.remove();
     }
   }
@@ -113,5 +125,13 @@
   }
 
   Jari.sendMessage = sendMessage;
-  Jari.ui = { toast, showcmd, flash, copyText, statusContainer, buildCategoryTable };
+  Jari.ui = {
+    toast,
+    showcmd,
+    flash,
+    copyText,
+    statusContainer,
+    buildCategoryTable,
+    withHiddenTextarea,
+  };
 })();
