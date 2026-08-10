@@ -1470,9 +1470,9 @@
     header.className = "jari-prompt-header";
     header.textContent = title;
 
-    overlay.appendChild(inputEl);
-    overlay.appendChild(header);
     overlay.appendChild(listEl);
+    overlay.appendChild(header);
+    overlay.appendChild(inputEl);
     document.body.appendChild(overlay);
 
     filtered = tabs;

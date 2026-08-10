@@ -44,8 +44,8 @@
   --jari-url-fg: var(--jari-muted);
   --jari-url-bg: var(--jari-bg);
 
-  --jari-of-fg: #2b2100;
-  --jari-of-bg: #f5b800;
+  --jari-of-fg: #cdcdcd;
+  --jari-of-bg: #333738;
 }
 
 /* Dark palette: the vague colorscheme's colors, lifted a few notches
@@ -82,10 +82,8 @@
 
 /* --- Prompt overlay (completion list) — tabs, omnibar, merge picker --- */
 .jari-prompt {
-  top: 0;
-  bottom: auto;
-  background: var(--jari-cmplt-bg);
-  color: var(--jari-cmplt-fg);
+  background: #1c1c24 !important;
+  color: #cdcdcd !important;
   font-size: var(--jari-cmplt-font-size);
   font-family: var(--jari-cmplt-font-family);
 }
@@ -95,14 +93,24 @@
   font-family: var(--jari-cmdl-font-family);
   font-size: var(--jari-cmdl-font-size);
   line-height: var(--jari-cmdl-line-height);
-  color: var(--jari-cmdl-fg);
-  background: var(--jari-cmdl-bg);
+  color: #cdcdcd;
+  background: #1c1c24;
   border: unset;
   outline: none;
   padding: 0 0 0 0.5ex;
 }
 
-.jari-prompt-header,
+.jari-prompt-header {
+  background: #252530;
+  color: #cdcdcd;
+  font-size: var(--jari-header-font-size);
+  font-weight: var(--jari-header-font-weight);
+  border-bottom: 1px solid #333738;
+  padding: 0 0.5ex;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .jari-help-title {
   background: var(--jari-header-bg);
   color: var(--jari-fg);
@@ -120,7 +128,7 @@
   padding: 0;
   max-height: 50vh;
   overflow: auto;
-  border-top: var(--jari-cmplt-border-top);
+  border-bottom: 1px solid #333738;
 }
 
 .jari-prompt-list li {
@@ -134,8 +142,8 @@
 }
 
 .jari-prompt-list li .url {
-  color: var(--jari-url-fg);
-  background: var(--jari-url-bg);
+  color: #878787;
+  background: transparent;
   text-decoration: none;
   margin-left: 1em;
 }
