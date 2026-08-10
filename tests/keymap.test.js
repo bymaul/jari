@@ -46,6 +46,26 @@ test("normalizeSettings migrates renamed command ids in stored keymaps", () => {
   assert.equal(s.keymap.j, "scrollDown");
 });
 
+test("fuzzyMatch returns null when chars are missing or out of order", () => {
+  assert.equal(Jari.fuzzyMatch("xyz", "abcdef"), null);
+  assert.equal(Jari.fuzzyMatch("ba", "abc"), null);
+  assert.equal(Jari.fuzzyMatch("", "anything"), null);
+});
+
+test("fuzzyMatch reports matched indices in order", () => {
+  assert.deepEqual(Jari.fuzzyMatch("fb", "foo bar").indices, [0, 4]);
+  assert.deepEqual(Jari.fuzzyMatch("gt", "gtx").indices, [0, 1]);
+});
+
+test("fuzzyMatch prefers consecutive runs and word starts", () => {
+  const consecutive = Jari.fuzzyMatch("ab", "abxx").score;
+  const scattered = Jari.fuzzyMatch("ab", "axb").score;
+  assert.ok(consecutive > scattered);
+  const wordStart = Jari.fuzzyMatch("ab", "ab").score;
+  const midWord = Jari.fuzzyMatch("ab", "cab").score;
+  assert.ok(wordStart > midWord);
+});
+
 test("balanceCategories spreads categories across the columns", () => {
   const byCategory = new Map([
     ["scrolling", ["scrollDown", "scrollUp"]],

@@ -262,6 +262,35 @@
     },
   };
 
+  // Fuzzy subsequence matcher for the prompt lists. Every query char must
+  // appear in text in order; the returned score ranks results so consecutive
+  // runs, word starts and early positions win. Returns null on no match.
+  Jari.fuzzyMatch = function fuzzyMatch(query, text) {
+    const q = String(query).toLowerCase();
+    const t = String(text).toLowerCase();
+    if (!q) return null;
+    let score = 0;
+    let consecutive = 0;
+    let last = -1;
+    const indices = [];
+    for (const ch of q) {
+      const i = t.indexOf(ch, last + 1);
+      if (i === -1) return null;
+      indices.push(i);
+      if (i === last + 1) {
+        consecutive += 1;
+        score += 12 + consecutive * 4;
+      } else {
+        consecutive = 0;
+        score += 4;
+        score -= (i - last) * 2;
+      }
+      if (i === 0 || !/[\w]/.test(t[i - 1])) score += 8;
+      last = i;
+    }
+    return { score, indices };
+  };
+
   // Greedy column balance for the help overlay and the options keymap grid:
   // assign each category to the currently shortest column so the columns end
   // up roughly equal (a category header counts one row + one row per command).

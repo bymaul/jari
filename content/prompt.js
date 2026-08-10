@@ -23,6 +23,7 @@
   let tabs = [];
   let filtered = [];
   let selected = 0;
+  let query = ""; // current filter text, used for match highlighting
   let mode = "tabs"; // "tabs" | "merge" | "open" | "edit"
   let suggestSeq = 0; // invalidates in-flight suggestion fetches
   let suggestTimer = null;
@@ -76,8 +77,9 @@
   // search depending on looksLikeUrl — and the suggestions arrive async,
   // debounced, replacing that row's list. A stale response (query changed or
   // overlay closed) is dropped via suggestSeq.
-  function handleOpenInput(query) {
-    const q = query.trim();
+  function handleOpenInput(queryText) {
+    const q = queryText.trim();
+    query = q;
     if (!q) {
       clearTimeout(suggestTimer);
       suggestSeq++;
@@ -98,10 +100,29 @@
       if (!active || seq !== suggestSeq) return;
       const res = (await Jari.sendMessage("suggest", { query: q })) || [];
       if (!active || seq !== suggestSeq) return;
-      filtered = [row, ...res.map((r) => ({ kind: "suggestion", title: r.title, url: r.url }))];
+      const suggestions = res
+        .map((r) => ({
+          kind: "suggestion",
+          title: r.title,
+          url: r.url,
+          match: Jari.fuzzyMatch(q, r.title + " " + (r.url || "")),
+        }))
+        .filter((r) => r.match)
+        .sort((a, b) => b.match.score - a.match.score);
+      filtered = [row, ...suggestions];
       selected = 0;
       renderList();
     }, 130);
+  }
+
+  // Rank a list by fuzzy score against the query; entries that don't match
+  // at all are dropped.
+  function rankTabs(q, list) {
+    return list
+      .map((item) => ({ item, match: Jari.fuzzyMatch(q, item.title + " " + (item.url || "")) }))
+      .filter((x) => x.match)
+      .sort((a, b) => b.match.score - a.match.score)
+      .map((x) => x.item);
   }
 
   function render(title, placeholder) {
@@ -112,12 +133,12 @@
     inputEl.type = "text";
     inputEl.placeholder = placeholder;
     inputEl.addEventListener("input", () => {
-      const query = inputEl.value;
+      const q = inputEl.value.trim();
+      query = q;
       if (mode === "open" || mode === "edit") {
-        handleOpenInput(query);
+        handleOpenInput(q);
       } else {
-        const q = query.toLowerCase();
-        filtered = tabs.filter((tab) => (tab.title + " " + tab.url).toLowerCase().includes(q));
+        filtered = q ? rankTabs(q, tabs) : tabs;
         selected = 0;
         renderList();
       }
@@ -140,6 +161,34 @@
     inputEl.focus();
   }
 
+  // Fill a span with text, wrapping the fuzzy-matched characters in a
+  // .jari-match element. indices come from fuzzyMatch against the same text.
+  function renderText(el, text, indices) {
+    if (!indices || indices.length === 0) {
+      el.textContent = text;
+      return;
+    }
+    const matched = new Set(indices);
+    const frag = document.createDocumentFragment();
+    let run = "";
+    for (let i = 0; i < text.length; i++) {
+      if (matched.has(i)) {
+        if (run) {
+          frag.appendChild(document.createTextNode(run));
+          run = "";
+        }
+        const mark = document.createElement("span");
+        mark.className = "jari-match";
+        mark.textContent = text[i];
+        frag.appendChild(mark);
+      } else {
+        run += text[i];
+      }
+    }
+    if (run) frag.appendChild(document.createTextNode(run));
+    el.appendChild(frag);
+  }
+
   function renderList() {
     if (mode === "open" || mode === "edit") {
       listEl.textContent = "";
@@ -147,7 +196,7 @@
         const li = document.createElement("li");
         const title = document.createElement("span");
         title.className = "title";
-        title.textContent =
+        const titleText =
           row.kind === "search"
             ? `Search for "${row.title}"`
             : row.kind === "url"
@@ -155,7 +204,16 @@
               : row.title || "(untitled)";
         const url = document.createElement("span");
         url.className = "url";
-        url.textContent = row.kind === "suggestion" ? row.url || "" : "";
+        const urlText = row.kind === "suggestion" ? row.url || "" : "";
+        // Only suggestion rows get fuzzy highlighting; the typed-query row
+        // is the query itself and would look odd.
+        if (row.kind === "suggestion" && query) {
+          renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
+          renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
+        } else {
+          title.textContent = titleText;
+          url.textContent = urlText;
+        }
         li.appendChild(title);
         li.appendChild(url);
         listEl.appendChild(li);
@@ -180,10 +238,17 @@
       win.textContent = "#" + winLabels.get(tab.windowId);
       const title = document.createElement("span");
       title.className = "title";
-      title.textContent = tab.title || "(untitled)";
+      const titleText = tab.title || "(untitled)";
       const url = document.createElement("span");
       url.className = "url";
-      url.textContent = tab.url || "";
+      const urlText = tab.url || "";
+      if (query) {
+        renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
+        renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
+      } else {
+        title.textContent = titleText;
+        url.textContent = urlText;
+      }
       li.appendChild(win);
       li.appendChild(title);
       li.appendChild(url);
@@ -280,6 +345,7 @@
     tabs = [];
     filtered = [];
     selected = 0;
+    query = "";
     mode = "tabs";
     active = false;
   }
