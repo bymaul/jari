@@ -61,8 +61,8 @@
 
     // Clipboard
     Y: 'copyTitleUrl',
-    p: 'pasteOpenTab',
-    P: 'pasteOpenTabBackground',
+    p: 'pasteOpen',
+    P: 'pasteOpenBackground',
 
     // Site-level control
     I: 'toggleIgnore',
@@ -77,8 +77,8 @@
     // the options table and help overlay.
     gt: 'tabSearch',
     gg: 'scrollTop',
-    gu: 'goParentUrl',
-    gU: 'goUrlRoot',
+    gu: 'goUp',
+    gU: 'goToRoot',
     ge: 'editUrl',
     gs: 'cycleScrollArea',
     gS: 'resetScrollArea',
@@ -169,13 +169,29 @@
   // Elements Jari's own overlays create. Content features must not touch
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
+
+  // Command renames, old id -> new id. Stored keymaps may reference the old
+  // names; normalizeSettings remaps them so existing bindings keep working.
+  Jari.renamedCommands = {
+    scrollHalfDown: 'scrollHalfPageDown',
+    scrollHalfUp: 'scrollHalfPageUp',
+    goParentUrl: 'goUp',
+    goUrlRoot: 'goToRoot',
+    pasteOpenTab: 'pasteOpen',
+    pasteOpenTabBackground: 'pasteOpenBackground',
+  };
+
   // Sanitize a raw storage blob into a complete settings object with defaults
   // filled in and invalid values dropped. Shared by the content-script
   // settings layer and the options page so both interpret stored values the
   // same way.
   Jari.normalizeSettings = function normalizeSettings(data) {
     const d = data || {};
-    const keymap = { ...Jari.keymapDefaults, ...(d.keymap || {}) };
+    const storedKeymap = {};
+    for (const [key, command] of Object.entries(d.keymap || {})) {
+      storedKeymap[key] = Jari.renamedCommands[command] || command;
+    }
+    const keymap = { ...Jari.keymapDefaults, ...storedKeymap };
     for (const key of Jari.unboundKeys) delete keymap[key];
     for (const key of Jari.prefixKeys) delete keymap[key];
     return {

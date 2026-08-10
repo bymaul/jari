@@ -26,6 +26,26 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
   assert.deepEqual(bad.disabledSites, []);
 });
 
+test("normalizeSettings migrates renamed command ids in stored keymaps", () => {
+  const s = Jari.normalizeSettings({
+    keymap: {
+      p: "pasteOpenTab",
+      P: "pasteOpenTabBackground",
+      gu: "goParentUrl",
+      gU: "goUrlRoot",
+      d: "scrollHalfDown",
+      u: "scrollHalfUp",
+    },
+  });
+  assert.equal(s.keymap.p, "pasteOpen");
+  assert.equal(s.keymap.P, "pasteOpenBackground");
+  assert.equal(s.keymap.gu, "goUp");
+  assert.equal(s.keymap.gU, "goToRoot");
+  assert.equal(s.keymap.d, "scrollHalfPageDown");
+  assert.equal(s.keymap.u, "scrollHalfPageUp");
+  assert.equal(s.keymap.j, "scrollDown");
+});
+
 test("balanceCategories spreads categories across the columns", () => {
   const byCategory = new Map([
     ["scrolling", ["scrollDown", "scrollUp"]],
