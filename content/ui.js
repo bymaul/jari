@@ -94,6 +94,24 @@
     flashTimer = setTimeout(() => showcmd(null), ms);
   }
 
+  // Shared table shell for the help and options keybinding lists: a category
+  // header row over a caller-supplied body renderer, so both overlays build
+  // identical tables without duplicating the shell.
+  function buildCategoryTable(cat, headerClass, renderBody) {
+    const table = document.createElement("table");
+    const tbody = document.createElement("tbody");
+    const headerRow = document.createElement("tr");
+    headerRow.className = headerClass;
+    const th = document.createElement("th");
+    th.colSpan = 2;
+    th.textContent = cat.label;
+    headerRow.appendChild(th);
+    tbody.appendChild(headerRow);
+    renderBody(tbody);
+    table.appendChild(tbody);
+    return table;
+  }
+
   Jari.sendMessage = sendMessage;
-  Jari.ui = { toast, showcmd, flash, copyText, statusContainer };
+  Jari.ui = { toast, showcmd, flash, copyText, statusContainer, buildCategoryTable };
 })();
