@@ -118,6 +118,8 @@
   Jari.settingsDefaults = {
     scrollStep: 200,
     smoothScroll: false,
+    // Rank prompt lists by fuzzy subsequence score instead of plain substring.
+    fuzzyMatching: true,
     timeoutMs: 2000,
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
@@ -200,6 +202,8 @@
       scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : Jari.settingsDefaults.scrollStep,
       smoothScroll:
         typeof d.smoothScroll === 'boolean' ? d.smoothScroll : Jari.settingsDefaults.smoothScroll,
+      fuzzyMatching:
+        typeof d.fuzzyMatching === 'boolean' ? d.fuzzyMatching : Jari.settingsDefaults.fuzzyMatching,
       timeoutMs:
         Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
           ? d.timeoutMs
@@ -264,7 +268,8 @@
 
   // Fuzzy subsequence matcher for the prompt lists. Every query char must
   // appear in text in order; the returned score ranks results so consecutive
-  // runs, word starts and early positions win. Returns null on no match.
+  // runs, word starts, camel-case boundaries and early positions win. Returns
+  // null on no match.
   Jari.fuzzyMatch = function fuzzyMatch(query, text) {
     const q = String(query).toLowerCase();
     const t = String(text).toLowerCase();
@@ -279,13 +284,14 @@
       indices.push(i);
       if (i === last + 1) {
         consecutive += 1;
-        score += 12 + consecutive * 4;
+        score += 14 + consecutive; // a run scores higher the longer it is
       } else {
         consecutive = 0;
-        score += 4;
-        score -= (i - last) * 2;
+        score += 2;
+        score -= (i - last) * 3; // gap penalty for skipped characters
       }
-      if (i === 0 || !/[\w]/.test(t[i - 1])) score += 8;
+      if (i === 0 || !/[\w]/.test(t[i - 1])) score += 12; // word start
+      else if (text[i] !== text[i].toLowerCase()) score += 8; // camel-case boundary
       last = i;
     }
     return { score, indices };

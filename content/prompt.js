@@ -100,28 +100,42 @@
       if (!active || seq !== suggestSeq) return;
       const res = (await Jari.sendMessage("suggest", { query: q })) || [];
       if (!active || seq !== suggestSeq) return;
+      const fuzzy = Jari.settings.isFuzzyMatching();
       const suggestions = res
-        .map((r) => ({
-          kind: "suggestion",
-          title: r.title,
-          url: r.url,
-          match: Jari.fuzzyMatch(q, r.title + " " + (r.url || "")),
-        }))
+        .map((r) => {
+          const hay = r.title + " " + (r.url || "");
+          const match = fuzzy
+            ? Jari.fuzzyMatch(q, hay)
+            : hay.toLowerCase().includes(q)
+              ? { score: 0, indices: null }
+              : null;
+          return { kind: "suggestion", title: r.title, url: r.url, match };
+        })
         .filter((r) => r.match)
-        .sort((a, b) => b.match.score - a.match.score);
+        .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0));
       filtered = [row, ...suggestions];
       selected = 0;
       renderList();
     }, 130);
   }
 
-  // Rank a list by fuzzy score against the query; entries that don't match
-  // at all are dropped.
+  // Rank a list against the query; entries that don't match at all are
+  // dropped. With fuzzy matching off this falls back to a plain substring
+  // filter that keeps the original order.
   function rankTabs(q, list) {
+    const fuzzy = Jari.settings.isFuzzyMatching();
     return list
-      .map((item) => ({ item, match: Jari.fuzzyMatch(q, item.title + " " + (item.url || "")) }))
+      .map((item) => {
+        const hay = item.title + " " + (item.url || "");
+        const match = fuzzy
+          ? Jari.fuzzyMatch(q, hay)
+          : hay.toLowerCase().includes(q)
+            ? { score: 0, indices: null }
+            : null;
+        return { item, match };
+      })
       .filter((x) => x.match)
-      .sort((a, b) => b.match.score - a.match.score)
+      .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0))
       .map((x) => x.item);
   }
 
@@ -205,9 +219,11 @@
         const url = document.createElement("span");
         url.className = "url";
         const urlText = row.kind === "suggestion" ? row.url || "" : "";
-        // Only suggestion rows get fuzzy highlighting; the typed-query row
-        // is the query itself and would look odd.
-        if (row.kind === "suggestion" && query) {
+        // Only suggestion rows get match highlighting; the typed-query row
+        // is the query itself and would look odd. Highlighting requires
+        // fuzzy matching — substring mode renders plain text.
+        const highlight = row.kind === "suggestion" && query && Jari.settings.isFuzzyMatching();
+        if (highlight) {
           renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
           renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
         } else {
@@ -242,7 +258,7 @@
       const url = document.createElement("span");
       url.className = "url";
       const urlText = tab.url || "";
-      if (query) {
+      if (query && Jari.settings.isFuzzyMatching()) {
         renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
         renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
       } else {

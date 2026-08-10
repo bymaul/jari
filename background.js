@@ -270,15 +270,12 @@ const handlers = {
     }
     try {
       const tabs = await chrome.tabs.query({});
-      for (const tab of tabs) {
-        const title = tab.title || "";
-        const url = tab.url || "";
-        if (!q || title.toLowerCase().includes(q) || url.toLowerCase().includes(q)) {
-          push(title, url, "tab");
-        }
-      }
+      // Push every open tab as a candidate — the prompt's fuzzy matcher
+      // filters and ranks them client-side, so substring pre-filtering here
+      // would hide matches like "ytb" for "YouTube".
+      for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
     } catch {}
-    return items.slice(0, 15);
+    return items.slice(0, 40);
   },
 
   // Search with the browser's default engine, in a new foreground tab by
