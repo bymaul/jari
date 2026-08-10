@@ -2,18 +2,9 @@
 
 ## Features
 
-- **Scroll** with `j`/`k`/`h`/`l` and repeat counts (`5j`, `gg`). Smooth scrolling is optional.
-- **Scroll-area targeting**: `gs` cycles nested scroll containers, `gS` resets to the page, `w` flashes the active area.
-- **Tabs**: `x`/`X` close and restore, `H`/`L` switch, `<<`/`>>` move left/right, `g0`/`g$` jump to first/last, `W` splits a tab into its own window (again to merge back).
-- **History**: `S`/`D` go back/forward.
-- **Tab search** (`gt`) and **omnibar** (`t`): filter open tabs, or open a URL / search with suggestions from history, bookmarks, and open tabs. `ge` edits the current page URL in place.
-- **Link hints**: `f` labels clickable elements, `F` opens in a new tab, `yf` yanks the URL. `i` focuses the nearest text field.
-- **Clipboard**: `yy` copies the URL, `Y` copies title + URL, `gp`/`gP` open what's on the clipboard in a tab.
-- **Modes**: `I` ignores Jari until pressed again, `o` passes keys through for a few seconds.
-- **Per-site disabling**: `ctrl+alt+v` toggles the current site; the options page manages the full list.
-- **Help overlay**: `?` shows every binding; `;e` opens the options page.
-
-All bindings are rebindable from the options page, including the multi-key `g`/`;`/`y`/`<`/`>` prefixes. Repeat counts (`3x`, `5j`) work on repeatable commands.
+Keyboard-driven browsing with everything on the home row: scrolling with repeat
+counts, tab and history management, link hints, a fuzzy-search omnibar, and
+ignore/passthrough modes — every key rebindable from the options page.
 
 ## Default keybindings
 
