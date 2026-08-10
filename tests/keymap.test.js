@@ -75,6 +75,33 @@ test("fuzzyMatch rewards camel-case boundaries", () => {
   assert.ok(camel > plain);
 });
 
+test("fuzzyMatch multi-term requires every term and sums scores", () => {
+  assert.deepEqual(Jari.fuzzyMatch("pria youtube", "Pria on YouTube").indices, [
+    0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14,
+  ]);
+  assert.ok(
+    Jari.fuzzyMatch("pria youtube", "Pria on YouTube").score >
+      Jari.fuzzyMatch("pria", "Pria on YouTube").score,
+  );
+  assert.equal(Jari.fuzzyMatch("pria youtube", "Pria only"), null);
+  assert.equal(Jari.fuzzyMatch("pria   youtube", "Pria on YouTube") === null, false);
+  assert.equal(Jari.fuzzyMatch("", "anything"), null);
+});
+
+test("fuzzyIndices skips terms that are not in the field", () => {
+  assert.deepEqual(Jari.fuzzyIndices("pria youtube", "Pria"), [0, 1, 2, 3]);
+  assert.deepEqual(Jari.fuzzyIndices("pria youtube", "YouTube"), [0, 1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(Jari.fuzzyIndices("pria youtube", "zzz"), []);
+  assert.deepEqual(Jari.fuzzyIndices("", "anything"), []);
+});
+
+test("substringMatch requires every term as a substring", () => {
+  assert.equal(Jari.substringMatch("pria youtube", "Pria on YouTube"), true);
+  assert.equal(Jari.substringMatch("pria youtube", "Pria only"), false);
+  assert.equal(Jari.substringMatch("pria", "My Pria Page"), true);
+  assert.equal(Jari.substringMatch("", "anything"), false);
+});
+
 test("balanceCategories spreads categories across the columns", () => {
   const byCategory = new Map([
     ["scrolling", ["scrollDown", "scrollUp"]],
