@@ -5,6 +5,7 @@
 // URL safety: only plain web-ish destinations may be navigated to or opened
 // in tabs. Everything else (javascript:, data:, chrome:, ...) is rejected,
 // and bare hostnames are assumed to be https.
+// Keep in sync with Jari.allowedUrlSchemes in content/keymap.js.
 const ALLOWED_URL_SCHEMES = new Set(["http", "https", "file", "about"]);
 const BLOCKED_URL_SCHEMES = new Set([
   "javascript",

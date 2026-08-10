@@ -172,6 +172,11 @@
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
 
+  // URL schemes safe to open/navigate to. The background keeps its own copy
+  // (it cannot load the content bundle); keep the two in sync. hints.js uses
+  // this to decide whether an <a> href may open in a background tab.
+  Jari.allowedUrlSchemes = new Set(['http', 'https', 'file', 'about']);
+
   // Command renames, old id -> new id. Stored keymaps may reference the old
   // names; normalizeSettings remaps them so existing bindings keep working.
   Jari.renamedCommands = {

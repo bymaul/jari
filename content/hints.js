@@ -247,7 +247,8 @@
     const href = el.href || el.getAttribute?.("href");
     // Only hand web-ish URLs to the background. Anything else (javascript:,
     // data:, mailto:, ...) is a same-tab click, which the site itself offers.
-    if (href && /^(https?:|file:|about:)/i.test(href)) {
+    const scheme = href && href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1].toLowerCase();
+    if (scheme && Jari.allowedUrlSchemes.has(scheme)) {
       Jari.sendMessage("openInBackgroundTab", { url: href });
     } else {
       el.click();

@@ -74,47 +74,35 @@
     for (const cats of columns) {
       const col = document.createElement("div");
       col.className = "jari-keymap-column";
-      for (const cat of cats) col.appendChild(buildCategoryTable(byCategory, cat));
+      for (const cat of cats) {
+        col.appendChild(
+          Jari.ui.buildCategoryTable(cat, "cat-header", (tbody) => {
+            for (const [name, cmd] of byCategory.get(cat.id)) {
+              const row = document.createElement("tr");
+              row.dataset.command = name;
+
+              const labelTd = document.createElement("td");
+              labelTd.textContent = cmd.label;
+
+              const keyTd = document.createElement("td");
+              const input = document.createElement("input");
+              input.type = "text";
+              input.readOnly = true;
+              input.value = keyFor(name);
+              input.title = "Click, then press a key to rebind. Backspace clears.";
+              input.addEventListener("focus", () => startRecording(input, name));
+
+              keyTd.appendChild(input);
+              row.appendChild(labelTd);
+              row.appendChild(keyTd);
+              tbody.appendChild(row);
+            }
+          }),
+        );
+      }
       grid.appendChild(col);
     }
     tableEl.appendChild(grid);
-  }
-
-  function buildCategoryTable(byCategory, cat) {
-    const table = document.createElement("table");
-    const tbody = document.createElement("tbody");
-
-    const headerRow = document.createElement("tr");
-    headerRow.className = "cat-header";
-    const th = document.createElement("th");
-    th.colSpan = 2;
-    th.textContent = cat.label;
-    headerRow.appendChild(th);
-    tbody.appendChild(headerRow);
-
-    for (const [name, cmd] of byCategory.get(cat.id)) {
-      const row = document.createElement("tr");
-      row.dataset.command = name;
-
-      const labelTd = document.createElement("td");
-      labelTd.textContent = cmd.label;
-
-      const keyTd = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "text";
-      input.readOnly = true;
-      input.value = keyFor(name);
-      input.title = "Click, then press a key to rebind. Backspace clears.";
-      input.addEventListener("focus", () => startRecording(input, name));
-
-      keyTd.appendChild(input);
-      row.appendChild(labelTd);
-      row.appendChild(keyTd);
-      tbody.appendChild(row);
-    }
-
-    table.appendChild(tbody);
-    return table;
   }
 
   function keyFor(commandName) {

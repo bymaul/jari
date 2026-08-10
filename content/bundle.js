@@ -174,6 +174,11 @@
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
 
+  // URL schemes safe to open/navigate to. The background keeps its own copy
+  // (it cannot load the content bundle); keep the two in sync. hints.js uses
+  // this to decide whether an <a> href may open in a background tab.
+  Jari.allowedUrlSchemes = new Set(['http', 'https', 'file', 'about']);
+
   // Command renames, old id -> new id. Stored keymaps may reference the old
   // names; normalizeSettings remaps them so existing bindings keep working.
   Jari.renamedCommands = {
@@ -603,8 +608,26 @@
     flashTimer = setTimeout(() => showcmd(null), ms);
   }
 
+  // Shared table shell for the help and options keybinding lists: a category
+  // header row over a caller-supplied body renderer, so both overlays build
+  // identical tables without duplicating the shell.
+  function buildCategoryTable(cat, headerClass, renderBody) {
+    const table = document.createElement("table");
+    const tbody = document.createElement("tbody");
+    const headerRow = document.createElement("tr");
+    headerRow.className = headerClass;
+    const th = document.createElement("th");
+    th.colSpan = 2;
+    th.textContent = cat.label;
+    headerRow.appendChild(th);
+    tbody.appendChild(headerRow);
+    renderBody(tbody);
+    table.appendChild(tbody);
+    return table;
+  }
+
   Jari.sendMessage = sendMessage;
-  Jari.ui = { toast, showcmd, flash, copyText, statusContainer };
+  Jari.ui = { toast, showcmd, flash, copyText, statusContainer, buildCategoryTable };
 })();
 
 // ---- commands.js ----
@@ -1372,7 +1395,8 @@
     const href = el.href || el.getAttribute?.("href");
     // Only hand web-ish URLs to the background. Anything else (javascript:,
     // data:, mailto:, ...) is a same-tab click, which the site itself offers.
-    if (href && /^(https?:|file:|about:)/i.test(href)) {
+    const scheme = href && href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1].toLowerCase();
+    if (scheme && Jari.allowedUrlSchemes.has(scheme)) {
       Jari.sendMessage("openInBackgroundTab", { url: href });
     } else {
       el.click();
@@ -1871,7 +1895,24 @@
     for (const col of columns) {
       const colEl = document.createElement('div');
       colEl.className = 'jari-help-column';
-      for (const cat of col) colEl.appendChild(buildCategoryTable(cat, byCategory.get(cat.id)));
+      for (const cat of col) {
+        colEl.appendChild(
+          Jari.ui.buildCategoryTable(cat, 'jari-help-cat-header', (tbody) => {
+            for (const { key, label } of byCategory.get(cat.id)) {
+              const tr = document.createElement('tr');
+              const keyTd = document.createElement('td');
+              keyTd.className = 'jari-help-key';
+              keyTd.textContent = key;
+              const labelTd = document.createElement('td');
+              labelTd.className = 'jari-help-label';
+              labelTd.textContent = label;
+              tr.appendChild(keyTd);
+              tr.appendChild(labelTd);
+              tbody.appendChild(tr);
+            }
+          }),
+        );
+      }
       grid.appendChild(colEl);
     }
     listEl.appendChild(grid);
@@ -1885,35 +1926,6 @@
     overlay.appendChild(footer);
 
     document.body.appendChild(overlay);
-  }
-
-  function buildCategoryTable(cat, rows) {
-    const table = document.createElement('table');
-    const tbody = document.createElement('tbody');
-
-    const headerRow = document.createElement('tr');
-    headerRow.className = 'jari-help-cat-header';
-    const th = document.createElement('th');
-    th.colSpan = 2;
-    th.textContent = cat.label;
-    headerRow.appendChild(th);
-    tbody.appendChild(headerRow);
-
-    for (const { key, label } of rows) {
-      const tr = document.createElement('tr');
-      const keyTd = document.createElement('td');
-      keyTd.className = 'jari-help-key';
-      keyTd.textContent = key;
-      const labelTd = document.createElement('td');
-      labelTd.className = 'jari-help-label';
-      labelTd.textContent = label;
-      tr.appendChild(keyTd);
-      tr.appendChild(labelTd);
-      tbody.appendChild(tr);
-    }
-
-    table.appendChild(tbody);
-    return table;
   }
 
   function onKeyDown(event) {

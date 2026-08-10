@@ -63,7 +63,24 @@
     for (const col of columns) {
       const colEl = document.createElement('div');
       colEl.className = 'jari-help-column';
-      for (const cat of col) colEl.appendChild(buildCategoryTable(cat, byCategory.get(cat.id)));
+      for (const cat of col) {
+        colEl.appendChild(
+          Jari.ui.buildCategoryTable(cat, 'jari-help-cat-header', (tbody) => {
+            for (const { key, label } of byCategory.get(cat.id)) {
+              const tr = document.createElement('tr');
+              const keyTd = document.createElement('td');
+              keyTd.className = 'jari-help-key';
+              keyTd.textContent = key;
+              const labelTd = document.createElement('td');
+              labelTd.className = 'jari-help-label';
+              labelTd.textContent = label;
+              tr.appendChild(keyTd);
+              tr.appendChild(labelTd);
+              tbody.appendChild(tr);
+            }
+          }),
+        );
+      }
       grid.appendChild(colEl);
     }
     listEl.appendChild(grid);
@@ -77,35 +94,6 @@
     overlay.appendChild(footer);
 
     document.body.appendChild(overlay);
-  }
-
-  function buildCategoryTable(cat, rows) {
-    const table = document.createElement('table');
-    const tbody = document.createElement('tbody');
-
-    const headerRow = document.createElement('tr');
-    headerRow.className = 'jari-help-cat-header';
-    const th = document.createElement('th');
-    th.colSpan = 2;
-    th.textContent = cat.label;
-    headerRow.appendChild(th);
-    tbody.appendChild(headerRow);
-
-    for (const { key, label } of rows) {
-      const tr = document.createElement('tr');
-      const keyTd = document.createElement('td');
-      keyTd.className = 'jari-help-key';
-      keyTd.textContent = key;
-      const labelTd = document.createElement('td');
-      labelTd.className = 'jari-help-label';
-      labelTd.textContent = label;
-      tr.appendChild(keyTd);
-      tr.appendChild(labelTd);
-      tbody.appendChild(tr);
-    }
-
-    table.appendChild(tbody);
-    return table;
   }
 
   function onKeyDown(event) {
