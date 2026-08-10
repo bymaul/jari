@@ -128,15 +128,10 @@
     passthroughMs: 3000,
   };
 
-  // Bindings removed from the defaults after a keybind overhaul. Stripped from
-  // any stored keymap so old saved configs stop showing them.
-  Jari.unboundKeys = [];
-
   // Prefix keys ("g", ";", "y") must never double as single-key bindings —
   // the dispatcher resolves a prefix before the single-key keymap, so a lone
   // "g" binding would be shadowed and conflict with the prefix group. Stripped
-  // from stored keymaps like unboundKeys, and rejected by the options-page
-  // recorder.
+  // from stored keymaps and rejected by the options-page recorder.
   Jari.prefixKeys = new Set(Object.keys(Jari.prefixes || {}));
 
   // --- Shared helpers ------------------------------------------------------
@@ -201,7 +196,6 @@
       storedKeymap[key] = Jari.renamedCommands[command] || command;
     }
     const keymap = { ...Jari.keymapDefaults, ...storedKeymap };
-    for (const key of Jari.unboundKeys) delete keymap[key];
     for (const key of Jari.prefixKeys) delete keymap[key];
     return {
       keymap,
@@ -569,13 +563,25 @@
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
+      withHiddenTextarea((ta) => {
+        ta.value = text;
+        ta.select();
+        document.execCommand("copy");
+      });
+    }
+  }
+
+  // Run fn with a focused, invisible textarea on the page — the execCommand
+  // copy/paste fallback used by copyText and pasteClipboard.
+  function withHiddenTextarea(fn) {
+    const ta = document.createElement("textarea");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    try {
+      return fn(ta);
+    } finally {
       ta.remove();
     }
   }
@@ -627,7 +633,15 @@
   }
 
   Jari.sendMessage = sendMessage;
-  Jari.ui = { toast, showcmd, flash, copyText, statusContainer, buildCategoryTable };
+  Jari.ui = {
+    toast,
+    showcmd,
+    flash,
+    copyText,
+    statusContainer,
+    buildCategoryTable,
+    withHiddenTextarea,
+  };
 })();
 
 // ---- commands.js ----
@@ -745,16 +759,12 @@
   // secure pages. The caller treats the result as a URL — background
   // normalizeUrl turns bare hostnames into https.
   function pasteClipboard() {
-    const ta = document.createElement("textarea");
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.focus();
     let text = "";
     try {
-      if (document.execCommand("paste")) text = ta.value.trim();
+      Jari.ui.withHiddenTextarea((ta) => {
+        if (document.execCommand("paste")) text = ta.value.trim();
+      });
     } catch {}
-    ta.remove();
     if (text) return Promise.resolve(text);
     try {
       return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
@@ -1875,18 +1885,20 @@
     overlay.appendChild(title);
 
     // Collect every binding: single keys and two-key pairs from the keymap.
+    // A command may be bound to more than one key, so keys accumulate.
     const byCommand = new Map();
     for (const [key, commandName] of Object.entries(Jari.settings.getKeymap())) {
-      byCommand.set(commandName, key);
+      if (!byCommand.has(commandName)) byCommand.set(commandName, []);
+      byCommand.get(commandName).push(key);
     }
 
     const byCategory = new Map();
-    for (const [commandName, key] of byCommand) {
+    for (const [commandName, keys] of byCommand) {
       const cmd = Jari.commands[commandName];
       if (!cmd) continue;
       const id = cmd.category || 'other';
       if (!byCategory.has(id)) byCategory.set(id, []);
-      byCategory.get(id).push({ key, label: cmd.label });
+      byCategory.get(id).push({ keys, label: cmd.label });
     }
 
     // Split the categories across three columns, keeping each category whole
@@ -1903,11 +1915,11 @@
       for (const cat of col) {
         colEl.appendChild(
           Jari.ui.buildCategoryTable(cat, 'jari-help-cat-header', (tbody) => {
-            for (const { key, label } of byCategory.get(cat.id)) {
+            for (const { keys, label } of byCategory.get(cat.id)) {
               const tr = document.createElement('tr');
               const keyTd = document.createElement('td');
               keyTd.className = 'jari-help-key';
-              keyTd.textContent = key;
+              keyTd.textContent = keys.join(', ');
               const labelTd = document.createElement('td');
               labelTd.className = 'jari-help-label';
               labelTd.textContent = label;
@@ -2228,10 +2240,11 @@
       return;
     }
 
-    // Count prefix: digits 0-9 accumulate an unlimited repeat count. Only
-    // when no prefix already claimed the key — "g0" is firstTab, not a count.
+    // Count prefix: digits 0-9 accumulate a repeat count, capped so an
+    // unlimited string cannot grow. Only when no prefix already claimed the
+    // key — "g0" is firstTab, not a count. Consumers clamp the value anyway.
     if (!commandName && /^[0-9]$/.test(key)) {
-      pendingCount += key;
+      if (pendingCount.length < 9) pendingCount += key;
       typedSeq += key;
       Jari.ui.showcmd(typedSeq);
       event.preventDefault();

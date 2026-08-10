@@ -126,15 +126,10 @@
     passthroughMs: 3000,
   };
 
-  // Bindings removed from the defaults after a keybind overhaul. Stripped from
-  // any stored keymap so old saved configs stop showing them.
-  Jari.unboundKeys = [];
-
   // Prefix keys ("g", ";", "y") must never double as single-key bindings —
   // the dispatcher resolves a prefix before the single-key keymap, so a lone
   // "g" binding would be shadowed and conflict with the prefix group. Stripped
-  // from stored keymaps like unboundKeys, and rejected by the options-page
-  // recorder.
+  // from stored keymaps and rejected by the options-page recorder.
   Jari.prefixKeys = new Set(Object.keys(Jari.prefixes || {}));
 
   // --- Shared helpers ------------------------------------------------------
@@ -199,7 +194,6 @@
       storedKeymap[key] = Jari.renamedCommands[command] || command;
     }
     const keymap = { ...Jari.keymapDefaults, ...storedKeymap };
-    for (const key of Jari.unboundKeys) delete keymap[key];
     for (const key of Jari.prefixKeys) delete keymap[key];
     return {
       keymap,

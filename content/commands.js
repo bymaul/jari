@@ -112,16 +112,12 @@
   // secure pages. The caller treats the result as a URL — background
   // normalizeUrl turns bare hostnames into https.
   function pasteClipboard() {
-    const ta = document.createElement("textarea");
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.focus();
     let text = "";
     try {
-      if (document.execCommand("paste")) text = ta.value.trim();
+      Jari.ui.withHiddenTextarea((ta) => {
+        if (document.execCommand("paste")) text = ta.value.trim();
+      });
     } catch {}
-    ta.remove();
     if (text) return Promise.resolve(text);
     try {
       return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
