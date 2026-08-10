@@ -15,6 +15,7 @@
   const disabledList = document.querySelector("#disabled-list");
   const scrollStepEl = document.querySelector("#scroll-step");
   const smoothScrollEl = document.querySelector("#smooth-scroll");
+  const fuzzyMatchingEl = document.querySelector("#fuzzy-matching");
   const timeoutEl = document.querySelector("#timeout");
   const passthroughEl = document.querySelector("#passthrough-timeout");
   const keymapFilterEl = document.querySelector("#keymap-filter");
@@ -27,6 +28,7 @@
     await Jari.settings.load();
     scrollStepEl.value = Jari.settings.getScrollStep();
     smoothScrollEl.checked = Jari.settings.isSmoothScroll();
+    fuzzyMatchingEl.checked = Jari.settings.isFuzzyMatching();
     timeoutEl.value = Jari.settings.getTimeoutMs();
     passthroughEl.value = Jari.settings.getPassthroughMs();
     renderKeymap();
@@ -218,6 +220,7 @@
     return {
       scrollStep: parseInt(scrollStepEl.value, 10),
       smoothScroll: smoothScrollEl.checked,
+      fuzzyMatching: fuzzyMatchingEl.checked,
       timeoutMs: parseInt(timeoutEl.value, 10),
       passthroughMs: parseInt(passthroughEl.value, 10),
     };
@@ -243,11 +246,13 @@
       keymap: { ...Jari.keymapDefaults },
       scrollStep: SETTINGS_DEFAULTS.scrollStep,
       smoothScroll: SETTINGS_DEFAULTS.smoothScroll,
+      fuzzyMatching: SETTINGS_DEFAULTS.fuzzyMatching,
       timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
       passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
     });
     scrollStepEl.value = SETTINGS_DEFAULTS.scrollStep;
     smoothScrollEl.checked = SETTINGS_DEFAULTS.smoothScroll;
+    fuzzyMatchingEl.checked = SETTINGS_DEFAULTS.fuzzyMatching;
     timeoutEl.value = SETTINGS_DEFAULTS.timeoutMs;
     passthroughEl.value = SETTINGS_DEFAULTS.passthroughMs;
     renderKeymap();

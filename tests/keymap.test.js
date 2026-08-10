@@ -24,6 +24,9 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
   assert.equal(bad.scrollStep, 200);
   assert.equal(bad.timeoutMs, 2000);
   assert.deepEqual(bad.disabledSites, []);
+
+  assert.equal(Jari.normalizeSettings({}).fuzzyMatching, true);
+  assert.equal(Jari.normalizeSettings({ fuzzyMatching: false }).fuzzyMatching, false);
 });
 
 test("normalizeSettings migrates renamed command ids in stored keymaps", () => {
@@ -64,6 +67,12 @@ test("fuzzyMatch prefers consecutive runs and word starts", () => {
   const wordStart = Jari.fuzzyMatch("ab", "ab").score;
   const midWord = Jari.fuzzyMatch("ab", "cab").score;
   assert.ok(wordStart > midWord);
+});
+
+test("fuzzyMatch rewards camel-case boundaries", () => {
+  const camel = Jari.fuzzyMatch("ot", "inOTabs").score;
+  const plain = Jari.fuzzyMatch("ot", "inotabs").score;
+  assert.ok(camel > plain);
 });
 
 test("balanceCategories spreads categories across the columns", () => {

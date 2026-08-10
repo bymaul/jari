@@ -12,6 +12,7 @@
     disabledSites: [],
     scrollStep: Jari.settingsDefaults.scrollStep,
     smoothScroll: Jari.settingsDefaults.smoothScroll,
+    fuzzyMatching: Jari.settingsDefaults.fuzzyMatching,
     timeoutMs: Jari.settingsDefaults.timeoutMs,
     passthroughMs: Jari.settingsDefaults.passthroughMs,
   };
@@ -22,6 +23,7 @@
     state.disabledSites = s.disabledSites;
     state.scrollStep = s.scrollStep;
     state.smoothScroll = s.smoothScroll;
+    state.fuzzyMatching = s.fuzzyMatching;
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
   }
@@ -42,6 +44,7 @@
         disabledSites: state.disabledSites,
         scrollStep: state.scrollStep,
         smoothScroll: state.smoothScroll,
+        fuzzyMatching: state.fuzzyMatching,
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
       },
@@ -81,6 +84,10 @@
     return state.smoothScroll;
   }
 
+  function isFuzzyMatching() {
+    return state.fuzzyMatching;
+  }
+
   function getTimeoutMs() {
     return state.timeoutMs;
   }
@@ -111,6 +118,7 @@
     getDisabledSites,
     getScrollStep,
     isSmoothScroll,
+    isFuzzyMatching,
     getTimeoutMs,
     getPassthroughMs,
     toggleDisabled,

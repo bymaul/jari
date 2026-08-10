@@ -120,6 +120,8 @@
   Jari.settingsDefaults = {
     scrollStep: 200,
     smoothScroll: false,
+    // Rank prompt lists by fuzzy subsequence score instead of plain substring.
+    fuzzyMatching: true,
     timeoutMs: 2000,
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
@@ -202,6 +204,8 @@
       scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : Jari.settingsDefaults.scrollStep,
       smoothScroll:
         typeof d.smoothScroll === 'boolean' ? d.smoothScroll : Jari.settingsDefaults.smoothScroll,
+      fuzzyMatching:
+        typeof d.fuzzyMatching === 'boolean' ? d.fuzzyMatching : Jari.settingsDefaults.fuzzyMatching,
       timeoutMs:
         Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
           ? d.timeoutMs
@@ -266,7 +270,8 @@
 
   // Fuzzy subsequence matcher for the prompt lists. Every query char must
   // appear in text in order; the returned score ranks results so consecutive
-  // runs, word starts and early positions win. Returns null on no match.
+  // runs, word starts, camel-case boundaries and early positions win. Returns
+  // null on no match.
   Jari.fuzzyMatch = function fuzzyMatch(query, text) {
     const q = String(query).toLowerCase();
     const t = String(text).toLowerCase();
@@ -281,13 +286,14 @@
       indices.push(i);
       if (i === last + 1) {
         consecutive += 1;
-        score += 12 + consecutive * 4;
+        score += 14 + consecutive; // a run scores higher the longer it is
       } else {
         consecutive = 0;
-        score += 4;
-        score -= (i - last) * 2;
+        score += 2;
+        score -= (i - last) * 3; // gap penalty for skipped characters
       }
-      if (i === 0 || !/[\w]/.test(t[i - 1])) score += 8;
+      if (i === 0 || !/[\w]/.test(t[i - 1])) score += 12; // word start
+      else if (text[i] !== text[i].toLowerCase()) score += 8; // camel-case boundary
       last = i;
     }
     return { score, indices };
@@ -330,6 +336,7 @@
     disabledSites: [],
     scrollStep: Jari.settingsDefaults.scrollStep,
     smoothScroll: Jari.settingsDefaults.smoothScroll,
+    fuzzyMatching: Jari.settingsDefaults.fuzzyMatching,
     timeoutMs: Jari.settingsDefaults.timeoutMs,
     passthroughMs: Jari.settingsDefaults.passthroughMs,
   };
@@ -340,6 +347,7 @@
     state.disabledSites = s.disabledSites;
     state.scrollStep = s.scrollStep;
     state.smoothScroll = s.smoothScroll;
+    state.fuzzyMatching = s.fuzzyMatching;
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
   }
@@ -360,6 +368,7 @@
         disabledSites: state.disabledSites,
         scrollStep: state.scrollStep,
         smoothScroll: state.smoothScroll,
+        fuzzyMatching: state.fuzzyMatching,
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
       },
@@ -399,6 +408,10 @@
     return state.smoothScroll;
   }
 
+  function isFuzzyMatching() {
+    return state.fuzzyMatching;
+  }
+
   function getTimeoutMs() {
     return state.timeoutMs;
   }
@@ -429,6 +442,7 @@
     getDisabledSites,
     getScrollStep,
     isSmoothScroll,
+    isFuzzyMatching,
     getTimeoutMs,
     getPassthroughMs,
     toggleDisabled,
@@ -1469,28 +1483,42 @@
       if (!active || seq !== suggestSeq) return;
       const res = (await Jari.sendMessage("suggest", { query: q })) || [];
       if (!active || seq !== suggestSeq) return;
+      const fuzzy = Jari.settings.isFuzzyMatching();
       const suggestions = res
-        .map((r) => ({
-          kind: "suggestion",
-          title: r.title,
-          url: r.url,
-          match: Jari.fuzzyMatch(q, r.title + " " + (r.url || "")),
-        }))
+        .map((r) => {
+          const hay = r.title + " " + (r.url || "");
+          const match = fuzzy
+            ? Jari.fuzzyMatch(q, hay)
+            : hay.toLowerCase().includes(q)
+              ? { score: 0, indices: null }
+              : null;
+          return { kind: "suggestion", title: r.title, url: r.url, match };
+        })
         .filter((r) => r.match)
-        .sort((a, b) => b.match.score - a.match.score);
+        .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0));
       filtered = [row, ...suggestions];
       selected = 0;
       renderList();
     }, 130);
   }
 
-  // Rank a list by fuzzy score against the query; entries that don't match
-  // at all are dropped.
+  // Rank a list against the query; entries that don't match at all are
+  // dropped. With fuzzy matching off this falls back to a plain substring
+  // filter that keeps the original order.
   function rankTabs(q, list) {
+    const fuzzy = Jari.settings.isFuzzyMatching();
     return list
-      .map((item) => ({ item, match: Jari.fuzzyMatch(q, item.title + " " + (item.url || "")) }))
+      .map((item) => {
+        const hay = item.title + " " + (item.url || "");
+        const match = fuzzy
+          ? Jari.fuzzyMatch(q, hay)
+          : hay.toLowerCase().includes(q)
+            ? { score: 0, indices: null }
+            : null;
+        return { item, match };
+      })
       .filter((x) => x.match)
-      .sort((a, b) => b.match.score - a.match.score)
+      .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0))
       .map((x) => x.item);
   }
 
@@ -1574,9 +1602,11 @@
         const url = document.createElement("span");
         url.className = "url";
         const urlText = row.kind === "suggestion" ? row.url || "" : "";
-        // Only suggestion rows get fuzzy highlighting; the typed-query row
-        // is the query itself and would look odd.
-        if (row.kind === "suggestion" && query) {
+        // Only suggestion rows get match highlighting; the typed-query row
+        // is the query itself and would look odd. Highlighting requires
+        // fuzzy matching — substring mode renders plain text.
+        const highlight = row.kind === "suggestion" && query && Jari.settings.isFuzzyMatching();
+        if (highlight) {
           renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
           renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
         } else {
@@ -1611,7 +1641,7 @@
       const url = document.createElement("span");
       url.className = "url";
       const urlText = tab.url || "";
-      if (query) {
+      if (query && Jari.settings.isFuzzyMatching()) {
         renderText(title, titleText, (Jari.fuzzyMatch(query, titleText) || {}).indices);
         renderText(url, urlText, (Jari.fuzzyMatch(query, urlText) || {}).indices);
       } else {
