@@ -42,7 +42,8 @@
         el.tagName === 'TEXTAREA' ||
         el.tagName === 'SELECT' ||
         el.isContentEditable ||
-        el.getAttribute('role') === 'textbox')
+        el.getAttribute('role') === 'textbox' ||
+        el.getAttribute('role') === 'searchbox')
     );
   }
 
