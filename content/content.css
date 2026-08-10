@@ -360,9 +360,9 @@
   align-items: flex-start;
   justify-content: flex-start;
   padding: 0.5ex;
-  background: rgba(96, 96, 121, 0.28);
-  border: 1px solid rgba(205, 205, 205, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: rgba(224, 163, 99, 0.25);
+  border: 1px solid rgba(224, 163, 99, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .jari-scroll-highlight-label {
@@ -371,7 +371,7 @@
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #cdcdcd;
+  color: #e0a363;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   padding: 0.25ex 0.5ex;
 }
