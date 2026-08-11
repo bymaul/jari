@@ -1,8 +1,8 @@
+import "./setup.mjs";
 import { test } from "node:test";
 import assert from "node:assert";
-import { loadBackground } from "./harness.js";
-
-const { normalizeUrl, clampCount } = loadBackground();
+import { clampCount, normalizeUrl } from "../background/handlers.js";
+import { blockedUrlSchemes, suggestionSources, urlSchemes } from "../shared/constants.js";
 
 test("normalizeUrl assumes https for bare hosts", () => {
   assert.equal(normalizeUrl("acme.com"), "https://acme.com");
@@ -45,4 +45,14 @@ test("clampCount bounds and normalizes the count", () => {
   assert.equal(clampCount(2.9), 2);
   assert.equal(clampCount(NaN), 1);
   assert.equal(clampCount(Infinity), 1);
+});
+
+test("URL schemes and suggestion sources are the single shared source", () => {
+  // background/handlers.js and content/keymap.js must agree — both import
+  // shared/constants.js, so this test guards against a regression to
+  // per-context copies.
+  assert.ok(urlSchemes.has("https"));
+  assert.ok(!urlSchemes.has("javascript"));
+  assert.ok(blockedUrlSchemes.has("data"));
+  assert.deepEqual(suggestionSources, ["tab", "history", "bookmark"]);
 });

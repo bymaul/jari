@@ -1,9 +1,10 @@
 // Jari: content-script entry point.
 // Boots settings and installs the capture-phase keydown dispatcher that
-// routes keys to active modes (hints/prompt), the count prefix, the
-// "g" prefix, and the user keymap. A Neovim-style showcmd
-// readout echoes counts and prefix keys while they are being composed; an
-// inactivity timeout drops the composition if it is never completed.
+// routes keys to the active overlay (help/hints/prompt, via the Overlays
+// registry), the count prefix, the "g" prefix, and the user keymap. A
+// Neovim-style showcmd readout echoes counts and prefix keys while they are
+// being composed; an inactivity timeout drops the composition if it is never
+// completed.
 //
 // "I" toggles ignore mode: Jari stops reacting to every key (except the
 // toggle itself) until it is pressed again, with a persistent status pill.
@@ -16,9 +17,7 @@ import { Events, canonicalKey, deepActiveElement, modifierKeys, prefixes } from 
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { commands, setModeActions } from "./commands.js";
-import { Help } from "./help.js";
-import { Hints } from "./hints.js";
-import { Prompt } from "./prompt.js";
+import { Overlays } from "./overlays.js";
 
 let pendingCount = '';
 let pendingPrefix = null;
@@ -75,9 +74,7 @@ function setIgnore(on) {
   clearPending();
   if (on) {
     // No overlay may stay open while keys pass through.
-    Help.close();
-    Hints.cancel();
-    Prompt.close();
+    Overlays.closeAll();
     showPill('ignore', 'Ignore mode');
   } else {
     hidePill('ignore');
@@ -97,9 +94,7 @@ function enterPassthrough() {
   setIgnore(false);
   clearPending();
   // No overlay may stay open while keys pass through.
-  Help.close();
-  Hints.cancel();
-  Prompt.close();
+  Overlays.closeAll();
   passthroughMode = true;
   showPill('passthrough', 'Passthrough (' + settings.getPassthroughMs() + 'ms)');
   clearTimeout(passthroughTimer);
@@ -193,9 +188,8 @@ function handleKeydown(event) {
 
   // Active overlays own every key; each overlay blocks the keys it
   // consumes from reaching the page.
-  if (Help.isActive()) return Help.onKeyDown(event);
-  if (Hints.isActive()) return Hints.onKeyDown(event);
-  if (Prompt.isActive()) return Prompt.onKeyDown(event);
+  const overlay = Overlays.active();
+  if (overlay) return overlay.onKeyDown(event);
 
   const key = canonicalKey(event);
 
@@ -306,9 +300,7 @@ async function boot() {
     if (settings.isDisabled()) {
       setIgnore(false);
       exitPassthrough();
-      Help.close();
-      Hints.cancel();
-      Prompt.close();
+      Overlays.closeAll();
     }
   });
 

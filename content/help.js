@@ -7,6 +7,7 @@ import { balanceCategories } from "./keymap.js";
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { COMMAND_CATALOG } from "./catalog.js";
+import { register } from "./overlays.js";
 
 const STEP = 50;
 const COLUMNS = 3;
@@ -149,3 +150,5 @@ function close() {
 }
 
 export const Help = { open, close, onKeyDown, isActive };
+
+register("help", { close, onKeyDown, isActive });

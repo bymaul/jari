@@ -20,6 +20,7 @@ import {
 const MAX_HINTS = 100;
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
+import { register } from "./overlays.js";
 
 // Broad selector of "things you can click". Includes ARIA roles, inline
 // onclick handlers, and form controls; hidden inputs are excluded.
@@ -452,3 +453,5 @@ export const Hints = {
   isActive,
   generateLabels,
 };
+
+register("hints", { close: cancel, onKeyDown, isActive });

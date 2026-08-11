@@ -11,6 +11,8 @@
 // consulting the single-key keymap. No fixed sequences ship by default —
 // every pair is user-bound from the options page.
 
+import { suggestionSources } from "../shared/constants.js";
+
 export const Events = {
   listeners: {},
   on(event, fn) {
@@ -128,14 +130,11 @@ export const settingsDefaults = {
   hintChars: 'sadfjklewcmpgh',
   // Which sources feed the omnibar suggestions. Empty means suggestions are
   // off and only the typed query row is shown.
-  suggestionSources: ['tab', 'history', 'bookmark'],
+  suggestionSources: suggestionSources.slice(),
   // Copy format for the title+URL command: plain ("Title\nURL") or markdown
   // ("[Title](URL)").
   copyFormat: 'plain',
 };
-
-// Known omnibar suggestion sources, used to validate the stored value.
-export const suggestionSources = ['tab', 'history', 'bookmark'];
 
 // Prefix keys ("g", ";", "y", ...) must never double as single-key bindings —
 // the dispatcher resolves a prefix before the single-key keymap, so a lone
@@ -230,10 +229,12 @@ export function containsElement(container, target) {
   return false;
 }
 
-// URL schemes safe to open/navigate to. The background keeps its own copy
-// (it cannot load the content bundle); keep the two in sync. hints.js uses
-// this to decide whether an <a> href may open in a background tab.
-export const allowedUrlSchemes = new Set(['http', 'https', 'file', 'about']);
+// URL schemes safe to open/navigate to, defined in shared/constants.js (the
+// background service worker keeps its own copy via the shared module).
+export { urlSchemes as allowedUrlSchemes } from "../shared/constants.js";
+// Known omnibar suggestion sources; the validation list in normalizeSettings
+// and the background's suggestion handler both read this.
+export { suggestionSources } from "../shared/constants.js";
 
 // Sanitize a raw storage blob into a complete settings object with defaults
 // filled in and invalid values dropped. Shared by the content-script

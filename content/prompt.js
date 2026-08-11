@@ -16,6 +16,7 @@
 import { Url, fuzzyIndices, fuzzyMatch, substringMatch } from "./keymap.js";
 import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
+import { register } from "./overlays.js";
 
 let active = false;
 let overlay = null;
@@ -200,73 +201,71 @@ function renderText(el, text, indices) {
   el.appendChild(frag);
 }
 
+// A span with a class, ready for text or match highlighting.
+function makeSpan(className) {
+  const el = document.createElement("span");
+  el.className = className;
+  return el;
+}
+
+// Fill the title/url spans of a list row. With a non-empty query in fuzzy
+// mode, matched characters are highlighted; otherwise the text is plain.
+function renderTitleUrl(li, titleText, urlText, q) {
+  const title = makeSpan("title");
+  const url = makeSpan("url");
+  if (q && settings.isFuzzyMatching()) {
+    renderText(title, titleText, fuzzyIndices(q, titleText));
+    renderText(url, urlText, fuzzyIndices(q, urlText));
+  } else {
+    title.textContent = titleText;
+    url.textContent = urlText;
+  }
+  li.appendChild(title);
+  li.appendChild(url);
+  return li;
+}
+
+// Omnibar row: the typed query (labeled as an open or a search) or a
+// suggestion. Only suggestion rows get match highlighting — the typed-query
+// row is the query itself and would look odd.
+function renderSuggestionRow(row) {
+  const li = document.createElement("li");
+  const titleText =
+    row.kind === "search"
+      ? `Search for "${row.title}"`
+      : row.kind === "url"
+        ? `Open ${row.title}`
+        : row.title || "(untitled)";
+  const urlText = row.kind === "suggestion" ? row.url || "" : "";
+  return renderTitleUrl(li, titleText, urlText, row.kind === "suggestion" ? query : "");
+}
+
+// Tab (or merge window) row: a window tag plus title/url.
+function renderTabRow(tab, winLabel) {
+  const li = document.createElement("li");
+  const win = makeSpan("jari-win-tag");
+  win.textContent = "#" + winLabel;
+  li.appendChild(win);
+  return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query);
+}
+
 function renderList() {
+  const rows = filtered.slice(0, 50);
+  listEl.textContent = "";
   if (mode === "open" || mode === "edit") {
-    listEl.textContent = "";
-    for (const row of filtered.slice(0, 50)) {
-      const li = document.createElement("li");
-      const title = document.createElement("span");
-      title.className = "title";
-      const titleText =
-        row.kind === "search"
-          ? `Search for "${row.title}"`
-          : row.kind === "url"
-            ? `Open ${row.title}`
-            : row.title || "(untitled)";
-      const url = document.createElement("span");
-      url.className = "url";
-      const urlText = row.kind === "suggestion" ? row.url || "" : "";
-      // Only suggestion rows get match highlighting; the typed-query row
-      // is the query itself and would look odd. Highlighting requires
-      // fuzzy matching — substring mode renders plain text.
-      const highlight = row.kind === "suggestion" && query && settings.isFuzzyMatching();
-      if (highlight) {
-        renderText(title, titleText, fuzzyIndices(query, titleText));
-        renderText(url, urlText, fuzzyIndices(query, urlText));
-      } else {
-        title.textContent = titleText;
-        url.textContent = urlText;
-      }
-      li.appendChild(title);
-      li.appendChild(url);
-      listEl.appendChild(li);
-    }
+    for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
     highlight();
     return;
   }
 
-  listEl.textContent = "";
   // Label windows #1, #2, ... in order of first appearance so tabs from
   // different windows are distinguishable in the list.
   const winLabels = new Map();
   let winIndex = 0;
-  const rows = filtered.slice(0, 50);
   for (const tab of rows) {
     if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
   }
-  for (const tab of rows) {
-    const li = document.createElement("li");
-    const win = document.createElement("span");
-    win.className = "jari-win-tag";
-    win.textContent = "#" + winLabels.get(tab.windowId);
-    const title = document.createElement("span");
-    title.className = "title";
-    const titleText = tab.title || "(untitled)";
-    const url = document.createElement("span");
-    url.className = "url";
-    const urlText = tab.url || "";
-    if (query && settings.isFuzzyMatching()) {
-      renderText(title, titleText, fuzzyIndices(query, titleText));
-      renderText(url, urlText, fuzzyIndices(query, urlText));
-    } else {
-      title.textContent = titleText;
-      url.textContent = urlText;
-    }
-    li.appendChild(win);
-    li.appendChild(title);
-    li.appendChild(url);
-    listEl.appendChild(li);
-  }
+  for (const tab of rows) listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId)));
   highlight();
 }
 
@@ -364,3 +363,5 @@ function close() {
 }
 
 export const Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
+
+register("prompt", { close, onKeyDown, isActive });

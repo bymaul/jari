@@ -86,6 +86,20 @@ ignore/passthrough modes — every key rebindable from the options page.
 | `?` | Show keybindings |
 | `;e` | Open settings |
 
+### Commands without default bindings
+
+These commands exist but ship unbound — bind one from the options page:
+
+| Command | Label |
+| --- | --- |
+| `scrollPageDown` / `scrollPageUp` | Scroll page down / up |
+| `scrollHalfPageDown` / `scrollHalfPageUp` | Scroll half page down / up |
+| `newTab` | New tab |
+| `splitTab` | Move tab to new window |
+| `duplicateTab` | Duplicate tab |
+| `togglePin` | Pin/unpin tab |
+| `toggleMute` | Mute/unmute tab |
+
 ## Install
 
 1. Load the extension unpacked:
@@ -95,15 +109,18 @@ ignore/passthrough modes — every key rebindable from the options page.
 
 ## Build
 
-The ES-module content scripts and options page are bundled with esbuild into
-`content/bundle.js` and `options/options.bundle.js` (IIFE, no exports), and the
-target's manifest is copied to `manifest.json`:
+The ES-module content scripts, options page and background service worker are
+bundled with esbuild into `content/bundle.js`, `options/options.bundle.js` and
+`background.js` (IIFE, no exports — content scripts can't use runtime ESM
+imports, and the background must stay a single classic file), and the target's
+manifest is copied to `manifest.json`:
 
 ```sh
 npm run build:chrome   # or: npm run build:firefox
 ```
 
-Rebuild after editing anything under `content/`, and load the folder again.
+Rebuild after editing anything under `content/`, `options/`, `background/` or
+`shared/`, and load the folder again.
 
 ## Development
 
@@ -117,5 +134,9 @@ npm test
 
 - `content/` — content scripts (bundled) and `content.css`
 - `options/` — options page
-- `background.js` — service worker
-- `build.js` — bundles content scripts and generates `manifest.json`
+- `background/` — background service worker source (`handlers.js` +
+  `main.js`), bundled into `background.js`
+- `shared/` — constants shared by every bundle (compiled into each one)
+- `background.js`, `content/bundle.js`, `options/options.bundle.js` — generated bundles
+- `build.js` — bundles content/options/background and generates `manifest.json`
+- `docs/` — site-testing checklist and known issues
