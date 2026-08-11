@@ -1,9 +1,6 @@
-/* Jari options page — monospace, compact, colored with the vague
-   colorscheme (github.com/vague-theme/vague): cool, dark, low contrast. */
+/* Jari options page — monospace, compact */
 
 :root {
-  /* Vague colorscheme (github.com/vague-theme/vague), lifted a few notches
-     brighter: cool, dark, low contrast. */
   --bg: #1e1e26;
   --panel: #262630;
   --border: #3f4346;

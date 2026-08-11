@@ -139,8 +139,8 @@
   function queryAll(selector, onShadowRoot) {
     const out = [];
     const visit = (root) => {
-      for (const el of root.querySelectorAll("*")) {
-        if (el.matches(selector)) out.push(el);
+      for (const el of root.querySelectorAll(selector)) {
+        out.push(el);
         if (el.shadowRoot) {
           if (onShadowRoot) onShadowRoot(el.shadowRoot);
           visit(el.shadowRoot);
@@ -149,6 +149,14 @@
     };
     visit(document);
     return out;
+  }
+  function containsElement(container, target2) {
+    let node = target2;
+    while (node) {
+      if (node === container) return true;
+      node = node.parentElement || node.getRootNode().host;
+    }
+    return false;
   }
   var allowedUrlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about"]);
   function normalizeSettings(data) {
@@ -727,6 +735,7 @@
   var Scroll = { getTarget, cycle, resetToGlobal, showHighlight };
 
   // content/hints.js
+  var MAX_HINTS = 100;
   var CLICKABLE_SELECTOR = [
     "a[href]",
     "area[href]",
@@ -843,6 +852,15 @@
   var labels = /* @__PURE__ */ new Map();
   var overlays = /* @__PURE__ */ new Map();
   var typed = "";
+  var hintsHost = null;
+  function getHintsHost() {
+    if (hintsHost && hintsHost.isConnected) return hintsHost;
+    hintsHost = document.createElement("div");
+    hintsHost.className = "jari-hints-host";
+    hintsHost.style.cssText = "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483647;";
+    document.body.appendChild(hintsHost);
+    return hintsHost;
+  }
   function isActive() {
     return mode !== null;
   }
@@ -850,27 +868,63 @@
     const config = MODES[nextMode];
     if (!config) return;
     cancel();
-    const elements = topLevelElements(
-      queryAll(config.selector).filter(isInteractive).filter((el) => !config.linkOnly || linkHref(el))
-    );
-    if (nextMode === "focus" && elements.length === 1) {
-      focusAndPlaceCaret(elements[0]);
+    const top = [];
+    const viableSet = /* @__PURE__ */ new Set();
+    const rects = /* @__PURE__ */ new Map();
+    let counted = 0;
+    for (const el of queryAll(config.selector)) {
+      if (!isInteractive(el)) continue;
+      if (config.linkOnly && !linkHref(el)) continue;
+      if (top.length >= MAX_HINTS) {
+        if (isVisible(el)) counted++;
+        continue;
+      }
+      const rect = isVisible(el);
+      if (!rect) continue;
+      if (isOccluded(el, rect)) continue;
+      viableSet.add(el);
+      rects.set(el, rect);
+      counted++;
+      let node = el.parentElement || el.getRootNode().host;
+      let nested = false;
+      while (node) {
+        if (viableSet.has(node)) {
+          nested = true;
+          break;
+        }
+        node = node.parentElement || node.getRootNode().host;
+      }
+      if (!nested) top.push(el);
+    }
+    const topLevel = top;
+    const hintCount = topLevel.length;
+    if (nextMode === "focus" && topLevel.length === 1) {
+      focusAndPlaceCaret(topLevel[0]);
       return;
     }
-    if (elements.length === 0) {
+    if (topLevel.length === 0) {
       ui.toast("No matches");
       return;
     }
     mode = nextMode;
     if (nextMode === "focus") {
-      ui.toast(`${elements.length} inputs \u2014 pick one`);
+      ui.toast(`${hintCount} inputs \u2014 pick one`);
     }
-    const hintLabels = generateLabels(elements.length);
-    elements.forEach((el, i) => {
+    if (counted > MAX_HINTS) {
+      ui.toast(`Showing ${MAX_HINTS} of ${counted} hints`);
+    }
+    const hintLabels = generateLabels(hintCount);
+    const host = getHintsHost();
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < hintCount; i++) {
+      const el = topLevel[i];
       const label = hintLabels[i];
       labels.set(label, el);
-      overlays.set(label, createHintOverlay(label, el));
-    });
+      const box = createHintOverlay(label, rects.get(el));
+      overlays.set(label, box);
+      fragment.appendChild(box);
+    }
+    host.appendChild(fragment);
   }
   function isInteractive(el) {
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
@@ -879,36 +933,26 @@
       const href = el.getAttribute("href");
       if (href === null || href.trim() === "") return false;
     }
-    return isVisible(el);
+    return true;
   }
   function isVisible(el) {
     const rect = el.getBoundingClientRect();
     const vw = window.innerWidth || document.documentElement.clientWidth;
     const vh = window.innerHeight || document.documentElement.clientHeight;
-    if (rect.width <= 0 || rect.height <= 0) return false;
-    if (rect.top < 0 || rect.left < 0 || rect.bottom > vh || rect.right > vw) return false;
-    let node = el;
-    while (node) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        if (node.hasAttribute("hidden")) return false;
-        const style = window.getComputedStyle(node);
-        if (style.display === "none" || style.visibility === "hidden") return false;
-        if (parseFloat(style.opacity) === 0) return false;
-      }
-      node = node.getRootNode().host || node.parentElement;
-    }
-    return true;
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    if (rect.top < 0 || rect.left < 0 || rect.bottom > vh || rect.right > vw) return null;
+    const style = window.getComputedStyle(el);
+    if (style.visibility === "hidden") return null;
+    if (parseFloat(style.opacity) === 0) return null;
+    return rect;
   }
-  function topLevelElements(elements) {
-    const set2 = new Set(elements);
-    return elements.filter((el) => {
-      let node = el.parentElement || el.getRootNode().host;
-      while (node) {
-        if (set2.has(node)) return false;
-        node = node.parentElement || node.getRootNode().host;
-      }
-      return true;
-    });
+  function isOccluded(el, rect) {
+    if (el.matches("input, textarea, select, [contenteditable]")) return false;
+    const top = el.getRootNode().elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2
+    );
+    return !top || !containsElement(el, top);
   }
   function generateLabels(count) {
     const chars = alphabet();
@@ -934,8 +978,7 @@
     }
     return s;
   }
-  function createHintOverlay(label, el) {
-    const rect = el.getBoundingClientRect();
+  function createHintOverlay(label, rect) {
     const box = document.createElement("div");
     box.className = "jari-hint";
     for (const ch of label) {
@@ -945,7 +988,6 @@
     }
     box.style.left = window.scrollX + rect.left + "px";
     box.style.top = window.scrollY + rect.top + "px";
-    document.body.appendChild(box);
     return box;
   }
   function openInNewTab(el) {
@@ -999,7 +1041,8 @@
     }
   }
   function cancel() {
-    for (const box of overlays.values()) box.remove();
+    if (hintsHost) hintsHost.remove();
+    hintsHost = null;
     overlays.clear();
     labels.clear();
     typed = "";
