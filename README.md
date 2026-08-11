@@ -40,7 +40,7 @@ ignore/passthrough modes — every key rebindable from the options page.
 | `g$` | Jump to last tab |
 | `<<` | Move tab left |
 | `>>` | Move tab right |
-| `W` | Split tab / merge window |
+| `gw` | Split tab / merge window |
 | `gp` | Open clipboard URL in current tab |
 | `gP` | Open clipboard URL in background tab |
 
@@ -95,8 +95,9 @@ ignore/passthrough modes — every key rebindable from the options page.
 
 ## Build
 
-The content scripts are concatenated into `content/bundle.js` and the target's
-manifest is copied to `manifest.json`:
+The ES-module content scripts and options page are bundled with esbuild into
+`content/bundle.js` and `options/options.bundle.js` (IIFE, no exports), and the
+target's manifest is copied to `manifest.json`:
 
 ```sh
 npm run build:chrome   # or: npm run build:firefox

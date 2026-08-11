@@ -1,28 +1,19 @@
-// Test harness: loads a Jari script into a sandbox and exposes the globals it
-// defines. Content scripts are browser IIFEs that write onto `window`, so they
-// get a fresh plain object. The background service worker is the same shape
-// but reads `chrome` — a stub is provided and function declarations become
-// sandbox globals (e.g. normalizeUrl, clampCount).
-"use strict";
+// Test harness: loads the background service worker into a vm sandbox and
+// exposes the globals it defines (normalizeUrl, clampCount). Content modules
+// are ESM now and are imported directly by the test files — tests/setup.mjs
+// provides the browser globals they touch at import time.
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+import { fileURLToPath } from "node:url";
 
-const fs = require("fs");
-const path = require("path");
-const vm = require("vm");
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const root = path.join(__dirname, "..");
-
-// Node's vm context has no browser or Node globals, so the ones the scripts
-// touch are injected explicitly.
+// Node's vm context has no browser or Node globals, so the ones the script
+// touches are injected explicitly.
 const browserGlobals = { URL, console, setTimeout, clearTimeout };
 
-function loadContentScript(name) {
-  const sandbox = { window: {}, ...browserGlobals };
-  const code = fs.readFileSync(path.join(root, "content", name), "utf8");
-  vm.runInNewContext(code, sandbox, { filename: name });
-  return sandbox.window.Jari;
-}
-
-function loadBackground() {
+export function loadBackground() {
   const sandbox = {
     chrome: { runtime: { onMessage: { addListener() {} } } },
     ...browserGlobals,
@@ -31,5 +22,3 @@ function loadBackground() {
   vm.runInNewContext(code, sandbox, { filename: "background.js" });
   return sandbox;
 }
-
-module.exports = { loadContentScript, loadBackground };
