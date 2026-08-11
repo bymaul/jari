@@ -1,10 +1,6 @@
-"use strict";
-
-const { test } = require("node:test");
-const assert = require("node:assert");
-const { loadContentScript } = require("./harness.js");
-
-const Jari = loadContentScript("keymap.js");
+import { test } from "node:test";
+import assert from "node:assert";
+import * as Jari from "../content/keymap.js";
 
 test("canonicalKey orders modifiers and keeps the bare key", () => {
   assert.equal(Jari.canonicalKey({ key: "g" }), "g");

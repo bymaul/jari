@@ -1,8 +1,6 @@
-"use strict";
-
-const { test } = require("node:test");
-const assert = require("node:assert");
-const { loadBackground } = require("./harness.js");
+import { test } from "node:test";
+import assert from "node:assert";
+import { loadBackground } from "./harness.js";
 
 const { normalizeUrl, clampCount } = loadBackground();
 
