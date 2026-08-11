@@ -25,68 +25,69 @@ export const Events = {
 
 export const keymapDefaults = {
   // Scrolling
-  j: 'scrollDown',
-  k: 'scrollUp',
-  h: 'scrollLeft',
-  l: 'scrollRight',
-  G: 'scrollBottom',
-  w: 'showScrollArea',
-  '+': 'zoomIn',
-  '-': 'zoomOut',
+  j: "scrollDown",
+  k: "scrollUp",
+  h: "scrollLeft",
+  l: "scrollRight",
+  G: "scrollBottom",
+  w: "showScrollArea",
+  "+": "zoomIn",
+  "-": "zoomOut",
 
   // Tabs
-  t: 'omnibar',
-  x: 'closeTab',
-  X: 'restoreTab',
-  H: 'previousTab',
-  L: 'nextTab',
-  '<<': 'moveTabLeft',
-  '>>': 'moveTabRight',
+  t: "omnibar",
+  x: "closeTab",
+  X: "restoreTab",
+  H: "previousTab",
+  L: "nextTab",
+  "<<": "moveTabLeft",
+  ">>": "moveTabRight",
 
   // Window: split this tab into its own window; again, merge back.
-  gw: 'splitOrMergeTab',
+  gw: "splitOrMergeTab",
 
   // History
-  S: 'historyBack',
-  D: 'historyForward',
+  S: "historyBack",
+  D: "historyForward",
 
   // Hints
-  f: 'linkHints',
-  F: 'linkHintsNewTab',
-  i: 'focusInput',
+  f: "linkHints",
+  F: "linkHintsNewTab",
+  gf: "linkHintsBackground",
+  i: "focusInput",
 
   // Page navigation
-  r: 'reloadTab',
-  R: 'hardReload',
+  r: "reloadTab",
+  R: "hardReload",
 
   // Clipboard
-  Y: 'copyTitleUrl',
-  gp: 'pasteOpen',
-  gP: 'pasteOpenBackground',
+  Y: "copyTitleUrl",
+  gp: "pasteOpen",
+  gP: "pasteOpenBackground",
 
   // Site-level control
-  I: 'toggleIgnore',
-  o: 'passthrough',
-  'ctrl+alt+v': 'toggleDisabled',
+  I: "toggleIgnore",
+  o: "passthrough",
+  "ctrl+alt+v": "toggleDisabled",
 
   // Help
-  '?': 'showHelp',
+  "?": "showHelp",
 
   // Two-key sequences, composed via the prefix keys (g, ;, y) below.
   // Stored like any other binding: rebindable, overridable, and visible in
   // the options table and help overlay.
-  gt: 'tabSearch',
-  gg: 'scrollTop',
-  gu: 'goUp',
-  gU: 'goToRoot',
-  ge: 'editUrl',
-  gs: 'cycleScrollArea',
-  gS: 'resetScrollArea',
-  g0: 'firstTab',
-  g$: 'lastTab',
-  ';e': 'openOptions',
-  yf: 'linkHintsYank',
-  yy: 'copyUrl',
+  gt: "tabSearch",
+  gg: "scrollTop",
+  gu: "goUp",
+  gU: "goToRoot",
+  ge: "editUrl",
+  gs: "cycleScrollArea",
+  gS: "resetScrollArea",
+  g0: "firstTab",
+  g$: "lastTab",
+  ";e": "openOptions",
+  yf: "linkHintsYank",
+  yy: "copyUrl",
 };
 
 // Prefix keys: the first key of a two-key binding ("go" = "g" then "o").
@@ -94,24 +95,24 @@ export const keymapDefaults = {
 // more prefix keys here without touching the dispatcher.
 export const prefixes = {
   g: {},
-  ';': {},
+  ";": {},
   y: {},
-  '<': {},
-  '>': {},
+  "<": {},
+  ">": {},
 };
 
 // Command categories, shared by the help overlay and the options page.
 export const categories = [
-  { id: 'scrolling', label: 'Scrolling' },
-  { id: 'view', label: 'View & zoom' },
-  { id: 'tabs', label: 'Tabs' },
-  { id: 'tabActions', label: 'Tab actions' },
-  { id: 'history', label: 'History' },
-  { id: 'hints', label: 'Hints' },
-  { id: 'page', label: 'Page' },
-  { id: 'clipboard', label: 'Clipboard' },
-  { id: 'modes', label: 'Modes' },
-  { id: 'help', label: 'Help' },
+  { id: "scrolling", label: "Scrolling" },
+  { id: "view", label: "View & zoom" },
+  { id: "tabs", label: "Tabs" },
+  { id: "tabActions", label: "Tab actions" },
+  { id: "history", label: "History" },
+  { id: "hints", label: "Hints" },
+  { id: "page", label: "Page" },
+  { id: "clipboard", label: "Clipboard" },
+  { id: "modes", label: "Modes" },
+  { id: "help", label: "Help" },
 ];
 
 // Non-key defaults. Overridable from the options page.
@@ -120,20 +121,20 @@ export const settingsDefaults = {
   smoothScroll: false,
   // Rank prompt lists by fuzzy subsequence score instead of plain substring.
   fuzzyMatching: true,
-  timeoutMs: 2000,
+  timeoutMs: 1500,
   // "o" passthrough duration: how long keys reach the page before Jari
   // takes over again (Escape exits sooner).
-  passthroughMs: 3000,
+  passthroughMs: 1500,
   // Characters used to build link-hint labels ("f"/"F"/"yf"). The default
   // is a home-row set to reduce finger travel; any run of unique characters
   // works.
-  hintChars: 'sadfjklewcmpgh',
+  hintChars: "sadfjklewcmpgh",
   // Which sources feed the omnibar suggestions. Empty means suggestions are
   // off and only the typed query row is shown.
   suggestionSources: suggestionSources.slice(),
   // Copy format for the title+URL command: plain ("Title\nURL") or markdown
   // ("[Title](URL)").
-  copyFormat: 'plain',
+  copyFormat: "plain",
 };
 
 // Prefix keys ("g", ";", "y", ...) must never double as single-key bindings —
@@ -150,32 +151,33 @@ export const prefixKeys = new Set(Object.keys(prefixes));
 // themselves. "OS" is the Windows/Super key, "Fn" and "AltGraph" laptop
 // extras.
 export const modifierKeys = new Set([
-  'Control',
-  'Alt',
-  'Shift',
-  'Meta',
-  'OS',
-  'CapsLock',
-  'NumLock',
-  'ScrollLock',
-  'Fn',
-  'AltGraph',
+  "Control",
+  "Alt",
+  "Shift",
+  "Meta",
+  "OS",
+  "CapsLock",
+  "NumLock",
+  "ScrollLock",
+  "Fn",
+  "AltGraph",
 ]);
 
 // Canonical key string: modifiers in ctrl/alt/meta order, then the key.
 // "Shift" is deliberately absent — a capital letter is its own key.
 export function canonicalKey(event) {
   const parts = [];
-  if (event.ctrlKey) parts.push('ctrl');
-  if (event.altKey) parts.push('alt');
-  if (event.metaKey) parts.push('meta');
+  if (event.ctrlKey) parts.push("ctrl");
+  if (event.altKey) parts.push("alt");
+  if (event.metaKey) parts.push("meta");
   parts.push(event.key);
-  return parts.join('+');
+  return parts.join("+");
 }
 
 // Elements Jari's own overlays create. Content features must not touch
 // them: hints must not label them.
-export const overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
+export const overlaySelectors =
+  ".jari-overlay, .jari-hint, .jari-scroll-highlight";
 
 // --- Shadow DOM helpers --------------------------------------------------
 // Open shadow roots are reachable by content scripts; closed roots are not
@@ -251,13 +253,21 @@ export function normalizeSettings(data) {
   return {
     keymap,
     disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
-    scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : settingsDefaults.scrollStep,
+    scrollStep: Number.isFinite(d.scrollStep)
+      ? d.scrollStep
+      : settingsDefaults.scrollStep,
     smoothScroll:
-      typeof d.smoothScroll === 'boolean' ? d.smoothScroll : settingsDefaults.smoothScroll,
+      typeof d.smoothScroll === "boolean"
+        ? d.smoothScroll
+        : settingsDefaults.smoothScroll,
     fuzzyMatching:
-      typeof d.fuzzyMatching === 'boolean' ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
+      typeof d.fuzzyMatching === "boolean"
+        ? d.fuzzyMatching
+        : settingsDefaults.fuzzyMatching,
     timeoutMs:
-      Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
+      Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
+        ? d.timeoutMs
+        : settingsDefaults.timeoutMs,
     passthroughMs:
       Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
         ? d.passthroughMs
@@ -266,15 +276,18 @@ export function normalizeSettings(data) {
     suggestionSources: Array.isArray(d.suggestionSources)
       ? d.suggestionSources.filter((s) => suggestionSources.includes(s))
       : settingsDefaults.suggestionSources.slice(),
-    copyFormat: d.copyFormat === 'markdown' ? 'markdown' : settingsDefaults.copyFormat,
+    copyFormat:
+      d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
   };
 }
 
 // Hint characters: uppercase, deduplicated, must stay long enough to label a
 // reasonable page. Anything unusable falls back to the default set.
 function normalizeHintChars(raw) {
-  if (typeof raw !== 'string') return settingsDefaults.hintChars.toUpperCase();
-  const chars = [...new Set(raw.toUpperCase())].filter((c) => /[A-Z0-9]/.test(c)).join('');
+  if (typeof raw !== "string") return settingsDefaults.hintChars.toUpperCase();
+  const chars = [...new Set(raw.toUpperCase())]
+    .filter((c) => /[A-Z0-9]/.test(c))
+    .join("");
   return chars.length >= 4 ? chars : settingsDefaults.hintChars.toUpperCase();
 }
 
@@ -285,12 +298,12 @@ export const Url = {
     try {
       const url = new URL(href);
       let path = url.pathname;
-      if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-      const idx = path.lastIndexOf('/');
-      path = idx > 0 ? path.slice(0, idx) : '/';
+      if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+      const idx = path.lastIndexOf("/");
+      path = idx > 0 ? path.slice(0, idx) : "/";
       url.pathname = path;
-      url.search = '';
-      url.hash = '';
+      url.search = "";
+      url.hash = "";
       return url.href;
     } catch {
       return href;
@@ -300,9 +313,9 @@ export const Url = {
   rootUrlOf(href) {
     try {
       const url = new URL(href);
-      url.pathname = '/';
-      url.search = '';
-      url.hash = '';
+      url.pathname = "/";
+      url.search = "";
+      url.hash = "";
       return url.href;
     } catch {
       return href;
@@ -323,7 +336,7 @@ export const Url = {
   looksLikeUrl(text) {
     const s = text.trim();
     if (!s || /\s/.test(s)) return false;
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith('//')) return true;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith("//")) return true;
     if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
     return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
   },
@@ -335,7 +348,9 @@ export const Url = {
   suggestionTerm(query) {
     const idx = query.search(/\s/);
     if (idx === -1) return query;
-    return Url.looksLikeUrl(query.slice(0, idx)) ? query.slice(idx).trim() : query;
+    return Url.looksLikeUrl(query.slice(0, idx))
+      ? query.slice(idx).trim()
+      : query;
   },
 };
 

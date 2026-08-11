@@ -67,3 +67,53 @@ test("generateLabels starts at two characters and grows past the alphabet square
     assert.strictEqual(labels[676].length, 3);
   });
 });
+
+// visiblePortion reads the window at call time; swap in a fake for the
+// duration, mirroring the document swap in shadow.test.js.
+function withWindow(innerWidth, innerHeight, fn) {
+  const previous = globalThis.window;
+  globalThis.window = { innerWidth, innerHeight };
+  try {
+    fn();
+  } finally {
+    globalThis.window = previous;
+  }
+}
+
+test("visiblePortion keeps fully on-screen rects as-is", () => {
+  withWindow(1000, 800, () => {
+    assert.deepEqual(Hints.visiblePortion({ left: 100, top: 100, right: 300, bottom: 200 }), {
+      left: 100,
+      top: 100,
+      right: 300,
+      bottom: 200,
+    });
+  });
+});
+
+test("visiblePortion clamps rects cut off by the fold or edges", () => {
+  withWindow(1000, 800, () => {
+    // A result cut off by the bottom of the viewport keeps its on-screen part.
+    assert.deepEqual(Hints.visiblePortion({ left: 0, top: 700, right: 300, bottom: 900 }), {
+      left: 0,
+      top: 700,
+      right: 300,
+      bottom: 800,
+    });
+    // Left edge cut off.
+    assert.deepEqual(Hints.visiblePortion({ left: -50, top: 100, right: 200, bottom: 150 }), {
+      left: 0,
+      top: 100,
+      right: 200,
+      bottom: 150,
+    });
+  });
+});
+
+test("visiblePortion rejects rects entirely outside the viewport", () => {
+  withWindow(1000, 800, () => {
+    assert.equal(Hints.visiblePortion({ left: 0, top: 900, right: 100, bottom: 1000 }), null);
+    assert.equal(Hints.visiblePortion({ left: 1100, top: 0, right: 1200, bottom: 100 }), null);
+    assert.equal(Hints.visiblePortion({ left: 0, top: 0, right: 100, bottom: -50 }), null);
+  });
+});

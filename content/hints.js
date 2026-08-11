@@ -18,6 +18,9 @@ import {
 // clickables; labeling them all is slow and useless, so the first MAX_HINTS
 // in document order get hints and the rest are skipped.
 const MAX_HINTS = 100;
+// Approximate hint-box height, used to keep labels fully inside the
+// viewport when the hinted element only shows a sliver at the fold edge.
+const LABEL_HEIGHT = 20;
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
 import { register } from "./overlays.js";
@@ -163,6 +166,15 @@ const MODES = {
   newtab: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: openInNewTab },
   yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
   focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
+  // background: same as newtab, but sticky — the hints stay up after a pick
+  // so the next label can be typed immediately (opening several links in a
+  // row). See onKeyDown for the keep-open handling.
+  background: {
+    selector: CLICKABLE_SELECTOR,
+    linkOnly: true,
+    sticky: true,
+    activate: openInNewTab,
+  },
 };
 
 function activateClick(el) {
@@ -233,7 +245,10 @@ function start(nextMode) {
     if (!rect) continue;
     if (isOccluded(el, rect)) continue;
     viableSet.add(el);
-    rects.set(el, rect);
+    // Labels sit on the visible portion, not the full rect: a link half
+    // under the sticky bar or cut by the fold would otherwise get its hint
+    // box at an off-screen or covered position.
+    rects.set(el, visiblePortion(rect));
     counted++;
     // Top-level unless an already-collected ancestor is also a match.
     let node = el.parentElement || el.getRootNode().host;
@@ -297,20 +312,39 @@ function isInteractive(el) {
   return true;
 }
 
-// The element's on-screen rect, or null when it is not visible: zero-size
-// or off-viewport (display:none anywhere collapses the rect to zero size),
-// visibility:hidden on itself or an ancestor (computed visibility is
+// The part of `rect` inside the viewport, or null when none of it shows.
+// An element cut off by the fold or scrolled under a sticky bar is still a
+// valid hint target — its visible part is clickable — so both the visibility
+// test and the occlusion hit-test work on this portion instead of the full
+// rect.
+function visiblePortion(rect) {
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const left = Math.max(rect.left, 0);
+  const top = Math.max(rect.top, 0);
+  const right = Math.min(rect.right, vw);
+  const bottom = Math.min(rect.bottom, vh);
+  if (right <= left || bottom <= top) return null;
+  return { left, top, right, bottom };
+}
+
+// The element's on-screen rect, or null when it is not visible: zero-size,
+// entirely off-viewport (display:none anywhere collapses the rect to zero
+// size), visibility:hidden on itself or an ancestor (computed visibility is
 // inherited), or own opacity:0. One computed-style read covers both, which
 // is cheaper than checkVisibility's ancestor walk and keeps the scan fast on
 // element-heavy pages. A hidden ancestor's opacity is not caught — the same
 // limitation Surfingkeys accepts.
 function isVisible(el) {
   const rect = el.getBoundingClientRect();
-  const vw = window.innerWidth || document.documentElement.clientWidth;
-  const vh = window.innerHeight || document.documentElement.clientHeight;
   if (rect.width <= 0 || rect.height <= 0) return null;
-  // Must be fully inside the viewport.
-  if (rect.top < 0 || rect.left < 0 || rect.bottom > vh || rect.right > vw) return null;
+  // At least a sliver must be inside the viewport.
+  const portion = visiblePortion(rect);
+  if (!portion) return null;
+  // A pixel or two of an element is noise, not a target.
+  const MIN_VISIBLE = 4;
+  if (portion.right - portion.left < MIN_VISIBLE) return null;
+  if (portion.bottom - portion.top < MIN_VISIBLE) return null;
 
   const style = window.getComputedStyle(el);
   if (style.visibility === "hidden") return null;
@@ -318,21 +352,53 @@ function isVisible(el) {
   return rect;
 }
 
-// True when the topmost element at the rect's center blocks the candidate:
-// a sticky bar, an absolutely-positioned sibling, a carousel overlap. The
-// hit-test ignores pointer-events:none layers, so decorative overlays
-// (Instagram's gradient bars) don't cause false skips. Form controls are
-// almost never occluded and hit-testing every one is the dominant scan cost
-// on input-heavy pages, so they skip the test (Surfingkeys does the same).
-// The hit-test runs on the element's own root so shadow content is tested
-// against its shadow tree instead of the document.
+// True when the topmost element at the visible area's center blocks the
+// candidate: a sticky bar, an absolutely-positioned sibling, a carousel
+// overlap. The hit-test ignores pointer-events:none layers, so decorative
+// overlays (Instagram's gradient bars) don't cause false skips. Form
+// controls are almost never occluded and hit-testing every one is the
+// dominant scan cost on input-heavy pages, so they skip the test
+// (Surfingkeys does the same). The hit-test runs on the element's own root
+// so shadow content is tested against its shadow tree instead of the
+// document.
+// Sample points across the visible portion, center first. Hint activation
+// clicks the element directly (el.click()), never the hit-test point, so an
+// element only needs ONE uncovered sample to be a useful hint target. The
+// extra points only run when the center is covered, so the common case stays
+// a single hit test.
+function occlusionSamples(portion) {
+  const { left, top, right, bottom } = portion;
+  const cx = (left + right) / 2;
+  const cy = (top + bottom) / 2;
+  const points = [[cx, cy]];
+  const w = right - left;
+  const h = bottom - top;
+  if (w >= 8) points.push([left + w * 0.25, cy], [left + w * 0.75, cy]);
+  if (h >= 8) points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
+  return points;
+}
+
 function isOccluded(el, rect) {
   if (el.matches("input, textarea, select, [contenteditable]")) return false;
-  const top = el.getRootNode().elementFromPoint(
-    rect.left + rect.width / 2,
-    rect.top + rect.height / 2,
-  );
-  return !top || !containsElement(el, top);
+  // Hit-test the visible portion, not the full rect: a link scrolled under a
+  // sticky header or cut off by the fold has an off-screen or covered center
+  // even though its visible part is clickable (Google's sticky search bar is
+  // the classic case).
+  const portion = visiblePortion(rect);
+  if (!portion) return true;
+  const root = el.getRootNode();
+  for (const [x, y] of occlusionSamples(portion)) {
+    const top = root.elementFromPoint(x, y);
+    if (!top) continue;
+    // Not occluded when the hit is the candidate, lives inside it, or wraps
+    // it: sites like Google make the whole result row the click zone, so the
+    // topmost element at a link's center is its own ancestor (the anchor is
+    // pointer-events:none or display:contents behind it). Real occluders —
+    // sticky headers, modals, carousels — are siblings of what they cover,
+    // never ancestors, so they are still caught.
+    if (containsElement(el, top) || containsElement(top, el)) return false;
+  }
+  return true;
 }
 
 // Labels are always at least two characters (AA, AB, ...) and grow a
@@ -372,8 +438,11 @@ function createHintOverlay(label, rect) {
     span.textContent = ch;
     box.appendChild(span);
   }
+  // Keep the box fully inside the viewport: a link with only a sliver
+  // visible at the fold edge would otherwise put its label half off-screen.
+  const top = Math.max(0, Math.min(rect.top, window.innerHeight - LABEL_HEIGHT));
   box.style.left = window.scrollX + rect.left + "px";
-  box.style.top = window.scrollY + rect.top + "px";
+  box.style.top = window.scrollY + top + "px";
   return box;
 }
 
@@ -417,7 +486,20 @@ function onKeyDown(event) {
   }
 
   if (exact && partial === 0) {
-    MODES[mode].activate(labels.get(exact));
+    const modeConfig = MODES[mode];
+    modeConfig.activate(labels.get(exact));
+    if (modeConfig.sticky) {
+      // Keep the hints up so the next link can be picked: drop the label
+      // just used — each link opens once — and clear the typed buffer.
+      const box = overlays.get(exact);
+      if (box) box.remove();
+      overlays.delete(exact);
+      labels.delete(exact);
+      typed = "";
+      updateHighlight();
+      if (labels.size === 0) cancel();
+      return;
+    }
     cancel();
     return;
   }
@@ -452,6 +534,7 @@ export const Hints = {
   onKeyDown,
   isActive,
   generateLabels,
+  visiblePortion,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });
