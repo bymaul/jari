@@ -14,14 +14,14 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
   assert.equal(s.smoothScroll, true);
   assert.equal(s.keymap.j, "scrollTop");
   assert.equal(s.keymap.t, "omnibar");
-  assert.equal(s.timeoutMs, 2000);
+  assert.equal(s.timeoutMs, 1500);
   assert.equal(s.hintChars, "SADFJKLEWCMPGH");
   assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
   assert.equal(s.copyFormat, "plain");
 
   const bad = Jari.normalizeSettings({ scrollStep: "x", timeoutMs: 0, disabledSites: "x" });
   assert.equal(bad.scrollStep, 200);
-  assert.equal(bad.timeoutMs, 2000);
+  assert.equal(bad.timeoutMs, 1500);
   assert.deepEqual(bad.disabledSites, []);
 
   assert.equal(Jari.normalizeSettings({}).fuzzyMatching, true);

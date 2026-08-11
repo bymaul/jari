@@ -55,6 +55,7 @@ ignore/passthrough modes — every key rebindable from the options page.
 | --- | --- |
 | `f` | Link hints (click) |
 | `F` | Link hints (new tab) |
+| `gf` | Link hints (background tab, keep open) |
 | `yf` | Copy link URL |
 | `i` | Focus nearest input |
 

@@ -41,6 +41,7 @@
     // Hints
     f: "linkHints",
     F: "linkHintsNewTab",
+    gf: "linkHintsBackground",
     i: "focusInput",
     // Page navigation
     r: "reloadTab",
@@ -95,10 +96,10 @@
     smoothScroll: false,
     // Rank prompt lists by fuzzy subsequence score instead of plain substring.
     fuzzyMatching: true,
-    timeoutMs: 2e3,
+    timeoutMs: 1500,
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
-    passthroughMs: 3e3,
+    passthroughMs: 1500,
     // Characters used to build link-hint labels ("f"/"F"/"yf"). The default
     // is a home-row set to reduce finger travel; any run of unique characters
     // works.
@@ -757,6 +758,7 @@
 
   // content/hints.js
   var MAX_HINTS = 100;
+  var LABEL_HEIGHT = 20;
   var CLICKABLE_SELECTOR = [
     "a[href]",
     "area[href]",
@@ -860,7 +862,16 @@
     click: { selector: CLICKABLE_SELECTOR, activate: activateClick },
     newtab: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: openInNewTab },
     yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
-    focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret }
+    focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
+    // background: same as newtab, but sticky — the hints stay up after a pick
+    // so the next label can be typed immediately (opening several links in a
+    // row). See onKeyDown for the keep-open handling.
+    background: {
+      selector: CLICKABLE_SELECTOR,
+      linkOnly: true,
+      sticky: true,
+      activate: openInNewTab
+    }
   };
   function activateClick(el) {
     firePointerSequence(el);
@@ -904,7 +915,7 @@
       if (!rect) continue;
       if (isOccluded(el, rect)) continue;
       viableSet.add(el);
-      rects.set(el, rect);
+      rects.set(el, visiblePortion(rect));
       counted++;
       let node = el.parentElement || el.getRootNode().host;
       let nested = false;
@@ -956,24 +967,51 @@
     }
     return true;
   }
-  function isVisible(el) {
-    const rect = el.getBoundingClientRect();
+  function visiblePortion(rect) {
     const vw = window.innerWidth || document.documentElement.clientWidth;
     const vh = window.innerHeight || document.documentElement.clientHeight;
+    const left = Math.max(rect.left, 0);
+    const top = Math.max(rect.top, 0);
+    const right = Math.min(rect.right, vw);
+    const bottom = Math.min(rect.bottom, vh);
+    if (right <= left || bottom <= top) return null;
+    return { left, top, right, bottom };
+  }
+  function isVisible(el) {
+    const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return null;
-    if (rect.top < 0 || rect.left < 0 || rect.bottom > vh || rect.right > vw) return null;
+    const portion = visiblePortion(rect);
+    if (!portion) return null;
+    const MIN_VISIBLE = 4;
+    if (portion.right - portion.left < MIN_VISIBLE) return null;
+    if (portion.bottom - portion.top < MIN_VISIBLE) return null;
     const style = window.getComputedStyle(el);
     if (style.visibility === "hidden") return null;
     if (parseFloat(style.opacity) === 0) return null;
     return rect;
   }
+  function occlusionSamples(portion) {
+    const { left, top, right, bottom } = portion;
+    const cx = (left + right) / 2;
+    const cy = (top + bottom) / 2;
+    const points = [[cx, cy]];
+    const w = right - left;
+    const h = bottom - top;
+    if (w >= 8) points.push([left + w * 0.25, cy], [left + w * 0.75, cy]);
+    if (h >= 8) points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
+    return points;
+  }
   function isOccluded(el, rect) {
     if (el.matches("input, textarea, select, [contenteditable]")) return false;
-    const top = el.getRootNode().elementFromPoint(
-      rect.left + rect.width / 2,
-      rect.top + rect.height / 2
-    );
-    return !top || !containsElement(el, top);
+    const portion = visiblePortion(rect);
+    if (!portion) return true;
+    const root = el.getRootNode();
+    for (const [x, y] of occlusionSamples(portion)) {
+      const top = root.elementFromPoint(x, y);
+      if (!top) continue;
+      if (containsElement(el, top) || containsElement(top, el)) return false;
+    }
+    return true;
   }
   function generateLabels(count) {
     const chars = alphabet();
@@ -1007,8 +1045,9 @@
       span.textContent = ch;
       box.appendChild(span);
     }
+    const top = Math.max(0, Math.min(rect.top, window.innerHeight - LABEL_HEIGHT));
     box.style.left = window.scrollX + rect.left + "px";
-    box.style.top = window.scrollY + rect.top + "px";
+    box.style.top = window.scrollY + top + "px";
     return box;
   }
   function openInNewTab(el) {
@@ -1043,7 +1082,18 @@
       else if (lower.startsWith(typed)) partial++;
     }
     if (exact && partial === 0) {
-      MODES[mode].activate(labels.get(exact));
+      const modeConfig = MODES[mode];
+      modeConfig.activate(labels.get(exact));
+      if (modeConfig.sticky) {
+        const box = overlays2.get(exact);
+        if (box) box.remove();
+        overlays2.delete(exact);
+        labels.delete(exact);
+        typed = "";
+        updateHighlight();
+        if (labels.size === 0) cancel();
+        return;
+      }
       cancel();
       return;
     }
@@ -1074,7 +1124,8 @@
     cancel,
     onKeyDown,
     isActive,
-    generateLabels
+    generateLabels,
+    visiblePortion
   };
   register("hints", { close: cancel, onKeyDown, isActive });
 
@@ -1398,6 +1449,7 @@
     // Hints
     linkHints: { category: "hints", label: "Link hints" },
     linkHintsNewTab: { category: "hints", label: "Link hints (new tab)" },
+    linkHintsBackground: { category: "hints", label: "Link hints (background, keep open)" },
     linkHintsYank: { category: "hints", label: "Copy link URL" },
     focusInput: { category: "hints", label: "Focus input" },
     // Page
@@ -1744,6 +1796,7 @@ ${location.href}`;
     // Hints
     linkHints: { ...COMMAND_CATALOG.linkHints, run: () => Hints.start("click") },
     linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
+    linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
     linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
     focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
     // Page navigation

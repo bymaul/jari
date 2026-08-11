@@ -263,6 +263,7 @@ export const commands = {
   // Hints
   linkHints: { ...COMMAND_CATALOG.linkHints, run: () => Hints.start("click") },
   linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
+  linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
   linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
   focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
 

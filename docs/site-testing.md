@@ -44,6 +44,7 @@ See `docs/known-issues.md` for outstanding reports and their current status.
 - [ ] **Test YouTube**
   - [ ] On a video page, press `f` — hints appear on visible links (suggestions, comments, description); a hint opens the target in a background tab.
   - [ ] `yf` copies a link URL; `Y` copies title + URL in the configured format.
+  - [ ] `gf` opens a link in a background tab and keeps the hints up; picking another label opens a second tab; the used label disappears and cannot be picked twice.
   - [ ] `gs`/`gS` — nested scroll areas (comment pane, description) cycle correctly.
   - [ ] `j`/`k` scroll the page; press `k` while paused — note YouTube's own `j`/`k` seek shortcuts must NOT fire when Jari consumes the key (page keys are intercepted).
   - [ ] `t` omnibar suggests YouTube tabs/history and opens results.

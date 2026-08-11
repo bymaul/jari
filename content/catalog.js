@@ -53,6 +53,7 @@ export const COMMAND_CATALOG = {
   // Hints
   linkHints: { category: "hints", label: "Link hints" },
   linkHintsNewTab: { category: "hints", label: "Link hints (new tab)" },
+  linkHintsBackground: { category: "hints", label: "Link hints (background, keep open)" },
   linkHintsYank: { category: "hints", label: "Copy link URL" },
   focusInput: { category: "hints", label: "Focus input" },
 
