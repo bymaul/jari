@@ -19,6 +19,9 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
   assert.equal(s.keymap.j, "scrollTop");
   assert.equal(s.keymap.t, "omnibar");
   assert.equal(s.timeoutMs, 2000);
+  assert.equal(s.hintChars, "SADFJKLEWCMPGH");
+  assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
+  assert.equal(s.copyFormat, "plain");
 
   const bad = Jari.normalizeSettings({ scrollStep: "x", timeoutMs: 0, disabledSites: "x" });
   assert.equal(bad.scrollStep, 200);
@@ -27,6 +30,26 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
 
   assert.equal(Jari.normalizeSettings({}).fuzzyMatching, true);
   assert.equal(Jari.normalizeSettings({ fuzzyMatching: false }).fuzzyMatching, false);
+});
+
+test("normalizeSettings validates hintChars, suggestionSources and copyFormat", () => {
+  const s = Jari.normalizeSettings({
+    hintChars: "sadfjklewcmpgh",
+    suggestionSources: ["tab"],
+    copyFormat: "markdown",
+  });
+  assert.equal(s.hintChars, "SADFJKLEWCMPGH");
+  assert.deepEqual(s.suggestionSources, ["tab"]);
+  assert.equal(s.copyFormat, "markdown");
+
+  assert.equal(Jari.normalizeSettings({ hintChars: "ab" }).hintChars, "SADFJKLEWCMPGH");
+  assert.equal(Jari.normalizeSettings({ hintChars: "aabbccdd" }).hintChars, "ABCD");
+  assert.deepEqual(Jari.normalizeSettings({ suggestionSources: [] }).suggestionSources, []);
+  assert.deepEqual(
+    Jari.normalizeSettings({ suggestionSources: ["tab", "bogus", "bookmark"] }).suggestionSources,
+    ["tab", "bookmark"],
+  );
+  assert.equal(Jari.normalizeSettings({ copyFormat: "bogus" }).copyFormat, "plain");
 });
 
 test("fuzzyMatch returns null when chars are missing or out of order", () => {

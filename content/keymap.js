@@ -44,7 +44,7 @@
     '>>': 'moveTabRight',
 
     // Window: split this tab into its own window; again, merge back.
-    W: 'splitOrMergeTab',
+    gw: 'splitOrMergeTab',
 
     // History
     S: 'historyBack',
@@ -124,7 +124,20 @@
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
     passthroughMs: 3000,
+    // Characters used to build link-hint labels ("f"/"F"/"yf"). The default
+    // is a home-row set to reduce finger travel; any run of unique characters
+    // works.
+    hintChars: 'sadfjklewcmpgh',
+    // Which sources feed the omnibar suggestions. Empty means suggestions are
+    // off and only the typed query row is shown.
+    suggestionSources: ['tab', 'history', 'bookmark'],
+    // Copy format for the title+URL command: plain ("Title\nURL") or markdown
+    // ("[Title](URL)").
+    copyFormat: 'plain',
   };
+
+  // Known omnibar suggestion sources, used to validate the stored value.
+  Jari.suggestionSources = ['tab', 'history', 'bookmark'];
 
   // Prefix keys ("g", ";", "y") must never double as single-key bindings —
   // the dispatcher resolves a prefix before the single-key keymap, so a lone
@@ -167,6 +180,43 @@
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
 
+  // --- Shadow DOM helpers --------------------------------------------------
+  // Open shadow roots are reachable by content scripts; closed roots are not
+  // (platform design). These let hints and scroll areas see inside open
+  // roots. keymap.js is the natural home: the options page loads it too and
+  // both content features agree on the traversal.
+
+  // The element that actually has focus, crossing open shadow boundaries.
+  // document.activeElement stops at a shadow host — when the user types in a
+  // shadow-tree input (Gmail, Notion, Docs), the host is reported as active
+  // and Jari would hijack the keys meant for that field.
+  Jari.deepActiveElement = function deepActiveElement() {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    return el;
+  };
+
+  // Every element matching `selector` in the document and inside open shadow
+  // roots. One walk per root, depth-first, recursing into each shadow root
+  // as it is found. onShadowRoot is called with every open root encountered
+  // so callers can observe or instrument them. Returns a fresh array.
+  Jari.queryAll = function queryAll(selector, onShadowRoot) {
+    const out = [];
+    const visit = (root) => {
+      for (const el of root.querySelectorAll('*')) {
+        if (el.matches(selector)) out.push(el);
+        if (el.shadowRoot) {
+          if (onShadowRoot) onShadowRoot(el.shadowRoot);
+          visit(el.shadowRoot);
+        }
+      }
+    };
+    visit(document);
+    return out;
+  };
+
   // URL schemes safe to open/navigate to. The background keeps its own copy
   // (it cannot load the content bundle); keep the two in sync. hints.js uses
   // this to decide whether an <a> href may open in a background tab.
@@ -200,8 +250,22 @@
         Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
           ? d.passthroughMs
           : Jari.settingsDefaults.passthroughMs,
+      hintChars: normalizeHintChars(d.hintChars),
+      suggestionSources: Array.isArray(d.suggestionSources)
+        ? d.suggestionSources.filter((s) => Jari.suggestionSources.includes(s))
+        : Jari.settingsDefaults.suggestionSources.slice(),
+      copyFormat:
+        d.copyFormat === 'markdown' ? 'markdown' : Jari.settingsDefaults.copyFormat,
     };
   };
+
+  // Hint characters: uppercase, deduplicated, must stay long enough to label a
+  // reasonable page. Anything unusable falls back to the default set.
+  function normalizeHintChars(raw) {
+    if (typeof raw !== 'string') return Jari.settingsDefaults.hintChars.toUpperCase();
+    const chars = [...new Set(raw.toUpperCase())].filter((c) => /[A-Z0-9]/.test(c)).join('');
+    return chars.length >= 4 ? chars : Jari.settingsDefaults.hintChars.toUpperCase();
+  }
 
   // URL helpers shared by the page-navigation commands ("gu"/"gU") and the
   // omnibar's URL-vs-search guess.

@@ -8,8 +8,6 @@
 (() => {
   const Jari = window.Jari || (window.Jari = {});
 
-  const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
   // Broad selector of "things you can click". Includes ARIA roles, inline
   // onclick handlers, and form controls; hidden inputs are excluded.
   const CLICKABLE_SELECTOR = [
@@ -60,6 +58,34 @@
     "[role='spinbutton']",
   ].join(",");
 
+  // True when the element carries a usable link href. "yank"/"newtab" only
+  // hint links — a button without an href has nothing to copy or open.
+  function linkHref(el) {
+    const href = el.href || el.getAttribute?.("href");
+    return typeof href === "string" && href.trim() !== "";
+  }
+
+  // Many sites (Google Docs, Notion, Gmail widgets) act on pointer/mouse
+  // input, often on a shadow host, and ignore a bare el.click(). Dispatch the
+  // full pointer sequence the way a real click does so those components react.
+  // Untrusted events trigger no default action — a text input is not moved or
+  // selected — so callers follow up with el.click() or el.focus() themselves.
+  function firePointerSequence(el) {
+    const rect = el.getBoundingClientRect();
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    };
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
+      const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
+      el.dispatchEvent(new Ctor(type, opts));
+    }
+  }
+
   // Focus a text target with the caret at the end of its content — "i" should
   // drop you at the end of the line, not the start. Inputs/textarea use the
   // selection API; editable elements get a collapsed range at the end.
@@ -88,29 +114,54 @@
     }
   }
 
+  // Focus the target of a focus-mode hint. Some editors (ProseMirror,
+  // CodeMirror, Notion blocks) only enter an editable state on pointer input,
+  // so fire a pointer sequence after focusing.
   function focusAndPlaceCaret(el) {
+    const editable = el.querySelector(
+      '[contenteditable="true"], [contenteditable="plaintext-only"], input:not([type="hidden"]), textarea',
+    );
+    if (editable) el = editable;
+
     el.focus();
+    if (el.isConnected) firePointerSequence(el);
+    if (el.isConnected && Jari.deepActiveElement() !== el) el.focus();
     // Place the caret immediately, then again across a window of ticks:
     // Chrome finalizes its focus default selection after the keydown, and
     // page handlers (React, autocomplete) can re-place the caret even later.
     // Each attempt re-verifies the element still owns focus; a fixed shot
     // count stops early so a page that keeps fighting the caret wins in the
     // end rather than Jari re-placing forever.
+    const target = el;
     const shots = [0, 16, 32, 64, 128, 256];
     for (const delay of shots) {
       setTimeout(() => {
-        if (document.activeElement !== el) return;
-        placeCaretAtEnd(el);
+        if (Jari.deepActiveElement() !== target) return;
+        placeCaretAtEnd(target);
       }, delay);
     }
   }
 
+  // click labels everything clickable; newtab and yank only links (a button
+  // without an href has nothing to open or copy).
   const MODES = {
-    click: { selector: CLICKABLE_SELECTOR, activate: (el) => el.click() },
-    newtab: { selector: CLICKABLE_SELECTOR, activate: openInNewTab },
-    yank: { selector: CLICKABLE_SELECTOR, activate: yankLink },
+    click: { selector: CLICKABLE_SELECTOR, activate: activateClick },
+    newtab: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: openInNewTab },
+    yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
     focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
   };
+
+  function activateClick(el) {
+    firePointerSequence(el);
+    el.click();
+  }
+
+  // Hint labels are built from the configured character set (settings
+  // hintChars, default home-row set). Empty fallback can't happen —
+  // normalizeSettings guarantees at least four characters — but guard anyway.
+  function alphabet() {
+    return Jari.settings.getHintChars() || Jari.settingsDefaults.hintChars;
+  }
 
   let mode = null;
   let labels = new Map(); // hint label -> target element
@@ -127,7 +178,9 @@
     cancel();
 
     const elements = topLevelElements(
-      Array.from(document.querySelectorAll(config.selector)).filter(isInteractive),
+      Jari.queryAll(config.selector)
+        .filter(isInteractive)
+        .filter((el) => !config.linkOnly || linkHref(el)),
     );
     if (nextMode === "focus" && elements.length === 1) {
       focusAndPlaceCaret(elements[0]);
@@ -174,55 +227,63 @@
 
     // Walk up the tree: an ancestor can hide the whole subtree even when the
     // element still reports a non-zero rect — e.g. custom-styled radios are
-    // often opacity:0, or carousel slides are visibility:hidden.
+    // often opacity:0, or carousel slides are visibility:hidden. Crosses
+    // shadow boundaries to the host so a shadow subtree inherits the host's
+    // visibility.
     let node = el;
-    while (node && node.nodeType === Node.ELEMENT_NODE) {
-      if (node.hasAttribute("hidden")) return false;
-      const style = window.getComputedStyle(node);
-      if (style.display === "none" || style.visibility === "hidden") return false;
-      if (parseFloat(style.opacity) === 0) return false;
-      node = node.parentElement;
+    while (node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.hasAttribute("hidden")) return false;
+        const style = window.getComputedStyle(node);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        if (parseFloat(style.opacity) === 0) return false;
+      }
+      node = node.getRootNode().host || node.parentElement;
     }
     return true;
   }
 
   // Drop nested matches: if an element sits inside another matched element,
   // only keep the outermost one so hints don't pile up on the same spot
-  // (e.g. <a><button>x</button></a>).
+  // (e.g. <a><button>x</button></a>). Shadow boundaries are crossed to the
+  // host, so a clickable inside a shadow tree counts as nested under a host
+  // that is itself a match.
   function topLevelElements(elements) {
     const set = new Set(elements);
     return elements.filter((el) => {
-      let parent = el.parentElement;
-      while (parent) {
-        if (set.has(parent)) return false;
-        parent = parent.parentElement;
+      let node = el.parentElement || el.getRootNode().host;
+      while (node) {
+        if (set.has(node)) return false;
+        node = node.parentElement || node.getRootNode().host;
       }
       return true;
     });
   }
 
-  // Always two characters (AA, AB, ... ZZ). Past 676 matches it grows to
-  // three characters and beyond, so labels never duplicate.
+  // Labels are always at least two characters (AA, AB, ...) and grow a
+  // character whenever the set is exhausted, so they never duplicate.
   function generateLabels(count) {
-    const n = ALPHABET.length;
+    const chars = alphabet();
+    const n = chars.length;
     const labels = [];
     let i = 0;
     let length = 2;
     while (i < count) {
       const combos = Math.pow(n, length);
       for (let k = 0; k < combos && i < count; k++, i++) {
-        labels.push(toBase26(k, length));
+        labels.push(toBase26(k, length, chars));
       }
       length++;
     }
     return labels;
   }
 
-  function toBase26(value, length) {
+  function toBase26(value, length, chars) {
+    const n = chars.length;
     let s = "";
     for (let p = 0; p < length; p++) {
-      s = ALPHABET[value % 26] + s;
-      value = Math.floor(value / 26);
+      s = chars[value % n] + s;
+      value = Math.floor(value / n);
     }
     return s;
   }
@@ -251,6 +312,7 @@
     if (scheme && Jari.allowedUrlSchemes.has(scheme)) {
       Jari.sendMessage("openInBackgroundTab", { url: href });
     } else {
+      firePointerSequence(el);
       el.click();
     }
   }
@@ -310,5 +372,11 @@
     mode = null;
   }
 
-  Jari.Hints = { start, cancel, onKeyDown, isActive };
+  Jari.Hints = {
+    start,
+    cancel,
+    onKeyDown,
+    isActive,
+    generateLabels,
+  };
 })();

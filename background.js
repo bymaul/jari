@@ -41,6 +41,23 @@ function clampCount(count, max = 20) {
   return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : 1;
 }
 
+// Which sources feed the omnibar suggestions. The background cannot load the
+// content bundle, so it reads the stored setting directly and falls back to
+// all sources. Keep in sync with Jari.settingsDefaults.suggestionSources in
+// content/keymap.js.
+const DEFAULT_SUGGESTION_SOURCES = ["tab", "history", "bookmark"];
+
+async function getSuggestionSources() {
+  try {
+    const stored = await chrome.storage.sync.get("settings");
+    const sources = stored.settings && stored.settings.suggestionSources;
+    if (Array.isArray(sources)) {
+      return sources.filter((s) => DEFAULT_SUGGESTION_SOURCES.includes(s));
+    }
+  } catch {}
+  return DEFAULT_SUGGESTION_SOURCES.slice();
+}
+
 const handlers = {
   createTab: async (_, { url } = {}) => {
     const target = url === undefined ? undefined : normalizeUrl(url);
@@ -249,22 +266,29 @@ const handlers = {
       seen.add(url);
       items.push({ title: title || url, url, source });
     }
-    try {
-      const tabs = await chrome.tabs.query({});
-      // Push every open tab as a candidate — the prompt's fuzzy matcher
-      // filters and ranks them client-side, so substring pre-filtering here
-      // would hide matches like "ytb" for "YouTube".
-      for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
-    } catch {}
+    const sources = await getSuggestionSources();
+    if (sources.includes("tab")) {
+      try {
+        const tabs = await chrome.tabs.query({});
+        // Push every open tab as a candidate — the prompt's fuzzy matcher
+        // filters and ranks them client-side, so substring pre-filtering here
+        // would hide matches like "ytb" for "YouTube".
+        for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
+      } catch {}
+    }
     if (q) {
-      try {
-        const results = await chrome.history.search({ text: q, maxResults: 12, startTime: 0 });
-        for (const item of results) push(item.title, item.url, "history");
-      } catch {}
-      try {
-        const bms = await chrome.bookmarks.search(q);
-        for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark");
-      } catch {}
+      if (sources.includes("history")) {
+        try {
+          const results = await chrome.history.search({ text: q, maxResults: 12, startTime: 0 });
+          for (const item of results) push(item.title, item.url, "history");
+        } catch {}
+      }
+      if (sources.includes("bookmark")) {
+        try {
+          const bms = await chrome.bookmarks.search(q);
+          for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark");
+        } catch {}
+      }
     }
     return items.slice(0, 40);
   },
