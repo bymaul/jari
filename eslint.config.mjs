@@ -68,6 +68,7 @@ export default [
         Promise: "readonly",
         PointerEvent: "readonly",
         MouseEvent: "readonly",
+        performance: "readonly",
       },
     },
     rules: {

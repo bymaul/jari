@@ -7,11 +7,17 @@
 //   focus  - focus inputs; auto-focuses when exactly one match exists
 import {
   allowedUrlSchemes,
+  containsElement,
   deepActiveElement,
   overlaySelectors,
   queryAll,
   settingsDefaults,
 } from "./keymap.js";
+
+// Upper bound on labels rendered at once. Pages can match hundreds of
+// clickables; labeling them all is slow and useless, so the first MAX_HINTS
+// in document order get hints and the rest are skipped.
+const MAX_HINTS = 100;
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
 
@@ -174,6 +180,23 @@ let mode = null;
 let labels = new Map(); // hint label -> target element
 let overlays = new Map(); // hint label -> overlay element
 let typed = "";
+let hintsHost = null;
+
+// All hint labels live in one host element that is attached to the page as a
+// single node. Appending 100 individual boxes to the body (open) and removing
+// them one by one (close) was a visible source of jank; a single host makes
+// both a one-node mutation. The absolute .jari-hint children are positioned
+// relative to the document origin, so their viewport-derived coordinates
+// still land in the same place as when they hung directly off the body.
+function getHintsHost() {
+  if (hintsHost && hintsHost.isConnected) return hintsHost;
+  hintsHost = document.createElement("div");
+  hintsHost.className = "jari-hints-host";
+  hintsHost.style.cssText =
+    "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483647;";
+  document.body.appendChild(hintsHost);
+  return hintsHost;
+}
 
 function isActive() {
   return mode !== null;
@@ -184,16 +207,53 @@ function start(nextMode) {
   if (!config) return;
   cancel();
 
-  const elements = topLevelElements(
-    queryAll(config.selector)
-      .filter(isInteractive)
-      .filter((el) => !config.linkOnly || linkHref(el)),
-  );
-  if (nextMode === "focus" && elements.length === 1) {
-    focusAndPlaceCaret(elements[0]);
+  // One pass collects every hintable element together with its rect: the
+  // rect from the visibility check is reused for the occlusion test and for
+  // the overlay position, so no rect is read twice and no overlay append
+  // invalidates the next read. Scanning stops once MAX_HINTS top-level
+  // elements are found — ancestors always precede descendants in document
+  // order, so nested matches are recognizable as we go and the remaining
+  // candidates only need a cheap count for the "Showing N of M" toast. That
+  // caps the expensive elementFromPoint hit tests at ~MAX_HINTS regardless
+  // of how many matches the page has.
+  const top = [];
+  const viableSet = new Set();
+  const rects = new Map();
+  let counted = 0;
+  for (const el of queryAll(config.selector)) {
+    if (!isInteractive(el)) continue;
+    if (config.linkOnly && !linkHref(el)) continue;
+    if (top.length >= MAX_HINTS) {
+      // Past the cap: no hit test, just count the visible survivors.
+      if (isVisible(el)) counted++;
+      continue;
+    }
+    const rect = isVisible(el);
+    if (!rect) continue;
+    if (isOccluded(el, rect)) continue;
+    viableSet.add(el);
+    rects.set(el, rect);
+    counted++;
+    // Top-level unless an already-collected ancestor is also a match.
+    let node = el.parentElement || el.getRootNode().host;
+    let nested = false;
+    while (node) {
+      if (viableSet.has(node)) {
+        nested = true;
+        break;
+      }
+      node = node.parentElement || node.getRootNode().host;
+    }
+    if (!nested) top.push(el);
+  }
+  const topLevel = top;
+  const hintCount = topLevel.length;
+
+  if (nextMode === "focus" && topLevel.length === 1) {
+    focusAndPlaceCaret(topLevel[0]);
     return;
   }
-  if (elements.length === 0) {
+  if (topLevel.length === 0) {
     ui.toast("No matches");
     return;
   }
@@ -202,18 +262,30 @@ function start(nextMode) {
   // Multiple focus targets: hint labels appear on each input so the user
   // can pick one; tell them the hints are up.
   if (nextMode === "focus") {
-    ui.toast(`${elements.length} inputs — pick one`);
+    ui.toast(`${hintCount} inputs — pick one`);
   }
-  const hintLabels = generateLabels(elements.length);
-  elements.forEach((el, i) => {
+  if (counted > MAX_HINTS) {
+    ui.toast(`Showing ${MAX_HINTS} of ${counted} hints`);
+  }
+  const hintLabels = generateLabels(hintCount);
+  // Build every box into a detached fragment and attach it to the host once,
+  // so the page sees a single DOM mutation instead of one per hint.
+  const host = getHintsHost();
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < hintCount; i++) {
+    const el = topLevel[i];
     const label = hintLabels[i];
     labels.set(label, el);
-    overlays.set(label, createHintOverlay(label, el));
-  });
+    const box = createHintOverlay(label, rects.get(el));
+    overlays.set(label, box);
+    fragment.appendChild(box);
+  }
+  host.appendChild(fragment);
 }
 
-// An element must be on-screen and genuinely interactive: not disabled,
-// not hidden, and not an anchor without a usable href.
+// An element must be genuinely interactive: not disabled and not an anchor
+// without a usable href. Visibility and occlusion are checked separately so
+// the visibility pass can reuse the rect it computed.
 function isInteractive(el) {
   if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
   if (el.closest(overlaySelectors)) return false;
@@ -221,50 +293,45 @@ function isInteractive(el) {
     const href = el.getAttribute("href");
     if (href === null || href.trim() === "") return false;
   }
-  return isVisible(el);
+  return true;
 }
 
+// The element's on-screen rect, or null when it is not visible: zero-size
+// or off-viewport (display:none anywhere collapses the rect to zero size),
+// visibility:hidden on itself or an ancestor (computed visibility is
+// inherited), or own opacity:0. One computed-style read covers both, which
+// is cheaper than checkVisibility's ancestor walk and keeps the scan fast on
+// element-heavy pages. A hidden ancestor's opacity is not caught — the same
+// limitation Surfingkeys accepts.
 function isVisible(el) {
   const rect = el.getBoundingClientRect();
   const vw = window.innerWidth || document.documentElement.clientWidth;
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  if (rect.width <= 0 || rect.height <= 0) return false;
+  if (rect.width <= 0 || rect.height <= 0) return null;
   // Must be fully inside the viewport.
-  if (rect.top < 0 || rect.left < 0 || rect.bottom > vh || rect.right > vw) return false;
+  if (rect.top < 0 || rect.left < 0 || rect.bottom > vh || rect.right > vw) return null;
 
-  // Walk up the tree: an ancestor can hide the whole subtree even when the
-  // element still reports a non-zero rect — e.g. custom-styled radios are
-  // often opacity:0, or carousel slides are visibility:hidden. Crosses
-  // shadow boundaries to the host so a shadow subtree inherits the host's
-  // visibility.
-  let node = el;
-  while (node) {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      if (node.hasAttribute("hidden")) return false;
-      const style = window.getComputedStyle(node);
-      if (style.display === "none" || style.visibility === "hidden") return false;
-      if (parseFloat(style.opacity) === 0) return false;
-    }
-    node = node.getRootNode().host || node.parentElement;
-  }
-  return true;
+  const style = window.getComputedStyle(el);
+  if (style.visibility === "hidden") return null;
+  if (parseFloat(style.opacity) === 0) return null;
+  return rect;
 }
 
-// Drop nested matches: if an element sits inside another matched element,
-// only keep the outermost one so hints don't pile up on the same spot
-// (e.g. <a><button>x</button></a>). Shadow boundaries are crossed to the
-// host, so a clickable inside a shadow tree counts as nested under a host
-// that is itself a match.
-function topLevelElements(elements) {
-  const set = new Set(elements);
-  return elements.filter((el) => {
-    let node = el.parentElement || el.getRootNode().host;
-    while (node) {
-      if (set.has(node)) return false;
-      node = node.parentElement || node.getRootNode().host;
-    }
-    return true;
-  });
+// True when the topmost element at the rect's center blocks the candidate:
+// a sticky bar, an absolutely-positioned sibling, a carousel overlap. The
+// hit-test ignores pointer-events:none layers, so decorative overlays
+// (Instagram's gradient bars) don't cause false skips. Form controls are
+// almost never occluded and hit-testing every one is the dominant scan cost
+// on input-heavy pages, so they skip the test (Surfingkeys does the same).
+// The hit-test runs on the element's own root so shadow content is tested
+// against its shadow tree instead of the document.
+function isOccluded(el, rect) {
+  if (el.matches("input, textarea, select, [contenteditable]")) return false;
+  const top = el.getRootNode().elementFromPoint(
+    rect.left + rect.width / 2,
+    rect.top + rect.height / 2,
+  );
+  return !top || !containsElement(el, top);
 }
 
 // Labels are always at least two characters (AA, AB, ...) and grow a
@@ -295,8 +362,7 @@ function toBase26(value, length, chars) {
   return s;
 }
 
-function createHintOverlay(label, el) {
-  const rect = el.getBoundingClientRect();
+function createHintOverlay(label, rect) {
   const box = document.createElement("div");
   box.className = "jari-hint";
   // One span per character so updateHighlight can mute the typed prefix.
@@ -307,7 +373,6 @@ function createHintOverlay(label, el) {
   }
   box.style.left = window.scrollX + rect.left + "px";
   box.style.top = window.scrollY + rect.top + "px";
-  document.body.appendChild(box);
   return box;
 }
 
@@ -372,7 +437,8 @@ function updateHighlight() {
 }
 
 function cancel() {
-  for (const box of overlays.values()) box.remove();
+  if (hintsHost) hintsHost.remove();
+  hintsHost = null;
   overlays.clear();
   labels.clear();
   typed = "";

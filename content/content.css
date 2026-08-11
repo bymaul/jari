@@ -9,7 +9,6 @@
   --jari-font-family-sans: sans-serif;
   --jari-font-size: 12pt;
   --jari-small-font-size: calc(var(--jari-font-size) * 0.75);
-  /* Light palette: cool paper, the light suit of the vague dark scheme. */
   --jari-bg: #f5f5f7;
   --jari-fg: #333738;
   --jari-muted: #606079;
@@ -48,8 +47,6 @@
   --jari-of-bg: #333738;
 }
 
-/* Dark palette: the vague colorscheme's colors, lifted a few notches
-   brighter. */
 @media (prefers-color-scheme: dark) {
   :root {
     --jari-bg: #1e1e26;
