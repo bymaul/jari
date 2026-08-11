@@ -1,12 +1,19 @@
 // ESLint flat config for Jari.
-// Content scripts, options page and the service worker all run as plain
-// scripts (IIFEs) in either Chrome or Firefox, so `chrome` is the only
-// extension-specific global.
+// package.json sets "type": "module", so content scripts, options page,
+// build script, tests and benchmarks are all ESM by default. The background
+// service worker (background.js) is still a classic script and `chrome` is
+// the only extension-specific global.
 import js from "@eslint/js";
 
 export default [
   {
-    ignores: ["**/node_modules/**", "dist/**"],
+    ignores: [
+      "**/node_modules/**",
+      "dist/**",
+      // Generated bundles, rebuilt by npm run build:chrome.
+      "content/bundle.js",
+      "options/options.bundle.js",
+    ],
   },
   js.configs.recommended,
   {
@@ -15,9 +22,7 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       globals: {
-        require: "readonly",
         process: "readonly",
-        __dirname: "readonly",
         console: "readonly",
       },
     },
@@ -28,9 +33,6 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       globals: {
-        require: "readonly",
-        module: "readonly",
-        __dirname: "readonly",
         process: "readonly",
         console: "readonly",
       },
@@ -42,8 +44,6 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       globals: {
-        require: "readonly",
-        __dirname: "readonly",
         process: "readonly",
         console: "readonly",
       },
