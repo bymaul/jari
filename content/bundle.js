@@ -1902,6 +1902,6 @@ ${location.href}`;
     window.addEventListener("keydown", handleKeydown, true);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
   }
-  setModeActions({ ignore: { toggle: toggleIgnore }, passthrough: { enter: enterPassthrough } });
+  setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
   boot();
 })();
