@@ -197,14 +197,17 @@ export function deepActiveElement() {
 }
 
 // Every element matching `selector` in the document and inside open shadow
-// roots. One walk per root, depth-first, recursing into each shadow root
-// as it is found. onShadowRoot is called with every open root encountered
-// so callers can observe or instrument them. Returns a fresh array.
+// roots. Matching is delegated to the native querySelectorAll per root, so a
+// heavy page is not walked element-by-element. Shadow roots are traversed
+// only under hosts that themselves match the selector (a clickable inside a
+// shadow tree whose host is not a match is out of scope). onShadowRoot is
+// called with every traversed open root so callers can observe them.
+// Returns a fresh array.
 export function queryAll(selector, onShadowRoot) {
   const out = [];
   const visit = (root) => {
-    for (const el of root.querySelectorAll('*')) {
-      if (el.matches(selector)) out.push(el);
+    for (const el of root.querySelectorAll(selector)) {
+      out.push(el);
       if (el.shadowRoot) {
         if (onShadowRoot) onShadowRoot(el.shadowRoot);
         visit(el.shadowRoot);
@@ -213,6 +216,18 @@ export function queryAll(selector, onShadowRoot) {
   };
   visit(document);
   return out;
+}
+
+// True when `target` is `container` or lives inside it, crossing shadow
+// boundaries on the way up (a host contains its shadow content for the
+// purposes of containment checks). Used by the hint occlusion test.
+export function containsElement(container, target) {
+  let node = target;
+  while (node) {
+    if (node === container) return true;
+    node = node.parentElement || node.getRootNode().host;
+  }
+  return false;
 }
 
 // URL schemes safe to open/navigate to. The background keeps its own copy
