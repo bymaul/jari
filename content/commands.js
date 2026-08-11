@@ -1,287 +1,285 @@
 // Jari: the command registry.
 // Each command is { category, label, run, repeatable? }. category groups
-// commands on the options page.
+// commands on the options page; category/label/repeatable come from the
+// COMMAND_CATALOG, run is implemented here.
 // run receives { count, event }. repeatable commands scale with the count
 // prefix (e.g. "3j", "5x").
-(() => {
-  const Jari = window.Jari || (window.Jari = {});
+import { Url } from "./keymap.js";
+import { settings } from "./settings.js";
+import { sendMessage, ui } from "./ui.js";
+import { Scroll } from "./scroll.js";
+import { Hints } from "./hints.js";
+import { Prompt } from "./prompt.js";
+import { Help } from "./help.js";
+import { COMMAND_CATALOG } from "./catalog.js";
 
-  const PAGE_RATIO = 0.9;
-  const HALF_RATIO = 0.5;
+const PAGE_RATIO = 0.9;
+const HALF_RATIO = 0.5;
 
-  // Scrolling targets the window by default; "gs"/"gS" retarget it to a
-  // page's nested scroll container (or back to the window).
-  function getScrollElement() {
-    return Jari.Scroll.getTarget();
+// The ignore/passthrough modes are owned by the content entry point (they
+// share its keydown state). The registry must not import the entry, so the
+// entry wires the actions here; the run closures below call them at runtime.
+let ignoreToggle = () => {};
+let passthroughEnter = () => {};
+export function setModeActions({ ignore, passthrough } = {}) {
+  if (ignore) ignoreToggle = ignore;
+  if (passthrough) passthroughEnter = passthrough;
+}
+
+// Scrolling targets the window by default; "gs"/"gS" retarget it to a
+// page's nested scroll container (or back to the window).
+function getScrollElement() {
+  return Scroll.getTarget();
+}
+
+function scrollHeightOf(el) {
+  return el === window
+    ? (document.scrollingElement || document.documentElement || document.body).scrollHeight
+    : el.scrollHeight;
+}
+
+function clientHeightOf(el) {
+  return el === window ? window.innerHeight : el.clientHeight;
+}
+
+// Manual smooth scrolling. Holding a key fires repeated keydowns; each
+// scrollBy({ behavior: "smooth" }) cancels the previous animation, which
+// stutters. Instead, accumulate the requested distance and animate it with
+// requestAnimationFrame until it is consumed.
+let smoothState = null; // { el, x, y, rafId }
+
+function scrollPosOf(el) {
+  return el === window
+    ? { x: window.scrollX, y: window.scrollY }
+    : { x: el.scrollLeft, y: el.scrollTop };
+}
+
+// Respect the OS-level reduced-motion preference: when set, skip the smooth
+// animation and jump instantly even if smoothScroll is enabled.
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function smoothScrollBy(el, x, y) {
+  if (smoothState === null || smoothState.el !== el) {
+    smoothState = { el, x: 0, y: 0, rafId: null };
   }
-
-  function scrollHeightOf(el) {
-    return el === window
-      ? (document.scrollingElement || document.documentElement || document.body).scrollHeight
-      : el.scrollHeight;
-  }
-
-  function clientHeightOf(el) {
-    return el === window ? window.innerHeight : el.clientHeight;
-  }
-
-  // Manual smooth scrolling. Holding a key fires repeated keydowns; each
-  // scrollBy({ behavior: "smooth" }) cancels the previous animation, which
-  // stutters. Instead, accumulate the requested distance and animate it with
-  // requestAnimationFrame until it is consumed.
-  let smoothState = null; // { el, x, y, rafId }
-
-  function scrollPosOf(el) {
-    return el === window
-      ? { x: window.scrollX, y: window.scrollY }
-      : { x: el.scrollLeft, y: el.scrollTop };
-  }
-
-  // Respect the OS-level reduced-motion preference: when set, skip the smooth
-  // animation and jump instantly even if smoothScroll is enabled.
-  function prefersReducedMotion() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-
-  function smoothScrollBy(el, x, y) {
-    if (smoothState === null || smoothState.el !== el) {
-      smoothState = { el, x: 0, y: 0, rafId: null };
-    }
-    smoothState.x += x;
-    smoothState.y += y;
-    if (smoothState.rafId === null) {
-      smoothState.rafId = requestAnimationFrame(smoothScrollStep);
-    }
-  }
-
-  function smoothScrollStep() {
-    if (!smoothState) return;
-    smoothState.rafId = null;
-    const { el } = smoothState;
-    const pendingX = smoothState.x;
-    const pendingY = smoothState.y;
-    if (pendingX === 0 && pendingY === 0) {
-      smoothState = null;
-      return;
-    }
-    // Ease-out toward the target, capped per frame so a large backlog (a held
-    // key) still scrolls at a steady, sane speed.
-    const CAP = 150;
-    const moveX =
-      pendingX !== 0
-        ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.25)))
-        : 0;
-    const moveY =
-      pendingY !== 0
-        ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.25)))
-        : 0;
-
-    const before = scrollPosOf(el);
-    el.scrollBy({ left: moveX, top: moveY, behavior: "auto" });
-    const after = scrollPosOf(el);
-    const dx = after.x - before.x;
-    const dy = after.y - before.y;
-    // Consume what actually moved; an axis that couldn't move (scroll limit
-    // reached) is dropped so the loop can end, while the other axis keeps
-    // animating.
-    if (dx !== 0) smoothState.x -= dx;
-    else smoothState.x = 0;
-    if (dy !== 0) smoothState.y -= dy;
-    else smoothState.y = 0;
-
+  smoothState.x += x;
+  smoothState.y += y;
+  if (smoothState.rafId === null) {
     smoothState.rafId = requestAnimationFrame(smoothScrollStep);
   }
+}
 
-  function scrollBy({ x = 0, y = 0, count = 1 }) {
-    const el = getScrollElement();
-    if (Jari.settings.isSmoothScroll() && !prefersReducedMotion()) {
-      smoothScrollBy(el, x * count, y * count);
-    } else {
-      el.scrollBy({ left: x * count, top: y * count, behavior: "auto" });
-    }
+function smoothScrollStep() {
+  if (!smoothState) return;
+  smoothState.rafId = null;
+  const { el } = smoothState;
+  const pendingX = smoothState.x;
+  const pendingY = smoothState.y;
+  if (pendingX === 0 && pendingY === 0) {
+    smoothState = null;
+    return;
   }
+  // Ease-out toward the target, capped per frame so a large backlog (a held
+  // key) still scrolls at a steady, sane speed.
+  const CAP = 150;
+  const moveX =
+    pendingX !== 0
+      ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.25)))
+      : 0;
+  const moveY =
+    pendingY !== 0
+      ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.25)))
+      : 0;
 
-  async function copyToClipboard(text, message) {
-    await Jari.ui.copyText(text);
-    Jari.ui.toast(message);
+  const before = scrollPosOf(el);
+  el.scrollBy({ left: moveX, top: moveY, behavior: "auto" });
+  const after = scrollPosOf(el);
+  const dx = after.x - before.x;
+  const dy = after.y - before.y;
+  // Consume what actually moved; an axis that couldn't move (scroll limit
+  // reached) is dropped so the loop can end, while the other axis keeps
+  // animating.
+  if (dx !== 0) smoothState.x -= dx;
+  else smoothState.x = 0;
+  if (dy !== 0) smoothState.y -= dy;
+  else smoothState.y = 0;
+
+  smoothState.rafId = requestAnimationFrame(smoothScrollStep);
+}
+
+function scrollBy({ x = 0, y = 0, count = 1 }) {
+  const el = getScrollElement();
+  if (settings.isSmoothScroll() && !prefersReducedMotion()) {
+    smoothScrollBy(el, x * count, y * count);
+  } else {
+    el.scrollBy({ left: x * count, top: y * count, behavior: "auto" });
   }
+}
 
-  // Title + URL, formatted per the copyFormat setting: plain ("Title\nURL")
-  // or a markdown link ("[Title](URL)").
-  function copyTitleUrlText() {
-    return Jari.settings.getCopyFormat() === "markdown"
-      ? `[${document.title}](${location.href})`
-      : `${document.title}\n${location.href}`;
+async function copyToClipboard(text, message) {
+  await ui.copyText(text);
+  ui.toast(message);
+}
+
+// Title + URL, formatted per the copyFormat setting: plain ("Title\nURL")
+// or a markdown link ("[Title](URL)").
+function copyTitleUrlText() {
+  return settings.getCopyFormat() === "markdown"
+    ? `[${document.title}](${location.href})`
+    : `${document.title}\n${location.href}`;
+}
+
+// Read the clipboard. A hidden textarea + execCommand("paste") is the
+// reliable path from a content script (needs the "clipboardRead" permission
+// in the manifest); navigator.clipboard.readText() is the fallback on
+// secure pages. The caller treats the result as a URL — background
+// normalizeUrl turns bare hostnames into https.
+function pasteClipboard() {
+  let text = "";
+  try {
+    ui.withHiddenTextarea((ta) => {
+      if (document.execCommand("paste")) text = ta.value.trim();
+    });
+  } catch {}
+  if (text) return Promise.resolve(text);
+  try {
+    return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
+  } catch {
+    return Promise.resolve("");
   }
+}
 
-  // Read the clipboard. A hidden textarea + execCommand("paste") is the
-  // reliable path from a content script (needs the "clipboardRead" permission
-  // in the manifest); navigator.clipboard.readText() is the fallback on
-  // secure pages. The caller treats the result as a URL — background
-  // normalizeUrl turns bare hostnames into https.
-  function pasteClipboard() {
-    let text = "";
-    try {
-      Jari.ui.withHiddenTextarea((ta) => {
-        if (document.execCommand("paste")) text = ta.value.trim();
-      });
-    } catch {}
-    if (text) return Promise.resolve(text);
-    try {
-      return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
-    } catch {
-      return Promise.resolve("");
-    }
-  }
+export const commands = {
+  // Scrolling
+  scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
+  scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
+  scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
+  scrollRight: { ...COMMAND_CATALOG.scrollRight, run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }) },
+  scrollTop: {
+    ...COMMAND_CATALOG.scrollTop,
+    run: () => {
+      const el = getScrollElement();
+      if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
+      else el.scrollTo({ top: 0, behavior: "auto" });
+    },
+  },
+  scrollBottom: {
+    ...COMMAND_CATALOG.scrollBottom,
+    run: () => {
+      const el = getScrollElement();
+      const target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
+      if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target - scrollPosOf(el).y);
+      else el.scrollTo({ top: target, behavior: "auto" });
+    },
+  },
+  scrollPageDown: {
+    ...COMMAND_CATALOG.scrollPageDown,
+    run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count }),
+  },
+  scrollPageUp: {
+    ...COMMAND_CATALOG.scrollPageUp,
+    run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count }),
+  },
+  scrollHalfPageDown: {
+    ...COMMAND_CATALOG.scrollHalfPageDown,
+    run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
+  },
+  scrollHalfPageUp: {
+    ...COMMAND_CATALOG.scrollHalfPageUp,
+    run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
+  },
+  cycleScrollArea: { ...COMMAND_CATALOG.cycleScrollArea, run: () => Scroll.cycle() },
+  resetScrollArea: { ...COMMAND_CATALOG.resetScrollArea, run: () => Scroll.resetToGlobal() },
+  showScrollArea: { ...COMMAND_CATALOG.showScrollArea, run: () => Scroll.showHighlight() },
+  zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
+  zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
 
-  const commands = {
-    // Scrolling
-    scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true, run: (c) => scrollBy({ y: Jari.settings.getScrollStep(), count: c.count }) },
-    scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true, run: (c) => scrollBy({ y: -Jari.settings.getScrollStep(), count: c.count }) },
-    scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true, run: (c) => scrollBy({ x: -Jari.settings.getScrollStep(), count: c.count }) },
-    scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true, run: (c) => scrollBy({ x: Jari.settings.getScrollStep(), count: c.count }) },
-    scrollTop: {
-      category: "scrolling",
-      label: "Scroll to top",
-      run: () => {
-        const el = getScrollElement();
-        if (Jari.settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
-        else el.scrollTo({ top: 0, behavior: "auto" });
-      },
+  // Tabs
+  newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
+  closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
+  restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
+  pasteOpen: {
+    ...COMMAND_CATALOG.pasteOpen,
+    run: async () => {
+      const text = await pasteClipboard();
+      if (!text) return ui.toast("Clipboard empty");
+      const res = await sendMessage("navigate", { url: text });
+      if (res && !res.ok) ui.toast("Not a URL");
     },
-    scrollBottom: {
-      category: "scrolling",
-      label: "Scroll to bottom",
-      run: () => {
-        const el = getScrollElement();
-        const target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
-        if (Jari.settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target - scrollPosOf(el).y);
-        else el.scrollTo({ top: target, behavior: "auto" });
-      },
+  },
+  pasteOpenBackground: {
+    ...COMMAND_CATALOG.pasteOpenBackground,
+    run: async () => {
+      const text = await pasteClipboard();
+      if (!text) return ui.toast("Clipboard empty");
+      const res = await sendMessage("openInBackgroundTab", { url: text });
+      if (res && !res.ok) ui.toast("Not a URL");
     },
-    scrollPageDown: {
-      category: "scrolling",
-      label: "Scroll page down",
-      repeatable: true,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count }),
+  },
+  previousTab: { ...COMMAND_CATALOG.previousTab, run: (c) => sendMessage("previousTab", { count: c.count }) },
+  nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
+  firstTab: { ...COMMAND_CATALOG.firstTab, run: () => sendMessage("firstTab") },
+  lastTab: { ...COMMAND_CATALOG.lastTab, run: () => sendMessage("lastTab") },
+  splitTab: { ...COMMAND_CATALOG.splitTab, run: () => sendMessage("splitTab") },
+  splitOrMergeTab: {
+    ...COMMAND_CATALOG.splitOrMergeTab,
+    run: async () => {
+      const res = await sendMessage("splitOrMerge");
+      if (res && res.needMerge) Prompt.openMerge(res);
     },
-    scrollPageUp: {
-      category: "scrolling",
-      label: "Scroll page up",
-      repeatable: true,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count }),
+  },
+  moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
+  moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
+  duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
+  togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
+  toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
+  tabSearch: { ...COMMAND_CATALOG.tabSearch, run: () => Prompt.open() },
+  omnibar: { ...COMMAND_CATALOG.omnibar, run: () => Prompt.openOmnibar() },
+  reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
+  hardReload: { ...COMMAND_CATALOG.hardReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
+  goUp: {
+    ...COMMAND_CATALOG.goUp,
+    run: () => {
+      const target = Url.parentUrlOf(location.href);
+      if (Url.isSamePath(target, location.href)) return ui.toast("Already at root");
+      sendMessage("navigate", { url: target });
     },
-    scrollHalfPageDown: {
-      category: "scrolling",
-      label: "Scroll half page down",
-      repeatable: true,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
+  },
+  goToRoot: {
+    ...COMMAND_CATALOG.goToRoot,
+    run: () => {
+      const target = Url.rootUrlOf(location.href);
+      if (Url.isSamePath(target, location.href)) return ui.toast("Already at root");
+      sendMessage("navigate", { url: target });
     },
-    scrollHalfPageUp: {
-      category: "scrolling",
-      label: "Scroll half page up",
-      repeatable: true,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
-    },
-    cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas", run: () => Jari.Scroll.cycle() },
-    resetScrollArea: { category: "scrolling", label: "Reset to page scroll", run: () => Jari.Scroll.resetToGlobal() },
-    showScrollArea: { category: "scrolling", label: "Show scroll area", run: () => Jari.Scroll.showHighlight() },
-    zoomIn: { category: "view", label: "Zoom in", run: () => Jari.sendMessage("zoomBy", { delta: 0.1 }) },
-    zoomOut: { category: "view", label: "Zoom out", run: () => Jari.sendMessage("zoomBy", { delta: -0.1 }) },
+  },
+  editUrl: {
+    ...COMMAND_CATALOG.editUrl,
+    run: () => Prompt.openEditUrl(),
+  },
 
-    // Tabs
-    newTab: { category: "tabs", label: "New tab", run: () => Jari.sendMessage("createTab") },
-    closeTab: { category: "tabs", label: "Close tab", repeatable: true, run: (c) => Jari.sendMessage("closeTab", { count: c.count }) },
-    restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true, run: (c) => Jari.sendMessage("restoreTab", { count: c.count }) },
-    pasteOpen: {
-      category: "tabs",
-      label: "Open clipboard URL in current tab",
-      run: async () => {
-        const text = await pasteClipboard();
-        if (!text) return Jari.ui.toast("Clipboard empty");
-        const res = await Jari.sendMessage("navigate", { url: text });
-        if (res && !res.ok) Jari.ui.toast("Not a URL");
-      },
-    },
-    pasteOpenBackground: {
-      category: "tabs",
-      label: "Open clipboard URL in background tab",
-      run: async () => {
-        const text = await pasteClipboard();
-        if (!text) return Jari.ui.toast("Clipboard empty");
-        const res = await Jari.sendMessage("openInBackgroundTab", { url: text });
-        if (res && !res.ok) Jari.ui.toast("Not a URL");
-      },
-    },
-    previousTab: { category: "tabs", label: "Previous tab", repeatable: true, run: (c) => Jari.sendMessage("previousTab", { count: c.count }) },
-    nextTab: { category: "tabs", label: "Next tab", repeatable: true, run: (c) => Jari.sendMessage("nextTab", { count: c.count }) },
-    firstTab: { category: "tabs", label: "Jump to first tab", run: () => Jari.sendMessage("firstTab") },
-    lastTab: { category: "tabs", label: "Jump to last tab", run: () => Jari.sendMessage("lastTab") },
-    splitTab: { category: "tabActions", label: "Move tab to new window", run: () => Jari.sendMessage("splitTab") },
-    splitOrMergeTab: {
-      category: "tabActions",
-      label: "Split tab / merge window",
-      run: async () => {
-        const res = await Jari.sendMessage("splitOrMerge");
-        if (res && res.needMerge) Jari.Prompt.openMerge(res);
-      },
-    },
-    moveTabLeft: { category: "tabActions", label: "Move tab left", run: () => Jari.sendMessage("moveTabLeft") },
-    moveTabRight: { category: "tabActions", label: "Move tab right", run: () => Jari.sendMessage("moveTabRight") },
-    duplicateTab: { category: "tabActions", label: "Duplicate tab", run: () => Jari.sendMessage("duplicateTab") },
-    togglePin: { category: "tabActions", label: "Pin/unpin tab", run: () => Jari.sendMessage("togglePin") },
-    toggleMute: { category: "tabActions", label: "Mute/unmute tab", run: () => Jari.sendMessage("toggleMute") },
-    tabSearch: { category: "tabs", label: "Tab search", run: () => Jari.Prompt.open() },
-    omnibar: { category: "tabs", label: "Open URL or search", run: () => Jari.Prompt.openOmnibar() },
-    reloadTab: { category: "page", label: "Reload", run: () => Jari.sendMessage("reloadTab", { bypassCache: false }) },
-    hardReload: { category: "page", label: "Reload (bypass cache)", run: () => Jari.sendMessage("reloadTab", { bypassCache: true }) },
-    goUp: {
-      category: "page",
-      label: "Go to parent path",
-      run: () => {
-        const target = Jari.Url.parentUrlOf(location.href);
-        if (Jari.Url.isSamePath(target, location.href)) return Jari.ui.toast("Already at root");
-        Jari.sendMessage("navigate", { url: target });
-      },
-    },
-    goToRoot: {
-      category: "page",
-      label: "Go to site root",
-      run: () => {
-        const target = Jari.Url.rootUrlOf(location.href);
-        if (Jari.Url.isSamePath(target, location.href)) return Jari.ui.toast("Already at root");
-        Jari.sendMessage("navigate", { url: target });
-      },
-    },
-    editUrl: {
-      category: "page",
-      label: "Edit current URL",
-      run: () => Jari.Prompt.openEditUrl(),
-    },
+  // Hints
+  linkHints: { ...COMMAND_CATALOG.linkHints, run: () => Hints.start("click") },
+  linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
+  linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
+  focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
 
-    // Hints
-    linkHints: { category: "hints", label: "Link hints", run: () => Jari.Hints.start("click") },
-    linkHintsNewTab: { category: "hints", label: "Link hints (new tab)", run: () => Jari.Hints.start("newtab") },
-    linkHintsYank: { category: "hints", label: "Copy link URL", run: () => Jari.Hints.start("yank") },
-    focusInput: { category: "hints", label: "Focus input", run: () => Jari.Hints.start("focus") },
+  // Page navigation
+  historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
+  historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
 
-    // Page navigation
-    historyBack: { category: "history", label: "Go back in history", run: () => Jari.sendMessage("historyBack") },
-    historyForward: { category: "history", label: "Go forward in history", run: () => Jari.sendMessage("historyForward") },
+  // Clipboard
+  copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
+  copyTitleUrl: { ...COMMAND_CATALOG.copyTitleUrl, run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
 
-    // Clipboard
-    copyUrl: { category: "clipboard", label: "Copy URL", run: () => copyToClipboard(location.href, "Copied") },
-    copyTitleUrl: { category: "clipboard", label: "Copy title + URL", run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
+  // Site-level control
+  toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
+  passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
+  toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
 
-    // Site-level control
-    toggleIgnore: { category: "modes", label: "Ignore mode", run: () => Jari.Ignore.toggle() },
-    passthrough: { category: "modes", label: "Passthrough keys (timed)", run: () => Jari.Passthrough.enter() },
-    toggleDisabled: { category: "modes", label: "Enable/disable on this site", run: () => Jari.settings.toggleDisabled() },
-
-    // Help & settings
-    showHelp: { category: "help", label: "Show keybindings", run: () => Jari.Help.open() },
-    openOptions: { category: "help", label: "Open settings", run: () => Jari.sendMessage("openOptions") },
-  };
-
-  Jari.commands = commands;
-})();
+  // Help & settings
+  showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
+  openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
+};

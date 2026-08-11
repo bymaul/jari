@@ -1,0 +1,78 @@
+// Jari: command metadata shared by the command registry (commands.js) and the
+// help overlay (help.js). Pure data — no imports — so either consumer can
+// resolve a command name to its category and label without a registry cycle.
+// commands.js pairs each entry with a `run` implementation; help.js reads
+// only the display fields.
+
+export const COMMAND_CATALOG = {
+  // Scrolling
+  scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
+  scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
+  scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
+  scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
+  scrollTop: { category: "scrolling", label: "Scroll to top" },
+  scrollBottom: { category: "scrolling", label: "Scroll to bottom" },
+  scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
+  scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
+  scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
+  scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
+  cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas" },
+  resetScrollArea: { category: "scrolling", label: "Reset to page scroll" },
+  showScrollArea: { category: "scrolling", label: "Show scroll area" },
+
+  // View & zoom
+  zoomIn: { category: "view", label: "Zoom in" },
+  zoomOut: { category: "view", label: "Zoom out" },
+
+  // Tabs
+  newTab: { category: "tabs", label: "New tab" },
+  closeTab: { category: "tabs", label: "Close tab", repeatable: true },
+  restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
+  pasteOpen: { category: "tabs", label: "Open clipboard URL in current tab" },
+  pasteOpenBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
+  previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
+  nextTab: { category: "tabs", label: "Next tab", repeatable: true },
+  firstTab: { category: "tabs", label: "Jump to first tab" },
+  lastTab: { category: "tabs", label: "Jump to last tab" },
+  tabSearch: { category: "tabs", label: "Tab search" },
+  omnibar: { category: "tabs", label: "Open URL or search" },
+
+  // Tab actions
+  splitTab: { category: "tabActions", label: "Move tab to new window" },
+  splitOrMergeTab: { category: "tabActions", label: "Split tab / merge window" },
+  moveTabLeft: { category: "tabActions", label: "Move tab left" },
+  moveTabRight: { category: "tabActions", label: "Move tab right" },
+  duplicateTab: { category: "tabActions", label: "Duplicate tab" },
+  togglePin: { category: "tabActions", label: "Pin/unpin tab" },
+  toggleMute: { category: "tabActions", label: "Mute/unmute tab" },
+
+  // History
+  historyBack: { category: "history", label: "Go back in history" },
+  historyForward: { category: "history", label: "Go forward in history" },
+
+  // Hints
+  linkHints: { category: "hints", label: "Link hints" },
+  linkHintsNewTab: { category: "hints", label: "Link hints (new tab)" },
+  linkHintsYank: { category: "hints", label: "Copy link URL" },
+  focusInput: { category: "hints", label: "Focus input" },
+
+  // Page
+  reloadTab: { category: "page", label: "Reload" },
+  hardReload: { category: "page", label: "Reload (bypass cache)" },
+  goUp: { category: "page", label: "Go to parent path" },
+  goToRoot: { category: "page", label: "Go to site root" },
+  editUrl: { category: "page", label: "Edit current URL" },
+
+  // Clipboard
+  copyUrl: { category: "clipboard", label: "Copy URL" },
+  copyTitleUrl: { category: "clipboard", label: "Copy title + URL" },
+
+  // Modes
+  toggleIgnore: { category: "modes", label: "Ignore mode" },
+  passthrough: { category: "modes", label: "Passthrough keys (timed)" },
+  toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
+
+  // Help & settings
+  showHelp: { category: "help", label: "Show keybindings" },
+  openOptions: { category: "help", label: "Open settings" },
+};
