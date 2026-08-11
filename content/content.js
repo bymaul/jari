@@ -320,6 +320,6 @@ async function boot() {
   document.addEventListener('fullscreenchange', handleFullscreenChange);
 }
 
-setModeActions({ ignore: { toggle: toggleIgnore }, passthrough: { enter: enterPassthrough } });
+setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
 
 boot();
