@@ -204,8 +204,10 @@
     }
 
     // Form fields: pass everything through except Escape (blur) and the
-    // site-toggle shortcut.
-    const activeEl = document.activeElement;
+    // site-toggle shortcut. Focus may sit inside an open shadow root (Gmail,
+    // Notion, Docs editors), where document.activeElement only reports the
+    // host — walk into it so typing in those fields still passes through.
+    const activeEl = Jari.deepActiveElement();
     if (isTypingTarget(activeEl)) {
       if (commandName === 'toggleDisabled') run(commandName, 1, event);
       else if (event.key === 'Escape') {

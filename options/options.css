@@ -97,41 +97,40 @@ code {
   color: var(--fg);
 }
 
-/* Behavior fields: label on the left, hint stacked UNDER the input. */
-#behavior-fields {
+/* Settings rows: each setting carries the label and a one-line hint on the
+   left, the control right-aligned on the same line. */
+.setting {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.field {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  flex: 1 1 300px;
-  min-height: 30px;
+.setting:last-child {
+  border-bottom: none;
 }
 
-.field label {
-  flex: 0 0 110px;
-  padding-top: 3px;
-}
-
-.control {
+.setting-text {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  min-width: 0;
 }
 
-.control-row {
+.setting-text label {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.setting-control {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.control input[type='number'] {
+.setting-control input[type='number'] {
+  width: 90px;
   padding: 3px 6px;
   background: #1e1e26;
   border: 1px solid var(--border);
@@ -140,16 +139,58 @@ code {
   font-size: 12px;
 }
 
-.control input[type='number']:focus {
+.setting-control input[type='number']:focus {
   border-color: var(--fg);
   outline: none;
 }
 
-.control input[type='checkbox'] {
+.setting-control input[type='checkbox'] {
   width: 14px;
   height: 14px;
   margin: 0;
   accent-color: var(--link);
+}
+
+.setting-control select {
+  padding: 3px 6px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.setting-control select:focus {
+  border-color: var(--fg);
+  outline: none;
+}
+
+.setting-control input[type='text'] {
+  width: 180px;
+  padding: 3px 6px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.setting-control input[type='text']:focus {
+  border-color: var(--fg);
+  outline: none;
+}
+
+/* Checkbox list (omnibar suggestion sources): a row of labeled toggles. */
+.setting-sources {
+  gap: 12px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .unit {

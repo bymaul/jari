@@ -19,62 +19,106 @@
 
     <main>
       <section class="card">
-        <h2>Behavior</h2>
-        <div id="behavior-fields">
-          <div class="field">
+        <h2>Scrolling</h2>
+        <div class="setting">
+          <div class="setting-text">
             <label for="scroll-step">Scroll step</label>
-            <div class="control">
-              <div class="control-row">
-                <input id="scroll-step" type="number" min="1" max="500" step="5" />
-                <span class="unit">px</span>
-              </div>
-              <p class="hint">
-                Distance covered by one <code>j</code>/<code>k</code> or <code>h</code>/<code>l</code> press.
-              </p>
-            </div>
+            <p class="hint">
+              Distance per <code data-key="scrollDown"></code>/<code data-key="scrollUp"></code>/<code data-key="scrollLeft"></code>/<code data-key="scrollRight"></code> press.
+            </p>
           </div>
-          <div class="field">
+          <div class="setting-control">
+            <input id="scroll-step" type="number" min="1" max="500" step="5" />
+            <span class="unit">px</span>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
             <label for="smooth-scroll">Smooth scroll</label>
-            <div class="control">
-              <input id="smooth-scroll" type="checkbox" />
-              <p class="hint">Animate scrolling instead of jumping straight to the position.</p>
-            </div>
+            <p class="hint">Animate scrolling instead of jumping.</p>
           </div>
-          <div class="field">
+          <div class="setting-control">
+            <input id="smooth-scroll" type="checkbox" />
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Search</h2>
+        <div class="setting">
+          <div class="setting-text">
             <label for="fuzzy-matching">Fuzzy matching</label>
-            <div class="control">
-              <input id="fuzzy-matching" type="checkbox" />
-              <p class="hint">
-                Match the prompt lists by character subsequence (<code>ytb</code> finds
-                <code>YouTube</code>) and rank the best matches first. Off only shows literal
-                substring matches and keeps the original order.
-              </p>
-            </div>
+            <p class="hint">Subsequence match — <code>ytb</code> finds <code>YouTube</code>.</p>
           </div>
-          <div class="field">
-            <label for="timeout">Timeout</label>
-            <div class="control">
-              <div class="control-row">
-                <input id="timeout" type="number" min="100" max="10000" step="100" />
-                <span class="unit">ms</span>
-              </div>
-              <p class="hint">
-                How long a half-typed <code>g</code> prefix or count waits before clearing.
-              </p>
-            </div>
+          <div class="setting-control">
+            <input id="fuzzy-matching" type="checkbox" />
           </div>
-          <div class="field">
-            <label for="passthrough-timeout">Passthrough timeout</label>
-            <div class="control">
-              <div class="control-row">
-                <input id="passthrough-timeout" type="number" min="100" max="30000" step="100" />
-                <span class="unit">ms</span>
-              </div>
-              <p class="hint">
-                How long <code>o</code> passes keys to the page before Jari takes over again. Escape
-                exits sooner.
-              </p>
-            </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label>Suggestions</label>
+            <p class="hint">Sources shown under the typed query in <code data-key="omnibar"></code>.</p>
+          </div>
+          <div class="setting-control setting-sources">
+            <label class="check"><input id="source-tab" type="checkbox" /> Tabs</label>
+            <label class="check"><input id="source-history" type="checkbox" /> History</label>
+            <label class="check"><input id="source-bookmark" type="checkbox" /> Bookmarks</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Hints</h2>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="hint-chars">Hint characters</label>
+            <p class="hint">
+              Used for <code data-key="linkHints"></code>/<code data-key="linkHintsNewTab"></code>/<code data-key="linkHintsYank"></code>
+              labels. Any run of unique characters works.
+            </p>
+          </div>
+          <div class="setting-control">
+            <input id="hint-chars" type="text" />
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Clipboard</h2>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="copy-format">Copy title + URL as</label>
+            <p class="hint">Format for the <code data-key="copyTitleUrl"></code> command.</p>
+          </div>
+          <div class="setting-control">
+            <select id="copy-format">
+              <option value="plain">Plain (title + URL)</option>
+              <option value="markdown">Markdown link</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Timing</h2>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="timeout">Sequence timeout</label>
+            <p class="hint">How long a half-typed <code>g</code> prefix or count waits.</p>
+          </div>
+          <div class="setting-control">
+            <input id="timeout" type="number" min="100" max="10000" step="100" />
+            <span class="unit">ms</span>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="passthrough-timeout">Passthrough duration</label>
+            <p class="hint">How long <code data-key="passthrough"></code> lets the page have the keys.</p>
+          </div>
+          <div class="setting-control">
+            <input id="passthrough-timeout" type="number" min="100" max="30000" step="100" />
+            <span class="unit">ms</span>
           </div>
         </div>
       </section>
@@ -101,7 +145,7 @@
         <h2>Disabled sites</h2>
         <p class="hint">
           Jari is turned off on these sites. Press
-          <code>ctrl+alt+v</code> on a page to toggle it there, or add a host here.
+          <code data-key="toggleDisabled"></code> on a page to toggle it there, or add a host here.
         </p>
         <div class="add-site">
           <input id="disabled-site-input" type="text" placeholder="example.com" />
@@ -113,7 +157,7 @@
 
     <footer>
       <div class="wrap">
-        To open these settings anytime, press <code>; e</code> on any page (or find Jari under
+        To open these settings anytime, press <code data-key="openOptions"></code> on any page (or find Jari under
         <code>chrome://extensions</code>).
       </div>
     </footer>

@@ -22,20 +22,37 @@
   // scroll area nearest the viewport. Without this, scrolling stays dead
   // until the user presses gs/w. The decision is made once and cached:
   // a picked area lives in `target`, a negative outcome in `resolved`.
+  //
+  // An auto-picked area is provisional: the DOM mutates as a page loads, and
+  // the best target can change (Instagram's profile column appears only once
+  // the feed renders; until then the sidebar menu is the only scroller). The
+  // mutation observer clears `resolved` on any DOM change, so an auto-picked
+  // target is re-evaluated on the next lookup. Targets the user picks
+  // explicitly (gs/gS/w) are not — they chose it.
   let resolved = false;
+  let autoPicked = false;
 
   function getTarget() {
     if (target !== null && !target.isConnected) {
       // A page change removed the element since it was picked — fall back to
       // the window and re-resolve on the next call.
       target = null;
+      autoPicked = false;
       resolved = false;
+    }
+    if (target !== null && autoPicked && !resolved) {
+      // The DOM changed after an auto-pick; re-resolve so a newly loaded
+      // content column can take over from an early sidebar/menu pick.
+      target = null;
     }
     if (target === null && !resolved) {
       resolved = true;
       if (!pageCanScroll()) {
         const areas = findScrollableElements();
-        if (areas.length > 0) target = nearestArea(areas) || areas[0];
+        if (areas.length > 0) {
+          target = nearestArea(areas) || areas[0];
+          autoPicked = true;
+        }
       }
     }
     return target === null ? window : target;
@@ -55,6 +72,27 @@
   let cachedEpoch = -1;
   let cachedAreas = null;
 
+  // The document observer only sees the light DOM — mutations inside a
+  // shadow root do not bubble into the host's document tree. Any open shadow
+  // root discovered during a scan gets its own observer so the epoch cache
+  // invalidates when scrollability changes inside a shadow subtree too.
+  const observedRoots = new Set();
+
+  function ensureObserved(root) {
+    if (observedRoots.has(root)) return;
+    observedRoots.add(root);
+    if (typeof window.MutationObserver === 'undefined') return;
+    new window.MutationObserver(() => {
+      scanEpoch++;
+      resolved = false;
+    }).observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+  }
+
   if (typeof window.MutationObserver !== 'undefined') {
     new window.MutationObserver(() => {
       scanEpoch++;
@@ -71,6 +109,26 @@
     });
   }
 
+  // A scrollable pane that is hidden from view (display:none, visibility:
+  // hidden, opacity:0, or a "hidden" attribute on itself or an ancestor) must
+  // not become a "gs" stop — the wheel would move an invisible surface.
+  // Crosses shadow boundaries to the host, mirroring hints.isVisible but
+  // without the viewport test: an off-screen but real pane is still a valid
+  // scroll target.
+  function isScrollVisible(el) {
+    let node = el;
+    while (node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.hasAttribute('hidden')) return false;
+        const style = window.getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        if (parseFloat(style.opacity) === 0) return false;
+      }
+      node = node.getRootNode().host || node.parentElement;
+    }
+    return true;
+  }
+
   // Elements that can actually scroll in either axis: overflow allows it and
   // the content overflows the box. Form fields (textarea/select/input) are
   // their own scrollable widgets, not page scroll areas, so they are skipped.
@@ -81,12 +139,15 @@
     cachedEpoch = scanEpoch;
     const areas = [];
     const roots = new Set([document.documentElement, document.body]);
-    for (const el of document.querySelectorAll('*')) {
+    // queryAll walks open shadow roots too, and attaches observers to each
+    // root it finds (see ensureObserved).
+    for (const el of Jari.queryAll('*', ensureObserved)) {
       if (roots.has(el)) continue;
       if (el.closest(Jari.overlaySelectors)) continue;
       const tag = el.tagName;
       if (tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'INPUT') continue;
       if (el.clientHeight < 16 && el.clientWidth < 16) continue;
+      if (!isScrollVisible(el)) continue;
       const canY = el.scrollHeight > el.clientHeight + 1;
       const canX = el.scrollWidth > el.clientWidth + 1;
       if (!canY && !canX) continue;
@@ -121,19 +182,27 @@
     return true;
   }
 
-  // Nearest scroll area to the viewport center — used to pick the starting
-  // point on pages without global scroll, so cycling begins where the user
-  // is looking instead of at the first match in document order.
+  // Picks the initial scroll target on pages without global scroll (a fixed
+  // app shell). Prefer the area that covers the most viewport, with a bonus
+  // for containing the viewport center — the main content scroller wins over
+  // a sidebar menu or suggestion panel even when that panel is closer to the
+  // center.
   function nearestArea(areas) {
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const cx = vw / 2;
+    const cy = vh / 2;
     let best = null;
-    let bestDist = Infinity;
+    let bestScore = -Infinity;
     for (const el of areas) {
       const r = el.getBoundingClientRect();
-      const d = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
-      if (d < bestDist) {
-        bestDist = d;
+      const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
+      const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      const coverage = (coveredW * coveredH) / (vw * vh);
+      const containsCenter = r.left <= cx && cx <= r.right && r.top <= cy && cy <= r.bottom;
+      const score = coverage + (containsCenter ? 1 : 0);
+      if (score > bestScore) {
+        bestScore = score;
         best = el;
       }
     }
@@ -167,6 +236,7 @@
     } else {
       target = stops[(idx + 1) % stops.length];
     }
+    autoPicked = false;
     showHighlight();
   }
 
@@ -184,6 +254,7 @@
       }
       target = nearestArea(areas) || areas[0];
     }
+    autoPicked = false;
     showHighlight();
   }
 
@@ -202,6 +273,7 @@
       const areas = findScrollableElements();
       if (areas.length === 0) return;
       target = nearestArea(areas) || areas[0];
+      autoPicked = false;
       area = target;
     }
     const rect =

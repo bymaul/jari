@@ -37,6 +37,19 @@ export default [
     },
   },
   {
+    // The benchmark scripts run under Node.
+    files: ["benchmarks/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: {
+        require: "readonly",
+        __dirname: "readonly",
+        process: "readonly",
+        console: "readonly",
+      },
+    },
+  },
+  {
     files: ["**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
@@ -53,6 +66,8 @@ export default [
         requestAnimationFrame: "readonly",
         URL: "readonly",
         Promise: "readonly",
+        PointerEvent: "readonly",
+        MouseEvent: "readonly",
       },
     },
     rules: {

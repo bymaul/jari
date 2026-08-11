@@ -106,6 +106,14 @@
     Jari.ui.toast(message);
   }
 
+  // Title + URL, formatted per the copyFormat setting: plain ("Title\nURL")
+  // or a markdown link ("[Title](URL)").
+  function copyTitleUrlText() {
+    return Jari.settings.getCopyFormat() === "markdown"
+      ? `[${document.title}](${location.href})`
+      : `${document.title}\n${location.href}`;
+  }
+
   // Read the clipboard. A hidden textarea + execCommand("paste") is the
   // reliable path from a content script (needs the "clipboardRead" permission
   // in the manifest); navigator.clipboard.readText() is the fallback on
@@ -263,7 +271,7 @@
 
     // Clipboard
     copyUrl: { category: "clipboard", label: "Copy URL", run: () => copyToClipboard(location.href, "Copied") },
-    copyTitleUrl: { category: "clipboard", label: "Copy title + URL", run: () => copyToClipboard(`${document.title}\n${location.href}`, "Copied") },
+    copyTitleUrl: { category: "clipboard", label: "Copy title + URL", run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
 
     // Site-level control
     toggleIgnore: { category: "modes", label: "Ignore mode", run: () => Jari.Ignore.toggle() },

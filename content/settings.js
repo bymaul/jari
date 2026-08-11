@@ -15,6 +15,9 @@
     fuzzyMatching: Jari.settingsDefaults.fuzzyMatching,
     timeoutMs: Jari.settingsDefaults.timeoutMs,
     passthroughMs: Jari.settingsDefaults.passthroughMs,
+    hintChars: Jari.settingsDefaults.hintChars,
+    suggestionSources: Jari.settingsDefaults.suggestionSources.slice(),
+    copyFormat: Jari.settingsDefaults.copyFormat,
   };
 
   function merge(data) {
@@ -26,6 +29,9 @@
     state.fuzzyMatching = s.fuzzyMatching;
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
+    state.hintChars = s.hintChars;
+    state.suggestionSources = s.suggestionSources;
+    state.copyFormat = s.copyFormat;
   }
 
   async function load() {
@@ -47,6 +53,9 @@
         fuzzyMatching: state.fuzzyMatching,
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
+        hintChars: state.hintChars,
+        suggestionSources: state.suggestionSources,
+        copyFormat: state.copyFormat,
       },
     });
   }
@@ -96,6 +105,18 @@
     return state.passthroughMs;
   }
 
+  function getHintChars() {
+    return state.hintChars;
+  }
+
+  function getSuggestionSources() {
+    return state.suggestionSources;
+  }
+
+  function getCopyFormat() {
+    return state.copyFormat;
+  }
+
   function toggleDisabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -121,6 +142,9 @@
     isFuzzyMatching,
     getTimeoutMs,
     getPassthroughMs,
+    getHintChars,
+    getSuggestionSources,
+    getCopyFormat,
     toggleDisabled,
   };
 })();

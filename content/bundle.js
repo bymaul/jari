@@ -46,7 +46,7 @@
     '>>': 'moveTabRight',
 
     // Window: split this tab into its own window; again, merge back.
-    W: 'splitOrMergeTab',
+    gw: 'splitOrMergeTab',
 
     // History
     S: 'historyBack',
@@ -126,7 +126,20 @@
     // "o" passthrough duration: how long keys reach the page before Jari
     // takes over again (Escape exits sooner).
     passthroughMs: 3000,
+    // Characters used to build link-hint labels ("f"/"F"/"yf"). The default
+    // is a home-row set to reduce finger travel; any run of unique characters
+    // works.
+    hintChars: 'sadfjklewcmpgh',
+    // Which sources feed the omnibar suggestions. Empty means suggestions are
+    // off and only the typed query row is shown.
+    suggestionSources: ['tab', 'history', 'bookmark'],
+    // Copy format for the title+URL command: plain ("Title\nURL") or markdown
+    // ("[Title](URL)").
+    copyFormat: 'plain',
   };
+
+  // Known omnibar suggestion sources, used to validate the stored value.
+  Jari.suggestionSources = ['tab', 'history', 'bookmark'];
 
   // Prefix keys ("g", ";", "y") must never double as single-key bindings —
   // the dispatcher resolves a prefix before the single-key keymap, so a lone
@@ -169,6 +182,43 @@
   // them: hints must not label them.
   Jari.overlaySelectors = '.jari-overlay, .jari-hint, .jari-scroll-highlight';
 
+  // --- Shadow DOM helpers --------------------------------------------------
+  // Open shadow roots are reachable by content scripts; closed roots are not
+  // (platform design). These let hints and scroll areas see inside open
+  // roots. keymap.js is the natural home: the options page loads it too and
+  // both content features agree on the traversal.
+
+  // The element that actually has focus, crossing open shadow boundaries.
+  // document.activeElement stops at a shadow host — when the user types in a
+  // shadow-tree input (Gmail, Notion, Docs), the host is reported as active
+  // and Jari would hijack the keys meant for that field.
+  Jari.deepActiveElement = function deepActiveElement() {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    return el;
+  };
+
+  // Every element matching `selector` in the document and inside open shadow
+  // roots. One walk per root, depth-first, recursing into each shadow root
+  // as it is found. onShadowRoot is called with every open root encountered
+  // so callers can observe or instrument them. Returns a fresh array.
+  Jari.queryAll = function queryAll(selector, onShadowRoot) {
+    const out = [];
+    const visit = (root) => {
+      for (const el of root.querySelectorAll('*')) {
+        if (el.matches(selector)) out.push(el);
+        if (el.shadowRoot) {
+          if (onShadowRoot) onShadowRoot(el.shadowRoot);
+          visit(el.shadowRoot);
+        }
+      }
+    };
+    visit(document);
+    return out;
+  };
+
   // URL schemes safe to open/navigate to. The background keeps its own copy
   // (it cannot load the content bundle); keep the two in sync. hints.js uses
   // this to decide whether an <a> href may open in a background tab.
@@ -202,8 +252,22 @@
         Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
           ? d.passthroughMs
           : Jari.settingsDefaults.passthroughMs,
+      hintChars: normalizeHintChars(d.hintChars),
+      suggestionSources: Array.isArray(d.suggestionSources)
+        ? d.suggestionSources.filter((s) => Jari.suggestionSources.includes(s))
+        : Jari.settingsDefaults.suggestionSources.slice(),
+      copyFormat:
+        d.copyFormat === 'markdown' ? 'markdown' : Jari.settingsDefaults.copyFormat,
     };
   };
+
+  // Hint characters: uppercase, deduplicated, must stay long enough to label a
+  // reasonable page. Anything unusable falls back to the default set.
+  function normalizeHintChars(raw) {
+    if (typeof raw !== 'string') return Jari.settingsDefaults.hintChars.toUpperCase();
+    const chars = [...new Set(raw.toUpperCase())].filter((c) => /[A-Z0-9]/.test(c)).join('');
+    return chars.length >= 4 ? chars : Jari.settingsDefaults.hintChars.toUpperCase();
+  }
 
   // URL helpers shared by the page-navigation commands ("gu"/"gU") and the
   // omnibar's URL-vs-search guess.
@@ -384,6 +448,9 @@
     fuzzyMatching: Jari.settingsDefaults.fuzzyMatching,
     timeoutMs: Jari.settingsDefaults.timeoutMs,
     passthroughMs: Jari.settingsDefaults.passthroughMs,
+    hintChars: Jari.settingsDefaults.hintChars,
+    suggestionSources: Jari.settingsDefaults.suggestionSources.slice(),
+    copyFormat: Jari.settingsDefaults.copyFormat,
   };
 
   function merge(data) {
@@ -395,6 +462,9 @@
     state.fuzzyMatching = s.fuzzyMatching;
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
+    state.hintChars = s.hintChars;
+    state.suggestionSources = s.suggestionSources;
+    state.copyFormat = s.copyFormat;
   }
 
   async function load() {
@@ -416,6 +486,9 @@
         fuzzyMatching: state.fuzzyMatching,
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
+        hintChars: state.hintChars,
+        suggestionSources: state.suggestionSources,
+        copyFormat: state.copyFormat,
       },
     });
   }
@@ -465,6 +538,18 @@
     return state.passthroughMs;
   }
 
+  function getHintChars() {
+    return state.hintChars;
+  }
+
+  function getSuggestionSources() {
+    return state.suggestionSources;
+  }
+
+  function getCopyFormat() {
+    return state.copyFormat;
+  }
+
   function toggleDisabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -490,6 +575,9 @@
     isFuzzyMatching,
     getTimeoutMs,
     getPassthroughMs,
+    getHintChars,
+    getSuggestionSources,
+    getCopyFormat,
     toggleDisabled,
   };
 })();
@@ -744,6 +832,14 @@
     Jari.ui.toast(message);
   }
 
+  // Title + URL, formatted per the copyFormat setting: plain ("Title\nURL")
+  // or a markdown link ("[Title](URL)").
+  function copyTitleUrlText() {
+    return Jari.settings.getCopyFormat() === "markdown"
+      ? `[${document.title}](${location.href})`
+      : `${document.title}\n${location.href}`;
+  }
+
   // Read the clipboard. A hidden textarea + execCommand("paste") is the
   // reliable path from a content script (needs the "clipboardRead" permission
   // in the manifest); navigator.clipboard.readText() is the fallback on
@@ -901,7 +997,7 @@
 
     // Clipboard
     copyUrl: { category: "clipboard", label: "Copy URL", run: () => copyToClipboard(location.href, "Copied") },
-    copyTitleUrl: { category: "clipboard", label: "Copy title + URL", run: () => copyToClipboard(`${document.title}\n${location.href}`, "Copied") },
+    copyTitleUrl: { category: "clipboard", label: "Copy title + URL", run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
 
     // Site-level control
     toggleIgnore: { category: "modes", label: "Ignore mode", run: () => Jari.Ignore.toggle() },
@@ -941,20 +1037,37 @@
   // scroll area nearest the viewport. Without this, scrolling stays dead
   // until the user presses gs/w. The decision is made once and cached:
   // a picked area lives in `target`, a negative outcome in `resolved`.
+  //
+  // An auto-picked area is provisional: the DOM mutates as a page loads, and
+  // the best target can change (Instagram's profile column appears only once
+  // the feed renders; until then the sidebar menu is the only scroller). The
+  // mutation observer clears `resolved` on any DOM change, so an auto-picked
+  // target is re-evaluated on the next lookup. Targets the user picks
+  // explicitly (gs/gS/w) are not — they chose it.
   let resolved = false;
+  let autoPicked = false;
 
   function getTarget() {
     if (target !== null && !target.isConnected) {
       // A page change removed the element since it was picked — fall back to
       // the window and re-resolve on the next call.
       target = null;
+      autoPicked = false;
       resolved = false;
+    }
+    if (target !== null && autoPicked && !resolved) {
+      // The DOM changed after an auto-pick; re-resolve so a newly loaded
+      // content column can take over from an early sidebar/menu pick.
+      target = null;
     }
     if (target === null && !resolved) {
       resolved = true;
       if (!pageCanScroll()) {
         const areas = findScrollableElements();
-        if (areas.length > 0) target = nearestArea(areas) || areas[0];
+        if (areas.length > 0) {
+          target = nearestArea(areas) || areas[0];
+          autoPicked = true;
+        }
       }
     }
     return target === null ? window : target;
@@ -974,6 +1087,27 @@
   let cachedEpoch = -1;
   let cachedAreas = null;
 
+  // The document observer only sees the light DOM — mutations inside a
+  // shadow root do not bubble into the host's document tree. Any open shadow
+  // root discovered during a scan gets its own observer so the epoch cache
+  // invalidates when scrollability changes inside a shadow subtree too.
+  const observedRoots = new Set();
+
+  function ensureObserved(root) {
+    if (observedRoots.has(root)) return;
+    observedRoots.add(root);
+    if (typeof window.MutationObserver === 'undefined') return;
+    new window.MutationObserver(() => {
+      scanEpoch++;
+      resolved = false;
+    }).observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+  }
+
   if (typeof window.MutationObserver !== 'undefined') {
     new window.MutationObserver(() => {
       scanEpoch++;
@@ -990,6 +1124,26 @@
     });
   }
 
+  // A scrollable pane that is hidden from view (display:none, visibility:
+  // hidden, opacity:0, or a "hidden" attribute on itself or an ancestor) must
+  // not become a "gs" stop — the wheel would move an invisible surface.
+  // Crosses shadow boundaries to the host, mirroring hints.isVisible but
+  // without the viewport test: an off-screen but real pane is still a valid
+  // scroll target.
+  function isScrollVisible(el) {
+    let node = el;
+    while (node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.hasAttribute('hidden')) return false;
+        const style = window.getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        if (parseFloat(style.opacity) === 0) return false;
+      }
+      node = node.getRootNode().host || node.parentElement;
+    }
+    return true;
+  }
+
   // Elements that can actually scroll in either axis: overflow allows it and
   // the content overflows the box. Form fields (textarea/select/input) are
   // their own scrollable widgets, not page scroll areas, so they are skipped.
@@ -1000,12 +1154,15 @@
     cachedEpoch = scanEpoch;
     const areas = [];
     const roots = new Set([document.documentElement, document.body]);
-    for (const el of document.querySelectorAll('*')) {
+    // queryAll walks open shadow roots too, and attaches observers to each
+    // root it finds (see ensureObserved).
+    for (const el of Jari.queryAll('*', ensureObserved)) {
       if (roots.has(el)) continue;
       if (el.closest(Jari.overlaySelectors)) continue;
       const tag = el.tagName;
       if (tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'INPUT') continue;
       if (el.clientHeight < 16 && el.clientWidth < 16) continue;
+      if (!isScrollVisible(el)) continue;
       const canY = el.scrollHeight > el.clientHeight + 1;
       const canX = el.scrollWidth > el.clientWidth + 1;
       if (!canY && !canX) continue;
@@ -1040,19 +1197,27 @@
     return true;
   }
 
-  // Nearest scroll area to the viewport center — used to pick the starting
-  // point on pages without global scroll, so cycling begins where the user
-  // is looking instead of at the first match in document order.
+  // Picks the initial scroll target on pages without global scroll (a fixed
+  // app shell). Prefer the area that covers the most viewport, with a bonus
+  // for containing the viewport center — the main content scroller wins over
+  // a sidebar menu or suggestion panel even when that panel is closer to the
+  // center.
   function nearestArea(areas) {
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const cx = vw / 2;
+    const cy = vh / 2;
     let best = null;
-    let bestDist = Infinity;
+    let bestScore = -Infinity;
     for (const el of areas) {
       const r = el.getBoundingClientRect();
-      const d = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
-      if (d < bestDist) {
-        bestDist = d;
+      const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
+      const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      const coverage = (coveredW * coveredH) / (vw * vh);
+      const containsCenter = r.left <= cx && cx <= r.right && r.top <= cy && cy <= r.bottom;
+      const score = coverage + (containsCenter ? 1 : 0);
+      if (score > bestScore) {
+        bestScore = score;
         best = el;
       }
     }
@@ -1086,6 +1251,7 @@
     } else {
       target = stops[(idx + 1) % stops.length];
     }
+    autoPicked = false;
     showHighlight();
   }
 
@@ -1103,6 +1269,7 @@
       }
       target = nearestArea(areas) || areas[0];
     }
+    autoPicked = false;
     showHighlight();
   }
 
@@ -1121,6 +1288,7 @@
       const areas = findScrollableElements();
       if (areas.length === 0) return;
       target = nearestArea(areas) || areas[0];
+      autoPicked = false;
       area = target;
     }
     const rect =
@@ -1164,8 +1332,6 @@
 //   focus  - focus inputs; auto-focuses when exactly one match exists
 (() => {
   const Jari = window.Jari || (window.Jari = {});
-
-  const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
   // Broad selector of "things you can click". Includes ARIA roles, inline
   // onclick handlers, and form controls; hidden inputs are excluded.
@@ -1217,6 +1383,34 @@
     "[role='spinbutton']",
   ].join(",");
 
+  // True when the element carries a usable link href. "yank"/"newtab" only
+  // hint links — a button without an href has nothing to copy or open.
+  function linkHref(el) {
+    const href = el.href || el.getAttribute?.("href");
+    return typeof href === "string" && href.trim() !== "";
+  }
+
+  // Many sites (Google Docs, Notion, Gmail widgets) act on pointer/mouse
+  // input, often on a shadow host, and ignore a bare el.click(). Dispatch the
+  // full pointer sequence the way a real click does so those components react.
+  // Untrusted events trigger no default action — a text input is not moved or
+  // selected — so callers follow up with el.click() or el.focus() themselves.
+  function firePointerSequence(el) {
+    const rect = el.getBoundingClientRect();
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    };
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
+      const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
+      el.dispatchEvent(new Ctor(type, opts));
+    }
+  }
+
   // Focus a text target with the caret at the end of its content — "i" should
   // drop you at the end of the line, not the start. Inputs/textarea use the
   // selection API; editable elements get a collapsed range at the end.
@@ -1245,29 +1439,54 @@
     }
   }
 
+  // Focus the target of a focus-mode hint. Some editors (ProseMirror,
+  // CodeMirror, Notion blocks) only enter an editable state on pointer input,
+  // so fire a pointer sequence after focusing.
   function focusAndPlaceCaret(el) {
+    const editable = el.querySelector(
+      '[contenteditable="true"], [contenteditable="plaintext-only"], input:not([type="hidden"]), textarea',
+    );
+    if (editable) el = editable;
+
     el.focus();
+    if (el.isConnected) firePointerSequence(el);
+    if (el.isConnected && Jari.deepActiveElement() !== el) el.focus();
     // Place the caret immediately, then again across a window of ticks:
     // Chrome finalizes its focus default selection after the keydown, and
     // page handlers (React, autocomplete) can re-place the caret even later.
     // Each attempt re-verifies the element still owns focus; a fixed shot
     // count stops early so a page that keeps fighting the caret wins in the
     // end rather than Jari re-placing forever.
+    const target = el;
     const shots = [0, 16, 32, 64, 128, 256];
     for (const delay of shots) {
       setTimeout(() => {
-        if (document.activeElement !== el) return;
-        placeCaretAtEnd(el);
+        if (Jari.deepActiveElement() !== target) return;
+        placeCaretAtEnd(target);
       }, delay);
     }
   }
 
+  // click labels everything clickable; newtab and yank only links (a button
+  // without an href has nothing to open or copy).
   const MODES = {
-    click: { selector: CLICKABLE_SELECTOR, activate: (el) => el.click() },
-    newtab: { selector: CLICKABLE_SELECTOR, activate: openInNewTab },
-    yank: { selector: CLICKABLE_SELECTOR, activate: yankLink },
+    click: { selector: CLICKABLE_SELECTOR, activate: activateClick },
+    newtab: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: openInNewTab },
+    yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
     focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
   };
+
+  function activateClick(el) {
+    firePointerSequence(el);
+    el.click();
+  }
+
+  // Hint labels are built from the configured character set (settings
+  // hintChars, default home-row set). Empty fallback can't happen —
+  // normalizeSettings guarantees at least four characters — but guard anyway.
+  function alphabet() {
+    return Jari.settings.getHintChars() || Jari.settingsDefaults.hintChars;
+  }
 
   let mode = null;
   let labels = new Map(); // hint label -> target element
@@ -1284,7 +1503,9 @@
     cancel();
 
     const elements = topLevelElements(
-      Array.from(document.querySelectorAll(config.selector)).filter(isInteractive),
+      Jari.queryAll(config.selector)
+        .filter(isInteractive)
+        .filter((el) => !config.linkOnly || linkHref(el)),
     );
     if (nextMode === "focus" && elements.length === 1) {
       focusAndPlaceCaret(elements[0]);
@@ -1331,55 +1552,63 @@
 
     // Walk up the tree: an ancestor can hide the whole subtree even when the
     // element still reports a non-zero rect — e.g. custom-styled radios are
-    // often opacity:0, or carousel slides are visibility:hidden.
+    // often opacity:0, or carousel slides are visibility:hidden. Crosses
+    // shadow boundaries to the host so a shadow subtree inherits the host's
+    // visibility.
     let node = el;
-    while (node && node.nodeType === Node.ELEMENT_NODE) {
-      if (node.hasAttribute("hidden")) return false;
-      const style = window.getComputedStyle(node);
-      if (style.display === "none" || style.visibility === "hidden") return false;
-      if (parseFloat(style.opacity) === 0) return false;
-      node = node.parentElement;
+    while (node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.hasAttribute("hidden")) return false;
+        const style = window.getComputedStyle(node);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        if (parseFloat(style.opacity) === 0) return false;
+      }
+      node = node.getRootNode().host || node.parentElement;
     }
     return true;
   }
 
   // Drop nested matches: if an element sits inside another matched element,
   // only keep the outermost one so hints don't pile up on the same spot
-  // (e.g. <a><button>x</button></a>).
+  // (e.g. <a><button>x</button></a>). Shadow boundaries are crossed to the
+  // host, so a clickable inside a shadow tree counts as nested under a host
+  // that is itself a match.
   function topLevelElements(elements) {
     const set = new Set(elements);
     return elements.filter((el) => {
-      let parent = el.parentElement;
-      while (parent) {
-        if (set.has(parent)) return false;
-        parent = parent.parentElement;
+      let node = el.parentElement || el.getRootNode().host;
+      while (node) {
+        if (set.has(node)) return false;
+        node = node.parentElement || node.getRootNode().host;
       }
       return true;
     });
   }
 
-  // Always two characters (AA, AB, ... ZZ). Past 676 matches it grows to
-  // three characters and beyond, so labels never duplicate.
+  // Labels are always at least two characters (AA, AB, ...) and grow a
+  // character whenever the set is exhausted, so they never duplicate.
   function generateLabels(count) {
-    const n = ALPHABET.length;
+    const chars = alphabet();
+    const n = chars.length;
     const labels = [];
     let i = 0;
     let length = 2;
     while (i < count) {
       const combos = Math.pow(n, length);
       for (let k = 0; k < combos && i < count; k++, i++) {
-        labels.push(toBase26(k, length));
+        labels.push(toBase26(k, length, chars));
       }
       length++;
     }
     return labels;
   }
 
-  function toBase26(value, length) {
+  function toBase26(value, length, chars) {
+    const n = chars.length;
     let s = "";
     for (let p = 0; p < length; p++) {
-      s = ALPHABET[value % 26] + s;
-      value = Math.floor(value / 26);
+      s = chars[value % n] + s;
+      value = Math.floor(value / n);
     }
     return s;
   }
@@ -1408,6 +1637,7 @@
     if (scheme && Jari.allowedUrlSchemes.has(scheme)) {
       Jari.sendMessage("openInBackgroundTab", { url: href });
     } else {
+      firePointerSequence(el);
       el.click();
     }
   }
@@ -1467,7 +1697,13 @@
     mode = null;
   }
 
-  Jari.Hints = { start, cancel, onKeyDown, isActive };
+  Jari.Hints = {
+    start,
+    cancel,
+    onKeyDown,
+    isActive,
+    generateLabels,
+  };
 })();
 
 // ---- prompt.js ----
@@ -2197,8 +2433,10 @@
     }
 
     // Form fields: pass everything through except Escape (blur) and the
-    // site-toggle shortcut.
-    const activeEl = document.activeElement;
+    // site-toggle shortcut. Focus may sit inside an open shadow root (Gmail,
+    // Notion, Docs editors), where document.activeElement only reports the
+    // host — walk into it so typing in those fields still passes through.
+    const activeEl = Jari.deepActiveElement();
     if (isTypingTarget(activeEl)) {
       if (commandName === 'toggleDisabled') run(commandName, 1, event);
       else if (event.key === 'Escape') {

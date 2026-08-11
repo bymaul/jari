@@ -18,6 +18,11 @@
   const fuzzyMatchingEl = document.querySelector("#fuzzy-matching");
   const timeoutEl = document.querySelector("#timeout");
   const passthroughEl = document.querySelector("#passthrough-timeout");
+  const hintCharsEl = document.querySelector("#hint-chars");
+  const sourceTabEl = document.querySelector("#source-tab");
+  const sourceHistoryEl = document.querySelector("#source-history");
+  const sourceBookmarkEl = document.querySelector("#source-bookmark");
+  const copyFormatEl = document.querySelector("#copy-format");
   const keymapFilterEl = document.querySelector("#keymap-filter");
   const siteInputEl = document.querySelector("#disabled-site-input");
   const addSiteBtn = document.querySelector("#add-disabled-site");
@@ -31,6 +36,12 @@
     fuzzyMatchingEl.checked = Jari.settings.isFuzzyMatching();
     timeoutEl.value = Jari.settings.getTimeoutMs();
     passthroughEl.value = Jari.settings.getPassthroughMs();
+    hintCharsEl.value = Jari.settings.getHintChars();
+    const sources = Jari.settings.getSuggestionSources();
+    sourceTabEl.checked = sources.includes("tab");
+    sourceHistoryEl.checked = sources.includes("history");
+    sourceBookmarkEl.checked = sources.includes("bookmark");
+    copyFormatEl.value = Jari.settings.getCopyFormat();
     renderKeymap();
     renderDisabled();
   }
@@ -103,6 +114,16 @@
       grid.appendChild(col);
     }
     tableEl.appendChild(grid);
+    refreshKeyHints();
+  }
+
+  // Fill every <code data-key="..."> with the key currently bound to that
+  // command so the hint texts stay in sync with the live keymap. Called from
+  // renderKeymap(), which runs after every rebind, clear, reset and load.
+  function refreshKeyHints() {
+    for (const el of document.querySelectorAll("[data-key]")) {
+      el.textContent = keyFor(el.dataset.key) || "unbound";
+    }
   }
 
   function keyFor(commandName) {
@@ -196,26 +217,33 @@
     input.addEventListener("keydown", handler);
   }
 
-  // Read the scroll/behavior fields, snapping invalid values back to their
-  // defaults in the DOM, and return them as a patch for the settings store.
-  function collectScrollSettings() {
+  // Read the behavior fields, snapping invalid values back to their defaults
+  // in the DOM, and return them as a patch for the settings store.
+  function collectBehaviorSettings() {
     const raw = parseInt(scrollStepEl.value, 10);
     scrollStepEl.value = Number.isFinite(raw) && raw > 0 ? raw : SETTINGS_DEFAULTS.scrollStep;
     const tRaw = parseInt(timeoutEl.value, 10);
     timeoutEl.value = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
     const pRaw = parseInt(passthroughEl.value, 10);
     passthroughEl.value = Number.isFinite(pRaw) && pRaw > 0 ? pRaw : SETTINGS_DEFAULTS.passthroughMs;
+    const sources = [];
+    if (sourceTabEl.checked) sources.push("tab");
+    if (sourceHistoryEl.checked) sources.push("history");
+    if (sourceBookmarkEl.checked) sources.push("bookmark");
     return {
       scrollStep: parseInt(scrollStepEl.value, 10),
       smoothScroll: smoothScrollEl.checked,
       fuzzyMatching: fuzzyMatchingEl.checked,
       timeoutMs: parseInt(timeoutEl.value, 10),
       passthroughMs: parseInt(passthroughEl.value, 10),
+      hintChars: hintCharsEl.value,
+      suggestionSources: sources,
+      copyFormat: copyFormatEl.value,
     };
   }
 
   function save() {
-    const patch = collectScrollSettings();
+    const patch = collectBehaviorSettings();
     // keymap and disabledSites were already mutated in the live store (the
     // recorder and list buttons edit in place) — include snapshots so the
     // write persists exactly what the user sees.
@@ -229,22 +257,33 @@
 
   function reset() {
     // Restore defaults for the keymap and behavior options; the disabled
-    // sites list is per-user data and is left untouched.
-    Jari.settings.set({
-      keymap: { ...Jari.keymapDefaults },
-      scrollStep: SETTINGS_DEFAULTS.scrollStep,
-      smoothScroll: SETTINGS_DEFAULTS.smoothScroll,
-      fuzzyMatching: SETTINGS_DEFAULTS.fuzzyMatching,
-      timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
-      passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
-    });
+    // sites list is per-user data and is left untouched. update() persists
+    // immediately — a memory-only reset would be silently undone on reload.
+    Jari.settings
+      .update({
+        keymap: { ...Jari.keymapDefaults },
+        scrollStep: SETTINGS_DEFAULTS.scrollStep,
+        smoothScroll: SETTINGS_DEFAULTS.smoothScroll,
+        fuzzyMatching: SETTINGS_DEFAULTS.fuzzyMatching,
+        timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
+        passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
+        hintChars: SETTINGS_DEFAULTS.hintChars,
+        suggestionSources: SETTINGS_DEFAULTS.suggestionSources.slice(),
+        copyFormat: SETTINGS_DEFAULTS.copyFormat,
+      })
+      .then(() => status("Reset to defaults"))
+      .catch(() => status("Save failed"));
     scrollStepEl.value = SETTINGS_DEFAULTS.scrollStep;
     smoothScrollEl.checked = SETTINGS_DEFAULTS.smoothScroll;
     fuzzyMatchingEl.checked = SETTINGS_DEFAULTS.fuzzyMatching;
     timeoutEl.value = SETTINGS_DEFAULTS.timeoutMs;
     passthroughEl.value = SETTINGS_DEFAULTS.passthroughMs;
+    hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
+    sourceTabEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("tab");
+    sourceHistoryEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("history");
+    sourceBookmarkEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("bookmark");
+    copyFormatEl.value = SETTINGS_DEFAULTS.copyFormat;
     renderKeymap();
-    status("Reset to defaults");
   }
 
   function renderDisabled() {
