@@ -885,6 +885,7 @@
   var overlays2 = /* @__PURE__ */ new Map();
   var typed = "";
   var hintsHost = null;
+  var blockWheel = null;
   function getHintsHost() {
     if (hintsHost && hintsHost.isConnected) return hintsHost;
     hintsHost = document.createElement("div");
@@ -895,6 +896,15 @@
   }
   function isActive() {
     return mode !== null;
+  }
+  function setWheelBlocking(on) {
+    if (on && !blockWheel) {
+      blockWheel = (event) => event.preventDefault();
+      window.addEventListener("wheel", blockWheel, { capture: true, passive: false });
+    } else if (!on && blockWheel) {
+      window.removeEventListener("wheel", blockWheel, { capture: true });
+      blockWheel = null;
+    }
   }
   function start(nextMode) {
     const config = MODES[nextMode];
@@ -937,6 +947,7 @@
       fragment.appendChild(box);
     }
     host.appendChild(fragment);
+    setWheelBlocking(true);
   }
   function isInteractive(el) {
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
@@ -1122,6 +1133,7 @@
     }
   }
   function cancel() {
+    setWheelBlocking(false);
     if (hintsHost) hintsHost.remove();
     hintsHost = null;
     overlays2.clear();
@@ -1136,7 +1148,8 @@
     isActive,
     generateLabels,
     visiblePortion,
-    scanElements
+    scanElements,
+    setWheelBlocking
   };
   register("hints", { close: cancel, onKeyDown, isActive });
 
