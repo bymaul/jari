@@ -174,6 +174,15 @@ export function canonicalKey(event) {
   return parts.join("+");
 }
 
+// A repeat count is at least 1: a bare "0" prefix is a typo, not a command to
+// do nothing, and the same rule must hold for every command — "0j" scrolling
+// nothing while "0x" closes a tab (background's clampCount) is inconsistent.
+// Garbage and empty input count as no count.
+export function parseRepeatCount(raw) {
+  const n = parseInt(raw, 10);
+  return Number.isNaN(n) ? 1 : Math.max(1, n);
+}
+
 // Elements Jari's own overlays create. Content features must not touch
 // them: hints must not label them.
 export const overlaySelectors =

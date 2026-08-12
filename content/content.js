@@ -6,14 +6,15 @@
 // being composed; an inactivity timeout drops the composition if it is never
 // completed.
 //
-// "I" toggles ignore mode: Jari stops reacting to every key (except the
-// toggle itself) until it is pressed again, with a persistent status pill.
+// The bound key (default "I") toggles ignore mode: Jari stops reacting to
+// every key (except the toggle itself and Escape) until it is pressed again,
+// with a persistent status pill.
 // "o" enters passthrough mode: every key reaches the page until the timeout
 // expires or Escape is pressed, with a transient status pill.
 //
 // The ignore/passthrough actions are wired into the command registry via
 // setModeActions — the registry must not import this entry module.
-import { Events, canonicalKey, deepActiveElement, modifierKeys, prefixes } from "./keymap.js";
+import { Events, canonicalKey, deepActiveElement, modifierKeys, parseRepeatCount, prefixes } from "./keymap.js";
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { commands, setModeActions } from "./commands.js";
@@ -166,11 +167,13 @@ function handleKeydown(event) {
     return;
   }
 
-  // Ignore mode: everything passes through except the toggle itself and
-  // Escape, both of which leave the mode.
+  // Ignore mode: everything passes through except the bound toggle key and
+  // Escape, both of which leave the mode. The toggle key is resolved from the
+  // keymap rather than hardcoded — a rebound toggleIgnore must still be able
+  // to exit, and a literal "I" rebound to something else must not.
   if (ignoreMode) {
-    const plainI = event.key === 'I' && !event.ctrlKey && !event.altKey && !event.metaKey;
-    if (plainI || event.key === 'Escape') {
+    const key = canonicalKey(event);
+    if (settings.getKeymap()[key] === 'toggleIgnore' || event.key === 'Escape') {
       event.preventDefault();
       event.stopImmediatePropagation();
       toggleIgnore();
@@ -247,7 +250,8 @@ function handleKeydown(event) {
 
   // Count prefix: digits 0-9 accumulate a repeat count, capped so an
   // unlimited string cannot grow. Only when no prefix already claimed the
-  // key — "g0" is firstTab, not a count. Consumers clamp the value anyway.
+  // key — "g0" is firstTab, not a count. parseRepeatCount clamps the value
+  // (a bare "0" is a no-op count, not a do-nothing command).
   if (!commandName && /^[0-9]$/.test(key)) {
     if (pendingCount.length < 9) pendingCount += key;
     typedSeq += key;
@@ -277,7 +281,7 @@ function handleKeydown(event) {
     return;
   }
 
-  const count = pendingCount ? parseInt(pendingCount, 10) : 1;
+  const count = parseRepeatCount(pendingCount);
   const hadCount = pendingCount !== '';
   pendingCount = '';
   // Append the completing key even when it finished a prefix, so the echo

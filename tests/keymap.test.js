@@ -8,6 +8,14 @@ test("canonicalKey orders modifiers and keeps the bare key", () => {
   assert.equal(Jari.canonicalKey({ key: "G", metaKey: true }), "meta+G");
 });
 
+test("parseRepeatCount clamps counts to at least 1", () => {
+  assert.equal(Jari.parseRepeatCount("3"), 3);
+  assert.equal(Jari.parseRepeatCount("05"), 5);
+  assert.equal(Jari.parseRepeatCount("0"), 1);
+  assert.equal(Jari.parseRepeatCount(""), 1);
+  assert.equal(Jari.parseRepeatCount(undefined), 1);
+});
+
 test("normalizeSettings fills defaults and drops invalid values", () => {
   const s = Jari.normalizeSettings({ scrollStep: 100, smoothScroll: true, keymap: { j: "scrollTop" } });
   assert.equal(s.scrollStep, 100);
