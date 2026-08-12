@@ -132,6 +132,10 @@
     parts.push(event.key);
     return parts.join("+");
   }
+  function parseRepeatCount(raw) {
+    const n = parseInt(raw, 10);
+    return Number.isNaN(n) ? 1 : Math.max(1, n);
+  }
   var overlaySelectors = ".jari-overlay, .jari-hint, .jari-scroll-highlight";
   function deepActiveElement() {
     let el = document.activeElement;
@@ -1962,8 +1966,8 @@ ${location.href}`;
       return;
     }
     if (ignoreMode) {
-      const plainI = event.key === "I" && !event.ctrlKey && !event.altKey && !event.metaKey;
-      if (plainI || event.key === "Escape") {
+      const key2 = canonicalKey(event);
+      if (settings.getKeymap()[key2] === "toggleIgnore" || event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
         toggleIgnore();
@@ -2032,7 +2036,7 @@ ${location.href}`;
       clearPending();
       return;
     }
-    const count = pendingCount ? parseInt(pendingCount, 10) : 1;
+    const count = parseRepeatCount(pendingCount);
     const hadCount = pendingCount !== "";
     pendingCount = "";
     typedSeq += key;
