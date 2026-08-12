@@ -1183,6 +1183,7 @@
   var mode2 = "tabs";
   var suggestSeq = 0;
   var suggestTimer = null;
+  var restoreFocus = null;
   function isActive2() {
     return active;
   }
@@ -1278,6 +1279,7 @@
         renderList();
       }
     });
+    inputEl.addEventListener("keydown", (event) => event.stopPropagation());
     listEl = document.createElement("ul");
     listEl.className = "jari-prompt-list";
     const header = document.createElement("div");
@@ -1289,6 +1291,7 @@
     document.body.appendChild(overlay);
     filtered = tabs;
     renderList();
+    restoreFocus = document.activeElement;
     inputEl.focus();
   }
   function renderText(el, text, indices) {
@@ -1442,6 +1445,10 @@
     query = "";
     mode2 = "tabs";
     active = false;
+    if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
+      restoreFocus.focus();
+    }
+    restoreFocus = null;
   }
   var Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown: onKeyDown2, isActive: isActive2 };
   register("prompt", { close, onKeyDown: onKeyDown2, isActive: isActive2 });
