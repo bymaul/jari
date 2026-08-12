@@ -900,35 +900,15 @@
     const config = MODES[nextMode];
     if (!config) return;
     cancel();
-    const top = [];
-    const viableSet = /* @__PURE__ */ new Set();
-    const rects = /* @__PURE__ */ new Map();
-    let counted = 0;
-    for (const el of queryAll(config.selector)) {
-      if (!isInteractive(el)) continue;
-      if (config.linkOnly && !linkHref(el)) continue;
-      if (top.length >= MAX_HINTS) {
-        if (isVisible(el)) counted++;
-        continue;
+    const { top: topLevel, rects, total: counted } = scanElements(
+      queryAll(config.selector),
+      {
+        passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
+        visible: isVisible,
+        occluded: isOccluded,
+        max: MAX_HINTS
       }
-      const rect = isVisible(el);
-      if (!rect) continue;
-      if (isOccluded(el, rect)) continue;
-      viableSet.add(el);
-      rects.set(el, visiblePortion(rect));
-      counted++;
-      let node = el.parentElement || el.getRootNode().host;
-      let nested = false;
-      while (node) {
-        if (viableSet.has(node)) {
-          nested = true;
-          break;
-        }
-        node = node.parentElement || node.getRootNode().host;
-      }
-      if (!nested) top.push(el);
-    }
-    const topLevel = top;
+    );
     const hintCount = topLevel.length;
     if (nextMode === "focus" && topLevel.length === 1) {
       focusAndPlaceCaret(topLevel[0]);
@@ -1012,6 +992,36 @@
       if (containsElement(el, top) || containsElement(top, el)) return false;
     }
     return true;
+  }
+  function scanElements(candidates, { passes, visible, occluded, max }) {
+    const top = [];
+    const viableSet = /* @__PURE__ */ new Set();
+    const rects = /* @__PURE__ */ new Map();
+    let counted = 0;
+    for (const el of candidates) {
+      if (!passes(el)) continue;
+      if (top.length >= max) {
+        if (visible(el)) counted++;
+        continue;
+      }
+      const rect = visible(el);
+      if (!rect) continue;
+      if (occluded(el, rect)) continue;
+      viableSet.add(el);
+      rects.set(el, rect);
+      counted++;
+      let node = el.parentElement || el.getRootNode().host;
+      let nested = false;
+      while (node) {
+        if (viableSet.has(node)) {
+          nested = true;
+          break;
+        }
+        node = node.parentElement || node.getRootNode().host;
+      }
+      if (!nested) top.push(el);
+    }
+    return { top, rects, total: counted };
   }
   function generateLabels(count) {
     const chars = alphabet();
@@ -1125,7 +1135,8 @@
     onKeyDown,
     isActive,
     generateLabels,
-    visiblePortion
+    visiblePortion,
+    scanElements
   };
   register("hints", { close: cancel, onKeyDown, isActive });
 
