@@ -319,3 +319,23 @@ async function boot() {
 setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
 
 boot();
+
+// Test surface: the dispatcher and its composition state are module-private,
+// and nothing else imports this entry module (the registry must not). The
+// test suite drives handleKeydown directly and resets state between cases.
+// The IIFE bundle drops the exports, so they are inert in production.
+export { handleKeydown };
+
+export function __resetState() {
+  clearTimeout(timer);
+  clearTimeout(passthroughTimer);
+  timer = null;
+  passthroughTimer = null;
+  pendingCount = '';
+  pendingPrefix = null;
+  typedSeq = '';
+  ignoreMode = false;
+  passthroughMode = false;
+  if (pills.ignore) hidePill('ignore');
+  if (pills.passthrough) hidePill('passthrough');
+}
