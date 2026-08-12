@@ -205,7 +205,7 @@ let labels = new Map(); // hint label -> target element
 let overlays = new Map(); // hint label -> overlay element
 let typed = "";
 let hintsHost = null;
-let consumed = new Set(); // elements already opened in sticky (background) mode
+let blockWheel = null;
 
 // All hint labels live in one host element that is attached to the page as a
 // single node. Appending 100 individual boxes to the body (open) and removing
@@ -227,28 +227,43 @@ function isActive() {
   return mode !== null;
 }
 
+// While hints are up, a wheel scroll invalidates the hint set: boxes sit at
+// scan-time coordinates, so after any scroll the overlay no longer matches
+// what is on screen. onKeyDown already preventDefaults every key (so arrow
+// keys, space and PageDown are dead), which leaves the wheel — the last
+// unguarded way to move the page. The capture-phase listener cancels it for
+// the whole window while hints are open. `passive: false` is required:
+// Chrome treats wheel listeners on window/document/body as passive by
+// default and would refuse to let a passive one cancel the scroll. The
+// listener only exists while hints are open, so the non-passive cost is zero
+// the rest of the time.
+function setWheelBlocking(on) {
+  if (on && !blockWheel) {
+    blockWheel = (event) => event.preventDefault();
+    window.addEventListener("wheel", blockWheel, {
+      capture: true,
+      passive: false,
+    });
+  } else if (!on && blockWheel) {
+    window.removeEventListener("wheel", blockWheel, { capture: true });
+    blockWheel = null;
+  }
+}
+
 // Hints sit at scan-time coordinates; while they are up, any scroll — a
 // window scroll, a page container (Instagram's feed scrolls inside its own
 // box), or a scrollbar drag — detaches every label from its element. A
 // capture-phase scroll listener re-anchors the labels to their elements'
-// current positions and, once the scroll settles, re-scans the viewport so
-// links that scrolled into view get labels and links that left lose them.
-// Scrolling is allowed while hints are up (there is no wheel block): the
-// re-anchor keeps the overlay glued to its elements during the scroll, and
-// the debounced re-render fixes up the set afterwards. The listener is
-// passive because there is nothing to cancel, and it only exists while hints
-// are open so no listener cost leaks into normal browsing. The re-anchor
-// runs once per frame: scroll events can fire many times per frame, and
-// recomputing 100 rects each is wasted work.
+// current positions. It is passive because there is nothing to cancel, and
+// it only exists while hints are open so no listener cost leaks into normal
+// browsing. The re-anchor runs once per frame: scroll events can fire many
+// times per frame, and recomputing 100 rects each is wasted work.
 let scrollTracking = null;
 let trackingFrame = null;
 
 function setScrollTracking(on) {
   if (on && !scrollTracking) {
-    scrollTracking = () => {
-      scheduleHintReposition();
-      scheduleRerender();
-    };
+    scrollTracking = () => scheduleHintReposition();
     window.addEventListener("scroll", scrollTracking, {
       capture: true,
       passive: true,
@@ -262,55 +277,6 @@ function setScrollTracking(on) {
 function scheduleHintReposition() {
   if (trackingFrame !== null) return;
   trackingFrame = requestAnimationFrame(repositionHints);
-}
-
-// A scroll settled: re-scan the current viewport and re-render the overlay.
-// Runs on a timer so a long scroll does not trigger a full style pass (the
-// dominant cost) on every frame — only once the scroll stops. The result is
-// the same scan the first render used, minus elements already opened in
-// sticky background mode, so labels stay on the links currently in view.
-const RERENDER_DEBOUNCE_MS = 80;
-let rerenderTimer = null;
-
-function scheduleRerender() {
-  if (rerenderTimer !== null) return;
-  rerenderTimer = setTimeout(() => {
-    rerenderTimer = null;
-    if (mode) rerenderHints();
-  }, RERENDER_DEBOUNCE_MS);
-}
-
-function rerenderHints() {
-  const config = MODES[mode];
-  const typedBefore = typed;
-  const candidates = config.pointerCursor
-    ? queryClickables(config.selector)
-    : queryAll(config.selector);
-  const { topLevel, rects, labels: hintLabels } = recomputeHints(
-    candidates,
-    config,
-    consumed,
-  );
-  labels.clear();
-  overlays.clear();
-  const host = getHintsHost();
-  const fragment = document.createDocumentFragment();
-  for (let i = 0; i < topLevel.length; i++) {
-    const el = topLevel[i];
-    const label = hintLabels[i];
-    labels.set(label, el);
-    const box = createHintOverlay(label, rects.get(el));
-    overlays.set(label, box);
-    fragment.appendChild(box);
-  }
-  host.replaceChildren(fragment);
-  typed = typedBefore;
-  // Labels shift when consumed elements drop out of sticky mode; a typed
-  // prefix that no longer matches any label is stale, drop it.
-  if (![...labels.keys()].some((l) => l.toLowerCase().startsWith(typed)))
-    typed = "";
-  updateHighlight();
-  if (labels.size === 0) cancel();
 }
 
 // Re-pin every visible label to its element. Labels whose element scrolled
@@ -458,6 +424,7 @@ function start(nextMode) {
     fragment.appendChild(box);
   }
   host.appendChild(fragment);
+  setWheelBlocking(true);
   setScrollTracking(true);
 }
 
@@ -677,26 +644,6 @@ function scanElements(
   return { top, rects, total: counted };
 }
 
-// Re-scan a fresh candidate list into a hint set, excluding elements already
-// opened in sticky background mode. Shares the scan predicates and rect
-// re-pinning with start(), so the scroll re-render and the first render
-// agree on what is hintable. The count-for-toast is dropped: re-renders do
-// not toast.
-function recomputeHints(candidates, config, exclude) {
-  const { top, rects } = scanElements(candidates, {
-    passes: (el) =>
-      isInteractive(el) && (!config.linkOnly || linkHref(el)) && !exclude.has(el),
-    visible: isVisible,
-    occluded: isOccluded,
-    max: MAX_HINTS,
-    nested: treeItemNested,
-  });
-  for (const el of top) {
-    rects.set(el, hintRect(el, rects.get(el)));
-  }
-  return { topLevel: top, rects, labels: generateLabels(top.length) };
-}
-
 // Labels are always at least two characters (AA, AB, ...) and grow a
 // character whenever the set is exhausted, so they never duplicate.
 function generateLabels(count) {
@@ -812,7 +759,6 @@ function onKeyDown(event) {
     if (modeConfig.sticky) {
       // Keep the hints up so the next link can be picked: drop the label
       // just used — each link opens once — and clear the typed buffer.
-      consumed.add(labels.get(exact));
       const box = overlays.get(exact);
       if (box) box.remove();
       overlays.delete(exact);
@@ -842,11 +788,8 @@ function updateHighlight() {
 }
 
 function cancel() {
+  setWheelBlocking(false);
   setScrollTracking(false);
-  if (rerenderTimer !== null) {
-    clearTimeout(rerenderTimer);
-    rerenderTimer = null;
-  }
   if (trackingFrame !== null) {
     cancelAnimationFrame(trackingFrame);
     trackingFrame = null;
@@ -855,7 +798,6 @@ function cancel() {
   hintsHost = null;
   overlays.clear();
   labels.clear();
-  consumed.clear();
   typed = "";
   mode = null;
 }
@@ -868,8 +810,8 @@ export const Hints = {
   generateLabels,
   visiblePortion,
   scanElements,
+  setWheelBlocking,
   setScrollTracking,
-  recomputeHints,
   labelPlacement,
   rectOverlapsScrollport,
   treeItemNested,
