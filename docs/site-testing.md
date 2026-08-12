@@ -41,6 +41,12 @@ See `docs/known-issues.md` for outstanding reports and their current status.
   - [ ] `o` passthrough in the document — keys reach the doc; `Esc` exits early (note: Docs uses `Esc` itself; verify the doc doesn't get a stray command).
   - [ ] Rebind the passthrough key to `z` on the options page; confirm `z` and not `o` triggers it here.
 
+- [ ] **Test Instagram**
+  - [ ] On the desktop feed, press `f` — hints appear on the left nav, the stories bar, and the first visible posts.
+  - [ ] Press `Esc`, scroll the feed down several posts, press `f` again — hints appear on the now-visible posts (regression: hints must not vanish after scrolling; see known-issues.md).
+  - [ ] The stories carousel still clips correctly: stories scrolled out of the horizontal tray get no hint.
+  - [ ] `f` on a post deep in the feed (scrolled 2+ viewports) still labels the visible links/buttons.
+
 - [ ] **Test YouTube**
   - [ ] On a video page, press `f` — hints appear on visible links (suggestions, comments, description); a hint opens the target in a background tab.
   - [ ] `yf` copies a link URL; `Y` copies title + URL in the configured format.

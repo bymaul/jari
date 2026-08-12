@@ -528,6 +528,20 @@ function occlusionSamples(portion) {
 // computation or reflow.
 function rectOverlapsScrollport(rect, node) {
   const box = node.getBoundingClientRect();
+  // A box that misses the viewport entirely cannot clip on-screen content,
+  // so it is treated as overlapping. The documentElement's box lives in
+  // document coordinates and slides off-screen as the page scrolls; without
+  // this guard the walk would reject every on-screen element once the page
+  // is scrolled. Guarded behind window so the mock-container tests (which
+  // have no window) keep taking the plain overlap path.
+  const vw = globalThis.window?.innerWidth;
+  const vh = globalThis.window?.innerHeight;
+  if (
+    vh != null &&
+    (box.bottom <= 0 || box.top >= vh || box.right <= 0 || box.left >= vw)
+  ) {
+    return true;
+  }
   return (
     rect.bottom > box.top &&
     rect.top < box.bottom &&

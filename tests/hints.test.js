@@ -586,6 +586,7 @@ function scrolledRootElement() {
     overflowX: "visible",
     overflowY: "scroll",
     getBoundingClientRect: () => ({ left: 0, top: -900, right: 800, bottom: -443 }),
+    getRootNode: () => ({ host: null }),
   };
 }
 
@@ -601,6 +602,7 @@ function viewportOnlyChain() {
     overflowX: "visible",
     overflowY: "visible",
     parentElement: html,
+    getRootNode: () => ({ host: null }),
   };
   return { html, body };
 }
@@ -632,18 +634,7 @@ test("isOccluded ignores the scrolled root element (Instagram scrolls the window
 
 test("isOccluded still rejects elements scrolled out of a real container", () => {
   const { html, body } = viewportOnlyChain();
-  // A real clip box: a carousel tray scrolled so its content is below the
-  // tray's on-screen box. Elements in that region are not really visible.
-  const tray = {
-    scrollWidth: 500,
-    clientWidth: 500,
-    scrollHeight: 400,
-    clientHeight: 100,
-    overflowX: "auto",
-    overflowY: "auto",
-    parentElement: body,
-    getBoundingClientRect: () => ({ left: 0, top: 0, right: 500, bottom: 100 }),
-  };
+  const tray = carouselTray(body);
   const below = { left: 10, top: 200, right: 60, bottom: 230 };
   withViewport({}, () => {
     withDocument({ documentElement: html, body }, () => {
@@ -651,6 +642,59 @@ test("isOccluded still rejects elements scrolled out of a real container", () =>
         Hints.isOccluded(onScreenEl(tray, below), below),
         true,
       );
+    });
+  });
+});
+
+// A carousel tray: a real clip box whose content can scroll out of its
+// on-screen box (overflow auto, client area smaller than the content).
+function carouselTray(parent) {
+  return {
+    scrollWidth: 500,
+    clientWidth: 500,
+    scrollHeight: 400,
+    clientHeight: 100,
+    overflowX: "auto",
+    overflowY: "auto",
+    parentElement: parent,
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 500, bottom: 100 }),
+  };
+}
+
+test("scanElements keeps on-screen links on a window-scrolled page (Instagram)", () => {
+  const { html, body } = viewportOnlyChain();
+  const rect = { left: 100, top: 100, right: 200, bottom: 130 };
+  const a = onScreenEl(body, rect);
+  const b = onScreenEl(body, rect);
+  withViewport({}, () => {
+    withDocument({ documentElement: html, body }, () => {
+      const { top, total } = Hints.scanElements([a, b], {
+        passes: () => true,
+        visible: () => rect,
+        occluded: Hints.isOccluded,
+        max: 100,
+      });
+      assert.deepEqual(top, [a, b]);
+      assert.strictEqual(total, 2);
+    });
+  });
+});
+
+test("scanElements drops elements scrolled out of a real container", () => {
+  const { html, body } = viewportOnlyChain();
+  const tray = carouselTray(body);
+  const offTray = onScreenEl(tray, { left: 10, top: 200, right: 60, bottom: 230 });
+  const onTray = onScreenEl(tray, { left: 10, top: 20, right: 60, bottom: 50 });
+  withViewport({}, () => {
+    withDocument({ documentElement: html, body }, () => {
+      const { top, total } = Hints.scanElements([offTray, onTray], {
+        passes: () => true,
+        visible: (el) => el.getBoundingClientRect(),
+        occluded: Hints.isOccluded,
+        max: 100,
+      });
+      assert.deepEqual(top, [onTray]);
+      assert.strictEqual(total, 1);
     });
   });
 });
