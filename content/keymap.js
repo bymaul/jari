@@ -117,7 +117,7 @@ export const categories = [
 
 // Non-key defaults. Overridable from the options page.
 export const settingsDefaults = {
-  scrollStep: 200,
+  scrollStep: 120,
   smoothScroll: false,
   // Rank prompt lists by fuzzy subsequence score instead of plain substring.
   fuzzyMatching: true,

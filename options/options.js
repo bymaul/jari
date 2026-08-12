@@ -108,7 +108,8 @@ function renderKeymap() {
             input.type = "text";
             input.readOnly = true;
             input.value = keyFor(name);
-            input.title = "Click, then press a key to rebind. Backspace clears.";
+            input.title =
+              "Click, then press a key to rebind. Backspace clears.";
             input.addEventListener("focus", () => startRecording(input, name));
 
             keyTd.appendChild(input);
@@ -182,7 +183,9 @@ function startRecording(input, name) {
         // binding (if any) is untouched.
         waitingPrefix = null;
         input.value = "press a key...";
-        status("Prefix cancelled — press a key, or Esc/Backspace to clear the binding");
+        status(
+          "Prefix cancelled — press a key, or Esc/Backspace to clear the binding",
+        );
         return;
       }
       input.removeEventListener("keydown", handler);
@@ -207,7 +210,9 @@ function startRecording(input, name) {
     if (prefixKeys.has(combo)) {
       waitingPrefix = combo;
       input.value = combo + " — press the next key, or Esc/Backspace to cancel";
-      status("Prefix keys can't be bound alone; press the next key of the sequence");
+      status(
+        "Prefix keys can't be bound alone; press the next key of the sequence",
+      );
       return;
     }
 
@@ -229,11 +234,14 @@ function startRecording(input, name) {
 // in the DOM, and return them as a patch for the settings store.
 function collectBehaviorSettings() {
   const raw = parseInt(scrollStepEl.value, 10);
-  scrollStepEl.value = Number.isFinite(raw) && raw > 0 ? raw : SETTINGS_DEFAULTS.scrollStep;
+  scrollStepEl.value =
+    Number.isFinite(raw) && raw > 0 ? raw : SETTINGS_DEFAULTS.scrollStep;
   const tRaw = parseInt(timeoutEl.value, 10);
-  timeoutEl.value = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
+  timeoutEl.value =
+    Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
   const pRaw = parseInt(passthroughEl.value, 10);
-  passthroughEl.value = Number.isFinite(pRaw) && pRaw > 0 ? pRaw : SETTINGS_DEFAULTS.passthroughMs;
+  passthroughEl.value =
+    Number.isFinite(pRaw) && pRaw > 0 ? pRaw : SETTINGS_DEFAULTS.passthroughMs;
   const sources = [];
   if (sourceTabEl.checked) sources.push("tab");
   if (sourceHistoryEl.checked) sources.push("history");
@@ -288,8 +296,10 @@ function reset() {
   passthroughEl.value = SETTINGS_DEFAULTS.passthroughMs;
   hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
   sourceTabEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("tab");
-  sourceHistoryEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("history");
-  sourceBookmarkEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("bookmark");
+  sourceHistoryEl.checked =
+    SETTINGS_DEFAULTS.suggestionSources.includes("history");
+  sourceBookmarkEl.checked =
+    SETTINGS_DEFAULTS.suggestionSources.includes("bookmark");
   copyFormatEl.value = SETTINGS_DEFAULTS.copyFormat;
   renderKeymap();
 }
@@ -335,7 +345,9 @@ function normalizeHost(raw) {
     }
   }
   host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
-  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(host)
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
+    host,
+  )
     ? host
     : "";
 }

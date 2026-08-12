@@ -65,6 +65,7 @@ export default [
         setTimeout: "readonly",
         clearTimeout: "readonly",
         requestAnimationFrame: "readonly",
+        cancelAnimationFrame: "readonly",
         URL: "readonly",
         Promise: "readonly",
         PointerEvent: "readonly",

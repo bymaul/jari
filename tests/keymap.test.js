@@ -28,7 +28,7 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
   assert.equal(s.copyFormat, "plain");
 
   const bad = Jari.normalizeSettings({ scrollStep: "x", timeoutMs: 0, disabledSites: "x" });
-  assert.equal(bad.scrollStep, 200);
+  assert.equal(bad.scrollStep, 120);
   assert.equal(bad.timeoutMs, 1500);
   assert.deepEqual(bad.disabledSites, []);
 

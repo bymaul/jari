@@ -39,6 +39,8 @@ const CLICKABLE_SELECTOR = [
   "[role='button']",
   "[role='link']",
   "[role='menuitem']",
+  "[role='menuitemcheckbox']",
+  "[role='menuitemradio']",
   "[role='tab']",
   "[role='checkbox']",
   "[role='radio']",
@@ -163,8 +165,16 @@ function focusAndPlaceCaret(el) {
 // click labels everything clickable; newtab and yank only links (a button
 // without an href has nothing to open or copy).
 const MODES = {
-  click: { selector: CLICKABLE_SELECTOR, activate: activateClick },
-  newtab: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: openInNewTab },
+  click: {
+    selector: CLICKABLE_SELECTOR,
+    pointerCursor: true,
+    activate: activateClick,
+  },
+  newtab: {
+    selector: CLICKABLE_SELECTOR,
+    linkOnly: true,
+    activate: openInNewTab,
+  },
   yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
   focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
   // background: same as newtab, but sticky — the hints stay up after a pick
@@ -230,11 +240,127 @@ function isActive() {
 function setWheelBlocking(on) {
   if (on && !blockWheel) {
     blockWheel = (event) => event.preventDefault();
-    window.addEventListener("wheel", blockWheel, { capture: true, passive: false });
+    window.addEventListener("wheel", blockWheel, {
+      capture: true,
+      passive: false,
+    });
   } else if (!on && blockWheel) {
     window.removeEventListener("wheel", blockWheel, { capture: true });
     blockWheel = null;
   }
+}
+
+// Hints sit at scan-time coordinates; while they are up, any scroll — a
+// window scroll, a page container (Instagram's feed scrolls inside its own
+// box), or a scrollbar drag — detaches every label from its element. A
+// capture-phase scroll listener re-anchors the labels to their elements'
+// current positions. It is passive because there is nothing to cancel, and
+// it only exists while hints are open so no listener cost leaks into normal
+// browsing. The re-anchor runs once per frame: scroll events can fire many
+// times per frame, and recomputing 100 rects each is wasted work.
+let scrollTracking = null;
+let trackingFrame = null;
+
+function setScrollTracking(on) {
+  if (on && !scrollTracking) {
+    scrollTracking = () => scheduleHintReposition();
+    window.addEventListener("scroll", scrollTracking, {
+      capture: true,
+      passive: true,
+    });
+  } else if (!on && scrollTracking) {
+    window.removeEventListener("scroll", scrollTracking, { capture: true });
+    scrollTracking = null;
+  }
+}
+
+function scheduleHintReposition() {
+  if (trackingFrame !== null) return;
+  trackingFrame = requestAnimationFrame(repositionHints);
+}
+
+// Re-pin every visible label to its element. Labels whose element scrolled
+// out of the viewport are hidden (display:none — they are absolute, so no
+// layout shifts); an element that scrolls back in is shown again. Detached
+// elements from a virtualized re-render read as zero-size and hide.
+function repositionHints() {
+  trackingFrame = null;
+  for (const [label, el] of labels) {
+    const box = overlays.get(label);
+    if (!box) continue;
+    const rect = hintRect(el, el.getBoundingClientRect());
+    const pos = labelPlacement(
+      rect,
+      window.scrollX,
+      window.scrollY,
+      window.innerWidth,
+      window.innerHeight,
+    );
+    if (!pos) {
+      box.style.display = "none";
+      continue;
+    }
+    box.style.display = "";
+    box.style.left = pos.left + "px";
+    box.style.top = pos.top + "px";
+  }
+}
+
+const POINTER_CAP = 200;
+
+function isPointerCursor(style) {
+  const cursor = style && style.cursor;
+  return (
+    cursor === "pointer" ||
+    (typeof cursor === "string" && cursor.startsWith("url("))
+  );
+}
+
+// Cheap pre-filters before any style read: no box (display:none subtree,
+// collapsed template content) or fully off-viewport means no pointer target.
+// The rect is recomputed by the visibility pass; within one synchronous scan
+// the browser caches it, so the double read is near-free.
+function isPointerCandidate(el) {
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  if (rect.left >= vw || rect.top >= vh || rect.right <= 0 || rect.bottom <= 0)
+    return false;
+  // One computed-style read covers visibility and cursor; hidden elements are
+  // dropped before the cursor test (visibility is inherited, so a hidden
+  // ancestor is caught too).
+  const style = window.getComputedStyle(el);
+  if (style.visibility === "hidden") return false;
+  return isPointerCursor(style);
+}
+
+// Click-hint candidates in flat-tree order: selector matches plus, when
+// enabled, elements SurfingKeys treats as clickable via the cursor heuristic.
+// Like queryAll, every element and open shadow root is walked (the flat tree
+// keeps shadow content after its host), so the ancestor-before-descendant
+// order the nesting logic relies on is preserved. Pointer-only additions are
+// capped so the style reads stay bounded.
+function queryClickables(selector, { pointerCursor = true } = {}) {
+  const out = [];
+  let pointerCount = 0;
+  const visit = (root) => {
+    for (const el of root.querySelectorAll("*")) {
+      if (el.matches(selector)) {
+        out.push(el);
+      } else if (
+        pointerCursor &&
+        pointerCount < POINTER_CAP &&
+        isPointerCandidate(el)
+      ) {
+        pointerCount++;
+        out.push(el);
+      }
+      if (el.shadowRoot) visit(el.shadowRoot);
+    }
+  };
+  visit(document);
+  return out;
 }
 
 function start(nextMode) {
@@ -242,16 +368,28 @@ function start(nextMode) {
   if (!config) return;
   cancel();
 
-  const { top: topLevel, rects, total: counted } = scanElements(
-    queryAll(config.selector),
-    {
-      passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
-      visible: isVisible,
-      occluded: isOccluded,
-      max: MAX_HINTS,
-      nested: treeItemNested,
-    },
-  );
+  const candidates = config.pointerCursor
+    ? queryClickables(config.selector)
+    : queryAll(config.selector);
+  const {
+    top: topLevel,
+    rects,
+    total: counted,
+  } = scanElements(candidates, {
+    passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
+    visible: isVisible,
+    occluded: isOccluded,
+    max: MAX_HINTS,
+    nested: treeItemNested,
+  });
+  // Wrapped or clipped anchors report one merged box (getBoundingClientRect)
+  // whose edges can point at empty space; the hint label lands on the box
+  // instead of a fragment that is actually visible. getClientRects gives the
+  // per-line fragments, so re-pin the label to a real one (SurfingKeys'
+  // getRealRect). Placement only — hit-testing already ran on the scan rect.
+  for (const el of topLevel) {
+    rects.set(el, hintRect(el, rects.get(el)));
+  }
   const hintCount = topLevel.length;
 
   if (nextMode === "focus" && topLevel.length === 1) {
@@ -287,6 +425,7 @@ function start(nextMode) {
   }
   host.appendChild(fragment);
   setWheelBlocking(true);
+  setScrollTracking(true);
 }
 
 // An element must be genuinely interactive: not disabled and not an anchor
@@ -346,7 +485,10 @@ function isVisible(el) {
   // walks the flat tree with cached render state and computes no style per
   // ancestor, so it stays cheap; the rect and computed-style fast-fails above
   // run first.
-  if (typeof el.checkVisibility === "function" && !el.checkVisibility({ opacityProperty: true })) {
+  if (
+    typeof el.checkVisibility === "function" &&
+    !el.checkVisibility({ opacityProperty: true })
+  ) {
     return null;
   }
   return rect;
@@ -386,7 +528,12 @@ function occlusionSamples(portion) {
 // computation or reflow.
 function rectOverlapsScrollport(rect, node) {
   const box = node.getBoundingClientRect();
-  return rect.bottom > box.top && rect.top < box.bottom && rect.right > box.left && rect.left < box.right;
+  return (
+    rect.bottom > box.top &&
+    rect.top < box.bottom &&
+    rect.right > box.left &&
+    rect.left < box.right
+  );
 }
 
 function isOccluded(el, rect) {
@@ -399,7 +546,10 @@ function isOccluded(el, rect) {
   // rejected too, while they still skip their expensive elementFromPoint test.
   let node = el.parentElement || el.getRootNode().host;
   while (node) {
-    if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) {
+    if (
+      node.scrollWidth > node.clientWidth ||
+      node.scrollHeight > node.clientHeight
+    ) {
       const style = window.getComputedStyle(node);
       if (style.overflowX !== "visible" || style.overflowY !== "visible") {
         if (!rectOverlapsScrollport(rect, node)) return true;
@@ -458,7 +608,10 @@ function treeItemNested(el, ancestor) {
 // distinct actions, like treeitem rows.
 // Returns the top-level elements in document order, a rect per element, and
 // the total count of viable elements for the toast.
-function scanElements(candidates, { passes, visible, occluded, max, nested = () => true }) {
+function scanElements(
+  candidates,
+  { passes, visible, occluded, max, nested = () => true },
+) {
   const top = [];
   const viableSet = new Set();
   const rects = new Map();
@@ -519,20 +672,44 @@ function toBase26(value, length, chars) {
   return s;
 }
 
+function hintRect(el, fallback) {
+  if (el.childElementCount === 0) {
+    const rects = el.getClientRects();
+    if (rects.length === 3) return rects[1];
+    if (rects.length === 2) return rects[0];
+  }
+  return fallback;
+}
+
+function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
+  const left = Math.max(rect.left, 0);
+  const top = Math.max(rect.top, 0);
+  const right = Math.min(rect.right, viewportWidth);
+  const bottom = Math.min(rect.bottom, viewportHeight);
+  if (right <= left || bottom <= top) return null;
+  return {
+    left: scrollX + left,
+    top: scrollY + Math.min(top, viewportHeight - LABEL_HEIGHT),
+  };
+}
+
 function createHintOverlay(label, rect) {
   const box = document.createElement("div");
   box.className = "jari-hint";
-  // One span per character so updateHighlight can mute the typed prefix.
   for (const ch of label) {
     const span = document.createElement("span");
     span.textContent = ch;
     box.appendChild(span);
   }
-  // Keep the box fully inside the viewport: a link with only a sliver
-  // visible at the fold edge would otherwise put its label half off-screen.
-  const top = Math.max(0, Math.min(rect.top, window.innerHeight - LABEL_HEIGHT));
-  box.style.left = window.scrollX + rect.left + "px";
-  box.style.top = window.scrollY + top + "px";
+  const pos = labelPlacement(
+    rect,
+    window.scrollX,
+    window.scrollY,
+    window.innerWidth,
+    window.innerHeight,
+  );
+  box.style.left = pos.left + "px";
+  box.style.top = pos.top + "px";
   return box;
 }
 
@@ -540,7 +717,8 @@ function openInNewTab(el) {
   const href = el.href || el.getAttribute?.("href");
   // Only hand web-ish URLs to the background. Anything else (javascript:,
   // data:, mailto:, ...) is a same-tab click, which the site itself offers.
-  const scheme = href && href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1].toLowerCase();
+  const scheme =
+    href && href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1].toLowerCase();
   if (scheme && allowedUrlSchemes.has(scheme)) {
     sendMessage("openInBackgroundTab", { url: href });
   } else {
@@ -611,6 +789,11 @@ function updateHighlight() {
 
 function cancel() {
   setWheelBlocking(false);
+  setScrollTracking(false);
+  if (trackingFrame !== null) {
+    cancelAnimationFrame(trackingFrame);
+    trackingFrame = null;
+  }
   if (hintsHost) hintsHost.remove();
   hintsHost = null;
   overlays.clear();
@@ -628,8 +811,14 @@ export const Hints = {
   visiblePortion,
   scanElements,
   setWheelBlocking,
+  setScrollTracking,
+  labelPlacement,
   rectOverlapsScrollport,
   treeItemNested,
+  clickableSelector: CLICKABLE_SELECTOR,
+  isPointerCursor,
+  queryClickables,
+  hintRect,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });
