@@ -1095,6 +1095,11 @@
   }
   function rectOverlapsScrollport(rect, node) {
     const box = node.getBoundingClientRect();
+    const vw = globalThis.window?.innerWidth;
+    const vh = globalThis.window?.innerHeight;
+    if (vh != null && (box.bottom <= 0 || box.top >= vh || box.right <= 0 || box.left >= vw)) {
+      return true;
+    }
     return rect.bottom > box.top && rect.top < box.bottom && rect.right > box.left && rect.left < box.right;
   }
   function isOccluded(el, rect) {

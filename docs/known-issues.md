@@ -6,6 +6,38 @@ current status.
 
 ## Resolved
 
+## Instagram feed — no hints after scrolling
+
+**Step:** On the desktop feed, scroll down a few posts, then press `f`.
+
+**Expected:** hints on the visible posts (username/hashtag links, action
+buttons, comment links).
+
+**Actual:** (pre-fix) at the top of the feed hints appear normally, but once
+the page is scrolled the scan finds nothing — zero hints even though the
+viewport is full of links.
+
+**Status:** resolved in 106eed0. Notes for future debugging:
+
+- Instagram scrolls the **window**, not an internal container, and sets
+  `overflow-y: scroll` on `<html>`. The occlusion scan walks ancestors
+  looking for clip boxes; the root element's `getBoundingClientRect()` is
+  viewport-sized but lives in document coordinates, so once the page scrolls
+  the box sits entirely above the viewport and the scrollport-overlap test
+  rejected every on-screen element.
+- Other sites did not show this because `overflow-y` defaults to `visible`
+  on `<html>`, and the walk skips ancestors with visible overflow. The bug
+  was specifically an explicit non-visible overflow on the root.
+- Two defenses now cover it: the walk skips `document.documentElement` and
+  `document.body` entirely (they are the viewport, not clip boxes), and
+  `rectOverlapsScrollport` treats any box that misses the viewport as
+  overlapping (an off-screen box cannot clip on-screen content). Real clip
+  boxes — carousels (Instagram's stories bar), feed columns — are descendants
+  and are still checked.
+- Regression coverage: `isOccluded` and `scanElements` tests in
+  `tests/hints.test.js` ("ignores the scrolled root element",
+  "keeps on-screen links on a window-scrolled page").
+
 ## Google search results — hint occlusion and label placement
 
 **Step:** Press `f` on Google SERPs, then scroll so a result's title sits
