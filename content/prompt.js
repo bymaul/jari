@@ -29,6 +29,7 @@ let query = ""; // current filter text, used for match highlighting
 let mode = "tabs"; // "tabs" | "merge" | "open" | "edit"
 let suggestSeq = 0; // invalidates in-flight suggestion fetches
 let suggestTimer = null;
+let restoreFocus = null; // element focused before the overlay opened
 
 function isActive() {
   return active;
@@ -155,6 +156,13 @@ function render(title, placeholder) {
       renderList();
     }
   });
+  // Shield the page from the keys typed into the search box. onKeyDown runs
+  // on the window capture phase and only stops the keys the prompt consumes;
+  // every other key still reaches this input (so typing works) and would
+  // otherwise keep bubbling up to the page's document/window listeners —
+  // site-wide shortcuts firing while the omnibar is open. Stopping the event
+  // at the input leaves the default text insertion untouched.
+  inputEl.addEventListener("keydown", (event) => event.stopPropagation());
 
   listEl = document.createElement("ul");
   listEl.className = "jari-prompt-list";
@@ -170,6 +178,10 @@ function render(title, placeholder) {
 
   filtered = tabs;
   renderList();
+  // Remember what had focus before the overlay took over, so close() can hand
+  // it back. Captured here, right before the input steals focus, covers every
+  // open* mode.
+  restoreFocus = document.activeElement;
   inputEl.focus();
 }
 
@@ -283,7 +295,9 @@ function move(delta) {
 
 // Capture-phase key handler. The search box owns printable keys; Escape,
 // Enter, Tab and the arrow keys are intercepted here and stopped so the
-// page never sees them.
+// page never sees them. The remaining keys are not stopped here — typing
+// must keep working — but a bubble listener on the input stops them at the
+// input before they can reach the page (see render()).
 function onKeyDown(event) {
   const inInput = document.activeElement === inputEl;
   if (inInput) {
@@ -360,6 +374,13 @@ function close() {
   query = "";
   mode = "tabs";
   active = false;
+  // Give focus back to what the overlay interrupted. Skipped when the action
+  // navigated away (the element is gone or focus already moved) — e.g. "ge"
+  // edits this tab, "gt" switches tabs.
+  if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
+    restoreFocus.focus();
+  }
+  restoreFocus = null;
 }
 
 export const Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
