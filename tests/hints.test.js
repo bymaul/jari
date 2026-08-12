@@ -264,3 +264,39 @@ test("setWheelBlocking removes the listener when disabled and never double-insta
     assert.strictEqual(listeners.length, 0);
   });
 });
+
+// A stand-in for a scroll container: rectOverlapsScrollport only reads the
+// node's box and scroll metrics, so a plain object suffices.
+function scrollContainer({ left = 0, top = 0, width = 500, height = 300, scrollLeft = 0, scrollTop = 0 } = {}) {
+  return {
+    scrollLeft,
+    scrollTop,
+    clientWidth: width,
+    clientHeight: height,
+    getBoundingClientRect: () => ({ left, top, right: left + width, bottom: top + height }),
+  };
+}
+
+test("rectOverlapsScrollport rejects elements scrolled out of the container", () => {
+  const container = scrollContainer({ top: 0, width: 500, height: 300, scrollTop: 300 });
+  // Scrollport now spans y in [300, 600]: an element still on screen at its
+  // old spot (inside the window viewport) is scrolled out of the carousel.
+  assert.equal(Hints.rectOverlapsScrollport({ left: 10, top: 50, right: 60, bottom: 80 }, container), false);
+  assert.equal(Hints.rectOverlapsScrollport({ left: 10, top: 350, right: 60, bottom: 380 }, container), true);
+});
+
+test("rectOverlapsScrollport rejects elements on each side of the scrollport", () => {
+  const container = scrollContainer({ width: 500, height: 300 });
+  assert.equal(Hints.rectOverlapsScrollport({ left: 0, top: 320, right: 100, bottom: 400 }, container), false); // below
+  assert.equal(Hints.rectOverlapsScrollport({ left: 0, top: -100, right: 100, bottom: -20 }, container), false); // above
+  assert.equal(Hints.rectOverlapsScrollport({ left: 520, top: 10, right: 600, bottom: 50 }, container), false); // right
+  assert.equal(Hints.rectOverlapsScrollport({ left: -100, top: 10, right: -20, bottom: 50 }, container), false); // left
+});
+
+test("rectOverlapsScrollport keeps anything overlapping the scrollport", () => {
+  const container = scrollContainer({ width: 500, height: 300 });
+  assert.equal(Hints.rectOverlapsScrollport({ left: 0, top: 0, right: 100, bottom: 100 }, container), true);
+  assert.equal(Hints.rectOverlapsScrollport({ left: 100, top: 100, right: 300, bottom: 200 }, container), true);
+  // A sliver over the edge still overlaps.
+  assert.equal(Hints.rectOverlapsScrollport({ left: 450, top: 100, right: 550, bottom: 200 }, container), true);
+});

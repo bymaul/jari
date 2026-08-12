@@ -268,7 +268,7 @@ function start(nextMode) {
     ui.toast(`${hintCount} inputs — pick one`);
   }
   if (counted > MAX_HINTS) {
-    ui.toast(`Showing ${MAX_HINTS} of ${counted} hints`);
+    ui.toast(`Showing ${hintCount} of ${counted} hints`);
   }
   const hintLabels = generateLabels(hintCount);
   // Build every box into a detached fragment and attach it to the host once,
@@ -376,7 +376,37 @@ function occlusionSamples(portion) {
   return points;
 }
 
+// True when `rect` (viewport coordinates) overlaps the scrolled client area
+// of `node` — i.e. the element is not scrolled out of this scroll container.
+// The node's box and scroll metrics are layout-cached after the scan's first
+// getBoundingClientRect, so the check adds no style computation or reflow.
+function rectOverlapsScrollport(rect, node) {
+  const box = node.getBoundingClientRect();
+  const top = box.top + node.scrollTop;
+  const bottom = top + node.clientHeight;
+  const left = box.left + node.scrollLeft;
+  const right = left + node.clientWidth;
+  return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+}
+
 function isOccluded(el, rect) {
+  // Scrolled out of a clipping ancestor's viewport: carousel trays and scroll
+  // containers keep off-view items invisible even though their rect is still
+  // inside the window viewport (Instagram's stories bar). Only an ancestor
+  // whose content overflows its box can clip, so the cheap scroll-size read
+  // gates the walk; among those, an overflow:visible box clips nothing. The
+  // walk runs before the form-control shortcut so scrolled-out inputs are
+  // rejected too, while they still skip their expensive elementFromPoint test.
+  let node = el.parentElement || el.getRootNode().host;
+  while (node) {
+    if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) {
+      const style = window.getComputedStyle(node);
+      if (style.overflowX !== "visible" || style.overflowY !== "visible") {
+        if (!rectOverlapsScrollport(rect, node)) return true;
+      }
+    }
+    node = node.parentElement || node.getRootNode().host;
+  }
   if (el.matches("input, textarea, select, [contenteditable]")) return false;
   // Hit-test the visible portion, not the full rect: a link scrolled under a
   // sticky header or cut off by the fold has an off-screen or covered center
@@ -583,6 +613,7 @@ export const Hints = {
   visiblePortion,
   scanElements,
   setWheelBlocking,
+  rectOverlapsScrollport,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });

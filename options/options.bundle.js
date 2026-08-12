@@ -920,7 +920,7 @@
       ui.toast(`${hintCount} inputs \u2014 pick one`);
     }
     if (counted > MAX_HINTS) {
-      ui.toast(`Showing ${MAX_HINTS} of ${counted} hints`);
+      ui.toast(`Showing ${hintCount} of ${counted} hints`);
     }
     const hintLabels = generateLabels(hintCount);
     const host = getHintsHost();
@@ -982,7 +982,25 @@
     if (h >= 8) points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
     return points;
   }
+  function rectOverlapsScrollport(rect, node) {
+    const box = node.getBoundingClientRect();
+    const top = box.top + node.scrollTop;
+    const bottom = top + node.clientHeight;
+    const left = box.left + node.scrollLeft;
+    const right = left + node.clientWidth;
+    return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+  }
   function isOccluded(el, rect) {
+    let node = el.parentElement || el.getRootNode().host;
+    while (node) {
+      if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) {
+        const style = window.getComputedStyle(node);
+        if (style.overflowX !== "visible" || style.overflowY !== "visible") {
+          if (!rectOverlapsScrollport(rect, node)) return true;
+        }
+      }
+      node = node.parentElement || node.getRootNode().host;
+    }
     if (el.matches("input, textarea, select, [contenteditable]")) return false;
     const portion = visiblePortion(rect);
     if (!portion) return true;
@@ -1139,7 +1157,8 @@
     generateLabels,
     visiblePortion,
     scanElements,
-    setWheelBlocking
+    setWheelBlocking,
+    rectOverlapsScrollport
   };
   register("hints", { close: cancel, onKeyDown, isActive });
 
