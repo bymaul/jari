@@ -319,10 +319,11 @@ function visiblePortion(rect) {
 // The element's on-screen rect, or null when it is not visible: zero-size,
 // entirely off-viewport (display:none anywhere collapses the rect to zero
 // size), visibility:hidden on itself or an ancestor (computed visibility is
-// inherited), or own opacity:0. One computed-style read covers both, which
-// is cheaper than checkVisibility's ancestor walk and keeps the scan fast on
-// element-heavy pages. A hidden ancestor's opacity is not caught — the same
-// limitation Surfingkeys accepts.
+// inherited), own opacity:0, or an opacity:0 ancestor (checked last, via
+// checkVisibility, because opacity does not inherit). One computed-style read
+// covers the cheap cases, which is faster than checkVisibility's ancestor
+// walk on element-heavy pages; the walk only runs for the few elements that
+// survive the fast-fails.
 function isVisible(el) {
   const rect = el.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
@@ -337,6 +338,15 @@ function isVisible(el) {
   const style = window.getComputedStyle(el);
   if (style.visibility === "hidden") return null;
   if (parseFloat(style.opacity) === 0) return null;
+  // opacity:0 on an ancestor hides the subtree even though the element's own
+  // opacity is 1 (opacity does not inherit) — dropdowns, carousels and
+  // fade-in panels keep their content at opacity:0 until shown. checkVisibility
+  // walks the flat tree with cached render state and computes no style per
+  // ancestor, so it stays cheap; the rect and computed-style fast-fails above
+  // run first.
+  if (typeof el.checkVisibility === "function" && !el.checkVisibility({ opacityProperty: true })) {
+    return null;
+  }
   return rect;
 }
 

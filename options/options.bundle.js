@@ -966,6 +966,9 @@
     const style = window.getComputedStyle(el);
     if (style.visibility === "hidden") return null;
     if (parseFloat(style.opacity) === 0) return null;
+    if (typeof el.checkVisibility === "function" && !el.checkVisibility({ opacityProperty: true })) {
+      return null;
+    }
     return rect;
   }
   function occlusionSamples(portion) {
