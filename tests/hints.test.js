@@ -279,10 +279,13 @@ function scrollContainer({ left = 0, top = 0, width = 500, height = 300, scrollL
 
 test("rectOverlapsScrollport rejects elements scrolled out of the container", () => {
   const container = scrollContainer({ top: 0, width: 500, height: 300, scrollTop: 300 });
-  // Scrollport now spans y in [300, 600]: an element still on screen at its
-  // old spot (inside the window viewport) is scrolled out of the carousel.
-  assert.equal(Hints.rectOverlapsScrollport({ left: 10, top: 50, right: 60, bottom: 80 }, container), false);
-  assert.equal(Hints.rectOverlapsScrollport({ left: 10, top: 350, right: 60, bottom: 380 }, container), true);
+  // Rects are viewport coordinates, like getBoundingClientRect returns; the
+  // container's box is the visible area regardless of scrollTop. An element
+  // below the box was scrolled out of the carousel even though it is still
+  // inside the window viewport; one inside the box, even though the container
+  // is scrolled 300px, is on screen.
+  assert.equal(Hints.rectOverlapsScrollport({ left: 10, top: 350, right: 60, bottom: 380 }, container), false);
+  assert.equal(Hints.rectOverlapsScrollport({ left: 10, top: 50, right: 60, bottom: 80 }, container), true);
 });
 
 test("rectOverlapsScrollport rejects elements on each side of the scrollport", () => {

@@ -376,17 +376,15 @@ function occlusionSamples(portion) {
   return points;
 }
 
-// True when `rect` (viewport coordinates) overlaps the scrolled client area
-// of `node` — i.e. the element is not scrolled out of this scroll container.
-// The node's box and scroll metrics are layout-cached after the scan's first
-// getBoundingClientRect, so the check adds no style computation or reflow.
+// True when `rect` (viewport coordinates) overlaps the visible area of
+// `node` — i.e. the element is not clipped out of this overflow container.
+// The rect and the node's box are both viewport coordinates, so no scroll
+// offset enters the comparison; the box is layout-cached by the browser
+// after the scan's first getBoundingClientRect, so the check adds no style
+// computation or reflow.
 function rectOverlapsScrollport(rect, node) {
   const box = node.getBoundingClientRect();
-  const top = box.top + node.scrollTop;
-  const bottom = top + node.clientHeight;
-  const left = box.left + node.scrollLeft;
-  const right = left + node.clientWidth;
-  return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+  return rect.bottom > box.top && rect.top < box.bottom && rect.right > box.left && rect.left < box.right;
 }
 
 function isOccluded(el, rect) {
