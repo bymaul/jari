@@ -220,49 +220,15 @@ function start(nextMode) {
   if (!config) return;
   cancel();
 
-  // One pass collects every hintable element together with its rect: the
-  // rect from the visibility check is reused for the occlusion test and for
-  // the overlay position, so no rect is read twice and no overlay append
-  // invalidates the next read. Scanning stops once MAX_HINTS top-level
-  // elements are found — ancestors always precede descendants in document
-  // order, so nested matches are recognizable as we go and the remaining
-  // candidates only need a cheap count for the "Showing N of M" toast. That
-  // caps the expensive elementFromPoint hit tests at ~MAX_HINTS regardless
-  // of how many matches the page has.
-  const top = [];
-  const viableSet = new Set();
-  const rects = new Map();
-  let counted = 0;
-  for (const el of queryAll(config.selector)) {
-    if (!isInteractive(el)) continue;
-    if (config.linkOnly && !linkHref(el)) continue;
-    if (top.length >= MAX_HINTS) {
-      // Past the cap: no hit test, just count the visible survivors.
-      if (isVisible(el)) counted++;
-      continue;
-    }
-    const rect = isVisible(el);
-    if (!rect) continue;
-    if (isOccluded(el, rect)) continue;
-    viableSet.add(el);
-    // Labels sit on the visible portion, not the full rect: a link half
-    // under the sticky bar or cut by the fold would otherwise get its hint
-    // box at an off-screen or covered position.
-    rects.set(el, visiblePortion(rect));
-    counted++;
-    // Top-level unless an already-collected ancestor is also a match.
-    let node = el.parentElement || el.getRootNode().host;
-    let nested = false;
-    while (node) {
-      if (viableSet.has(node)) {
-        nested = true;
-        break;
-      }
-      node = node.parentElement || node.getRootNode().host;
-    }
-    if (!nested) top.push(el);
-  }
-  const topLevel = top;
+  const { top: topLevel, rects, total: counted } = scanElements(
+    queryAll(config.selector),
+    {
+      passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
+      visible: isVisible,
+      occluded: isOccluded,
+      max: MAX_HINTS,
+    },
+  );
   const hintCount = topLevel.length;
 
   if (nextMode === "focus" && topLevel.length === 1) {
@@ -401,6 +367,53 @@ function isOccluded(el, rect) {
   return true;
 }
 
+// One pass collects every hintable element together with its rect: the rect
+// from the visibility check is reused for the occlusion test and for the
+// overlay position, so no rect is read twice and no overlay append
+// invalidates the next read. Scanning stops once `max` top-level elements
+// are found — ancestors always precede descendants in document order, so
+// nested matches are recognizable as we go and the remaining candidates only
+// need a cheap count for the "Showing N of M" toast. That caps the expensive
+// occlusion hit tests at ~max regardless of how many matches the page has.
+// The predicates are injected so the scan is testable without a DOM; the DOM
+// reads live in the callers, not here.
+// `visible` returns the element's rect, or null when it cannot be seen.
+// `occluded(el, rect)` says whether the element's visible part is covered.
+// Returns the top-level elements in document order, a rect per element, and
+// the total count of viable elements for the toast.
+function scanElements(candidates, { passes, visible, occluded, max }) {
+  const top = [];
+  const viableSet = new Set();
+  const rects = new Map();
+  let counted = 0;
+  for (const el of candidates) {
+    if (!passes(el)) continue;
+    if (top.length >= max) {
+      // Past the cap: no hit test, just count the visible survivors.
+      if (visible(el)) counted++;
+      continue;
+    }
+    const rect = visible(el);
+    if (!rect) continue;
+    if (occluded(el, rect)) continue;
+    viableSet.add(el);
+    rects.set(el, rect);
+    counted++;
+    // Top-level unless an already-collected ancestor is also a match.
+    let node = el.parentElement || el.getRootNode().host;
+    let nested = false;
+    while (node) {
+      if (viableSet.has(node)) {
+        nested = true;
+        break;
+      }
+      node = node.parentElement || node.getRootNode().host;
+    }
+    if (!nested) top.push(el);
+  }
+  return { top, rects, total: counted };
+}
+
 // Labels are always at least two characters (AA, AB, ...) and grow a
 // character whenever the set is exhausted, so they never duplicate.
 function generateLabels(count) {
@@ -535,6 +548,7 @@ export const Hints = {
   isActive,
   generateLabels,
   visiblePortion,
+  scanElements,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });

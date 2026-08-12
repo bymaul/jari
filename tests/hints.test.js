@@ -117,3 +117,99 @@ test("visiblePortion rejects rects entirely outside the viewport", () => {
     assert.equal(Hints.visiblePortion({ left: 0, top: 0, right: 100, bottom: -50 }), null);
   });
 });
+
+// The scan only touches the ancestor chain (parentElement +
+// getRootNode().host across shadow boundaries); every other DOM read lives in
+// the injected predicates, so a plain object stands in for a real element.
+function element(name, { parent = null, host = null } = {}) {
+  return { name, parentElement: parent, getRootNode: () => ({ host }) };
+}
+
+const alwaysPasses = () => true;
+const alwaysVisible = () => ({ ok: 1 });
+const neverOccluded = () => false;
+
+test("scanElements keeps top-level matches in document order", () => {
+  const a = element("a");
+  const b = element("b", { parent: a });
+  const c = element("c");
+  const { top, rects, total } = Hints.scanElements([a, b, c], {
+    passes: alwaysPasses,
+    visible: alwaysVisible,
+    occluded: neverOccluded,
+    max: 100,
+  });
+  assert.deepEqual(top, [a, c]);
+  // rects holds every viable element, nested matches included.
+  assert.strictEqual(rects.size, 3);
+  assert.strictEqual(total, 3);
+});
+
+test("scanElements drops elements the filter rejects", () => {
+  const a = element("a");
+  const b = element("b");
+  const { top, total } = Hints.scanElements([a, b], {
+    passes: (el) => el.name === "a",
+    visible: alwaysVisible,
+    occluded: neverOccluded,
+    max: 100,
+  });
+  assert.deepEqual(top, [a]);
+  assert.strictEqual(total, 1);
+});
+
+test("scanElements skips invisible elements and does not count them", () => {
+  const a = element("a");
+  const b = element("b");
+  const { top, total } = Hints.scanElements([a, b], {
+    passes: alwaysPasses,
+    visible: (el) => (el.name === "b" ? { ok: 1 } : null),
+    occluded: neverOccluded,
+    max: 100,
+  });
+  assert.deepEqual(top, [b]);
+  assert.strictEqual(total, 1);
+});
+
+test("scanElements skips occluded elements and does not count them", () => {
+  const a = element("a");
+  const b = element("b");
+  const { top, total } = Hints.scanElements([a, b], {
+    passes: alwaysPasses,
+    visible: alwaysVisible,
+    occluded: (el) => el.name === "a",
+    max: 100,
+  });
+  assert.deepEqual(top, [b]);
+  assert.strictEqual(total, 1);
+});
+
+test("scanElements stops occlusion testing once the cap is reached", () => {
+  const many = Array.from({ length: 10 }, (_, i) => element(`e${i}`));
+  let occlusionTests = 0;
+  const { top, total } = Hints.scanElements(many, {
+    passes: alwaysPasses,
+    visible: alwaysVisible,
+    occluded: () => {
+      occlusionTests++;
+      return false;
+    },
+    max: 3,
+  });
+  assert.strictEqual(top.length, 3);
+  assert.strictEqual(occlusionTests, 3);
+  // Everything past the cap is counted without an occlusion test.
+  assert.strictEqual(total, 10);
+});
+
+test("scanElements treats shadow content as nested under its host", () => {
+  const host = element("host");
+  const shadowButton = element("shadow-button", { host });
+  const { top } = Hints.scanElements([host, shadowButton], {
+    passes: alwaysPasses,
+    visible: alwaysVisible,
+    occluded: neverOccluded,
+    max: 100,
+  });
+  assert.deepEqual(top, [host]);
+});
