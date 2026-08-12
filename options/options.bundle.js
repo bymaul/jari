@@ -764,6 +764,7 @@
     "[role='switch']",
     "[role='option']",
     "[role='combobox']",
+    "[role='treeitem']",
     "[onclick]"
   ].join(",");
   var TEXT_INPUT_TYPES = [
@@ -903,7 +904,8 @@
         passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
         visible: isVisible,
         occluded: isOccluded,
-        max: MAX_HINTS
+        max: MAX_HINTS,
+        nested: treeItemNested
       }
     );
     const hintCount = topLevel.length;
@@ -1008,7 +1010,13 @@
     }
     return true;
   }
-  function scanElements(candidates, { passes, visible, occluded, max }) {
+  function isTreeItem(el) {
+    return el.getAttribute?.("role") === "treeitem";
+  }
+  function treeItemNested(el, ancestor) {
+    return !(isTreeItem(el) && isTreeItem(ancestor));
+  }
+  function scanElements(candidates, { passes, visible, occluded, max, nested = () => true }) {
     const top = [];
     const viableSet = /* @__PURE__ */ new Set();
     const rects = /* @__PURE__ */ new Map();
@@ -1026,15 +1034,15 @@
       rects.set(el, rect);
       counted++;
       let node = el.parentElement || el.getRootNode().host;
-      let nested = false;
+      let isNested = false;
       while (node) {
-        if (viableSet.has(node)) {
-          nested = true;
+        if (viableSet.has(node) && nested(el, node)) {
+          isNested = true;
           break;
         }
         node = node.parentElement || node.getRootNode().host;
       }
-      if (!nested) top.push(el);
+      if (!isNested) top.push(el);
     }
     return { top, rects, total: counted };
   }
@@ -1154,7 +1162,8 @@
     visiblePortion,
     scanElements,
     setWheelBlocking,
-    rectOverlapsScrollport
+    rectOverlapsScrollport,
+    treeItemNested
   };
   register("hints", { close: cancel, onKeyDown, isActive });
 
