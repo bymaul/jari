@@ -45,6 +45,7 @@ const CLICKABLE_SELECTOR = [
   "[role='switch']",
   "[role='option']",
   "[role='combobox']",
+  "[role='treeitem']",
   "[onclick]",
 ].join(",");
 
@@ -248,6 +249,7 @@ function start(nextMode) {
       visible: isVisible,
       occluded: isOccluded,
       max: MAX_HINTS,
+      nested: treeItemNested,
     },
   );
   const hintCount = topLevel.length;
@@ -427,6 +429,17 @@ function isOccluded(el, rect) {
   return true;
 }
 
+// A treeitem's clickable ancestor is its folder row — a different action
+// (expand/collapse) than the item itself (open a file) — so neither nests the
+// other: both must get hints, or every file under an expanded folder (e.g.
+// GitHub's file tree) would be hidden by the generic ancestor-dedup rule.
+function isTreeItem(el) {
+  return el.getAttribute?.("role") === "treeitem";
+}
+function treeItemNested(el, ancestor) {
+  return !(isTreeItem(el) && isTreeItem(ancestor));
+}
+
 // One pass collects every hintable element together with its rect: the rect
 // from the visibility check is reused for the occlusion test and for the
 // overlay position, so no rect is read twice and no overlay append
@@ -439,9 +452,13 @@ function isOccluded(el, rect) {
 // reads live in the callers, not here.
 // `visible` returns the element's rect, or null when it cannot be seen.
 // `occluded(el, rect)` says whether the element's visible part is covered.
+// `nested(el, ancestor)` decides whether an already-collected ancestor that
+// also matched should suppress the element's hint (default: yes — a clickable
+// card wrapping its link is one click). Callers may exempt pairs that are
+// distinct actions, like treeitem rows.
 // Returns the top-level elements in document order, a rect per element, and
 // the total count of viable elements for the toast.
-function scanElements(candidates, { passes, visible, occluded, max }) {
+function scanElements(candidates, { passes, visible, occluded, max, nested = () => true }) {
   const top = [];
   const viableSet = new Set();
   const rects = new Map();
@@ -459,17 +476,17 @@ function scanElements(candidates, { passes, visible, occluded, max }) {
     viableSet.add(el);
     rects.set(el, rect);
     counted++;
-    // Top-level unless an already-collected ancestor is also a match.
+    // Top-level unless an already-collected ancestor nests it.
     let node = el.parentElement || el.getRootNode().host;
-    let nested = false;
+    let isNested = false;
     while (node) {
-      if (viableSet.has(node)) {
-        nested = true;
+      if (viableSet.has(node) && nested(el, node)) {
+        isNested = true;
         break;
       }
       node = node.parentElement || node.getRootNode().host;
     }
-    if (!nested) top.push(el);
+    if (!isNested) top.push(el);
   }
   return { top, rects, total: counted };
 }
@@ -612,6 +629,7 @@ export const Hints = {
   scanElements,
   setWheelBlocking,
   rectOverlapsScrollport,
+  treeItemNested,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });

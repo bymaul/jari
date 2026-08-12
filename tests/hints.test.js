@@ -119,10 +119,17 @@ test("visiblePortion rejects rects entirely outside the viewport", () => {
 });
 
 // The scan only touches the ancestor chain (parentElement +
-// getRootNode().host across shadow boundaries); every other DOM read lives in
-// the injected predicates, so a plain object stands in for a real element.
-function element(name, { parent = null, host = null } = {}) {
-  return { name, parentElement: parent, getRootNode: () => ({ host }) };
+// getRootNode().host across shadow boundaries) and the injected predicates;
+// every other DOM read lives in the callers, so a plain object stands in for
+// a real element.
+function element(name, { parent = null, host = null, role = null } = {}) {
+  return {
+    name,
+    parentElement: parent,
+    role,
+    getRootNode: () => ({ host }),
+    getAttribute: (attr) => (attr === "role" ? role : null),
+  };
 }
 
 const alwaysPasses = () => true;
@@ -212,6 +219,25 @@ test("scanElements treats shadow content as nested under its host", () => {
     max: 100,
   });
   assert.deepEqual(top, [host]);
+});
+
+test("scanElements nests every match by default, and the predicate can exempt pairs", () => {
+  const folder = element("docs", { role: "treeitem" });
+  const file = element("file.md", { role: "treeitem", parent: folder });
+  const opts = {
+    passes: alwaysPasses,
+    visible: alwaysVisible,
+    occluded: neverOccluded,
+    max: 100,
+  };
+  // Default: the file is nested under its folder row (a clickable card
+  // wrapping its link is one click), so only the folder gets a hint.
+  assert.deepEqual(Hints.scanElements([folder, file], opts).top, [folder]);
+  // Tree rows: the folder expands, the file opens — both must be hinted, or
+  // every file under an expanded tree folder would be unreachable.
+  const tree = Hints.scanElements([folder, file], { ...opts, nested: Hints.treeItemNested });
+  assert.deepEqual(tree.top, [folder, file]);
+  assert.strictEqual(tree.total, 2);
 });
 
 // setWheelBlocking touches window listeners only; a recording fake stands in
