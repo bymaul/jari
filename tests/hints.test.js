@@ -213,3 +213,54 @@ test("scanElements treats shadow content as nested under its host", () => {
   });
   assert.deepEqual(top, [host]);
 });
+
+// setWheelBlocking touches window listeners only; a recording fake stands in
+// for the real window, mirroring the withWindow/document swaps above.
+function withFakeWindow(fn) {
+  const listeners = [];
+  const fake = {
+    addEventListener(type, handler, options) {
+      listeners.push({ type, handler, options });
+    },
+    removeEventListener(type, handler) {
+      const i = listeners.findIndex((l) => l.type === type && l.handler === handler);
+      if (i !== -1) listeners.splice(i, 1);
+    },
+  };
+  const previous = globalThis.window;
+  globalThis.window = fake;
+  try {
+    fn(fake, listeners);
+  } finally {
+    globalThis.window = previous;
+  }
+}
+
+test("setWheelBlocking installs a non-passive capture wheel listener that cancels scroll", () => {
+  withFakeWindow((win, listeners) => {
+    try {
+      Hints.setWheelBlocking(true);
+      assert.strictEqual(listeners.length, 1);
+      assert.strictEqual(listeners[0].type, "wheel");
+      assert.deepEqual(listeners[0].options, { capture: true, passive: false });
+      const event = { prevented: false, preventDefault() { this.prevented = true; } };
+      listeners[0].handler(event);
+      assert.strictEqual(event.prevented, true);
+    } finally {
+      // Leave the module state clean so later tests start from "blocking off".
+      Hints.setWheelBlocking(false);
+    }
+  });
+});
+
+test("setWheelBlocking removes the listener when disabled and never double-installs", () => {
+  withFakeWindow((win, listeners) => {
+    Hints.setWheelBlocking(true);
+    Hints.setWheelBlocking(true);
+    assert.strictEqual(listeners.length, 1);
+    Hints.setWheelBlocking(false);
+    assert.strictEqual(listeners.length, 0);
+    Hints.setWheelBlocking(false);
+    assert.strictEqual(listeners.length, 0);
+  });
+});

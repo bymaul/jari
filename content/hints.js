@@ -194,6 +194,7 @@ let labels = new Map(); // hint label -> target element
 let overlays = new Map(); // hint label -> overlay element
 let typed = "";
 let hintsHost = null;
+let blockWheel = null;
 
 // All hint labels live in one host element that is attached to the page as a
 // single node. Appending 100 individual boxes to the body (open) and removing
@@ -213,6 +214,26 @@ function getHintsHost() {
 
 function isActive() {
   return mode !== null;
+}
+
+// While hints are up, a wheel scroll invalidates the hint set: boxes sit at
+// scan-time coordinates, so after any scroll the overlay no longer matches
+// what is on screen. onKeyDown already preventDefaults every key (so arrow
+// keys, space and PageDown are dead), which leaves the wheel — the last
+// unguarded way to move the page. The capture-phase listener cancels it for
+// the whole window while hints are open. `passive: false` is required:
+// Chrome treats wheel listeners on window/document/body as passive by
+// default and would refuse to let a passive one cancel the scroll. The
+// listener only exists while hints are open, so the non-passive cost is zero
+// the rest of the time.
+function setWheelBlocking(on) {
+  if (on && !blockWheel) {
+    blockWheel = (event) => event.preventDefault();
+    window.addEventListener("wheel", blockWheel, { capture: true, passive: false });
+  } else if (!on && blockWheel) {
+    window.removeEventListener("wheel", blockWheel, { capture: true });
+    blockWheel = null;
+  }
 }
 
 function start(nextMode) {
@@ -263,6 +284,7 @@ function start(nextMode) {
     fragment.appendChild(box);
   }
   host.appendChild(fragment);
+  setWheelBlocking(true);
 }
 
 // An element must be genuinely interactive: not disabled and not an anchor
@@ -533,6 +555,7 @@ function updateHighlight() {
 }
 
 function cancel() {
+  setWheelBlocking(false);
   if (hintsHost) hintsHost.remove();
   hintsHost = null;
   overlays.clear();
@@ -549,6 +572,7 @@ export const Hints = {
   generateLabels,
   visiblePortion,
   scanElements,
+  setWheelBlocking,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });
