@@ -544,8 +544,20 @@ function isOccluded(el, rect) {
   // gates the walk; among those, an overflow:visible box clips nothing. The
   // walk runs before the form-control shortcut so scrolled-out inputs are
   // rejected too, while they still skip their expensive elementFromPoint test.
+  // The documentElement and body are the viewport, not clip boxes: their
+  // overflow is applied to (or propagated to) the viewport, and their boxes
+  // live in document coordinates, so they slide off-screen as the page
+  // scrolls. Testing them would reject every on-screen element once the page
+  // is scrolled — Instagram sets overflow-y: scroll on <html>, so its
+  // off-screen root box fails the overlap test and the scan finds nothing.
+  // Real clip boxes are descendants (carousels, feed columns) and are still
+  // walked.
   let node = el.parentElement || el.getRootNode().host;
-  while (node) {
+  while (
+    node &&
+    node !== document.documentElement &&
+    node !== document.body
+  ) {
     if (
       node.scrollWidth > node.clientWidth ||
       node.scrollHeight > node.clientHeight
@@ -809,6 +821,7 @@ export const Hints = {
   isActive,
   generateLabels,
   visiblePortion,
+  isOccluded,
   scanElements,
   setWheelBlocking,
   setScrollTracking,

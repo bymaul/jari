@@ -1099,7 +1099,7 @@
   }
   function isOccluded(el, rect) {
     let node = el.parentElement || el.getRootNode().host;
-    while (node) {
+    while (node && node !== document.documentElement && node !== document.body) {
       if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) {
         const style = window.getComputedStyle(node);
         if (style.overflowX !== "visible" || style.overflowY !== "visible") {
@@ -1299,6 +1299,7 @@
     isActive,
     generateLabels,
     visiblePortion,
+    isOccluded,
     scanElements,
     setWheelBlocking,
     setScrollTracking,

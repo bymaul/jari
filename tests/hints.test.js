@@ -555,6 +555,106 @@ test("rectOverlapsScrollport keeps anything overlapping the scrollport", () => {
   );
 });
 
+// A fake viewport for the occlusion walk: isOccluded reads window for the
+// computed style of each ancestor and for the viewport size in the hit test.
+function withViewport({ innerWidth = 800, innerHeight = 457 }, fn) {
+  const previous = globalThis.window;
+  globalThis.window = {
+    innerWidth,
+    innerHeight,
+    // The style object is the node itself; the walk reads only overflowX
+    // and overflowY off it.
+    getComputedStyle: (node) => node,
+  };
+  try {
+    fn();
+  } finally {
+    globalThis.window = previous;
+  }
+}
+
+// The documentElement of a window-scrolled page: a tall, scrollable root
+// whose box is viewport-sized and slides off-screen as the page scrolls
+// (Instagram sets overflow-y: scroll on <html>; at scrollY=900 its box is
+// entirely above the viewport).
+function scrolledRootElement() {
+  return {
+    scrollWidth: 2000,
+    clientWidth: 800,
+    scrollHeight: 5000,
+    clientHeight: 457,
+    overflowX: "visible",
+    overflowY: "scroll",
+    getBoundingClientRect: () => ({ left: 0, top: -900, right: 800, bottom: -443 }),
+  };
+}
+
+// An ancestor chain whose only clipping ancestor is the viewport itself
+// (html/body). isOccluded must not treat those as clip boxes.
+function viewportOnlyChain() {
+  const html = scrolledRootElement();
+  const body = {
+    scrollWidth: 2000,
+    clientWidth: 800,
+    scrollHeight: 5000,
+    clientHeight: 457,
+    overflowX: "visible",
+    overflowY: "visible",
+    parentElement: html,
+  };
+  return { html, body };
+}
+
+// The element stands in for an on-screen clickable; the hit test returns the
+// element itself so nothing else can occlude it.
+function onScreenEl(parent, rect) {
+  const el = {
+    parentElement: parent,
+    matches: () => false,
+    getBoundingClientRect: () => rect,
+    getRootNode: () => ({ elementFromPoint: () => el }),
+  };
+  return el;
+}
+
+test("isOccluded ignores the scrolled root element (Instagram scrolls the window)", () => {
+  const { html, body } = viewportOnlyChain();
+  const rect = { left: 100, top: 100, right: 200, bottom: 130 };
+  withViewport({}, () => {
+    withDocument({ documentElement: html, body }, () => {
+      assert.equal(
+        Hints.isOccluded(onScreenEl(body, rect), rect),
+        false,
+      );
+    });
+  });
+});
+
+test("isOccluded still rejects elements scrolled out of a real container", () => {
+  const { html, body } = viewportOnlyChain();
+  // A real clip box: a carousel tray scrolled so its content is below the
+  // tray's on-screen box. Elements in that region are not really visible.
+  const tray = {
+    scrollWidth: 500,
+    clientWidth: 500,
+    scrollHeight: 400,
+    clientHeight: 100,
+    overflowX: "auto",
+    overflowY: "auto",
+    parentElement: body,
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 500, bottom: 100 }),
+  };
+  const below = { left: 10, top: 200, right: 60, bottom: 230 };
+  withViewport({}, () => {
+    withDocument({ documentElement: html, body }, () => {
+      assert.equal(
+        Hints.isOccluded(onScreenEl(tray, below), below),
+        true,
+      );
+    });
+  });
+});
+
 // A fake element for queryClickables: matches by name (like shadow.test.js),
 // plus the rect/style reads the pointer gate does.
 function pointerEl(
