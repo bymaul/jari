@@ -199,16 +199,18 @@ export function deepActiveElement() {
 
 // Every element matching `selector` in the document and inside open shadow
 // roots. Matching is delegated to the native querySelectorAll per root, so a
-// heavy page is not walked element-by-element. Shadow roots are traversed
-// only under hosts that themselves match the selector (a clickable inside a
-// shadow tree whose host is not a match is out of scope). onShadowRoot is
-// called with every traversed open root so callers can observe them.
-// Returns a fresh array.
+// heavy page is not walked element-by-element. Traversal descends into the
+// shadow root of every element, matched or not — a generic <div> host can
+// wrap a whole shadow component whose clickables would otherwise be missed
+// (Notion, Docs, Gmail widgets). Tree order is preserved: the flat tree puts
+// shadow content after its host, so ancestors still precede descendants.
+// onShadowRoot is called with every traversed open root so callers can
+// observe them. Returns a fresh array.
 export function queryAll(selector, onShadowRoot) {
   const out = [];
   const visit = (root) => {
-    for (const el of root.querySelectorAll(selector)) {
-      out.push(el);
+    for (const el of root.querySelectorAll("*")) {
+      if (el.matches(selector)) out.push(el);
       if (el.shadowRoot) {
         if (onShadowRoot) onShadowRoot(el.shadowRoot);
         visit(el.shadowRoot);

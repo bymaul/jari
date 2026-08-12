@@ -143,8 +143,8 @@
   function queryAll(selector, onShadowRoot) {
     const out = [];
     const visit = (root) => {
-      for (const el of root.querySelectorAll(selector)) {
-        out.push(el);
+      for (const el of root.querySelectorAll("*")) {
+        if (el.matches(selector)) out.push(el);
         if (el.shadowRoot) {
           if (onShadowRoot) onShadowRoot(el.shadowRoot);
           visit(el.shadowRoot);
