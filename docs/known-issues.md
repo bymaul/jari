@@ -4,6 +4,33 @@ Open reports and platform limitations, collected from the site-testing passes.
 Each entry records the site, the step, what happened vs. expected, and its
 current status.
 
+## Resolved
+
+## Google search results — hint occlusion and label placement
+
+**Step:** Press `f` on Google SERPs, then scroll so a result's title sits
+half under the sticky search bar or cut by the fold.
+
+**Expected:** every visible result title gets a hint, and the hint label sits
+on the visible part of the result, fully inside the viewport.
+
+**Actual:** (pre-fix) results whose center was covered by the sticky bar or
+clipped by the fold got no hint at all, because the visibility and occlusion
+tests required the full rect center to be on-screen and uncovered.
+
+**Status:** resolved in 73c297b. Notes for future debugging:
+
+- Google's result-row wrapper span is the topmost element above its own
+  anchor (the anchor is `pointer-events:none`), so `isOccluded` now accepts a
+  hit that *wraps* the candidate as not occluding — real occluders (sticky
+  bars, modals, carousels) are siblings of what they cover, never ancestors.
+- The occlusion hit test samples up to five points across the visible
+  portion, center first; one uncovered point is enough, because hint
+  activation clicks the element directly (`el.click()`).
+- Labels are placed on the visible portion and clamped into the viewport.
+  Residual: a sliver on the right viewport edge (≥8px wide) can still put its
+  label slightly off-screen to the right — `left` is not clamped.
+
 ## Gmail — link hints over the compose window
 
 **Step:** Compose an email, press `f`, then click a hint on the compose window.
