@@ -9,97 +9,106 @@ ignore/passthrough modes — every key rebindable from the options page.
 ## Default keybindings
 
 ### Scrolling
-| Key | Command |
-| --- | --- |
-| `j` | Scroll down |
-| `k` | Scroll up |
-| `h` | Scroll left |
-| `l` | Scroll right |
-| `gg` | Scroll to top |
-| `G` | Scroll to bottom |
-| `w` | Show scroll area |
+
+| Key  | Command                   |
+| ---- | ------------------------- |
+| `j`  | Scroll down               |
+| `k`  | Scroll up                 |
+| `h`  | Scroll left               |
+| `l`  | Scroll right              |
+| `gg` | Scroll to top             |
+| `G`  | Scroll to bottom          |
+| `w`  | Show scroll area          |
 | `gs` | Cycle nested scroll areas |
-| `gS` | Reset to page scroll |
+| `gS` | Reset to page scroll      |
 
 ### View & zoom
-| Key | Command |
-| --- | --- |
-| `+` | Zoom in |
+
+| Key | Command  |
+| --- | -------- |
+| `+` | Zoom in  |
 | `-` | Zoom out |
 
 ### Tabs
-| Key | Command |
-| --- | --- |
-| `t` | Open URL or search (omnibar) |
-| `gt` | Tab search |
-| `x` | Close tab |
-| `X` | Reopen closed tab |
-| `H` | Previous tab |
-| `L` | Next tab |
-| `g0` | Jump to first tab |
-| `g$` | Jump to last tab |
-| `<<` | Move tab left |
-| `>>` | Move tab right |
-| `gw` | Split tab / merge window |
-| `gp` | Open clipboard URL in current tab |
+
+| Key  | Command                              |
+| ---- | ------------------------------------ |
+| `t`  | Open URL or search (omnibar)         |
+| `gt` | Tab search                           |
+| `x`  | Close tab                            |
+| `X`  | Reopen closed tab                    |
+| `H`  | Previous tab                         |
+| `L`  | Next tab                             |
+| `g0` | Jump to first tab                    |
+| `g$` | Jump to last tab                     |
+| `<<` | Move tab left                        |
+| `>>` | Move tab right                       |
+| `gw` | Split tab / merge window             |
+| `gp` | Open clipboard URL in current tab    |
 | `gP` | Open clipboard URL in background tab |
 
 ### History
-| Key | Command |
-| --- | --- |
-| `S` | Go back in history |
+
+| Key | Command               |
+| --- | --------------------- |
+| `S` | Go back in history    |
 | `D` | Go forward in history |
 
 ### Hints
-| Key | Command |
-| --- | --- |
-| `f` | Link hints (click) |
-| `F` | Link hints (new tab) |
+
+| Key  | Command                                |
+| ---- | -------------------------------------- |
+| `f`  | Link hints (click)                     |
+| `F`  | Link hints (new tab)                   |
 | `gf` | Link hints (background tab, keep open) |
-| `yf` | Copy link URL |
-| `i` | Focus nearest input |
+| `yf` | Copy link URL                          |
+| `i`  | Focus nearest input                    |
 
 ### Page
-| Key | Command |
-| --- | --- |
-| `r` | Reload |
-| `R` | Reload (bypass cache) |
-| `gu` | Go to parent path |
-| `gU` | Go to site root |
-| `ge` | Edit current URL |
+
+| Key  | Command               |
+| ---- | --------------------- |
+| `r`  | Reload                |
+| `R`  | Reload (bypass cache) |
+| `gu` | Go to parent path     |
+| `gU` | Go to site root       |
+| `ge` | Edit current URL      |
 
 ### Clipboard
-| Key | Command |
-| --- | --- |
-| `yy` | Copy URL |
-| `Y` | Copy title + URL |
+
+| Key  | Command          |
+| ---- | ---------------- |
+| `yy` | Copy URL         |
+| `Y`  | Copy title + URL |
 
 ### Modes
-| Key | Command |
-| --- | --- |
-| `I` | Ignore mode (until pressed again) |
-| `o` | Passthrough keys (timed) |
-| `ctrl+alt+v` | Enable/disable on this site |
+
+| Key          | Command                           |
+| ------------ | --------------------------------- |
+| `I`          | Ignore mode (until pressed again) |
+| `p`          | Passthrough keys (timed)          |
+| `ctrl+alt+v` | Enable/disable on this site       |
 
 ### Help
-| Key | Command |
-| --- | --- |
-| `?` | Show keybindings |
-| `;e` | Open settings |
+
+| Key  | Command          |
+| ---- | ---------------- |
+| `?`  | Show keybindings |
+| `;e` | Open settings    |
 
 ### Commands without default bindings
 
 These commands exist but ship unbound — bind one from the options page:
 
-| Command | Label |
-| --- | --- |
-| `scrollPageDown` / `scrollPageUp` | Scroll page down / up |
+| Command                                   | Label                      |
+| ----------------------------------------- | -------------------------- |
+| `scrollPageDown` / `scrollPageUp`         | Scroll page down / up      |
 | `scrollHalfPageDown` / `scrollHalfPageUp` | Scroll half page down / up |
-| `newTab` | New tab |
-| `splitTab` | Move tab to new window |
-| `duplicateTab` | Duplicate tab |
-| `togglePin` | Pin/unpin tab |
-| `toggleMute` | Mute/unmute tab |
+| `newTab`                                  | New tab                    |
+| `splitTab`                                | Move tab to new window     |
+| `duplicateTab`                            | Duplicate tab              |
+| `togglePin`                               | Pin/unpin tab              |
+| `toggleMute`                              | Mute/unmute tab            |
 
 ## Install
 

@@ -2,7 +2,12 @@
 // Holds the user keymap, the list of per-site disabled hosts, and the
 // behavior options (scroll step, smooth scrolling, timeouts).
 // Emits "settingsChanged" when storage changes so live tabs react instantly.
-import { Events, keymapDefaults, normalizeSettings, settingsDefaults } from "./keymap.js";
+import {
+  Events,
+  keymapDefaults,
+  normalizeSettings,
+  settingsDefaults,
+} from "./keymap.js";
 
 const STORAGE_KEY = "settings";
 

@@ -67,7 +67,7 @@ export const keymapDefaults = {
 
   // Site-level control
   I: "toggleIgnore",
-  o: "passthrough",
+  p: "passthrough",
   "ctrl+alt+v": "toggleDisabled",
 
   // Help
