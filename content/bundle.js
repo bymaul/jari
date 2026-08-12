@@ -52,7 +52,7 @@
     gP: "pasteOpenBackground",
     // Site-level control
     I: "toggleIgnore",
-    o: "passthrough",
+    p: "passthrough",
     "ctrl+alt+v": "toggleDisabled",
     // Help
     "?": "showHelp",
