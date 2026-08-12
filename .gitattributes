@@ -1,0 +1,4 @@
+# Normalize line endings to LF on commit and checkout, in every environment.
+# Prevents an editor or a Windows git from silently flipping the whole tree
+# to CRLF and turning every file into a line-ending diff.
+* text=auto eol=lf
