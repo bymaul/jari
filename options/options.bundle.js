@@ -883,7 +883,7 @@
   var overlays2 = /* @__PURE__ */ new Map();
   var typed = "";
   var hintsHost = null;
-  var blockWheel = null;
+  var consumed = /* @__PURE__ */ new Set();
   function getHintsHost() {
     if (hintsHost && hintsHost.isConnected) return hintsHost;
     hintsHost = document.createElement("div");
@@ -895,23 +895,14 @@
   function isActive() {
     return mode !== null;
   }
-  function setWheelBlocking(on) {
-    if (on && !blockWheel) {
-      blockWheel = (event) => event.preventDefault();
-      window.addEventListener("wheel", blockWheel, {
-        capture: true,
-        passive: false
-      });
-    } else if (!on && blockWheel) {
-      window.removeEventListener("wheel", blockWheel, { capture: true });
-      blockWheel = null;
-    }
-  }
   var scrollTracking = null;
   var trackingFrame = null;
   function setScrollTracking(on) {
     if (on && !scrollTracking) {
-      scrollTracking = () => scheduleHintReposition();
+      scrollTracking = () => {
+        scheduleHintReposition();
+        scheduleRerender();
+      };
       window.addEventListener("scroll", scrollTracking, {
         capture: true,
         passive: true
@@ -924,6 +915,43 @@
   function scheduleHintReposition() {
     if (trackingFrame !== null) return;
     trackingFrame = requestAnimationFrame(repositionHints);
+  }
+  var RERENDER_DEBOUNCE_MS = 80;
+  var rerenderTimer = null;
+  function scheduleRerender() {
+    if (rerenderTimer !== null) return;
+    rerenderTimer = setTimeout(() => {
+      rerenderTimer = null;
+      if (mode) rerenderHints();
+    }, RERENDER_DEBOUNCE_MS);
+  }
+  function rerenderHints() {
+    const config = MODES[mode];
+    const typedBefore = typed;
+    const candidates = config.pointerCursor ? queryClickables(config.selector) : queryAll(config.selector);
+    const { topLevel, rects, labels: hintLabels } = recomputeHints(
+      candidates,
+      config,
+      consumed
+    );
+    labels.clear();
+    overlays2.clear();
+    const host = getHintsHost();
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < topLevel.length; i++) {
+      const el = topLevel[i];
+      const label = hintLabels[i];
+      labels.set(label, el);
+      const box = createHintOverlay(label, rects.get(el));
+      overlays2.set(label, box);
+      fragment.appendChild(box);
+    }
+    host.replaceChildren(fragment);
+    typed = typedBefore;
+    if (![...labels.keys()].some((l) => l.toLowerCase().startsWith(typed)))
+      typed = "";
+    updateHighlight();
+    if (labels.size === 0) cancel();
   }
   function repositionHints() {
     trackingFrame = null;
@@ -1027,7 +1055,6 @@
       fragment.appendChild(box);
     }
     host.appendChild(fragment);
-    setWheelBlocking(true);
     setScrollTracking(true);
   }
   function isInteractive(el) {
@@ -1138,6 +1165,19 @@
     }
     return { top, rects, total: counted };
   }
+  function recomputeHints(candidates, config, exclude) {
+    const { top, rects } = scanElements(candidates, {
+      passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)) && !exclude.has(el),
+      visible: isVisible,
+      occluded: isOccluded,
+      max: MAX_HINTS,
+      nested: treeItemNested
+    });
+    for (const el of top) {
+      rects.set(el, hintRect(el, rects.get(el)));
+    }
+    return { topLevel: top, rects, labels: generateLabels(top.length) };
+  }
   function generateLabels(count) {
     const chars = alphabet();
     const n = chars.length;
@@ -1235,6 +1275,7 @@
       const modeConfig = MODES[mode];
       modeConfig.activate(labels.get(exact));
       if (modeConfig.sticky) {
+        consumed.add(labels.get(exact));
         const box = overlays2.get(exact);
         if (box) box.remove();
         overlays2.delete(exact);
@@ -1262,8 +1303,11 @@
     }
   }
   function cancel() {
-    setWheelBlocking(false);
     setScrollTracking(false);
+    if (rerenderTimer !== null) {
+      clearTimeout(rerenderTimer);
+      rerenderTimer = null;
+    }
     if (trackingFrame !== null) {
       cancelAnimationFrame(trackingFrame);
       trackingFrame = null;
@@ -1272,6 +1316,7 @@
     hintsHost = null;
     overlays2.clear();
     labels.clear();
+    consumed.clear();
     typed = "";
     mode = null;
   }
@@ -1283,8 +1328,8 @@
     generateLabels,
     visiblePortion,
     scanElements,
-    setWheelBlocking,
     setScrollTracking,
+    recomputeHints,
     labelPlacement,
     rectOverlapsScrollport,
     treeItemNested,
