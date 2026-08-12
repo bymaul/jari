@@ -9,7 +9,7 @@ function element(name, { shadowRoot, parent, host } = {}) {
     name,
     shadowRoot: shadowRoot || null,
     parentElement: parent || null,
-    matches: (sel) => sel === name,
+    matches: (sel) => sel === "*" || sel === name,
     // The shadow root's host when the element lives in a shadow tree; null
     // in the light DOM. getRootNode().host is all containsElement reads.
     getRootNode: () => ({ host: host || null }),
@@ -33,20 +33,23 @@ function withDocument(document, fn) {
 }
 
 test("queryAll finds matches inside open shadow roots, depth-first", () => {
-  // The shadow root is reached through a host that itself matches; a host
-  // that does not match is not traversed (querySelectorAll-based matching).
+  // Every host's root is traversed, matched or not — a generic <div> host
+  // wraps a whole shadow component (Notion, Docs, Figma). A matched host
+  // precedes its shadow content; the non-matching <div> host's shadow content
+  // comes before the matching host that follows it in the light tree.
   const shadowBtn = element("button");
-  const hostBtn = element("button", { shadowRoot: rootWith([shadowBtn]) });
+  const hostDiv = element("div", { shadowRoot: rootWith([shadowBtn]) });
+  const hostBtn = element("button", { shadowRoot: rootWith([element("span")]) });
   const lightBtn = element("button");
   const lightA = element("a");
-  withDocument(rootWith([lightA, hostBtn, lightBtn]), () => {
+  withDocument(rootWith([lightA, hostDiv, hostBtn, lightBtn]), () => {
     const matches = queryAll("button");
     assert.deepEqual(
       matches.map((e) => e.name),
       ["button", "button", "button"],
     );
-    assert.strictEqual(matches[0], hostBtn);
-    assert.strictEqual(matches[1], shadowBtn);
+    assert.strictEqual(matches[0], shadowBtn);
+    assert.strictEqual(matches[1], hostBtn);
     assert.strictEqual(matches[2], lightBtn);
   });
 });
