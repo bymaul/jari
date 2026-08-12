@@ -697,8 +697,8 @@ test("queryClickables caps pointer additions but keeps collecting selector match
   withDocument(rootWith([...many, link]), () => {
     withHintsWindow({}, () => {
       const found = Hints.queryClickables("a");
-      assert.strictEqual(found.length, 121); // 120 capped pointer + the link
-      assert.strictEqual(found[120], link);
+      assert.strictEqual(found.length, 201); // 200 capped pointer + the link
+      assert.strictEqual(found[200], link);
     });
   });
 });
