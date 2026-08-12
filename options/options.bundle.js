@@ -92,7 +92,7 @@
     { id: "help", label: "Help" }
   ];
   var settingsDefaults = {
-    scrollStep: 200,
+    scrollStep: 120,
     smoothScroll: false,
     // Rank prompt lists by fuzzy subsequence score instead of plain substring.
     fuzzyMatching: true,
@@ -758,6 +758,8 @@
     "[role='button']",
     "[role='link']",
     "[role='menuitem']",
+    "[role='menuitemcheckbox']",
+    "[role='menuitemradio']",
     "[role='tab']",
     "[role='checkbox']",
     "[role='radio']",
@@ -847,8 +849,16 @@
     }
   }
   var MODES = {
-    click: { selector: CLICKABLE_SELECTOR, activate: activateClick },
-    newtab: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: openInNewTab },
+    click: {
+      selector: CLICKABLE_SELECTOR,
+      pointerCursor: true,
+      activate: activateClick
+    },
+    newtab: {
+      selector: CLICKABLE_SELECTOR,
+      linkOnly: true,
+      activate: openInNewTab
+    },
     yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
     focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
     // background: same as newtab, but sticky — the hints stay up after a pick
@@ -888,26 +898,107 @@
   function setWheelBlocking(on) {
     if (on && !blockWheel) {
       blockWheel = (event) => event.preventDefault();
-      window.addEventListener("wheel", blockWheel, { capture: true, passive: false });
+      window.addEventListener("wheel", blockWheel, {
+        capture: true,
+        passive: false
+      });
     } else if (!on && blockWheel) {
       window.removeEventListener("wheel", blockWheel, { capture: true });
       blockWheel = null;
     }
   }
+  var scrollTracking = null;
+  var trackingFrame = null;
+  function setScrollTracking(on) {
+    if (on && !scrollTracking) {
+      scrollTracking = () => scheduleHintReposition();
+      window.addEventListener("scroll", scrollTracking, {
+        capture: true,
+        passive: true
+      });
+    } else if (!on && scrollTracking) {
+      window.removeEventListener("scroll", scrollTracking, { capture: true });
+      scrollTracking = null;
+    }
+  }
+  function scheduleHintReposition() {
+    if (trackingFrame !== null) return;
+    trackingFrame = requestAnimationFrame(repositionHints);
+  }
+  function repositionHints() {
+    trackingFrame = null;
+    for (const [label, el] of labels) {
+      const box = overlays2.get(label);
+      if (!box) continue;
+      const rect = hintRect(el, el.getBoundingClientRect());
+      const pos = labelPlacement(
+        rect,
+        window.scrollX,
+        window.scrollY,
+        window.innerWidth,
+        window.innerHeight
+      );
+      if (!pos) {
+        box.style.display = "none";
+        continue;
+      }
+      box.style.display = "";
+      box.style.left = pos.left + "px";
+      box.style.top = pos.top + "px";
+    }
+  }
+  var POINTER_CAP = 200;
+  function isPointerCursor(style) {
+    const cursor = style && style.cursor;
+    return cursor === "pointer" || typeof cursor === "string" && cursor.startsWith("url(");
+  }
+  function isPointerCandidate(el) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    const vw = window.innerWidth || document.documentElement.clientWidth;
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    if (rect.left >= vw || rect.top >= vh || rect.right <= 0 || rect.bottom <= 0)
+      return false;
+    const style = window.getComputedStyle(el);
+    if (style.visibility === "hidden") return false;
+    return isPointerCursor(style);
+  }
+  function queryClickables(selector, { pointerCursor = true } = {}) {
+    const out = [];
+    let pointerCount = 0;
+    const visit = (root) => {
+      for (const el of root.querySelectorAll("*")) {
+        if (el.matches(selector)) {
+          out.push(el);
+        } else if (pointerCursor && pointerCount < POINTER_CAP && isPointerCandidate(el)) {
+          pointerCount++;
+          out.push(el);
+        }
+        if (el.shadowRoot) visit(el.shadowRoot);
+      }
+    };
+    visit(document);
+    return out;
+  }
   function start(nextMode) {
     const config = MODES[nextMode];
     if (!config) return;
     cancel();
-    const { top: topLevel, rects, total: counted } = scanElements(
-      queryAll(config.selector),
-      {
-        passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
-        visible: isVisible,
-        occluded: isOccluded,
-        max: MAX_HINTS,
-        nested: treeItemNested
-      }
-    );
+    const candidates = config.pointerCursor ? queryClickables(config.selector) : queryAll(config.selector);
+    const {
+      top: topLevel,
+      rects,
+      total: counted
+    } = scanElements(candidates, {
+      passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
+      visible: isVisible,
+      occluded: isOccluded,
+      max: MAX_HINTS,
+      nested: treeItemNested
+    });
+    for (const el of topLevel) {
+      rects.set(el, hintRect(el, rects.get(el)));
+    }
     const hintCount = topLevel.length;
     if (nextMode === "focus" && topLevel.length === 1) {
       focusAndPlaceCaret(topLevel[0]);
@@ -937,6 +1028,7 @@
     }
     host.appendChild(fragment);
     setWheelBlocking(true);
+    setScrollTracking(true);
   }
   function isInteractive(el) {
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
@@ -1070,6 +1162,25 @@
     }
     return s;
   }
+  function hintRect(el, fallback) {
+    if (el.childElementCount === 0) {
+      const rects = el.getClientRects();
+      if (rects.length === 3) return rects[1];
+      if (rects.length === 2) return rects[0];
+    }
+    return fallback;
+  }
+  function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
+    const left = Math.max(rect.left, 0);
+    const top = Math.max(rect.top, 0);
+    const right = Math.min(rect.right, viewportWidth);
+    const bottom = Math.min(rect.bottom, viewportHeight);
+    if (right <= left || bottom <= top) return null;
+    return {
+      left: scrollX + left,
+      top: scrollY + Math.min(top, viewportHeight - LABEL_HEIGHT)
+    };
+  }
   function createHintOverlay(label, rect) {
     const box = document.createElement("div");
     box.className = "jari-hint";
@@ -1078,9 +1189,15 @@
       span.textContent = ch;
       box.appendChild(span);
     }
-    const top = Math.max(0, Math.min(rect.top, window.innerHeight - LABEL_HEIGHT));
-    box.style.left = window.scrollX + rect.left + "px";
-    box.style.top = window.scrollY + top + "px";
+    const pos = labelPlacement(
+      rect,
+      window.scrollX,
+      window.scrollY,
+      window.innerWidth,
+      window.innerHeight
+    );
+    box.style.left = pos.left + "px";
+    box.style.top = pos.top + "px";
     return box;
   }
   function openInNewTab(el) {
@@ -1146,6 +1263,11 @@
   }
   function cancel() {
     setWheelBlocking(false);
+    setScrollTracking(false);
+    if (trackingFrame !== null) {
+      cancelAnimationFrame(trackingFrame);
+      trackingFrame = null;
+    }
     if (hintsHost) hintsHost.remove();
     hintsHost = null;
     overlays2.clear();
@@ -1162,8 +1284,14 @@
     visiblePortion,
     scanElements,
     setWheelBlocking,
+    setScrollTracking,
+    labelPlacement,
     rectOverlapsScrollport,
-    treeItemNested
+    treeItemNested,
+    clickableSelector: CLICKABLE_SELECTOR,
+    isPointerCursor,
+    queryClickables,
+    hintRect
   };
   register("hints", { close: cancel, onKeyDown, isActive });
 
@@ -1984,7 +2112,9 @@ ${location.href}`;
         if (waitingPrefix) {
           waitingPrefix = null;
           input.value = "press a key...";
-          status("Prefix cancelled \u2014 press a key, or Esc/Backspace to clear the binding");
+          status(
+            "Prefix cancelled \u2014 press a key, or Esc/Backspace to clear the binding"
+          );
           return;
         }
         input.removeEventListener("keydown", handler);
@@ -2005,7 +2135,9 @@ ${location.href}`;
       if (prefixKeys.has(combo)) {
         waitingPrefix = combo;
         input.value = combo + " \u2014 press the next key, or Esc/Backspace to cancel";
-        status("Prefix keys can't be bound alone; press the next key of the sequence");
+        status(
+          "Prefix keys can't be bound alone; press the next key of the sequence"
+        );
         return;
       }
       if (RESERVED_KEYS.test(combo)) {
@@ -2109,7 +2241,9 @@ ${location.href}`;
       }
     }
     host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
-    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(host) ? host : "";
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
+      host
+    ) ? host : "";
   }
   function addDisabledSite() {
     const host = normalizeHost(siteInputEl.value);
