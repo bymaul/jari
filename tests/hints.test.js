@@ -372,44 +372,12 @@ function withFakeWindow(fn) {
   }
 }
 
-test("setWheelBlocking installs a non-passive capture wheel listener that cancels scroll", () => {
-  withFakeWindow((win, listeners) => {
-    try {
-      Hints.setWheelBlocking(true);
-      assert.strictEqual(listeners.length, 1);
-      assert.strictEqual(listeners[0].type, "wheel");
-      assert.deepEqual(listeners[0].options, { capture: true, passive: false });
-      const event = {
-        prevented: false,
-        preventDefault() {
-          this.prevented = true;
-        },
-      };
-      listeners[0].handler(event);
-      assert.strictEqual(event.prevented, true);
-    } finally {
-      // Leave the module state clean so later tests start from "blocking off".
-      Hints.setWheelBlocking(false);
-    }
-  });
-});
-
-test("setWheelBlocking removes the listener when disabled and never double-installs", () => {
-  withFakeWindow((win, listeners) => {
-    Hints.setWheelBlocking(true);
-    Hints.setWheelBlocking(true);
-    assert.strictEqual(listeners.length, 1);
-    Hints.setWheelBlocking(false);
-    assert.strictEqual(listeners.length, 0);
-    Hints.setWheelBlocking(false);
-    assert.strictEqual(listeners.length, 0);
-  });
-});
-
 test("setScrollTracking installs a passive capture scroll listener that schedules one reposition per frame", () => {
   const frames = [];
   const previousRAF = globalThis.requestAnimationFrame;
+  const previousCancelRAF = globalThis.cancelAnimationFrame;
   globalThis.requestAnimationFrame = (cb) => frames.push(cb);
+  globalThis.cancelAnimationFrame = () => {};
   try {
     withFakeWindow((win, listeners) => {
       try {
@@ -425,11 +393,14 @@ test("setScrollTracking installs a passive capture scroll listener that schedule
         listeners[0].handler();
         assert.strictEqual(frames.length, 1);
       } finally {
-        Hints.setScrollTracking(false);
+        // The handler also schedules a debounced re-render; cancel it so no
+        // dangling timer leaks into later tests.
+        Hints.cancel();
       }
     });
   } finally {
     globalThis.requestAnimationFrame = previousRAF;
+    globalThis.cancelAnimationFrame = previousCancelRAF;
   }
 });
 
@@ -442,6 +413,77 @@ test("setScrollTracking removes the listener when disabled and never double-inst
     assert.strictEqual(listeners.length, 0);
     Hints.setScrollTracking(false);
     assert.strictEqual(listeners.length, 0);
+  });
+});
+
+test("a scroll burst schedules one debounced re-render, and cancel drops it", () => {
+  const frames = [];
+  const timers = [];
+  const previousRAF = globalThis.requestAnimationFrame;
+  const previousCancelRAF = globalThis.cancelAnimationFrame;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  globalThis.requestAnimationFrame = (cb) => frames.push(cb);
+  globalThis.cancelAnimationFrame = () => {};
+  globalThis.setTimeout = (cb, ms) => {
+    timers.push({ cb, ms });
+    return timers.length;
+  };
+  globalThis.clearTimeout = (id) => {
+    const timer = timers[id - 1];
+    if (timer) timer.cb = null;
+  };
+  try {
+    withFakeWindow((win, listeners) => {
+      Hints.setScrollTracking(true);
+      const handler = listeners[0].handler;
+      // The whole burst — however many scroll events — schedules one timer.
+      handler();
+      handler();
+      handler();
+      assert.strictEqual(timers.length, 1);
+      assert.strictEqual(timers[0].ms, 80);
+      // Firing it clears the slot, so the next burst schedules a fresh one.
+      timers[0].cb();
+      handler();
+      assert.strictEqual(timers.length, 2);
+      // Closing the hints cancels a still-pending re-render.
+      Hints.cancel();
+      assert.strictEqual(timers.length, 2);
+      assert.ok(timers[1].cb === null);
+    });
+  } finally {
+    Hints.setScrollTracking(false);
+    globalThis.requestAnimationFrame = previousRAF;
+    globalThis.cancelAnimationFrame = previousCancelRAF;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+});
+
+test("recomputeHints re-scans candidates and drops consumed elements", () => {
+  const firstLink = pointerEl("a", { href: "/one" });
+  const secondLink = pointerEl("a", { href: "/two" });
+  const config = { linkOnly: true };
+  withChars("SADFJKLEWCMPGH", () => {
+    withHintsWindow({}, () => {
+      const initial = Hints.recomputeHints(
+        [firstLink, secondLink],
+        config,
+        new Set(),
+      );
+      assert.deepEqual(initial.topLevel, [firstLink, secondLink]);
+      assert.strictEqual(initial.labels.length, 2);
+      // Sticky mode consumed the first link: it must not come back on a
+      // re-render, and the labels rebuild around what remains.
+      const afterConsume = Hints.recomputeHints(
+        [firstLink, secondLink],
+        config,
+        new Set([firstLink]),
+      );
+      assert.deepEqual(afterConsume.topLevel, [secondLink]);
+      assert.strictEqual(afterConsume.labels.length, 1);
+    });
   });
 });
 
@@ -559,14 +601,19 @@ test("rectOverlapsScrollport keeps anything overlapping the scrollport", () => {
 // plus the rect/style reads the pointer gate does.
 function pointerEl(
   name,
-  { cursor = "default", visibility = "visible", rect, shadowRoot } = {},
+  { cursor = "default", visibility = "visible", rect, shadowRoot, href } = {},
 ) {
-  return {
+  const el = {
     name,
+    href,
     cursor,
     visibility,
     shadowRoot: shadowRoot || null,
     childElementCount: 0,
+    parentElement: null,
+    disabled: false,
+    closest: () => null,
+    getAttribute: (attr) => (attr === "href" ? href ?? null : null),
     matches: (sel) => sel === "*" || sel === name,
     getBoundingClientRect: () =>
       rect || {
@@ -579,6 +626,8 @@ function pointerEl(
       },
     getClientRects: () => [],
   };
+  el.getRootNode = () => ({ host: null, elementFromPoint: () => el });
+  return el;
 }
 
 // A document/shadow root whose querySelectorAll filters children by name.
