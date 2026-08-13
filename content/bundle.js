@@ -153,7 +153,7 @@
     for (const [key, command] of Object.entries(d.keymap || {})) {
       storedKeymap[key] = command;
     }
-    const keymap = { ...keymapDefaults, ...storedKeymap };
+    const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
     for (const key of prefixKeys) delete keymap[key];
     return {
       keymap,
