@@ -1,7 +1,3 @@
-// Jari: settings layer over chrome.storage.sync.
-// Holds the user keymap, the list of per-site disabled hosts, and the
-// behavior options (scroll step, smooth scrolling, timeouts).
-// Emits "settingsChanged" when storage changes so live tabs react instantly.
 import {
   Events,
   keymapDefaults,
@@ -64,14 +60,10 @@ function persist() {
   });
 }
 
-// Mutate the in-memory state without touching storage. The options page
-// edits this way and only writes on Save; the content script persists
-// immediately via update().
 function set(patch) {
   merge(normalizeSettings({ ...state, ...patch }));
 }
 
-// Mutate and persist. Awaitable so callers can report write failures.
 async function update(patch) {
   set(patch);
   await persist();

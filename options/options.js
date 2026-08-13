@@ -1,6 +1,3 @@
-// Jari options page: edit behavior options, keybindings and manage per-site
-// disabling. Imports the shared settings store, the command registry and the
-// keymap helpers directly (bundled by build.js into options.bundle.js).
 import {
   balanceCategories,
   canonicalKey,
@@ -54,8 +51,6 @@ async function load() {
   renderDisabled();
 }
 
-// Case-insensitive filter match on the command name, its label, or the key
-// it is currently bound to.
 function matchesFilter(name, cmd, filter) {
   return (
     name.toLowerCase().includes(filter) ||
@@ -84,8 +79,6 @@ function renderKeymap() {
     return;
   }
 
-  // Split the categories across three columns, keeping each category whole
-  // and balancing by row count (category header + one row per command).
   const columns = balanceCategories(byCategory, 3);
 
   const grid = document.createElement("div");
@@ -126,9 +119,6 @@ function renderKeymap() {
   refreshKeyHints();
 }
 
-// Fill every <code data-key="..."> with the key currently bound to that
-// command so the hint texts stay in sync with the live keymap. Called from
-// renderKeymap(), which runs after every rebind, clear, reset and load.
 function refreshKeyHints() {
   for (const el of document.querySelectorAll("[data-key]")) {
     el.textContent = keyFor(el.dataset.key) || "unbound";
@@ -147,22 +137,13 @@ function startRecording(input, name) {
   input.value = "press a key...";
   input.classList.add("recording");
 
-  // A prefix key ("g", ";", "y") can't be bound on its own — it starts a
-  // two-key sequence. Pressing one makes the recorder wait for the next key
-  // and binds the pair ("g" then "o" binds "go"); Escape/Backspace cancels
-  // the wait and returns to "press a key...". Any second key binds, digits
-  // included.
   let waitingPrefix = null;
 
   const commit = (combo) => {
     input.removeEventListener("keydown", handler);
     input.classList.remove("recording");
     waitingPrefix = null;
-    // Drop this command's old key(s) and any other command that already
-    // uses the new key, then bind. Without this, the command keeps its
-    // previous key and keyFor() would show that instead of what was
-    // just pressed. The live keymap object is mutated so Save persists
-    // exactly what the recorder produced.
+
     const keymap = settings.getKeymap();
     for (const [k, cmd] of Object.entries(keymap)) {
       if (k === combo || cmd === name) delete keymap[k];
@@ -175,12 +156,11 @@ function startRecording(input, name) {
   const handler = (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (modifierKeys.has(event.key)) return; // keep waiting for the real key
+    if (modifierKeys.has(event.key)) return;
 
     if (event.key === "Escape" || event.key === "Backspace") {
       if (waitingPrefix) {
-        // Cancel the pending prefix and go back to recording; the existing
-        // binding (if any) is untouched.
+
         waitingPrefix = null;
         input.value = "press a key...";
         status(
@@ -202,7 +182,7 @@ function startRecording(input, name) {
     const combo = canonicalKey(event);
 
     if (waitingPrefix) {
-      // Second key of a two-key binding; any key binds, digits included.
+
       commit(waitingPrefix + combo);
       return;
     }
@@ -230,8 +210,6 @@ function startRecording(input, name) {
   input.addEventListener("keydown", handler);
 }
 
-// Read the behavior fields, snapping invalid values back to their defaults
-// in the DOM, and return them as a patch for the settings store.
 function collectBehaviorSettings() {
   const raw = parseInt(scrollStepEl.value, 10);
   scrollStepEl.value =
@@ -260,9 +238,7 @@ function collectBehaviorSettings() {
 
 function save() {
   const patch = collectBehaviorSettings();
-  // keymap and disabledSites were already mutated in the live store (the
-  // recorder and list buttons edit in place) — include snapshots so the
-  // write persists exactly what the user sees.
+
   patch.keymap = { ...settings.getKeymap() };
   patch.disabledSites = settings.getDisabledSites();
   settings
@@ -272,9 +248,7 @@ function save() {
 }
 
 function reset() {
-  // Restore defaults for the keymap and behavior options; the disabled
-  // sites list is per-user data and is left untouched. update() persists
-  // immediately — a memory-only reset would be silently undone on reload.
+
   settings
     .update({
       keymap: { ...keymapDefaults },
@@ -331,9 +305,6 @@ function renderDisabled() {
   }
 }
 
-// Reduce a typed site to a plain hostname, matching location.hostname so
-// settings.isDisabled() finds it: accept a full URL or a bare host, drop
-// scheme/port/path. Unparseable input returns "".
 function normalizeHost(raw) {
   let host = raw.trim().toLowerCase();
   if (!host) return "";

@@ -1,18 +1,3 @@
-// Jari: the prompt overlay — a filterable list owned by a search box.
-// "gt" (tab search) lists the open tabs: typing filters by title/URL, arrows
-// move the selection, Enter activates, Escape closes.
-//
-// "t" (omnibar) reuses the same overlay to open a URL or search: the first
-// row is the typed query (opened as a URL when it looks like one, otherwise
-// searched with the default engine), below it come autocomplete matches from
-// the browser (history, bookmarks, open tabs).
-//
-// "ge" edits the current page URL: the same omnibar prefilled with the
-// current URL, and Enter navigates this tab instead of opening a new one.
-//
-// The overlay also serves as the merge picker for splitOrMergeTab: in a
-// single-tab window it lists the tabs of the other windows and Enter moves
-// this tab into the chosen one. Each feature is a mode over the one overlay.
 import { Url, fuzzyIndices, fuzzyMatch, substringMatch } from "./keymap.js";
 import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
@@ -25,11 +10,11 @@ let listEl = null;
 let tabs = [];
 let filtered = [];
 let selected = 0;
-let query = ""; // current filter text, used for match highlighting
-let mode = "tabs"; // "tabs" | "merge" | "open" | "edit"
-let suggestSeq = 0; // invalidates in-flight suggestion fetches
+let query = "";
+let mode = "tabs";
+let suggestSeq = 0;
 let suggestTimer = null;
-let restoreFocus = null; // element focused before the overlay opened
+let restoreFocus = null;
 
 function isActive() {
   return active;
@@ -44,8 +29,6 @@ async function open() {
   render("Tabs", "Search tabs...");
 }
 
-// "t": open a URL or search. The omnibar needs no initial data — the list
-// is built from the typed query as it comes in.
 function openOmnibar() {
   if (active) return;
   tabs = [];
@@ -54,8 +37,6 @@ function openOmnibar() {
   render("Open", "Search or type URL");
 }
 
-// "ge": edit the current page URL. Same omnibar as "t", but prefilled with
-// the current URL and Enter navigates this tab instead of opening a new one.
 function openEditUrl() {
   if (active) return;
   tabs = [];
@@ -66,8 +47,6 @@ function openEditUrl() {
   handleOpenInput(inputEl.value);
 }
 
-// Merge picker: entries are the OTHER windows (title = active tab, subtitle
-// = tab count); Enter moves this tab into the picked window.
 function openMerge(data) {
   if (active) return;
   tabs = (data && data.tabs) || [];
@@ -76,10 +55,6 @@ function openMerge(data) {
   render("Merge into", "Choose a window...");
 }
 
-// Omnibar input: row 0 is always the typed query — labeled as an open or a
-// search depending on looksLikeUrl — and the suggestions arrive async,
-// debounced, replacing that row's list. A stale response (query changed or
-// overlay closed) is dropped via suggestSeq.
 function handleOpenInput(queryText) {
   const q = queryText.trim();
   const term = Url.suggestionTerm(q);
@@ -116,8 +91,6 @@ function handleOpenInput(queryText) {
   }, 130);
 }
 
-// Map a list to { item, match } pairs, dropping non-matches and sorting by
-// score (fuzzy) or original order (substring mode).
 function rank(list, query) {
   const fuzzy = settings.isFuzzyMatching();
   return list
@@ -156,12 +129,7 @@ function render(title, placeholder) {
       renderList();
     }
   });
-  // Shield the page from the keys typed into the search box. onKeyDown runs
-  // on the window capture phase and only stops the keys the prompt consumes;
-  // every other key still reaches this input (so typing works) and would
-  // otherwise keep bubbling up to the page's document/window listeners —
-  // site-wide shortcuts firing while the omnibar is open. Stopping the event
-  // at the input leaves the default text insertion untouched.
+
   inputEl.addEventListener("keydown", (event) => event.stopPropagation());
 
   listEl = document.createElement("ul");
@@ -178,15 +146,11 @@ function render(title, placeholder) {
 
   filtered = tabs;
   renderList();
-  // Remember what had focus before the overlay took over, so close() can hand
-  // it back. Captured here, right before the input steals focus, covers every
-  // open* mode.
+
   restoreFocus = document.activeElement;
   inputEl.focus();
 }
 
-// Fill a span with text, wrapping the fuzzy-matched characters in a
-// .jari-match element. indices come from fuzzyIndices against the same text.
 function renderText(el, text, indices) {
   if (!indices || indices.length === 0) {
     el.textContent = text;
@@ -213,15 +177,12 @@ function renderText(el, text, indices) {
   el.appendChild(frag);
 }
 
-// A span with a class, ready for text or match highlighting.
 function makeSpan(className) {
   const el = document.createElement("span");
   el.className = className;
   return el;
 }
 
-// Fill the title/url spans of a list row. With a non-empty query in fuzzy
-// mode, matched characters are highlighted; otherwise the text is plain.
 function renderTitleUrl(li, titleText, urlText, q) {
   const title = makeSpan("title");
   const url = makeSpan("url");
@@ -237,9 +198,6 @@ function renderTitleUrl(li, titleText, urlText, q) {
   return li;
 }
 
-// Omnibar row: the typed query (labeled as an open or a search) or a
-// suggestion. Only suggestion rows get match highlighting — the typed-query
-// row is the query itself and would look odd.
 function renderSuggestionRow(row) {
   const li = document.createElement("li");
   const titleText =
@@ -252,7 +210,6 @@ function renderSuggestionRow(row) {
   return renderTitleUrl(li, titleText, urlText, row.kind === "suggestion" ? query : "");
 }
 
-// Tab (or merge window) row: a window tag plus title/url.
 function renderTabRow(tab, winLabel) {
   const li = document.createElement("li");
   const win = makeSpan("jari-win-tag");
@@ -270,8 +227,6 @@ function renderList() {
     return;
   }
 
-  // Label windows #1, #2, ... in order of first appearance so tabs from
-  // different windows are distinguishable in the list.
   const winLabels = new Map();
   let winIndex = 0;
   for (const tab of rows) {
@@ -293,11 +248,6 @@ function move(delta) {
   highlight();
 }
 
-// Capture-phase key handler. The search box owns printable keys; Escape,
-// Enter, Tab and the arrow keys are intercepted here and stopped so the
-// page never sees them. The remaining keys are not stopped here — typing
-// must keep working — but a bubble listener on the input stops them at the
-// input before they can reach the page (see render()).
 function onKeyDown(event) {
   const inInput = document.activeElement === inputEl;
   if (inInput) {
@@ -338,19 +288,16 @@ function onKeyDown(event) {
 function activate() {
   const item = filtered[selected];
   if (!item) {
-    // Nothing selected: in the omnibar an empty query still opens a blank
-    // new tab, preserving the old "t" behavior.
+
     if (mode === "open" && !inputEl.value.trim()) sendMessage("createTab");
     close();
     return;
   }
   if (mode === "merge") {
-    // Merge mode: entries are windows; the background moves this tab into
-    // the picked window and focuses it there.
+
     sendMessage("mergeTab", { targetWindowId: item.windowId });
   } else if (mode === "open" || mode === "edit") {
-    // "t" opens a new tab; "ge" edits the current page, so it navigates
-    // this tab instead.
+
     if (item.kind === "search") sendMessage("search", { query: inputEl.value, newTab: mode === "open" });
     else if (item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
   } else {
@@ -374,9 +321,7 @@ function close() {
   query = "";
   mode = "tabs";
   active = false;
-  // Give focus back to what the overlay interrupted. Skipped when the action
-  // navigated away (the element is gone or focus already moved) — e.g. "ge"
-  // edits this tab, "gt" switches tabs.
+
   if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
     restoreFocus.focus();
   }

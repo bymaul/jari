@@ -3,8 +3,6 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { Prompt } from "../content/prompt.js";
 
-// Minimal element standing in for the DOM nodes prompt.js creates. Only the
-// surface render/close touch is implemented: children, listeners, focus.
 function makeElement(tag) {
   return {
     tagName: tag,
@@ -15,7 +13,7 @@ function makeElement(tag) {
     _text: "",
     set textContent(value) {
       this._text = value;
-      // Setting textContent clears the children (renderList resets the list).
+
       if (value === "") this.children.length = 0;
     },
     get textContent() {
@@ -65,7 +63,6 @@ async function withDocument(document, fn) {
   }
 }
 
-// Resolve the background round-trips prompt.js makes with a canned response.
 async function withSendMessage(response, fn) {
   const original = chrome.runtime.sendMessage;
   chrome.runtime.sendMessage = (message, callback) => callback(response);
@@ -107,15 +104,11 @@ test("keys typed into the prompt input stop at the input and never reach the pag
     const input = await openPrompt(document);
     assert.strictEqual(document.activeElement, input);
 
-    // Dispatcher path (window capture) hands the key to the overlay, which
-    // must not stop printable keys — typing has to keep working.
     const printable = keyEvent("j");
     Prompt.onKeyDown(printable);
     assert.strictEqual(printable.preventDefaultCalls, 0);
     assert.strictEqual(printable.stopImmediatePropagationCalls, 0);
 
-    // The key reaches the input (target phase), where the shield stops it
-    // before it can bubble to the page's document/window listeners.
     input.dispatch("keydown", printable);
     assert.strictEqual(printable.stopPropagationCalls, 1);
     assert.strictEqual(printable.preventDefaultCalls, 0);
