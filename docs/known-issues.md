@@ -83,15 +83,24 @@ The z-order problem (hints behind the frame) is separate and also unresolved.
 
 **Step:** Press `i` (focus input) on a page with a text block.
 
-**Expected:** the text block is focused and the caret is placed so typing
-works immediately.
+**Expected:** the text block is focused and the caret is placed so typing works
+immediately.
 
 **Actual:** no focus lands in the block. `f` does detect the editor inputs as
 hint targets; activating one also fails to focus the editor.
 
-**Status:** open. Likely related to Notion's shadow-tree editor internals
-resisting programmatic focus; the pointer-sequence fallback in `focusAndPlaceCaret`
-does not cover it.
+**Status:** partially addressed. Caret placement when focus *does* land is now
+fixed (`placeCaretAtEnd` in `focusAndPlaceCaret`): focusing a prefilled
+`<input>`/`<textarea>` moves the caret to the end, and focusing a
+`contenteditable` (light-DOM or inside a shadow root) collapses the selection
+at the end. Verified end-to-end in the headless harness (input, textarea,
+contenteditable, and a shadow-hosted contenteditable; typing after focus
+appends at the end). The remaining Notion problem is that programmatic focus
+still does not land in Notion's editor block at all, which the caret fix does
+not address. Notion only renders editable blocks (`contenteditable="true"`)
+when signed in; publicly shared pages are read-only
+(`contenteditable="false"`), so headless validation against Notion requires a
+logged-in profile.
 
 ## Google Docs — `Esc` in hint mode
 

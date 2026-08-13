@@ -844,6 +844,7 @@
     el.focus();
     if (el.isConnected) firePointerSequence(el);
     if (el.isConnected && deepActiveElement() !== el) el.focus();
+    placeCaretAtEnd(el);
     const fightFocusStealer = () => {
       if (el.isConnected) {
         el.focus();
@@ -1307,13 +1308,13 @@
     return s;
   }
   function hintRect(el, fallback) {
-    const vh = window.innerHeight || document.documentElement.clientHeight;
+    const vh = globalThis.window?.innerHeight || globalThis.document?.documentElement?.clientHeight;
     let bottom = -1;
     let left = 0;
     let right = 0;
     let baseTop = 0;
     for (const rect of el.getClientRects()) {
-      if (rect.bottom <= 0 || rect.top >= vh) continue;
+      if (vh && (rect.bottom <= 0 || rect.top >= vh)) continue;
       if (rect.bottom > bottom) {
         bottom = rect.bottom;
         left = rect.left;
@@ -1322,10 +1323,7 @@
       }
     }
     if (bottom < 0) return fallback;
-    const top = Math.min(
-      Math.max(baseTop, bottom - LABEL_HEIGHT),
-      vh - LABEL_HEIGHT
-    );
+    const top = vh ? Math.min(Math.max(baseTop, bottom - LABEL_HEIGHT), vh - LABEL_HEIGHT) : Math.max(baseTop, bottom - LABEL_HEIGHT);
     return { left, top, right, bottom };
   }
   function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
@@ -1460,6 +1458,7 @@
     cancel,
     onKeyDown,
     isActive,
+    placeCaretAtEnd,
     generateLabels,
     visiblePortion,
     isOccluded,

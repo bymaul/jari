@@ -1006,3 +1006,64 @@ test("hintRect clamps the label anchor above the fold for a line that dips below
     globalThis.window = original;
   }
 });
+
+test("placeCaretAtEnd moves the caret to the end of an input and textarea", () => {
+  const calls = [];
+  const input = {
+    tagName: "INPUT",
+    value: "hello world",
+    setSelectionRange(start, end) {
+      calls.push({ start, end });
+    },
+  };
+  Hints.placeCaretAtEnd(input);
+  assert.deepEqual(calls, [{ start: 11, end: 11 }]);
+
+  const textarea = {
+    tagName: "TEXTAREA",
+    value: "abc",
+    setSelectionRange(start, end) {
+      calls.push({ start, end });
+    },
+  };
+  Hints.placeCaretAtEnd(textarea);
+  assert.deepEqual(calls[calls.length - 1], { start: 3, end: 3 });
+});
+
+test("placeCaretAtEnd collapses the selection at the end of a contenteditable", () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  let collapsedAt = null;
+  let rangeAdded = null;
+  globalThis.window = {
+    getSelection: () => ({
+      removeAllRanges() {},
+      addRange(range) {
+        rangeAdded = range;
+      },
+    }),
+  };
+  globalThis.document = {
+    createRange: () => ({
+      selectNodeContents(el) {
+        this.target = el;
+      },
+      collapse(toEnd) {
+        collapsedAt = toEnd;
+      },
+    }),
+  };
+  try {
+    const block = { tagName: "DIV", isContentEditable: true };
+    Hints.placeCaretAtEnd(block);
+    assert.strictEqual(collapsedAt, false);
+    assert.strictEqual(rangeAdded.target, block);
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+  }
+});
+
+test("placeCaretAtEnd never throws on stub-hostile elements", () => {
+  assert.doesNotThrow(() => Hints.placeCaretAtEnd({ tagName: "INPUT" }));
+});

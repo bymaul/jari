@@ -135,6 +135,7 @@ function focusAndPlaceCaret(el) {
   el.focus();
   if (el.isConnected) firePointerSequence(el);
   if (el.isConnected && deepActiveElement() !== el) el.focus();
+  placeCaretAtEnd(el);
   const fightFocusStealer = () => {
     if (el.isConnected) {
       el.focus();
@@ -873,6 +874,7 @@ export const Hints = {
   cancel,
   onKeyDown,
   isActive,
+  placeCaretAtEnd,
   generateLabels,
   visiblePortion,
   isOccluded,
