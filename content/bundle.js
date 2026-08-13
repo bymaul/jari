@@ -1147,8 +1147,9 @@
     for (let i = 0; i < hintCount; i++) {
       const el = pendingTopLevel[i];
       const label = hintLabels[i];
-      labels.set(label, el);
       const box = createHintOverlay(label, pendingRects.get(el));
+      if (!box) continue;
+      labels.set(label, el);
       overlays2.set(label, box);
       fragment.appendChild(box);
     }
@@ -1320,11 +1321,13 @@
     return s;
   }
   function hintRect(el, fallback) {
+    const vh = window.innerHeight || document.documentElement.clientHeight;
     let bottom = -1;
     let left = 0;
     let right = 0;
     let baseTop = 0;
     for (const rect of el.getClientRects()) {
+      if (rect.bottom <= 0 || rect.top >= vh) continue;
       if (rect.bottom > bottom) {
         bottom = rect.bottom;
         left = rect.left;
@@ -1333,7 +1336,11 @@
       }
     }
     if (bottom < 0) return fallback;
-    return { left, top: Math.max(baseTop, bottom - LABEL_HEIGHT), right, bottom };
+    const top = Math.min(
+      Math.max(baseTop, bottom - LABEL_HEIGHT),
+      vh - LABEL_HEIGHT
+    );
+    return { left, top, right, bottom };
   }
   function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
     const left = Math.max(rect.left, 0);
@@ -1361,6 +1368,7 @@
       window.innerWidth,
       window.innerHeight
     );
+    if (!pos) return null;
     box.style.left = pos.left + "px";
     box.style.top = pos.top + "px";
     return box;

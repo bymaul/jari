@@ -949,3 +949,60 @@ test("hintRect keeps the scan rect when there are no client rects", () => {
   const none = { getClientRects: () => [] };
   assert.deepEqual(Hints.hintRect(none, fallback), fallback);
 });
+
+test("hintRect skips a client rect below the fold and anchors to the last visible line", () => {
+  const original = globalThis.window;
+  globalThis.window = { innerHeight: 600 };
+  try {
+    const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
+    const wrapped = {
+      getClientRects: () => [
+        { left: 8, top: 440, right: 250, bottom: 456 },
+        { left: 8, top: 609, right: 300, bottom: 625 },
+      ],
+    };
+    assert.deepEqual(Hints.hintRect(wrapped, fallback), {
+      left: 8,
+      top: 440,
+      right: 250,
+      bottom: 456,
+    });
+  } finally {
+    globalThis.window = original;
+  }
+});
+
+test("hintRect falls back to the scan rect when every client rect is off-screen", () => {
+  const original = globalThis.window;
+  globalThis.window = { innerHeight: 600 };
+  try {
+    const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
+    const below = {
+      getClientRects: () => [
+        { left: 8, top: 700, right: 300, bottom: 720 },
+      ],
+    };
+    assert.deepEqual(Hints.hintRect(below, fallback), fallback);
+  } finally {
+    globalThis.window = original;
+  }
+});
+
+test("hintRect clamps the label anchor above the fold for a line that dips below it", () => {
+  const original = globalThis.window;
+  globalThis.window = { innerHeight: 600 };
+  try {
+    const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
+    const dipping = {
+      getClientRects: () => [{ left: 8, top: 590, right: 300, bottom: 640 }],
+    };
+    assert.deepEqual(Hints.hintRect(dipping, fallback), {
+      left: 8,
+      top: 580,
+      right: 300,
+      bottom: 640,
+    });
+  } finally {
+    globalThis.window = original;
+  }
+});
