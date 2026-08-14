@@ -2,22 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { containsElement, deepActiveElement, queryAll } from "../content/keymap.js";
 
-// keymap.js's shadow helpers read the global `document` at call time. Each
-// test swaps in a fake document for the duration and restores it afterwards.
 function element(name, { shadowRoot, parent, host } = {}) {
   return {
     name,
     shadowRoot: shadowRoot || null,
     parentElement: parent || null,
     matches: (sel) => sel === "*" || sel === name,
-    // The shadow root's host when the element lives in a shadow tree; null
-    // in the light DOM. getRootNode().host is all containsElement reads.
+
     getRootNode: () => ({ host: host || null }),
   };
 }
 
-// A shadow root or document root: querySelectorAll filters its children by
-// name match, standing in for the browser's native selector matching.
 function rootWith(children) {
   return { querySelectorAll: (sel) => children.filter((c) => c.matches(sel)) };
 }
@@ -33,10 +28,7 @@ function withDocument(document, fn) {
 }
 
 test("queryAll finds matches inside open shadow roots, depth-first", () => {
-  // Every host's root is traversed, matched or not — a generic <div> host
-  // wraps a whole shadow component (Notion, Docs, Figma). A matched host
-  // precedes its shadow content; the non-matching <div> host's shadow content
-  // comes before the matching host that follows it in the light tree.
+
   const shadowBtn = element("button");
   const hostDiv = element("div", { shadowRoot: rootWith([shadowBtn]) });
   const hostBtn = element("button", { shadowRoot: rootWith([element("span")]) });

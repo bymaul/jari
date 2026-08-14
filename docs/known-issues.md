@@ -6,6 +6,123 @@ current status.
 
 ## Resolved
 
+## Hint activation on framed pages left the other frames' hints on screen
+
+**Step:** Press `f` on a page with multiple frames (e.g. a logged-in Google SERP
+with account/menu frames), then type the full label for a hint in the main
+frame.
+
+**Expected:** activating the hint closes hint mode everywhere - the main frame
+and every other frame that drew hints.
+
+**Actual:** (pre-fix) the activated frame's hints cleared, but the hints drawn
+in the other frames stayed on screen. The background coordinates hints across
+frames (`coordinateHints` counts hints in every frame and relays keys via
+`HINTS_KEY`), so the other frames were never told to close.
+
+**Root cause:** in the content script, `onKeyDown` gated the closing
+`HINTS_KEY` message on the `needsRelay` flag _after_ calling `handleHintKey`.
+Activating a hint calls `cancel()`, which resets `needsRelay` to `false`, so
+the message announcing `closed: true` was dropped. The background therefore
+never sent `HINTS_CLOSE` to the remaining frames. A partial keypress relayed
+fine; only the final, closing keypress was lost.
+
+**Status:** resolved. `onKeyDown` now snapshots `needsRelay` before
+`handleHintKey`, so the closing key is always relayed and the background closes
+every frame that took part. Regression coverage: the
+"onKeyDown still relays the closing key when activation cancels the relay
+session" test in `tests/hints.test.js` (drives the real `COUNT_HINTS` /
+`DRAW_HINTS` message path), the existing `coordinateHints`/`relayHintKey` tests
+in `tests/background.test.js`, and the multi-frame E2E harness
+(`frames.html` fixture + `sw-instr.mjs`): after activating the avatar hint the
+background sends `HINTS_CLOSE` to both frames and all hints clear.
+
+**Step:** Press `f` on a page where clicking a target opens a menu instead of
+navigating (e.g. Google's profile picture on SERPs).
+
+**Expected:** activating the hint mirrors a real click - the menu opens and the
+page stays put.
+
+**Actual:** (pre-fix) `activateClick` fired a bare pointer/mouse press and a
+synthetic click, then force-navigated with `window.location.assign(href)` after
+300ms whenever the URL had not changed (the b110d53 SERP guarantee). Pages that
+intercept the click - Google's avatar opens its menu on mousedown - still got
+force-navigated to the link.
+
+**Status:** resolved in cfc5b3d. `simulateClick` now dispatches a realistic interaction: a
+hover sequence (`pointerover`/`pointerenter`/`mouseover`/`mouseenter`/
+`mousemove`), a full press (`pointerId`, `pointerType: mouse`, `isPrimary`,
+`buttons`/`detail`/`view`, screen coordinates), and then `el.click()` so the
+browser only applies default link navigation when the page does not cancel it.
+If the page cancels mousedown, a plain click is dispatched so handlers still
+run without navigating. The `location.assign` fallback survives only as a
+safety net for same-tab http(s) links that neither navigated nor canceled the
+click (`target=_blank` and `download` links are excluded). Hover events also
+arm hover-dependent UI, so buttons that only respond after a mouseover work
+without the user hovering first; hover simulation runs on activation only, and
+elements hidden via `opacity:0`/`visibility:hidden` are still not scanned, so a
+hover-revealed target must live inside a hintable container. Regression
+coverage: `simulateClick` tests in `tests/hints.test.js` and the fixture
+harness (`clicktest.mjs`): an intercepted menu link does not navigate, plain
+links still navigate, and arm-on-hover / hover-reveal targets activate without
+a real hover. Verify Google's avatar menu on a logged-in profile (the headless
+browser is logged out and bot-walled).
+
+Follow-up: simulated clicks also survive page handlers that throw. `dispatchSafe`
+guards every dispatched hover/press event, `el.click()` is wrapped, and hint
+activation is wrapped so a throwing page handler cannot leave the page in a
+half-clicked state. Regression coverage: the "simulateClick survives page
+handlers that throw" and "simulateClick survives handlers that cancel and then
+throw" tests in `tests/hints.test.js`.
+
+## Rebinding or unbinding a default key left the old binding active
+
+**Step:** On the options page, rebind the passthrough key from `p` to `z` and
+save; then press `p` on a page.
+
+**Expected:** `p` no longer triggers passthrough - the binding is replaced.
+
+**Actual:** (pre-fix) `p` still entered passthrough alongside `z`. The stored
+keymap had only `z`, but `normalizeSettings` merged the stored map over
+`keymapDefaults`, so any default binding removed by a rebind was resurrected
+from the defaults. Unbinding a default key was impossible for the same reason.
+
+**Status:** resolved in 980edb3. The stored keymap is now authoritative once
+present (`d.keymap != null ? storedKeymap : keymapDefaults`); defaults are
+only used on first run (no stored keymap). Regression coverage:
+`normalizeSettings` tests in `tests/keymap.test.js`
+("normalizeSettings fills defaults only when no keymap is stored",
+"rebinding away a default key removes the default binding"). Verified
+end-to-end with the rebind harness (`rebind.mjs`): rebind `p`→`z` makes `z`
+enter passthrough and `p` do nothing; reverting restores the original
+behavior.
+
+## Options page — hints, `f`/`F`/`i` did nothing
+
+**Step:** Open Jari's settings page and press `f` / `F` / `i`.
+
+**Expected:** hints appear over the settings page and activate, or the single
+input is focused.
+
+**Actual:** the key is consumed but nothing is drawn or focused.
+
+**Status:** resolved. Hint drawing moved from per-frame local drawing to
+background coordination in b110d53, and the background's `coordinateHints`
+reads `sender.tab.id`. Because the options page opens in a real tab
+(`open_in_tab: true`), its messages carry a defined `sender.tab`, so the
+handler did not take the extension-page branch and instead treated the page
+like a web content script: it called `chrome.webNavigation.getAllFrames` for
+the extension tab, which returns `[]`, hit the `total === 0` path, and
+answered `{ needsRelay: false }` without `drawLocally`. The content script's
+`start()` therefore skipped local drawing entirely.
+
+`coordinateHints` now also returns `{ needsRelay: false, drawLocally: true }`
+when the sender URL is `chrome-extension://`, regardless of `sender.tab`, so
+Jari's own pages always draw hints locally (the SW can never reach an
+extension page with `chrome.tabs.sendMessage` anyway). Verified end-to-end in
+the headless repro (`options-instr2.mjs`): pressing `f` on the settings page
+now draws hints, hint activation focuses the target, and Escape clears them.
+
 ## Instagram feed — no hints after scrolling
 
 **Step:** On the desktop feed, scroll down a few posts, then press `f`.
@@ -54,7 +171,7 @@ tests required the full rect center to be on-screen and uncovered.
 
 - Google's result-row wrapper span is the topmost element above its own
   anchor (the anchor is `pointer-events:none`), so `isOccluded` now accepts a
-  hit that *wraps* the candidate as not occluding — real occluders (sticky
+  hit that _wraps_ the candidate as not occluding — real occluders (sticky
   bars, modals, carousels) are siblings of what they cover, never ancestors.
 - The occlusion hit test samples up to five points across the visible
   portion, center first; one uncovered point is enough, because hint
@@ -73,35 +190,31 @@ tests required the full rect center to be on-screen and uncovered.
 main page they do not appear over the frame, and when they do appear they
 render **behind** the frame (the frame paints on top of the hint boxes).
 
-**Status:** open. Notes from the first pass: Gmail's compose window renders in
+**Status:** resolved. Notes from the first pass: Gmail's compose window renders in
 its own frame. Content scripts only see the frame that has focus, so hints
 reach compose when focus is inside it. If hints appear there but not from the
 main page, that is a frame-traversal limitation (hints don't cross frames).
-The z-order problem (hints behind the frame) is separate and also unresolved.
+The z-order problem (hints behind the frame) is separate and also resolved.
 
 ## Notion — `i` editor focus
 
 **Step:** Press `i` (focus input) on a page with a text block.
 
-**Expected:** the text block is focused and the caret is placed so typing
-works immediately.
+**Expected:** the text block is focused and the caret is placed so typing works
+immediately.
 
 **Actual:** no focus lands in the block. `f` does detect the editor inputs as
 hint targets; activating one also fails to focus the editor.
 
-**Status:** open. Likely related to Notion's shadow-tree editor internals
-resisting programmatic focus; the pointer-sequence fallback in `focusAndPlaceCaret`
-does not cover it.
-
-## Google Docs — `Esc` in hint mode
-
-**Step:** Press `f`, then `Esc` while a hint label is highlighted.
-
-**Expected:** hints close; the focused element (e.g. a toolbar item) blurs and
-any selection highlight clears.
-
-**Actual:** hints close but focus stays on the activated element.
-
-**Status:** open (low priority). Feature request, not a regression: `Esc`
-already closes hint mode; blurring the activated element is the desired
-addition.
+**Status:** open. Caret placement when focus _does_ land is fixed
+(`placeCaretAtEnd` in `focusAndPlaceCaret`): focusing a prefilled
+`<input>`/`<textarea>` moves the caret to the end, and focusing a
+`contenteditable` (light-DOM or inside a shadow root) collapses the selection
+at the end. Verified end-to-end in the headless harness (input, textarea,
+contenteditable, and a shadow-hosted contenteditable; typing after focus
+appends at the end). The remaining Notion problem: programmatic focus now
+lands, but only on the page title's editable, not on body text blocks - so
+`i` puts the caret in the title instead of the paragraph you are reading.
+Notion only renders editable blocks (`contenteditable="true"`) when signed
+in; publicly shared pages are read-only (`contenteditable="false"`), so
+headless validation against Notion requires a logged-in profile.

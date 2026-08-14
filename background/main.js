@@ -1,10 +1,18 @@
-// Jari: background service worker / event page entry.
-// Bundled by build.js into background.js (IIFE classic script), so the
-// manifest keeps pointing at a single classic file for both Chrome
-// (service_worker) and Firefox (scripts array).
-import { handlers } from "./handlers.js";
+import { handlers, coordinateHints, relayHintKey } from "./handlers.js";
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "COORDINATE_HINTS") {
+    coordinateHints(message, sender).then(sendResponse, () =>
+      sendResponse({ needsRelay: false }),
+    );
+    return true;
+  }
+
+  if (message.type === "HINTS_KEY") {
+    relayHintKey(message, sender);
+    return;
+  }
+
   const handler = handlers[message && message.action];
   if (!handler) return;
 
@@ -17,7 +25,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: false, error: String(err) });
       },
     );
-    return true; // keep the message channel open for the async response
+    return true;
   }
   sendResponse(result || { ok: true });
 });

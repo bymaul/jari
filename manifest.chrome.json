@@ -23,7 +23,8 @@
     "clipboardRead",
     "history",
     "bookmarks",
-    "search"
+    "search",
+    "webNavigation"
   ],
   "background": {
     "service_worker": "background.js"

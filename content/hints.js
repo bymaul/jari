@@ -1,10 +1,3 @@
-// Jari: link-hint mode (f / i).
-// Overlays a letter label on visible clickable/input elements; typing the
-// label resolves it. Modes:
-//   click  - activate the element (same tab)
-//   newtab - open anchors in a background tab, otherwise click
-//   yank   - copy the link URL to the clipboard (yf)
-//   focus  - focus inputs; auto-focuses when exactly one match exists
 import {
   allowedUrlSchemes,
   containsElement,
@@ -13,21 +6,18 @@ import {
   queryAll,
   settingsDefaults,
 } from "./keymap.js";
-
-// Upper bound on labels rendered at once. Pages can match hundreds of
-// clickables; labeling them all is slow and useless, so the first MAX_HINTS
-// in document order get hints and the rest are skipped.
-const MAX_HINTS = 100;
-// Approximate hint-box height, used to keep labels fully inside the
-// viewport when the hinted element only shows a sliver at the fold edge.
-const LABEL_HEIGHT = 20;
+import {
+  MIN_VISIBLE_HINT_SIZE,
+  OCCLUSION_SAMPLE_THRESHOLD,
+} from "../shared/constants.js";
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
 import { register } from "./overlays.js";
 
-// Broad selector of "things you can click". Includes ARIA roles, inline
-// onclick handlers, and form controls; hidden inputs are excluded.
-const CLICKABLE_SELECTOR = [
+const MAX_HINTS = 100;
+const LABEL_HEIGHT = 20;
+
+const STRONG_CLICKABLE_SELECTOR = [
   "a[href]",
   "area[href]",
   "button",
@@ -49,10 +39,25 @@ const CLICKABLE_SELECTOR = [
   "[role='combobox']",
   "[role='treeitem']",
   "[onclick]",
+  "[ng-click]",
+  "[\\@click]",
+  "[v-on\\:click]",
 ].join(",");
 
-// Text-entry targets for focus mode ("i"): text-like inputs, textarea and
-// editable elements. Radio/checkbox/button/file/color/range are excluded.
+const WEAK_CLICKABLE_SELECTOR = [
+  "[class*='button' i]",
+  "[class*='btn' i]",
+  "[class*='link' i]",
+  "[class*='clickable' i]",
+  "[class*='cursor-pointer' i]",
+  "[aria-haspopup='true']",
+  "[aria-pressed]",
+  "[aria-expanded]",
+  "[aria-controls]",
+].join(",");
+
+const CLICKABLE_SELECTOR = `${STRONG_CLICKABLE_SELECTOR},${WEAK_CLICKABLE_SELECTOR}`;
+
 const TEXT_INPUT_TYPES = [
   "text",
   "search",
@@ -78,18 +83,11 @@ const FOCUS_SELECTOR = [
   "[role='spinbutton']",
 ].join(",");
 
-// True when the element carries a usable link href. "yank"/"newtab" only
-// hint links — a button without an href has nothing to copy or open.
 function linkHref(el) {
   const href = el.href || el.getAttribute?.("href");
   return typeof href === "string" && href.trim() !== "";
 }
 
-// Many sites (Google Docs, Notion, Gmail widgets) act on pointer/mouse
-// input, often on a shadow host, and ignore a bare el.click(). Dispatch the
-// full pointer sequence the way a real click does so those components react.
-// Untrusted events trigger no default action — a text input is not moved or
-// selected — so callers follow up with el.click() or el.focus() themselves.
 function firePointerSequence(el) {
   const rect = el.getBoundingClientRect();
   const opts = {
@@ -106,19 +104,151 @@ function firePointerSequence(el) {
   }
 }
 
-// Focus a text target with the caret at the end of its content — "i" should
-// drop you at the end of the line, not the start. Inputs/textarea use the
-// selection API; editable elements get a collapsed range at the end.
-// Browsers apply their own focus default (caret at start) after a
-// programmatic focus, and some sites re-place the caret in focus or
-// autocomplete handlers — so placement is retried until it sticks.
+function eventCoords(el) {
+  const rect = el.getBoundingClientRect();
+  const clientX = rect.left + rect.width / 2;
+  const clientY = rect.top + rect.height / 2;
+  return {
+    clientX,
+    clientY,
+    screenX: window.screenX + clientX,
+    screenY: window.screenY + clientY,
+  };
+}
+
+function dispatchSafe(el, event) {
+  try {
+    el.dispatchEvent(event);
+  } catch (err) {
+    console.debug("[jari] page event handler threw:", err);
+  }
+  return !event.defaultPrevented;
+}
+
+function fireHoverSequence(el) {
+  const opts = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    ...eventCoords(el),
+    pointerId: 1,
+    pointerType: "mouse",
+    isPrimary: true,
+  };
+  for (const type of [
+    "pointerover",
+    "pointerenter",
+    "mouseover",
+    "mouseenter",
+    "mousemove",
+  ]) {
+    const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
+    dispatchSafe(el, new Ctor(type, opts));
+  }
+}
+
+function firePressSequence(el) {
+  const opts = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    ...eventCoords(el),
+    pointerId: 1,
+    pointerType: "mouse",
+    isPrimary: true,
+    view: window,
+    detail: 1,
+  };
+  dispatchSafe(el, new PointerEvent("pointerdown", { ...opts, buttons: 1 }));
+  const mousedownCanceled = !dispatchSafe(
+    el,
+    new MouseEvent("mousedown", { ...opts, buttons: 1 }),
+  );
+  dispatchSafe(el, new PointerEvent("pointerup", { ...opts, buttons: 0 }));
+  dispatchSafe(el, new MouseEvent("mouseup", { ...opts, buttons: 0 }));
+  return mousedownCanceled;
+}
+
+function fireClick(el) {
+  dispatchSafe(
+    el,
+    new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      button: 0,
+      buttons: 0,
+      detail: 1,
+      ...eventCoords(el),
+    }),
+  );
+}
+
+function elClick(el) {
+  let canceled = false;
+  const guard = (event) => {
+    canceled = event.defaultPrevented;
+  };
+  el.addEventListener("click", guard);
+  try {
+    el.click();
+  } catch (err) {
+    console.debug("[jari] el.click() threw:", err);
+  } finally {
+    el.removeEventListener("click", guard);
+  }
+  return canceled;
+}
+
+function hrefOf(el) {
+  const href = el.href || el.getAttribute?.("href");
+  return typeof href === "string" ? href : null;
+}
+
+function navigatesSameTab(el, href) {
+  if (!href) return false;
+  const scheme = href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+  if (!href.startsWith("/") && !(scheme && /^https?$/i.test(scheme))) {
+    return false;
+  }
+  const target = el.getAttribute?.("target");
+  if (target && target.toLowerCase() !== "_self") return false;
+  if (el.hasAttribute?.("download")) return false;
+  return true;
+}
+
+function simulateClick(el) {
+  const startHref = location.href;
+  fireHoverSequence(el);
+  const mousedownCanceled = firePressSequence(el);
+  let clickCanceled;
+  if (mousedownCanceled) {
+    fireClick(el);
+    clickCanceled = true;
+  } else {
+    clickCanceled = elClick(el);
+  }
+  const href = hrefOf(el);
+  if (mousedownCanceled || clickCanceled || !navigatesSameTab(el, href)) return;
+  setTimeout(() => {
+    if (location.href === startHref) {
+      try {
+        window.location.assign(href);
+      } catch {}
+    }
+  }, 300);
+}
+
 function placeCaretAtEnd(el) {
   if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
     try {
       const len = el.value ? el.value.length : 0;
       el.setSelectionRange(len, len);
     } catch {
-      // Some input types (number, date, ...) reject selection ranges.
+
     }
     return;
   }
@@ -130,13 +260,10 @@ function placeCaretAtEnd(el) {
     sel.removeAllRanges();
     sel.addRange(range);
   } catch {
-    // Not a real text entry (custom widget); focusing is all we can do.
+
   }
 }
 
-// Focus the target of a focus-mode hint. Some editors (ProseMirror,
-// CodeMirror, Notion blocks) only enter an editable state on pointer input,
-// so fire a pointer sequence after focusing.
 function focusAndPlaceCaret(el) {
   const editable = el.querySelector(
     '[contenteditable="true"], [contenteditable="plaintext-only"], input:not([type="hidden"]), textarea',
@@ -146,77 +273,95 @@ function focusAndPlaceCaret(el) {
   el.focus();
   if (el.isConnected) firePointerSequence(el);
   if (el.isConnected && deepActiveElement() !== el) el.focus();
-  // Place the caret immediately, then again across a window of ticks:
-  // Chrome finalizes its focus default selection after the keydown, and
-  // page handlers (React, autocomplete) can re-place the caret even later.
-  // Each attempt re-verifies the element still owns focus; a fixed shot
-  // count stops early so a page that keeps fighting the caret wins in the
-  // end rather than Jari re-placing forever.
-  const target = el;
-  const shots = [0, 16, 32, 64, 128, 256];
-  for (const delay of shots) {
-    setTimeout(() => {
-      if (deepActiveElement() !== target) return;
-      placeCaretAtEnd(target);
-    }, delay);
-  }
+  placeCaretAtEnd(el);
+  const fightFocusStealer = () => {
+    if (el.isConnected) {
+      el.focus();
+      placeCaretAtEnd(el);
+    }
+    el.removeEventListener("focusout", fightFocusStealer);
+  };
+
+  el.addEventListener("focusout", fightFocusStealer);
+
+  setTimeout(() => {
+    el.removeEventListener("focusout", fightFocusStealer);
+  }, 300);
 }
 
-// click labels everything clickable; newtab and yank only links (a button
-// without an href has nothing to open or copy).
+function focusSingleInput() {
+  if (mode !== "focus" || pendingTopLevel.length !== 1) return;
+  const el = pendingTopLevel[0];
+  cancel();
+  focusAndPlaceCaret(el);
+}
+
 const MODES = {
   click: {
-    selector: CLICKABLE_SELECTOR,
+    selector: STRONG_CLICKABLE_SELECTOR,
+    weak: WEAK_CLICKABLE_SELECTOR,
     pointerCursor: true,
     activate: activateClick,
   },
   newtab: {
-    selector: CLICKABLE_SELECTOR,
+    selector: STRONG_CLICKABLE_SELECTOR,
     linkOnly: true,
     activate: openInNewTab,
   },
-  yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
+  yank: {
+    selector: STRONG_CLICKABLE_SELECTOR,
+    linkOnly: true,
+    activate: yankLink,
+  },
   focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
-  // background: same as newtab, but sticky — the hints stay up after a pick
-  // so the next label can be typed immediately (opening several links in a
-  // row). See onKeyDown for the keep-open handling.
   background: {
-    selector: CLICKABLE_SELECTOR,
+    selector: STRONG_CLICKABLE_SELECTOR,
     linkOnly: true,
     sticky: true,
     activate: openInNewTab,
   },
 };
 
+const ACTIVATABLE_SELECTOR = [
+  "a[href]",
+  "area[href]",
+  "button",
+  "input:not([type='hidden'])",
+  "select",
+  "textarea",
+  "[role='button']",
+  "[role='link']",
+].join(",");
+
 function activateClick(el) {
-  firePointerSequence(el);
-  el.click();
+  if (el.matches(FOCUS_SELECTOR) || el.querySelector(FOCUS_SELECTOR)) {
+    focusAndPlaceCaret(el);
+    return;
+  }
+  if (!el.matches(ACTIVATABLE_SELECTOR)) {
+    const inner = el.querySelector(ACTIVATABLE_SELECTOR);
+    if (inner) el = inner;
+  }
+  simulateClick(el);
 }
 
-// Hint labels are built from the configured character set (settings
-// hintChars, default home-row set). Empty fallback can't happen —
-// normalizeSettings guarantees at least four characters — but guard anyway.
 function alphabet() {
   return settings.getHintChars() || settingsDefaults.hintChars;
 }
 
 let mode = null;
-let labels = new Map(); // hint label -> target element
-let overlays = new Map(); // hint label -> overlay element
+let needsRelay = false;
+let labels = new Map();
+let overlays = new Map();
 let typed = "";
 let hintsHost = null;
 let blockWheel = null;
 
-// All hint labels live in one host element that is attached to the page as a
-// single node. Appending 100 individual boxes to the body (open) and removing
-// them one by one (close) was a visible source of jank; a single host makes
-// both a one-node mutation. The absolute .jari-hint children are positioned
-// relative to the document origin, so their viewport-derived coordinates
-// still land in the same place as when they hung directly off the body.
 function getHintsHost() {
   if (hintsHost && hintsHost.isConnected) return hintsHost;
   hintsHost = document.createElement("div");
   hintsHost.className = "jari-hints-host";
+  hintsHost.setAttribute("aria-hidden", "true");
   hintsHost.style.cssText =
     "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483647;";
   document.body.appendChild(hintsHost);
@@ -227,16 +372,6 @@ function isActive() {
   return mode !== null;
 }
 
-// While hints are up, a wheel scroll invalidates the hint set: boxes sit at
-// scan-time coordinates, so after any scroll the overlay no longer matches
-// what is on screen. onKeyDown already preventDefaults every key (so arrow
-// keys, space and PageDown are dead), which leaves the wheel — the last
-// unguarded way to move the page. The capture-phase listener cancels it for
-// the whole window while hints are open. `passive: false` is required:
-// Chrome treats wheel listeners on window/document/body as passive by
-// default and would refuse to let a passive one cancel the scroll. The
-// listener only exists while hints are open, so the non-passive cost is zero
-// the rest of the time.
 function setWheelBlocking(on) {
   if (on && !blockWheel) {
     blockWheel = (event) => event.preventDefault();
@@ -250,14 +385,6 @@ function setWheelBlocking(on) {
   }
 }
 
-// Hints sit at scan-time coordinates; while they are up, any scroll — a
-// window scroll, a page container (Instagram's feed scrolls inside its own
-// box), or a scrollbar drag — detaches every label from its element. A
-// capture-phase scroll listener re-anchors the labels to their elements'
-// current positions. It is passive because there is nothing to cancel, and
-// it only exists while hints are open so no listener cost leaks into normal
-// browsing. The re-anchor runs once per frame: scroll events can fire many
-// times per frame, and recomputing 100 rects each is wasted work.
 let scrollTracking = null;
 let trackingFrame = null;
 
@@ -279,10 +406,6 @@ function scheduleHintReposition() {
   trackingFrame = requestAnimationFrame(repositionHints);
 }
 
-// Re-pin every visible label to its element. Labels whose element scrolled
-// out of the viewport are hidden (display:none — they are absolute, so no
-// layout shifts); an element that scrolls back in is shown again. Detached
-// elements from a virtualized re-render read as zero-size and hide.
 function repositionHints() {
   trackingFrame = null;
   for (const [label, el] of labels) {
@@ -291,6 +414,7 @@ function repositionHints() {
     const rect = hintRect(el, el.getBoundingClientRect());
     const pos = labelPlacement(
       rect,
+      settings.getHintPosition(),
       window.scrollX,
       window.scrollY,
       window.innerWidth,
@@ -303,10 +427,9 @@ function repositionHints() {
     box.style.display = "";
     box.style.left = pos.left + "px";
     box.style.top = pos.top + "px";
+    if (pos.transform) box.style.transform = pos.transform;
   }
 }
-
-const POINTER_CAP = 200;
 
 function isPointerCursor(style) {
   const cursor = style && style.cursor;
@@ -316,10 +439,8 @@ function isPointerCursor(style) {
   );
 }
 
-// Cheap pre-filters before any style read: no box (display:none subtree,
-// collapsed template content) or fully off-viewport means no pointer target.
-// The rect is recomputed by the visibility pass; within one synchronous scan
-// the browser caches it, so the double read is near-free.
+const POINTER_CAP = 200;
+
 function isPointerCandidate(el) {
   const rect = el.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return false;
@@ -327,110 +448,167 @@ function isPointerCandidate(el) {
   const vh = window.innerHeight || document.documentElement.clientHeight;
   if (rect.left >= vw || rect.top >= vh || rect.right <= 0 || rect.bottom <= 0)
     return false;
-  // One computed-style read covers visibility and cursor; hidden elements are
-  // dropped before the cursor test (visibility is inherited, so a hidden
-  // ancestor is caught too).
+
   const style = window.getComputedStyle(el);
   if (style.visibility === "hidden") return false;
   return isPointerCursor(style);
 }
 
-// Click-hint candidates in flat-tree order: selector matches plus, when
-// enabled, elements SurfingKeys treats as clickable via the cursor heuristic.
-// Like queryAll, every element and open shadow root is walked (the flat tree
-// keeps shadow content after its host), so the ancestor-before-descendant
-// order the nesting logic relies on is preserved. Pointer-only additions are
-// capped so the style reads stay bounded.
-function queryClickables(selector, { pointerCursor = true } = {}) {
-  const out = [];
+function isJsactionClick(el) {
+  const jsaction = el.getAttribute?.("jsaction");
+  if (!jsaction) return false;
+  for (const rawRule of jsaction.split(";")) {
+    const rule = rawRule.trim();
+    if (!rule) continue;
+    const split = rule.split(":");
+    if (split.length < 1 || split.length > 2) continue;
+    const eventType = split.length === 1 ? "click" : split[0];
+    if (eventType !== "click") continue;
+    const action = split.length === 1 ? rule : split[1];
+    const [namespace, actionName = "_"] = action.split(".");
+    if (namespace === "none" || actionName === "_") continue;
+    return true;
+  }
+  return false;
+}
+
+function queryClickables(
+  strongSelector,
+  { weak: weakSelector, pointerCursor = true } = {},
+) {
+  const candidates = [];
+  const weak = new WeakSet();
   let pointerCount = 0;
   const visit = (root) => {
     for (const el of root.querySelectorAll("*")) {
-      if (el.matches(selector)) {
-        out.push(el);
+      if (el.matches(strongSelector) || isJsactionClick(el)) {
+        candidates.push(el);
+      } else if (weakSelector && el.matches(weakSelector)) {
+        candidates.push(el);
+        weak.add(el);
       } else if (
         pointerCursor &&
         pointerCount < POINTER_CAP &&
         isPointerCandidate(el)
       ) {
         pointerCount++;
-        out.push(el);
+        candidates.push(el);
       }
       if (el.shadowRoot) visit(el.shadowRoot);
     }
   };
   visit(document);
-  return out;
+  return { candidates, weak };
 }
 
-function start(nextMode) {
-  const config = MODES[nextMode];
-  if (!config) return;
-  cancel();
+let pendingTopLevel = [];
+let pendingRects = new Map();
+let pendingTotal = 0;
 
-  const candidates = config.pointerCursor
-    ? queryClickables(config.selector)
-    : queryAll(config.selector);
-  const {
-    top: topLevel,
-    rects,
-    total: counted,
-  } = scanElements(candidates, {
+async function start(nextMode) {
+  if (!chrome.runtime?.id) {
+    console.debug(
+      "[jari] Extension context invalidated. Skipping hint coordination.",
+    );
+    return;
+  }
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      type: "COORDINATE_HINTS",
+      mode: nextMode,
+    });
+    needsRelay = Boolean(res && res.needsRelay);
+    if (res && res.drawLocally) {
+      const count = countHints(nextMode);
+      if (count === 0) {
+        cancel();
+        ui.toast("No matches");
+      } else if (nextMode === "focus" && pendingTopLevel.length === 1) {
+        focusSingleInput();
+      } else {
+        drawHints(0);
+      }
+    }
+  } catch (err) {
+    console.debug(
+      "[jari] Failed to coordinate hints (context likely invalidated):",
+      err,
+    );
+    needsRelay = false;
+  }
+}
+
+function countHints(nextMode) {
+  const config = MODES[nextMode];
+  if (!config) return 0;
+
+  cancel();
+  mode = nextMode;
+
+  const { candidates, weak } = config.pointerCursor
+    ? queryClickables(config.selector, { weak: config.weak })
+    : { candidates: queryAll(config.selector), weak: new WeakSet() };
+
+  const scanned = scanElements(candidates, {
     passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
     visible: isVisible,
     occluded: isOccluded,
     max: MAX_HINTS,
-    nested: treeItemNested,
+
+    nested: (el, ancestor) => !weak.has(ancestor) && treeItemNested(el, ancestor),
   });
-  // Wrapped or clipped anchors report one merged box (getBoundingClientRect)
-  // whose edges can point at empty space; the hint label lands on the box
-  // instead of a fragment that is actually visible. getClientRects gives the
-  // per-line fragments, so re-pin the label to a real one (SurfingKeys'
-  // getRealRect). Placement only — hit-testing already ran on the scan rect.
-  for (const el of topLevel) {
+
+  let top = scanned.top;
+  const rects = scanned.rects;
+
+  if (weak.size > 0) {
+    top = top.filter(
+      (el) =>
+        !weak.has(el) ||
+        !top.some((other) => other !== el && containsElement(el, other)),
+    );
+  }
+
+  for (const el of top) {
     rects.set(el, hintRect(el, rects.get(el)));
   }
-  const hintCount = topLevel.length;
 
-  if (nextMode === "focus" && topLevel.length === 1) {
-    focusAndPlaceCaret(topLevel[0]);
-    return;
-  }
-  if (topLevel.length === 0) {
-    ui.toast("No matches");
-    return;
+  pendingTopLevel = top;
+  pendingRects = rects;
+  pendingTotal = scanned.total;
+  return top.length;
+}
+
+function drawHints(startIndex) {
+  const hintCount = pendingTopLevel.length;
+  if (hintCount === 0) return;
+
+  if (pendingTotal > MAX_HINTS) {
+    ui.toast(`Showing ${hintCount} of ${pendingTotal} hints`);
   }
 
-  mode = nextMode;
-  // Multiple focus targets: hint labels appear on each input so the user
-  // can pick one; tell them the hints are up.
-  if (nextMode === "focus") {
-    ui.toast(`${hintCount} inputs — pick one`);
-  }
-  if (counted > MAX_HINTS) {
-    ui.toast(`Showing ${hintCount} of ${counted} hints`);
-  }
-  const hintLabels = generateLabels(hintCount);
-  // Build every box into a detached fragment and attach it to the host once,
-  // so the page sees a single DOM mutation instead of one per hint.
+  const hintLabels = generateLabels(hintCount, startIndex);
+
   const host = getHintsHost();
   const fragment = document.createDocumentFragment();
+  const position = settings.getHintPosition();
+
   for (let i = 0; i < hintCount; i++) {
-    const el = topLevel[i];
+    const el = pendingTopLevel[i];
     const label = hintLabels[i];
+    const box = createHintOverlay(label, pendingRects.get(el), position);
+    if (!box) continue;
     labels.set(label, el);
-    const box = createHintOverlay(label, rects.get(el));
     overlays.set(label, box);
     fragment.appendChild(box);
   }
+
   host.appendChild(fragment);
   setWheelBlocking(true);
   setScrollTracking(true);
 }
 
-// An element must be genuinely interactive: not disabled and not an anchor
-// without a usable href. Visibility and occlusion are checked separately so
-// the visibility pass can reuse the rect it computed.
 function isInteractive(el) {
   if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
   if (el.closest(overlaySelectors)) return false;
@@ -441,11 +619,6 @@ function isInteractive(el) {
   return true;
 }
 
-// The part of `rect` inside the viewport, or null when none of it shows.
-// An element cut off by the fold or scrolled under a sticky bar is still a
-// valid hint target — its visible part is clickable — so both the visibility
-// test and the occlusion hit-test work on this portion instead of the full
-// rect.
 function visiblePortion(rect) {
   const vw = window.innerWidth || document.documentElement.clientWidth;
   const vh = window.innerHeight || document.documentElement.clientHeight;
@@ -457,34 +630,18 @@ function visiblePortion(rect) {
   return { left, top, right, bottom };
 }
 
-// The element's on-screen rect, or null when it is not visible: zero-size,
-// entirely off-viewport (display:none anywhere collapses the rect to zero
-// size), visibility:hidden on itself or an ancestor (computed visibility is
-// inherited), own opacity:0, or an opacity:0 ancestor (checked last, via
-// checkVisibility, because opacity does not inherit). One computed-style read
-// covers the cheap cases, which is faster than checkVisibility's ancestor
-// walk on element-heavy pages; the walk only runs for the few elements that
-// survive the fast-fails.
 function isVisible(el) {
   const rect = el.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
-  // At least a sliver must be inside the viewport.
   const portion = visiblePortion(rect);
   if (!portion) return null;
-  // A pixel or two of an element is noise, not a target.
-  const MIN_VISIBLE = 4;
-  if (portion.right - portion.left < MIN_VISIBLE) return null;
-  if (portion.bottom - portion.top < MIN_VISIBLE) return null;
+  if (portion.right - portion.left < MIN_VISIBLE_HINT_SIZE) return null;
+  if (portion.bottom - portion.top < MIN_VISIBLE_HINT_SIZE) return null;
 
   const style = window.getComputedStyle(el);
   if (style.visibility === "hidden") return null;
   if (parseFloat(style.opacity) === 0) return null;
-  // opacity:0 on an ancestor hides the subtree even though the element's own
-  // opacity is 1 (opacity does not inherit) — dropdowns, carousels and
-  // fade-in panels keep their content at opacity:0 until shown. checkVisibility
-  // walks the flat tree with cached render state and computes no style per
-  // ancestor, so it stays cheap; the rect and computed-style fast-fails above
-  // run first.
+
   if (
     typeof el.checkVisibility === "function" &&
     !el.checkVisibility({ opacityProperty: true })
@@ -494,20 +651,6 @@ function isVisible(el) {
   return rect;
 }
 
-// True when the topmost element at the visible area's center blocks the
-// candidate: a sticky bar, an absolutely-positioned sibling, a carousel
-// overlap. The hit-test ignores pointer-events:none layers, so decorative
-// overlays (Instagram's gradient bars) don't cause false skips. Form
-// controls are almost never occluded and hit-testing every one is the
-// dominant scan cost on input-heavy pages, so they skip the test
-// (Surfingkeys does the same). The hit-test runs on the element's own root
-// so shadow content is tested against its shadow tree instead of the
-// document.
-// Sample points across the visible portion, center first. Hint activation
-// clicks the element directly (el.click()), never the hit-test point, so an
-// element only needs ONE uncovered sample to be a useful hint target. The
-// extra points only run when the center is covered, so the common case stays
-// a single hit test.
 function occlusionSamples(portion) {
   const { left, top, right, bottom } = portion;
   const cx = (left + right) / 2;
@@ -515,25 +658,16 @@ function occlusionSamples(portion) {
   const points = [[cx, cy]];
   const w = right - left;
   const h = bottom - top;
-  if (w >= 8) points.push([left + w * 0.25, cy], [left + w * 0.75, cy]);
-  if (h >= 8) points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
+  if (w >= OCCLUSION_SAMPLE_THRESHOLD)
+    points.push([left + w * 0.25, cy], [left + w * 0.75, cy]);
+  if (h >= OCCLUSION_SAMPLE_THRESHOLD)
+    points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
   return points;
 }
 
-// True when `rect` (viewport coordinates) overlaps the visible area of
-// `node` — i.e. the element is not clipped out of this overflow container.
-// The rect and the node's box are both viewport coordinates, so no scroll
-// offset enters the comparison; the box is layout-cached by the browser
-// after the scan's first getBoundingClientRect, so the check adds no style
-// computation or reflow.
 function rectOverlapsScrollport(rect, node) {
   const box = node.getBoundingClientRect();
-  // A box that misses the viewport entirely cannot clip on-screen content,
-  // so it is treated as overlapping. The documentElement's box lives in
-  // document coordinates and slides off-screen as the page scrolls; without
-  // this guard the walk would reject every on-screen element once the page
-  // is scrolled. Guarded behind window so the mock-container tests (which
-  // have no window) keep taking the plain overlap path.
+
   const vw = globalThis.window?.innerWidth;
   const vh = globalThis.window?.innerHeight;
   if (
@@ -551,21 +685,9 @@ function rectOverlapsScrollport(rect, node) {
 }
 
 function isOccluded(el, rect) {
-  // Scrolled out of a clipping ancestor's viewport: carousel trays and scroll
-  // containers keep off-view items invisible even though their rect is still
-  // inside the window viewport (Instagram's stories bar). Only an ancestor
-  // whose content overflows its box can clip, so the cheap scroll-size read
-  // gates the walk; among those, an overflow:visible box clips nothing. The
-  // walk runs before the form-control shortcut so scrolled-out inputs are
-  // rejected too, while they still skip their expensive elementFromPoint test.
-  // The documentElement and body are the viewport, not clip boxes: their
-  // overflow is applied to (or propagated to) the viewport, and their boxes
-  // live in document coordinates, so they slide off-screen as the page
-  // scrolls. Testing them would reject every on-screen element once the page
-  // is scrolled — Instagram sets overflow-y: scroll on <html>, so its
-  // off-screen root box fails the overlap test and the scan finds nothing.
-  // Real clip boxes are descendants (carousels, feed columns) and are still
-  // walked.
+  const portion = visiblePortion(rect);
+  if (!portion) return true;
+
   let node = el.parentElement || el.getRootNode().host;
   while (
     node &&
@@ -584,31 +706,49 @@ function isOccluded(el, rect) {
     node = node.parentElement || node.getRootNode().host;
   }
   if (el.matches("input, textarea, select, [contenteditable]")) return false;
-  // Hit-test the visible portion, not the full rect: a link scrolled under a
-  // sticky header or cut off by the fold has an off-screen or covered center
-  // even though its visible part is clickable (Google's sticky search bar is
-  // the classic case).
-  const portion = visiblePortion(rect);
-  if (!portion) return true;
+
   const root = el.getRootNode();
-  for (const [x, y] of occlusionSamples(portion)) {
+  const points = occlusionSamples(portion);
+  let occludedPoints = 0;
+
+  for (const [x, y] of points) {
     const top = root.elementFromPoint(x, y);
-    if (!top) continue;
-    // Not occluded when the hit is the candidate, lives inside it, or wraps
-    // it: sites like Google make the whole result row the click zone, so the
-    // topmost element at a link's center is its own ancestor (the anchor is
-    // pointer-events:none or display:contents behind it). Real occluders —
-    // sticky headers, modals, carousels — are siblings of what they cover,
-    // never ancestors, so they are still caught.
-    if (containsElement(el, top) || containsElement(top, el)) return false;
+
+    if (!top) {
+      occludedPoints++;
+      continue;
+    }
+
+    if (
+      containsElement(el, top) ||
+      containsElement(top, el) ||
+      flatContains(el, top) ||
+      flatContains(top, el)
+    ) {
+      return false;
+    } else {
+      occludedPoints++;
+    }
   }
-  return true;
+
+  return occludedPoints === points.length;
 }
 
-// A treeitem's clickable ancestor is its folder row — a different action
-// (expand/collapse) than the item itself (open a file) — so neither nests the
-// other: both must get hints, or every file under an expanded folder (e.g.
-// GitHub's file tree) would be hidden by the generic ancestor-dedup rule.
+function flatParent(node) {
+  if (node.assignedSlot) return node.assignedSlot;
+  if (node.parentElement) return node.parentElement;
+  if (node.getRootNode().host) return node.getRootNode().host;
+  return null;
+}
+
+function flatContains(ancestor, node) {
+  let current = node;
+  while (current && current !== ancestor) {
+    current = flatParent(current);
+  }
+  return current === ancestor;
+}
+
 function isTreeItem(el) {
   return el.getAttribute?.("role") === "treeitem";
 }
@@ -616,24 +756,6 @@ function treeItemNested(el, ancestor) {
   return !(isTreeItem(el) && isTreeItem(ancestor));
 }
 
-// One pass collects every hintable element together with its rect: the rect
-// from the visibility check is reused for the occlusion test and for the
-// overlay position, so no rect is read twice and no overlay append
-// invalidates the next read. Scanning stops once `max` top-level elements
-// are found — ancestors always precede descendants in document order, so
-// nested matches are recognizable as we go and the remaining candidates only
-// need a cheap count for the "Showing N of M" toast. That caps the expensive
-// occlusion hit tests at ~max regardless of how many matches the page has.
-// The predicates are injected so the scan is testable without a DOM; the DOM
-// reads live in the callers, not here.
-// `visible` returns the element's rect, or null when it cannot be seen.
-// `occluded(el, rect)` says whether the element's visible part is covered.
-// `nested(el, ancestor)` decides whether an already-collected ancestor that
-// also matched should suppress the element's hint (default: yes — a clickable
-// card wrapping its link is one click). Callers may exempt pairs that are
-// distinct actions, like treeitem rows.
-// Returns the top-level elements in document order, a rect per element, and
-// the total count of viable elements for the toast.
 function scanElements(
   candidates,
   { passes, visible, occluded, max, nested = () => true },
@@ -645,7 +767,7 @@ function scanElements(
   for (const el of candidates) {
     if (!passes(el)) continue;
     if (top.length >= max) {
-      // Past the cap: no hit test, just count the visible survivors.
+
       if (visible(el)) counted++;
       continue;
     }
@@ -655,7 +777,7 @@ function scanElements(
     viableSet.add(el);
     rects.set(el, rect);
     counted++;
-    // Top-level unless an already-collected ancestor nests it.
+
     let node = el.parentElement || el.getRootNode().host;
     let isNested = false;
     while (node) {
@@ -670,18 +792,21 @@ function scanElements(
   return { top, rects, total: counted };
 }
 
-// Labels are always at least two characters (AA, AB, ...) and grow a
-// character whenever the set is exhausted, so they never duplicate.
-function generateLabels(count) {
+function generateLabels(count, startIndex = 0) {
   const chars = alphabet();
   const n = chars.length;
   const labels = [];
   let i = 0;
   let length = 2;
-  while (i < count) {
+
+  const totalToGenerate = count + startIndex;
+
+  while (i < totalToGenerate) {
     const combos = Math.pow(n, length);
-    for (let k = 0; k < combos && i < count; k++, i++) {
-      labels.push(toBase26(k, length, chars));
+    for (let k = 0; k < combos && i < totalToGenerate; k++, i++) {
+      if (i >= startIndex) {
+        labels.push(toBase26(k, length, chars));
+      }
     }
     length++;
   }
@@ -699,27 +824,48 @@ function toBase26(value, length, chars) {
 }
 
 function hintRect(el, fallback) {
-  if (el.childElementCount === 0) {
-    const rects = el.getClientRects();
-    if (rects.length === 3) return rects[1];
-    if (rects.length === 2) return rects[0];
-  }
   return fallback;
 }
 
-function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
+function labelPlacement(
+  rect,
+  position,
+  scrollX,
+  scrollY,
+  viewportWidth,
+  viewportHeight,
+) {
   const left = Math.max(rect.left, 0);
   const top = Math.max(rect.top, 0);
   const right = Math.min(rect.right, viewportWidth);
   const bottom = Math.min(rect.bottom, viewportHeight);
   if (right <= left || bottom <= top) return null;
+
+  const [vert, horiz] = position.split("-");
+  const cx = (left + right) / 2;
+  const cy = (top + bottom) / 2;
+  const anchorX = horiz === "center" ? cx : horiz === "right" ? right : left;
+  const anchorY = vert === "middle" ? cy : vert === "bottom" ? bottom : top;
+
+  const tx = horiz === "center" ? -50 : horiz === "right" ? -100 : 0;
+  const ty = vert === "middle" ? -50 : vert === "bottom" ? -100 : 0;
+
+  const half = LABEL_HEIGHT / 2;
+  const minX = tx === -100 ? LABEL_HEIGHT : tx === -50 ? half : 0;
+  const maxX =
+    tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - half : viewportWidth - LABEL_HEIGHT;
+  const minY = ty === -100 ? LABEL_HEIGHT : ty === -50 ? half : 0;
+  const maxY =
+    ty === -100 ? viewportHeight : ty === -50 ? viewportHeight - half : viewportHeight - LABEL_HEIGHT;
+
   return {
-    left: scrollX + left,
-    top: scrollY + Math.min(top, viewportHeight - LABEL_HEIGHT),
+    left: scrollX + Math.min(Math.max(anchorX, minX), maxX),
+    top: scrollY + Math.min(Math.max(anchorY, minY), maxY),
+    transform: `translate(${tx}%, ${ty}%)`,
   };
 }
 
-function createHintOverlay(label, rect) {
+function createHintOverlay(label, rect, position) {
   const box = document.createElement("div");
   box.className = "jari-hint";
   for (const ch of label) {
@@ -729,27 +875,28 @@ function createHintOverlay(label, rect) {
   }
   const pos = labelPlacement(
     rect,
+    position,
     window.scrollX,
     window.scrollY,
     window.innerWidth,
     window.innerHeight,
   );
+  if (!pos) return null;
   box.style.left = pos.left + "px";
   box.style.top = pos.top + "px";
+  if (pos.transform) box.style.transform = pos.transform;
   return box;
 }
 
 function openInNewTab(el) {
   const href = el.href || el.getAttribute?.("href");
-  // Only hand web-ish URLs to the background. Anything else (javascript:,
-  // data:, mailto:, ...) is a same-tab click, which the site itself offers.
+
   const scheme =
     href && href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1].toLowerCase();
   if (scheme && allowedUrlSchemes.has(scheme)) {
     sendMessage("openInBackgroundTab", { url: href });
   } else {
-    firePointerSequence(el);
-    el.click();
+    simulateClick(el);
   }
 }
 
@@ -764,12 +911,30 @@ function onKeyDown(event) {
   event.preventDefault();
   event.stopImmediatePropagation();
 
-  if (event.key === "Escape") {
+  const shouldRelay = needsRelay;
+  const state = handleHintKey(event.key);
+  if (shouldRelay) {
+    try {
+      const p = chrome.runtime.sendMessage({
+        type: "HINTS_KEY",
+        key: event.key,
+        remaining: state.remaining,
+        closed: state.closed,
+      });
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } catch {
+
+    }
+  }
+}
+
+function handleHintKey(key) {
+  if (key === "Escape") {
     cancel();
-    return;
+    return { remaining: 0, closed: true };
   }
 
-  typed += event.key.toLowerCase();
+  typed += key.toLowerCase();
 
   let exact = null;
   let partial = 0;
@@ -781,26 +946,33 @@ function onKeyDown(event) {
 
   if (exact && partial === 0) {
     const modeConfig = MODES[mode];
-    modeConfig.activate(labels.get(exact));
+    try {
+      modeConfig.activate(labels.get(exact));
+    } catch (err) {
+      console.debug("[jari] hint activation failed:", err);
+    }
     if (modeConfig.sticky) {
-      // Keep the hints up so the next link can be picked: drop the label
-      // just used — each link opens once — and clear the typed buffer.
+
       const box = overlays.get(exact);
       if (box) box.remove();
       overlays.delete(exact);
       labels.delete(exact);
       typed = "";
       updateHighlight();
-      if (labels.size === 0) cancel();
-      return;
+      if (labels.size === 0) {
+        cancel();
+        return { remaining: 0, closed: true };
+      }
+      return { remaining: labels.size, closed: false };
     }
     cancel();
-    return;
+    return { remaining: 0, closed: true };
   }
   if (!exact && partial === 0) {
     typed = "";
   }
   updateHighlight();
+  return { remaining: labels.size, closed: false };
 }
 
 function updateHighlight() {
@@ -826,6 +998,7 @@ function cancel() {
   labels.clear();
   typed = "";
   mode = null;
+  needsRelay = false;
 }
 
 export const Hints = {
@@ -833,6 +1006,7 @@ export const Hints = {
   cancel,
   onKeyDown,
   isActive,
+  placeCaretAtEnd,
   generateLabels,
   visiblePortion,
   isOccluded,
@@ -844,8 +1018,28 @@ export const Hints = {
   treeItemNested,
   clickableSelector: CLICKABLE_SELECTOR,
   isPointerCursor,
+  isJsactionClick,
   queryClickables,
+  flatContains,
   hintRect,
+  simulateClick,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "COUNT_HINTS") {
+    sendResponse(countHints(msg.mode));
+  } else if (msg.type === "DRAW_HINTS") {
+    drawHints(msg.startIndex);
+  } else if (msg.type === "HINTS_RESET") {
+    cancel();
+    if (msg.toast) ui.toast(msg.toast);
+  } else if (msg.type === "HINTS_KEY") {
+    sendResponse(handleHintKey(msg.key));
+  } else if (msg.type === "HINTS_FOCUS_SINGLE") {
+    focusSingleInput();
+  } else if (msg.type === "HINTS_CLOSE") {
+    cancel();
+  }
+});

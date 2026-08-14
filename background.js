@@ -41,7 +41,8 @@
       if (Array.isArray(sources)) {
         return sources.filter((s) => suggestionSources.includes(s));
       }
-    } catch {
+    } catch (err) {
+      console.debug("[jari] Failed to get suggestion sources:", err);
     }
     return suggestionSources.slice();
   }
@@ -72,7 +73,8 @@
       let sessions;
       try {
         sessions = await chrome.sessions.getRecentlyClosed();
-      } catch {
+      } catch (err) {
+        console.debug("[jari] Failed to get recently closed sessions:", err);
         return { ok: true };
       }
       const tabs = (sessions || []).filter((s) => s.tab && s.tab.sessionId);
@@ -97,9 +99,6 @@
       }
       return { ok: true };
     },
-    // Split the active tab into its own window. In a single-tab window, return
-    // the OTHER windows (with their active tab's title) so the page can offer
-    // to merge back into one of them.
     splitOrMerge: async (sender) => {
       const tab = sender.tab;
       if (!tab || !tab.id) return { ok: false };
@@ -118,13 +117,14 @@
         };
       });
       if (others.length === 0) return { ok: true, needMerge: false };
-      return { ok: true, needMerge: true, ownTabId: tab.id, ownWindowId: tab.windowId, tabs: others };
+      return {
+        ok: true,
+        needMerge: true,
+        ownTabId: tab.id,
+        ownWindowId: tab.windowId,
+        tabs: others
+      };
     },
-    // Move the sender's tab to the end of another window's strip and focus it
-    // there; the emptied window closes itself. The moved tab is appended at the
-    // end, so activating the window's last tab focuses the merged tab — the
-    // sender's tab object can go stale once its old window closes, so the last
-    // tab is re-queried fresh instead of trusting its id.
     mergeTab: async (sender, { targetWindowId } = {}) => {
       const tab = sender.tab;
       if (!tab || !tab.id || !targetWindowId) return { ok: false };
@@ -155,7 +155,8 @@
     },
     lastTab: async () => {
       const tabs = await chrome.tabs.query({ currentWindow: true });
-      if (tabs.length) await chrome.tabs.update(tabs[tabs.length - 1].id, { active: true });
+      if (tabs.length)
+        await chrome.tabs.update(tabs[tabs.length - 1].id, { active: true });
       return { ok: true };
     },
     moveTabRight: async (sender) => {
@@ -204,10 +205,6 @@
         active: !!tab.active
       }));
     },
-    // Autocomplete for the "t" omnibar: matching history, bookmarks and open
-    // tabs, deduped by URL. Open tabs come first — they are usually the first
-    // pick and must not be cut off by the 40-item cap — then history, then
-    // bookmarks. Each source is best-effort — a missing permission just skips it.
     suggest: async (_, { query = "" } = {}) => {
       const q = query.trim().toLowerCase();
       const items = [];
@@ -222,36 +219,42 @@
         try {
           const tabs = await chrome.tabs.query({});
           for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
-        } catch {
+        } catch (err) {
+          console.debug("[jari] Tab search failed:", err);
         }
       }
       if (q) {
         if (sources.includes("history")) {
           try {
-            const results = await chrome.history.search({ text: q, maxResults: 12, startTime: 0 });
+            const results = await chrome.history.search({
+              text: q,
+              maxResults: 12,
+              startTime: 0
+            });
             for (const item of results) push(item.title, item.url, "history");
-          } catch {
+          } catch (err) {
+            console.debug("[jari] History search failed:", err);
           }
         }
         if (sources.includes("bookmark")) {
           try {
             const bms = await chrome.bookmarks.search(q);
             for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark");
-          } catch {
+          } catch (err) {
+            console.debug("[jari] Bookmark search failed:", err);
           }
         }
       }
       return items.slice(0, 40);
     },
-    // Search with the browser's default engine, in a new foreground tab by
-    // default ("ge" edits the current page, so it searches in the current tab).
-    // chrome.search.query is cross-browser (Chrome + Firefox 111+); fall back
-    // to a plain search URL if the API is unavailable.
     search: async (sender, { query = "", newTab = true } = {}) => {
       const text = query.trim();
       if (!text) return { ok: false };
       if (typeof chrome.search?.query === "function") {
-        await chrome.search.query({ text, disposition: newTab ? "NEW_TAB" : "CURRENT_TAB" });
+        await chrome.search.query({
+          text,
+          disposition: newTab ? "NEW_TAB" : "CURRENT_TAB"
+        });
         return { ok: true };
       }
       const url = "https://www.google.com/search?q=" + encodeURIComponent(text);
@@ -341,9 +344,165 @@
       await chrome.windows.update(windowId, { focused: true });
     }
   }
+  var hintFrames = /* @__PURE__ */ new Map();
+  chrome.tabs.onRemoved.addListener((tabId) => hintFrames.delete(tabId));
+  async function coordinateHints(message, sender) {
+    const fromExtensionPage = sender.url && sender.url.startsWith("chrome-extension://");
+    if (!sender.tab || fromExtensionPage) {
+      return { needsRelay: false, drawLocally: true };
+    }
+    const tabId = sender.tab.id;
+    const mode = message.mode;
+    let frames;
+    try {
+      frames = await chrome.webNavigation.getAllFrames({ tabId });
+    } catch {
+      return { needsRelay: false };
+    }
+    let currentIndex = 0;
+    let total = 0;
+    const counts = /* @__PURE__ */ new Map();
+    for (const frame of frames) {
+      try {
+        const count = await chrome.tabs.sendMessage(
+          tabId,
+          { type: "COUNT_HINTS", mode },
+          { frameId: frame.frameId }
+        );
+        if (count > 0) {
+          counts.set(frame.frameId, count);
+          total += count;
+        }
+      } catch {
+      }
+    }
+    if (total === 0) {
+      for (const frame of frames) {
+        try {
+          chrome.tabs.sendMessage(
+            tabId,
+            frame.frameId === 0 ? { type: "HINTS_RESET", toast: "No matches" } : { type: "HINTS_RESET" },
+            { frameId: frame.frameId }
+          );
+        } catch {
+        }
+      }
+      hintFrames.delete(tabId);
+      return { needsRelay: false };
+    }
+    if (message.mode === "focus" && total === 1) {
+      const frameId = [...counts.entries()].find(([, count]) => count === 1)?.[0];
+      for (const frame of frames) {
+        if (frame.frameId === frameId) continue;
+        try {
+          chrome.tabs.sendMessage(
+            tabId,
+            { type: "HINTS_RESET" },
+            { frameId: frame.frameId }
+          );
+        } catch {
+        }
+      }
+      if (frameId !== void 0) {
+        try {
+          chrome.tabs.sendMessage(
+            tabId,
+            { type: "HINTS_FOCUS_SINGLE" },
+            { frameId }
+          );
+        } catch {
+        }
+      }
+      hintFrames.delete(tabId);
+      return { needsRelay: false };
+    }
+    for (const frame of frames) {
+      const count = counts.get(frame.frameId);
+      if (!count) continue;
+      try {
+        chrome.tabs.sendMessage(
+          tabId,
+          { type: "DRAW_HINTS", startIndex: currentIndex, total },
+          { frameId: frame.frameId }
+        );
+        currentIndex += count;
+      } catch {
+      }
+    }
+    hintFrames.set(tabId, new Set(counts.keys()));
+    return {
+      needsRelay: counts.size > 1 || !counts.has(sender.frameId)
+    };
+  }
+  async function getHintFrameIds(tabId) {
+    const open = hintFrames.get(tabId);
+    if (open && open.size) return [...open];
+    let frames;
+    try {
+      frames = await chrome.webNavigation.getAllFrames({ tabId });
+    } catch {
+      return [];
+    }
+    return (frames || []).map((f) => f.frameId);
+  }
+  async function relayHintKey(message, sender) {
+    const frameIds = await getHintFrameIds(sender.tab.id);
+    let anyClosed = Boolean(message.closed);
+    let totalRemaining = message.remaining || 0;
+    for (const frameId of frameIds) {
+      if (frameId === sender.frameId) continue;
+      try {
+        const res = await chrome.tabs.sendMessage(
+          sender.tab.id,
+          { type: "HINTS_KEY", key: message.key },
+          { frameId }
+        );
+        if (res) {
+          if (res.closed) anyClosed = true;
+          totalRemaining += res.remaining || 0;
+        }
+      } catch {
+      }
+    }
+    if (anyClosed || totalRemaining === 0) {
+      await closeAllHints(sender.tab.id);
+    }
+  }
+  async function closeAllHints(tabId) {
+    const open = hintFrames.get(tabId);
+    if (open) hintFrames.delete(tabId);
+    let frameIds;
+    if (open && open.size) {
+      frameIds = [...open];
+    } else {
+      try {
+        const frames = await chrome.webNavigation.getAllFrames({ tabId });
+        frameIds = (frames || []).map((f) => f.frameId);
+      } catch {
+        return;
+      }
+    }
+    for (const frameId of frameIds) {
+      try {
+        chrome.tabs.sendMessage(tabId, { type: "HINTS_CLOSE" }, { frameId });
+      } catch {
+      }
+    }
+  }
 
   // background/main.js
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "COORDINATE_HINTS") {
+      coordinateHints(message, sender).then(
+        sendResponse,
+        () => sendResponse({ needsRelay: false })
+      );
+      return true;
+    }
+    if (message.type === "HINTS_KEY") {
+      relayHintKey(message, sender);
+      return;
+    }
     const handler = handlers[message && message.action];
     if (!handler) return;
     const result = handler(sender, message || {});

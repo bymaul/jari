@@ -1,7 +1,3 @@
-// Jari: settings layer over chrome.storage.sync.
-// Holds the user keymap, the list of per-site disabled hosts, and the
-// behavior options (scroll step, smooth scrolling, timeouts).
-// Emits "settingsChanged" when storage changes so live tabs react instantly.
 import {
   Events,
   keymapDefaults,
@@ -20,6 +16,7 @@ const state = {
   timeoutMs: settingsDefaults.timeoutMs,
   passthroughMs: settingsDefaults.passthroughMs,
   hintChars: settingsDefaults.hintChars,
+  hintPosition: settingsDefaults.hintPosition,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   copyFormat: settingsDefaults.copyFormat,
 };
@@ -34,6 +31,7 @@ function merge(data) {
   state.timeoutMs = s.timeoutMs;
   state.passthroughMs = s.passthroughMs;
   state.hintChars = s.hintChars;
+  state.hintPosition = s.hintPosition;
   state.suggestionSources = s.suggestionSources;
   state.copyFormat = s.copyFormat;
 }
@@ -58,20 +56,17 @@ function persist() {
       timeoutMs: state.timeoutMs,
       passthroughMs: state.passthroughMs,
       hintChars: state.hintChars,
+      hintPosition: state.hintPosition,
       suggestionSources: state.suggestionSources,
       copyFormat: state.copyFormat,
     },
   });
 }
 
-// Mutate the in-memory state without touching storage. The options page
-// edits this way and only writes on Save; the content script persists
-// immediately via update().
 function set(patch) {
   merge(normalizeSettings({ ...state, ...patch }));
 }
 
-// Mutate and persist. Awaitable so callers can report write failures.
 async function update(patch) {
   set(patch);
   await persist();
@@ -113,6 +108,10 @@ function getHintChars() {
   return state.hintChars;
 }
 
+function getHintPosition() {
+  return state.hintPosition;
+}
+
 function getSuggestionSources() {
   return state.suggestionSources;
 }
@@ -148,6 +147,7 @@ export const settings = {
   getTimeoutMs,
   getPassthroughMs,
   getHintChars,
+  getHintPosition,
   getSuggestionSources,
   getCopyFormat,
   toggleDisabled,
