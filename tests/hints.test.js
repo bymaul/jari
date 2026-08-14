@@ -1165,3 +1165,218 @@ test("start skips the local draw when the background relays to other frames", as
     chrome.runtime.sendMessage = previousSend;
   }
 });
+
+class MockEvent {
+  constructor(type, init = {}) {
+    this.type = type;
+    this.bubbles = !!init.bubbles;
+    this.cancelable = !!init.cancelable;
+    this.composed = !!init.composed;
+    this.button = init.button;
+    this.buttons = init.buttons;
+    this.detail = init.detail;
+    this.clientX = init.clientX;
+    this.clientY = init.clientY;
+    this.screenX = init.screenX;
+    this.screenY = init.screenY;
+    this.pointerId = init.pointerId;
+    this.pointerType = init.pointerType;
+    this.isPrimary = init.isPrimary;
+    this.view = init.view;
+    this.defaultPrevented = false;
+  }
+  preventDefault() {
+    if (this.cancelable) this.defaultPrevented = true;
+  }
+}
+
+function simulateStubElement({
+  href = null,
+  target = null,
+  download = false,
+  onMousedown = null,
+  onClick = null,
+} = {}) {
+  const handlers = new Map();
+  const el = {
+    href,
+    dispatched: [],
+    clickCount: 0,
+    addEventListener(type, fn) {
+      if (!handlers.has(type)) handlers.set(type, []);
+      handlers.get(type).push(fn);
+    },
+    removeEventListener(type, fn) {
+      const list = handlers.get(type) || [];
+      const index = list.indexOf(fn);
+      if (index !== -1) list.splice(index, 1);
+    },
+    dispatchEvent(event) {
+      el.dispatched.push(event);
+      for (const fn of handlers.get(event.type) || []) fn(event);
+      return !event.defaultPrevented;
+    },
+    click() {
+      el.clickCount += 1;
+      const event = new MockEvent("click", { bubbles: true, cancelable: true });
+      for (const fn of handlers.get("click") || []) fn(event);
+      return !event.defaultPrevented;
+    },
+    getAttribute(name) {
+      if (name === "href") return href;
+      if (name === "target") return target;
+      return null;
+    },
+    hasAttribute(name) {
+      return name === "download" && download;
+    },
+    getBoundingClientRect() {
+      return { left: 10, top: 20, right: 110, bottom: 40, width: 100, height: 20 };
+    },
+  };
+  if (onMousedown) el.addEventListener("mousedown", onMousedown);
+  if (onClick) el.addEventListener("click", onClick);
+  return el;
+}
+
+function withSimulateEnvironment(fn) {
+  const previousMouseEvent = globalThis.MouseEvent;
+  const previousPointerEvent = globalThis.PointerEvent;
+  const previousWindow = globalThis.window;
+  const previousLocation = globalThis.location;
+  const previousSetTimeout = globalThis.setTimeout;
+  const assigns = [];
+  globalThis.MouseEvent = MockEvent;
+  globalThis.PointerEvent = MockEvent;
+  globalThis.window = {
+    screenX: 0,
+    screenY: 0,
+    location: { assign: (url) => assigns.push(url) },
+  };
+  globalThis.location = { href: "https://example.test/start" };
+  globalThis.setTimeout = (run) => {
+    run();
+    return 0;
+  };
+  try {
+    fn({ assigns });
+  } finally {
+    globalThis.MouseEvent = previousMouseEvent;
+    globalThis.PointerEvent = previousPointerEvent;
+    globalThis.window = previousWindow;
+    globalThis.location = previousLocation;
+    globalThis.setTimeout = previousSetTimeout;
+  }
+}
+
+test("simulateClick dispatches a realistic hover, press and click sequence", () => {
+  withSimulateEnvironment(() => {
+    const el = simulateStubElement();
+    Hints.simulateClick(el);
+    assert.deepEqual(
+      el.dispatched.map((e) => e.type),
+      [
+        "pointerover",
+        "pointerenter",
+        "mouseover",
+        "mouseenter",
+        "mousemove",
+        "pointerdown",
+        "mousedown",
+        "pointerup",
+        "mouseup",
+      ],
+    );
+    assert.equal(el.clickCount, 1);
+    const pointerdown = el.dispatched.find((e) => e.type === "pointerdown");
+    assert.equal(pointerdown.buttons, 1);
+    assert.equal(pointerdown.pointerType, "mouse");
+    assert.equal(pointerdown.isPrimary, true);
+    assert.equal(pointerdown.detail, 1);
+    assert.equal(pointerdown.clientX, 60);
+    assert.equal(pointerdown.clientY, 30);
+    assert.equal(pointerdown.screenX, 60);
+    assert.equal(pointerdown.screenY, 30);
+    assert.equal(pointerdown.view, globalThis.window);
+    assert.equal(
+      el.dispatched.find((e) => e.type === "mousedown").buttons,
+      1,
+    );
+    assert.equal(el.dispatched.find((e) => e.type === "mouseup").buttons, 0);
+  });
+});
+
+test("simulateClick does not navigate when the page cancels mousedown", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({
+      href: "https://example.test/link",
+      onMousedown: (e) => e.preventDefault(),
+    });
+    Hints.simulateClick(el);
+    assert.equal(el.clickCount, 0);
+    assert.ok(el.dispatched.some((e) => e.type === "click"));
+    assert.deepEqual(assigns, []);
+  });
+});
+
+test("simulateClick respects click cancellation and does not navigate", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({
+      href: "https://example.test/link",
+      onClick: (e) => e.preventDefault(),
+    });
+    Hints.simulateClick(el);
+    assert.equal(el.clickCount, 1);
+    assert.deepEqual(assigns, []);
+  });
+});
+
+test("simulateClick does not fall back when the link navigated", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({
+      href: "/target",
+      onClick: () => {
+        globalThis.location.href = "/target";
+      },
+    });
+    Hints.simulateClick(el);
+    assert.equal(el.clickCount, 1);
+    assert.deepEqual(assigns, []);
+  });
+});
+
+test("simulateClick falls back to location.assign for a same-tab link that did not navigate", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({ href: "/target" });
+    Hints.simulateClick(el);
+    assert.equal(el.clickCount, 1);
+    assert.deepEqual(assigns, ["/target"]);
+  });
+});
+
+test("simulateClick skips the fallback for target=_blank links", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({ href: "/target", target: "_blank" });
+    Hints.simulateClick(el);
+    assert.equal(el.clickCount, 1);
+    assert.deepEqual(assigns, []);
+  });
+});
+
+test("simulateClick skips the fallback for download links", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({ href: "/target", download: true });
+    Hints.simulateClick(el);
+    assert.equal(el.clickCount, 1);
+    assert.deepEqual(assigns, []);
+  });
+});
+
+test("simulateClick skips the fallback for non-http links", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({ href: "mailto:test@example.com" });
+    Hints.simulateClick(el);
+    assert.equal(el.clickCount, 1);
+    assert.deepEqual(assigns, []);
+  });
+});

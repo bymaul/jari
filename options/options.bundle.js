@@ -837,6 +837,123 @@
       el.dispatchEvent(new Ctor(type, opts));
     }
   }
+  function eventCoords(el) {
+    const rect = el.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    return {
+      clientX,
+      clientY,
+      screenX: window.screenX + clientX,
+      screenY: window.screenY + clientY
+    };
+  }
+  function fireHoverSequence(el) {
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      ...eventCoords(el),
+      pointerId: 1,
+      pointerType: "mouse",
+      isPrimary: true
+    };
+    for (const type of [
+      "pointerover",
+      "pointerenter",
+      "mouseover",
+      "mouseenter",
+      "mousemove"
+    ]) {
+      const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
+      el.dispatchEvent(new Ctor(type, opts));
+    }
+  }
+  function firePressSequence(el) {
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      ...eventCoords(el),
+      pointerId: 1,
+      pointerType: "mouse",
+      isPrimary: true,
+      view: window,
+      detail: 1
+    };
+    el.dispatchEvent(new PointerEvent("pointerdown", { ...opts, buttons: 1 }));
+    const mousedown = new MouseEvent("mousedown", { ...opts, buttons: 1 });
+    const mousedownCanceled = el.dispatchEvent(mousedown) === false;
+    el.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0 }));
+    el.dispatchEvent(new MouseEvent("mouseup", { ...opts, buttons: 0 }));
+    return mousedownCanceled;
+  }
+  function fireClick(el) {
+    el.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        button: 0,
+        buttons: 0,
+        detail: 1,
+        ...eventCoords(el)
+      })
+    );
+  }
+  function elClick(el) {
+    let canceled = false;
+    const guard = (event) => {
+      canceled = event.defaultPrevented;
+    };
+    el.addEventListener("click", guard);
+    try {
+      el.click();
+    } finally {
+      el.removeEventListener("click", guard);
+    }
+    return canceled;
+  }
+  function hrefOf(el) {
+    const href = el.href || el.getAttribute?.("href");
+    return typeof href === "string" ? href : null;
+  }
+  function navigatesSameTab(el, href) {
+    if (!href) return false;
+    const scheme = href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+    if (!href.startsWith("/") && !(scheme && /^https?$/i.test(scheme))) {
+      return false;
+    }
+    const target2 = el.getAttribute?.("target");
+    if (target2 && target2.toLowerCase() !== "_self") return false;
+    if (el.hasAttribute?.("download")) return false;
+    return true;
+  }
+  function simulateClick(el) {
+    const startHref = location.href;
+    fireHoverSequence(el);
+    const mousedownCanceled = firePressSequence(el);
+    let clickCanceled;
+    if (mousedownCanceled) {
+      fireClick(el);
+      clickCanceled = true;
+    } else {
+      clickCanceled = elClick(el);
+    }
+    const href = hrefOf(el);
+    if (mousedownCanceled || clickCanceled || !navigatesSameTab(el, href)) return;
+    setTimeout(() => {
+      if (location.href === startHref) {
+        try {
+          window.location.assign(href);
+        } catch {
+        }
+      }
+    }, 300);
+  }
   function placeCaretAtEnd(el) {
     if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
       try {
@@ -918,25 +1035,6 @@
     "[role='button']",
     "[role='link']"
   ].join(",");
-  function dispatchClick(el) {
-    const rect = el.getBoundingClientRect();
-    const clientX = rect.left + rect.width / 2;
-    const clientY = rect.top + rect.height / 2;
-    el.dispatchEvent(
-      new MouseEvent("click", {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window,
-        button: 0,
-        buttons: 1,
-        clientX,
-        clientY,
-        screenX: window.screenX + clientX,
-        screenY: window.screenY + clientY
-      })
-    );
-  }
   function activateClick(el) {
     if (el.matches(FOCUS_SELECTOR) || el.querySelector(FOCUS_SELECTOR)) {
       focusAndPlaceCaret(el);
@@ -946,21 +1044,7 @@
       const inner = el.querySelector(ACTIVATABLE_SELECTOR);
       if (inner) el = inner;
     }
-    firePointerSequence(el);
-    dispatchClick(el);
-    const href = el.href || el.getAttribute?.("href");
-    const scheme = href?.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
-    if (href && (href.startsWith("/") || scheme && /^https?$/i.test(scheme))) {
-      const startHref = location.href;
-      setTimeout(() => {
-        if (location.href === startHref) {
-          try {
-            window.location.assign(href);
-          } catch {
-          }
-        }
-      }, 300);
-    }
+    simulateClick(el);
   }
   function alphabet() {
     return settings.getHintChars() || settingsDefaults.hintChars;
@@ -1396,8 +1480,7 @@
     if (scheme && urlSchemes.has(scheme)) {
       sendMessage("openInBackgroundTab", { url: href });
     } else {
-      firePointerSequence(el);
-      el.click();
+      simulateClick(el);
     }
   }
   function yankLink(el) {
@@ -1506,7 +1589,8 @@
     isJsactionClick,
     queryClickables,
     flatContains,
-    hintRect
+    hintRect,
+    simulateClick
   };
   register("hints", { close: cancel, onKeyDown, isActive });
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
