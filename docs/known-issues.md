@@ -196,6 +196,25 @@ reach compose when focus is inside it. If hints appear there but not from the
 main page, that is a frame-traversal limitation (hints don't cross frames).
 The z-order problem (hints behind the frame) is separate and also resolved.
 
+## Open
+
+## Link hints — stacked hints on the same link (`f`)
+
+**Step:** Press `f` on a page where a link is matched by multiple selectors or
+nested wrappers, then look at the hint labels.
+
+**Expected:** one hint label per visible target, placed so labels never overlap.
+
+**Actual:** multiple hints stack on the same link, so several labels overlap on
+top of one target (or cover each other) instead of each target getting a
+single label.
+
+**Status:** open. The hint scan keeps elements matched by several rules as
+distinct candidates (`strong` vs `weak` clickable selectors, plus
+pointer-cursor elements), so the same click target can end up with more than
+one hint. Needs an in-browser repro to decide whether to dedupe candidates by
+click target or by rendered rect.
+
 ## Notion — `i` editor focus
 
 **Step:** Press `i` (focus input) on a page with a text block.
