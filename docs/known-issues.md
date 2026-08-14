@@ -21,7 +21,7 @@ frames (`coordinateHints` counts hints in every frame and relays keys via
 `HINTS_KEY`), so the other frames were never told to close.
 
 **Root cause:** in the content script, `onKeyDown` gated the closing
-`HINTS_KEY` message on the `needsRelay` flag *after* calling `handleHintKey`.
+`HINTS_KEY` message on the `needsRelay` flag _after_ calling `handleHintKey`.
 Activating a hint calls `cancel()`, which resets `needsRelay` to `false`, so
 the message announcing `closed: true` was dropped. The background therefore
 never sent `HINTS_CLOSE` to the remaining frames. A partial keypress relayed
@@ -75,7 +75,6 @@ half-clicked state. Regression coverage: the "simulateClick survives page
 handlers that throw" and "simulateClick survives handlers that cancel and then
 throw" tests in `tests/hints.test.js`.
 
-
 ## Rebinding or unbinding a default key left the old binding active
 
 **Step:** On the options page, rebind the passthrough key from `p` to `z` and
@@ -123,21 +122,6 @@ Jari's own pages always draw hints locally (the SW can never reach an
 extension page with `chrome.tabs.sendMessage` anyway). Verified end-to-end in
 the headless repro (`options-instr2.mjs`): pressing `f` on the settings page
 now draws hints, hint activation focuses the target, and Escape clears them.
-
-## Ctrl+N / Ctrl+P prompt navigation — impossible in Chrome and Firefox
-
-**Step:** Set a prompt navigation mode that includes Ctrl+N/Ctrl+P and press
-it in the omnibar.
-
-**Expected:** the selection moves.
-
-**Actual:** Ctrl+N opens a new browser window regardless of what the page does.
-
-**Status:** wontfix — browsers reserve Ctrl+N/T/W (new window / new tab /
-close tab) and never deliver the keydown to page scripts, so no extension can
-intercept it (Chromium issue 41081444; Firefox ignores `preventDefault` for
-it). Prompt navigation therefore only uses Tab/Shift+Tab and Up/Down arrows;
-the prompt-navigation option was removed.
 
 ## Instagram feed — no hints after scrolling
 
@@ -187,7 +171,7 @@ tests required the full rect center to be on-screen and uncovered.
 
 - Google's result-row wrapper span is the topmost element above its own
   anchor (the anchor is `pointer-events:none`), so `isOccluded` now accepts a
-  hit that *wraps* the candidate as not occluding — real occluders (sticky
+  hit that _wraps_ the candidate as not occluding — real occluders (sticky
   bars, modals, carousels) are siblings of what they cover, never ancestors.
 - The occlusion hit test samples up to five points across the visible
   portion, center first; one uncovered point is enough, because hint
@@ -222,7 +206,7 @@ immediately.
 **Actual:** no focus lands in the block. `f` does detect the editor inputs as
 hint targets; activating one also fails to focus the editor.
 
-**Status:** open. Caret placement when focus *does* land is fixed
+**Status:** open. Caret placement when focus _does_ land is fixed
 (`placeCaretAtEnd` in `focusAndPlaceCaret`): focusing a prefilled
 `<input>`/`<textarea>` moves the caret to the end, and focusing a
 `contenteditable` (light-DOM or inside a shadow root) collapses the selection
