@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Hostile page for the prompt overlay</title>
+  <style>
+    /* Hostile page: centered text everywhere plus aggressive focus styling
+       on inputs. Jari's overlay must stay left-aligned and borderless. */
+    body {
+      text-align: center;
+      font: 14px sans-serif;
+    }
+    input {
+      text-align: center;
+      border: 3px dashed lime;
+    }
+    input:focus,
+    input:focus-visible,
+    input:active {
+      outline: 3px solid red;
+      border: 3px solid fuchsia;
+      box-shadow: 0 0 0 4px blue;
+    }
+  </style>
+</head>
+<body>
+  <p>Centered hostile page</p>
+  <a href="#a">link a</a>
+  <a href="#b">link b</a>
+</body>
+</html>
