@@ -570,6 +570,8 @@ function countHints(nextMode) {
     );
   }
 
+  top = dedupeOverlapping(top, rects);
+
   for (const el of top) {
     rects.set(el, hintRect(el, rects.get(el)));
   }
@@ -578,6 +580,63 @@ function countHints(nextMode) {
   pendingRects = rects;
   pendingTotal = scanned.total;
   return top.length;
+}
+
+function rectsNearIdentical(a, b) {
+  const left = Math.max(a.left, b.left);
+  const topY = Math.max(a.top, b.top);
+  const right = Math.min(a.right, b.right);
+  const bottom = Math.min(a.bottom, b.bottom);
+  if (right <= left || bottom <= topY) return false;
+  const intersection = (right - left) * (bottom - topY);
+  const areaA = (a.right - a.left) * (a.bottom - a.top);
+  const areaB = (b.right - b.left) * (b.bottom - b.top);
+  const minArea = Math.min(areaA, areaB);
+  if (minArea <= 0) return false;
+  return intersection / minArea >= 0.9;
+}
+
+function pickForOverlap(a, b, rects) {
+  const ra = rects.get(a);
+  const rb = rects.get(b);
+  const left = Math.max(ra.left, rb.left);
+  const topY = Math.max(ra.top, rb.top);
+  const right = Math.min(ra.right, rb.right);
+  const bottom = Math.min(ra.bottom, rb.bottom);
+  const cx = (left + right) / 2;
+  const cy = (topY + bottom) / 2;
+  let hit;
+  try {
+    hit = document.elementFromPoint(cx, cy);
+  } catch {
+    hit = null;
+  }
+  const inA = hit && flatContains(a, hit);
+  const inB = hit && flatContains(b, hit);
+  if (inA && !inB) return a;
+  if (inB && !inA) return b;
+  const areaA = (ra.right - ra.left) * (ra.bottom - ra.top);
+  const areaB = (rb.right - rb.left) * (rb.bottom - rb.top);
+  return areaA <= areaB ? a : b;
+}
+
+// Some click targets get hinted twice: separate elements matched by different
+// rules (strong vs weak selectors, pointer-cursor wrappers) whose rects are
+// near-identical but which are neither ancestors of each other nor occluded.
+// Collapse each such pair onto the element that actually sits on top.
+function dedupeOverlapping(top, rects) {
+  const drop = new Set();
+  for (let i = 0; i < top.length; i++) {
+    for (let j = i + 1; j < top.length; j++) {
+      const a = top[i];
+      const b = top[j];
+      if (drop.has(a) || drop.has(b)) continue;
+      if (!rectsNearIdentical(rects.get(a), rects.get(b))) continue;
+      const keepEl = pickForOverlap(a, b, rects);
+      drop.add(keepEl === a ? b : a);
+    }
+  }
+  return top.filter((el) => !drop.has(el));
 }
 
 function drawHints(startIndex) {
@@ -1023,6 +1082,8 @@ export const Hints = {
   flatContains,
   hintRect,
   simulateClick,
+  rectsNearIdentical,
+  dedupeOverlapping,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });

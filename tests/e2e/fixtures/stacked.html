@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stacked hints fixture</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  .row { margin-bottom: 24px; }
+  .overwrap { position: relative; width: 320px; height: 60px; }
+  .alpha {
+    position: absolute; left: 0; top: 0; width: 320px; height: 50px;
+    display: block; text-decoration: none; color: #000;
+    background: rgba(0, 0, 100, 0.1); border: 1px solid rgba(0, 0, 100, 0.3);
+  }
+  .beta {
+    position: absolute; left: 0; top: 0; width: 130px; height: 50px;
+    display: block; text-decoration: none; color: #000;
+    background: rgba(180, 0, 0, 0.15); border: 1px solid rgba(180, 0, 0, 0.4);
+  }
+  .card {
+    cursor: pointer; width: 260px; height: 60px;
+    background: rgba(0, 128, 0, 0.1); border: 1px solid rgba(0, 128, 0, 0.4);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .wrapper { background: rgba(100, 0, 100, 0.1); border: 1px solid rgba(100, 0, 100, 0.4); }
+  .icon-btn {
+    cursor: pointer; width: 30px; height: 30px; display: inline-block;
+    background: rgba(200, 150, 0, 0.3); border-radius: 4px; text-align: center;
+  }
+</style>
+</head>
+<body>
+  <h1>Stacked hints fixture</h1>
+
+  <div class="row" id="p-overlap-siblings">
+    <h3>Overlapping sibling links, same origin point (different hrefs)</h3>
+    <div class="overwrap">
+      <a href="#alpha" class="alpha">Alpha - wide link</a>
+      <a href="#beta" class="beta">Beta - narrow link on top</a>
+    </div>
+  </div>
+
+  <div class="row" id="p-same-href">
+    <h3>Two separate links with the same href</h3>
+    <div class="overwrap">
+      <a href="#same" class="alpha">Same-target text</a>
+      <a href="#same" class="beta">Same-target icon</a>
+    </div>
+  </div>
+
+  <div class="row" id="p-pointer-card">
+    <h3>Pointer-cursor card wrapping a link</h3>
+    <div class="card">
+      <a href="#card">Card link</a>
+    </div>
+  </div>
+
+  <div class="row" id="p-wrapper">
+    <h3>Wrapper (class=button) around a link</h3>
+    <div class="wrapper" style="display:inline-block; padding:8px;">
+      <a href="#wrapped">Wrapped link</a>
+    </div>
+  </div>
+
+  <div class="row" id="p-icon-in-link">
+    <h3>Icon button inside a link</h3>
+    <a href="#iconlink" style="display:inline-block; border:1px solid #999; padding:6px; text-decoration:none;">
+      Link with inner icon <span class="icon-btn">+</span>
+    </a>
+  </div>
+
+  <div class="row" id="p-link-in-icon">
+    <h3>Link inside a pointer-cursor wrapper on top</h3>
+    <div style="position:relative; width:300px; height:60px;">
+      <a href="#under" class="alpha">Underneath link</a>
+      <span class="icon-btn" style="position:absolute; left:0; top:0; width:300px; height:50px;">
+        <a href="#inside" style="text-decoration:none;">Inside link</a>
+      </span>
+    </div>
+  </div>
+</body>
+</html>

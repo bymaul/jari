@@ -729,6 +729,77 @@ function withDocument(document, fn) {
   }
 }
 
+function mockEl(id, parent = null) {
+  return {
+    id,
+    parentElement: parent,
+    assignedSlot: null,
+    getRootNode: () => ({ host: null }),
+  };
+}
+
+const FULL_RECT = { left: 0, top: 0, right: 100, bottom: 50 };
+
+test("rectsNearIdentical accepts fully overlapping rects and rejects partial ones", () => {
+  assert.ok(Hints.rectsNearIdentical(FULL_RECT, { left: 0, top: 0, right: 100, bottom: 50 }));
+  assert.ok(Hints.rectsNearIdentical(FULL_RECT, { left: 10, top: 0, right: 110, bottom: 50 }));
+  assert.ok(!Hints.rectsNearIdentical(FULL_RECT, { left: 60, top: 0, right: 160, bottom: 50 }));
+  assert.ok(!Hints.rectsNearIdentical(FULL_RECT, { left: 120, top: 0, right: 220, bottom: 80 }));
+});
+
+test("dedupeOverlapping keeps only the element on top at the shared center", () => {
+  const a = mockEl("a");
+  const b = mockEl("b");
+  const rects = new Map([
+    [a, FULL_RECT],
+    [b, FULL_RECT],
+  ]);
+  withDocument({ elementFromPoint: () => b }, () => {
+    assert.deepEqual(Hints.dedupeOverlapping([a, b], rects), [b]);
+  });
+});
+
+test("dedupeOverlapping counts a descendant hit as the ancestor element", () => {
+  const a = mockEl("a");
+  const inner = mockEl("inner", a);
+  const b = mockEl("b");
+  const rects = new Map([
+    [a, FULL_RECT],
+    [b, FULL_RECT],
+  ]);
+  withDocument({ elementFromPoint: () => inner }, () => {
+    assert.deepEqual(Hints.dedupeOverlapping([a, b], rects), [a]);
+  });
+});
+
+test("dedupeOverlapping falls back to the smaller rect when the hit is unrelated", () => {
+  const a = mockEl("a");
+  const b = mockEl("b");
+  const big = { left: 0, top: 0, right: 300, bottom: 50 };
+  const small = { left: 0, top: 0, right: 130, bottom: 50 };
+  const rects = new Map([
+    [a, big],
+    [b, small],
+  ]);
+  withDocument({ elementFromPoint: () => null }, () => {
+    assert.deepEqual(Hints.dedupeOverlapping([a, b], rects), [b]);
+  });
+});
+
+test("dedupeOverlapping keeps partially overlapping elements as distinct targets", () => {
+  const a = mockEl("a");
+  const b = mockEl("b");
+  const rectA = { left: 0, top: 0, right: 300, bottom: 50 };
+  const rectB = { left: 120, top: 0, right: 220, bottom: 80 };
+  const rects = new Map([
+    [a, rectA],
+    [b, rectB],
+  ]);
+  withDocument({ elementFromPoint: () => b }, () => {
+    assert.deepEqual(Hints.dedupeOverlapping([a, b], rects), [a, b]);
+  });
+});
+
 test("isPointerCursor accepts pointer and custom cursors, nothing else", () => {
   assert.equal(Hints.isPointerCursor({ cursor: "pointer" }), true);
   assert.equal(
