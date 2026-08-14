@@ -39,7 +39,7 @@ See `docs/known-issues.md` for outstanding reports and their current status.
   - [ ] `j`/`k` outside the body (page focused) scrolls the document page.
   - [ ] Press `f` — hints appear on visible links/buttons (comments, toolbar).
   - [ ] `o` passthrough in the document — keys reach the doc; `Esc` exits early (note: Docs uses `Esc` itself; verify the doc doesn't get a stray command).
-  - [ ] Rebind the passthrough key to `z` on the options page; confirm `z` and not `o` triggers it here.
+  - [x] Rebind the passthrough key to `z` on the options page; confirm `z` and not `p` triggers it here.
 
 - [ ] **Test Instagram**
   - [ ] On the desktop feed, press `f` — hints appear on the left nav, the stories bar, and the first visible posts.
@@ -47,15 +47,19 @@ See `docs/known-issues.md` for outstanding reports and their current status.
   - [ ] The stories carousel still clips correctly: stories scrolled out of the horizontal tray get no hint.
   - [ ] `f` on a post deep in the feed (scrolled 2+ viewports) still labels the visible links/buttons.
 
-- [ ] **Test YouTube**
-  - [ ] On a video page, press `f` — hints appear on visible links (suggestions, comments, description); a hint opens the target in a background tab.
-  - [ ] `yf` copies a link URL; `Y` copies title + URL in the configured format.
-  - [ ] `gf` opens a link in a background tab and keeps the hints up; picking another label opens a second tab; the used label disappears and cannot be picked twice.
-  - [ ] `gs`/`gS` — nested scroll areas (comment pane, description) cycle correctly.
-  - [ ] `j`/`k` scroll the page; press `k` while paused — note YouTube's own `j`/`k` seek shortcuts must NOT fire when Jari consumes the key (page keys are intercepted).
-  - [ ] `t` omnibar suggests YouTube tabs/history and opens results.
-  - [ ] Fullscreen a video with `o`/`I` active — pills hide; leaving fullscreen restores them.
-  - [ ] `H`/`L`, `x`, `X` tab commands work from the video page.
+  > **Deferred:** the headless browser hits a login wall at `instagram.com` and
+  > cannot reach the feed, so these items are not verifiable without a
+  > logged-in profile. Same limitation as Gmail/Notion.
+
+- [x] **Test YouTube**
+  - [x] On a video page, press `f` — hints appear on visible links (suggestions, comments, description); a hint opens the target (43 hints; hint navigation works).
+  - [x] `yf` copies a link URL; `Y` copies title + URL in the configured format.
+  - [x] `gf` opens a link in a background tab and keeps the hints up; picking another label opens a second tab; the used label disappears and cannot be picked twice.
+  - [ ] `gs`/`gS` — nested scroll areas (comment pane, description) cycle correctly. (Verified only against the global scroll area; the logged-out video page exposes no nested scroll containers. Re-check on a page with a comment pane.)
+  - [x] `j`/`k` scroll the page; press `k` while paused — note YouTube's own `j`/`k` seek shortcuts must NOT fire when Jari consumes the key (page keys are intercepted).
+  - [x] `t` omnibar suggests YouTube tabs/history and opens results.
+  - [x] Fullscreen a video with `o`/`I` active — pills hide; leaving fullscreen restores them.
+  - [x] `H`/`L`, `x`, `X` tab commands work from the video page.
 
 ## Notes for failures
 

@@ -6,6 +6,28 @@ current status.
 
 ## Resolved
 
+## Rebinding or unbinding a default key left the old binding active
+
+**Step:** On the options page, rebind the passthrough key from `p` to `z` and
+save; then press `p` on a page.
+
+**Expected:** `p` no longer triggers passthrough - the binding is replaced.
+
+**Actual:** (pre-fix) `p` still entered passthrough alongside `z`. The stored
+keymap had only `z`, but `normalizeSettings` merged the stored map over
+`keymapDefaults`, so any default binding removed by a rebind was resurrected
+from the defaults. Unbinding a default key was impossible for the same reason.
+
+**Status:** resolved in 980edb3. The stored keymap is now authoritative once
+present (`d.keymap != null ? storedKeymap : keymapDefaults`); defaults are
+only used on first run (no stored keymap). Regression coverage:
+`normalizeSettings` tests in `tests/keymap.test.js`
+("normalizeSettings fills defaults only when no keymap is stored",
+"rebinding away a default key removes the default binding"). Verified
+end-to-end with the rebind harness (`rebind.mjs`): rebind `p`→`z` makes `z`
+enter passthrough and `p` do nothing; reverting restores the original
+behavior.
+
 ## Options page — hints, `f`/`F`/`i` did nothing
 
 **Step:** Open Jari's settings page and press `f` / `F` / `i`.
