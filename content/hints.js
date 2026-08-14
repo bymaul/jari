@@ -353,6 +353,11 @@ let mode = null;
 let needsRelay = false;
 let labels = new Map();
 let overlays = new Map();
+// Cached measured label width per hint box. offsetWidth reports 0 for a
+// hidden (display:none) box, so a reposition of a box that was hidden (e.g. an
+// off-screen hint scrolled back into view) would otherwise fall back to the
+// LABEL_HEIGHT proxy and mis-clamp wide labels.
+const hintWidths = new WeakMap();
 let typed = "";
 let hintsHost = null;
 let blockWheel = null;
@@ -412,6 +417,7 @@ function repositionHints() {
     const box = overlays.get(label);
     if (!box) continue;
     const rect = hintRect(el, el.getBoundingClientRect());
+    const width = hintWidths.get(box) || box.offsetWidth || LABEL_HEIGHT;
     const pos = labelPlacement(
       rect,
       settings.getHintPosition(),
@@ -419,6 +425,7 @@ function repositionHints() {
       window.scrollY,
       window.innerWidth,
       window.innerHeight,
+      width,
     );
     if (!pos) {
       box.style.display = "none";
@@ -929,16 +936,20 @@ function labelPlacement(
 
 // Measure the label's rendered width so edge clamping keeps the whole box on
 // screen even when it is wider than the LABEL_HEIGHT proxy. Attach offscreen
-// and detach synchronously so no paint happens in between.
+// and detach synchronously so no paint happens in between. Uses the fractional
+// getBoundingClientRect width when available so the clamp leaves no sub-pixel
+// overhang, and caches it on the box (see hintWidths).
 function measureHintWidth(box) {
   const host = document.createElement("div");
   host.style.cssText =
     "position:fixed;left:-10000px;top:0;pointer-events:none;visibility:hidden;";
   document.body.appendChild(host);
   host.appendChild(box);
-  const width = box.offsetWidth;
+  const rect = box.getBoundingClientRect ? box.getBoundingClientRect() : null;
+  const width = rect && rect.width ? rect.width : box.offsetWidth;
   host.removeChild(box);
   document.body.removeChild(host);
+  hintWidths.set(box, width);
   return width;
 }
 
