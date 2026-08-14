@@ -1,12 +1,16 @@
-// Test setup: browser globals that content modules reference at import time.
-// Imported before any ../content/*.js module so settings.js can register its
-// storage listener on import. Call-time globals (document, location,
-// navigator) are provided by the individual tests where needed.
 globalThis.chrome = {
   runtime: {
-    onMessage: { addListener() {} },
+    onMessage: {
+      _listeners: [],
+      addListener(fn) {
+        this._listeners.push(fn);
+      },
+    },
     sendMessage() {},
     lastError: null,
+  },
+  tabs: {
+    onRemoved: { addListener() {} },
   },
   storage: {
     onChanged: { addListener() {} },

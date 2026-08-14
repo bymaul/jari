@@ -4,6 +4,9 @@
   // shared/constants.js
   var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about"]);
   var suggestionSources = ["tab", "history", "bookmark"];
+  var MIN_SCROLL_AREA_SIZE = 16;
+  var MIN_VISIBLE_HINT_SIZE = 4;
+  var OCCLUSION_SAMPLE_THRESHOLD = 8;
 
   // content/keymap.js
   var Events = {
@@ -16,7 +19,6 @@
     }
   };
   var keymapDefaults = {
-    // Scrolling
     j: "scrollDown",
     k: "scrollUp",
     h: "scrollLeft",
@@ -25,7 +27,6 @@
     w: "showScrollArea",
     "+": "zoomIn",
     "-": "zoomOut",
-    // Tabs
     t: "omnibar",
     x: "closeTab",
     X: "restoreTab",
@@ -33,32 +34,22 @@
     L: "nextTab",
     "<<": "moveTabLeft",
     ">>": "moveTabRight",
-    // Window: split this tab into its own window; again, merge back.
     gw: "splitOrMergeTab",
-    // History
     S: "historyBack",
     D: "historyForward",
-    // Hints
     f: "linkHints",
     F: "linkHintsNewTab",
     gf: "linkHintsBackground",
     i: "focusInput",
-    // Page navigation
     r: "reloadTab",
     R: "hardReload",
-    // Clipboard
     Y: "copyTitleUrl",
     gp: "pasteOpen",
     gP: "pasteOpenBackground",
-    // Site-level control
     I: "toggleIgnore",
     p: "passthrough",
     "ctrl+alt+v": "toggleDisabled",
-    // Help
     "?": "showHelp",
-    // Two-key sequences, composed via the prefix keys (g, ;, y) below.
-    // Stored like any other binding: rebindable, overridable, and visible in
-    // the options table and help overlay.
     gt: "tabSearch",
     gg: "scrollTop",
     gu: "goUp",
@@ -94,21 +85,12 @@
   var settingsDefaults = {
     scrollStep: 120,
     smoothScroll: false,
-    // Rank prompt lists by fuzzy subsequence score instead of plain substring.
     fuzzyMatching: true,
     timeoutMs: 1500,
-    // "o" passthrough duration: how long keys reach the page before Jari
-    // takes over again (Escape exits sooner).
     passthroughMs: 1500,
-    // Characters used to build link-hint labels ("f"/"F"/"yf"). The default
-    // is a home-row set to reduce finger travel; any run of unique characters
-    // works.
     hintChars: "sadfjklewcmpgh",
-    // Which sources feed the omnibar suggestions. Empty means suggestions are
-    // off and only the typed query row is shown.
+    hintPosition: "top-left",
     suggestionSources: suggestionSources.slice(),
-    // Copy format for the title+URL command: plain ("Title\nURL") or markdown
-    // ("[Title](URL)").
     copyFormat: "plain"
   };
   var prefixKeys = new Set(Object.keys(prefixes));
@@ -172,7 +154,7 @@
     for (const [key, command] of Object.entries(d.keymap || {})) {
       storedKeymap[key] = command;
     }
-    const keymap = { ...keymapDefaults, ...storedKeymap };
+    const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
     for (const key of prefixKeys) delete keymap[key];
     return {
       keymap,
@@ -183,10 +165,22 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       hintChars: normalizeHintChars(d.hintChars),
+      hintPosition: HINT_POSITIONS.includes(d.hintPosition) ? d.hintPosition : settingsDefaults.hintPosition,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat
     };
   }
+  var HINT_POSITIONS = [
+    "top-left",
+    "top-center",
+    "top-right",
+    "middle-left",
+    "middle-center",
+    "middle-right",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right"
+  ];
   function normalizeHintChars(raw) {
     if (typeof raw !== "string") return settingsDefaults.hintChars.toUpperCase();
     const chars = [...new Set(raw.toUpperCase())].filter((c) => /[A-Z0-9]/.test(c)).join("");
@@ -226,9 +220,6 @@
         return a === b;
       }
     },
-    // A bare query that is a URL — scheme, protocol-relative, localhost, or a
-    // dotted hostname (with an optional path/port). Everything else is search
-    // terms. The background's normalizeUrl turns bare hosts into https.
     looksLikeUrl(text) {
       const s = text.trim();
       if (!s || /\s/.test(s)) return false;
@@ -236,10 +227,6 @@
       if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
       return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
     },
-    // The term suggestions are matched against. When the query is a URL token
-    // followed by words (an edited omnibar URL like "https://youtube.com/ pria"),
-    // the URL is the anchor and the trailing words are the real filter term.
-    // Returns the trailing words, or the whole query when it has no leading URL.
     suggestionTerm(query2) {
       const idx = query2.search(/\s/);
       if (idx === -1) return query2;
@@ -329,6 +316,7 @@
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
     hintChars: settingsDefaults.hintChars,
+    hintPosition: settingsDefaults.hintPosition,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     copyFormat: settingsDefaults.copyFormat
   };
@@ -342,6 +330,7 @@
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
     state.hintChars = s.hintChars;
+    state.hintPosition = s.hintPosition;
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
   }
@@ -364,6 +353,7 @@
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
         hintChars: state.hintChars,
+        hintPosition: state.hintPosition,
         suggestionSources: state.suggestionSources,
         copyFormat: state.copyFormat
       }
@@ -403,6 +393,9 @@
   function getHintChars() {
     return state.hintChars;
   }
+  function getHintPosition() {
+    return state.hintPosition;
+  }
   function getSuggestionSources() {
     return state.suggestionSources;
   }
@@ -435,6 +428,7 @@
     getTimeoutMs,
     getPassthroughMs,
     getHintChars,
+    getHintPosition,
     getSuggestionSources,
     getCopyFormat,
     toggleDisabled
@@ -575,20 +569,29 @@
   var scanEpoch = 0;
   var cachedEpoch = -1;
   var cachedAreas = null;
+  var mutationTimeout = null;
+  function invalidateScrollCache() {
+    if (mutationTimeout) {
+      clearTimeout(mutationTimeout);
+    }
+    mutationTimeout = setTimeout(() => {
+      scanEpoch++;
+      resolved = false;
+      mutationTimeout = null;
+    }, 150);
+  }
   var observedRoots = /* @__PURE__ */ new Set();
   function ensureObserved(root) {
     if (observedRoots.has(root)) return;
     observedRoots.add(root);
-    if (typeof window.MutationObserver === "undefined") return;
-    new window.MutationObserver(() => {
-      scanEpoch++;
-      resolved = false;
-    }).observe(root, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "style"]
-    });
+    if (typeof window.MutationObserver !== "undefined") {
+      new window.MutationObserver(invalidateScrollCache).observe(root, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style"]
+      });
+    }
   }
   if (typeof window.MutationObserver !== "undefined") {
     new window.MutationObserver(() => {
@@ -607,7 +610,8 @@
       if (node.nodeType === Node.ELEMENT_NODE) {
         if (node.hasAttribute("hidden")) return false;
         const style = window.getComputedStyle(node);
-        if (style.display === "none" || style.visibility === "hidden") return false;
+        if (style.display === "none" || style.visibility === "hidden")
+          return false;
         if (parseFloat(style.opacity) === 0) return false;
       }
       node = node.getRootNode().host || node.parentElement;
@@ -624,7 +628,8 @@
       if (el.closest(overlaySelectors)) continue;
       const tag = el.tagName;
       if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
-      if (el.clientHeight < 16 && el.clientWidth < 16) continue;
+      if (el.clientHeight < MIN_SCROLL_AREA_SIZE && el.clientWidth < MIN_SCROLL_AREA_SIZE)
+        continue;
       if (!isScrollVisible(el)) continue;
       const canY = el.scrollHeight > el.clientHeight + 1;
       const canX = el.scrollWidth > el.clientWidth + 1;
@@ -717,7 +722,12 @@
       autoPicked = false;
       area = target;
     }
-    const rect = area === window ? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight } : area.getBoundingClientRect();
+    const rect = area === window ? {
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight
+    } : area.getBoundingClientRect();
     clearTimeout(highlightTimer);
     if (highlightEl) highlightEl.remove();
     const el = document.createElement("div");
@@ -747,14 +757,11 @@
     overlays.push({ name, ...api });
   }
   var Overlays = {
-    // Close every active overlay. Idempotent: each overlay's close() already
-    // no-ops when it is not open.
     closeAll() {
       for (const overlay3 of overlays) {
         if (overlay3.isActive()) overlay3.close();
       }
     },
-    // The overlay currently owning the keys, or null.
     active() {
       return overlays.find((overlay3) => overlay3.isActive()) || null;
     }
@@ -763,7 +770,7 @@
   // content/hints.js
   var MAX_HINTS = 100;
   var LABEL_HEIGHT = 20;
-  var CLICKABLE_SELECTOR = [
+  var STRONG_CLICKABLE_SELECTOR = [
     "a[href]",
     "area[href]",
     "button",
@@ -784,8 +791,23 @@
     "[role='option']",
     "[role='combobox']",
     "[role='treeitem']",
-    "[onclick]"
+    "[onclick]",
+    "[ng-click]",
+    "[\\@click]",
+    "[v-on\\:click]"
   ].join(",");
+  var WEAK_CLICKABLE_SELECTOR = [
+    "[class*='button' i]",
+    "[class*='btn' i]",
+    "[class*='link' i]",
+    "[class*='clickable' i]",
+    "[class*='cursor-pointer' i]",
+    "[aria-haspopup='true']",
+    "[aria-pressed]",
+    "[aria-expanded]",
+    "[aria-controls]"
+  ].join(",");
+  var CLICKABLE_SELECTOR = `${STRONG_CLICKABLE_SELECTOR},${WEAK_CLICKABLE_SELECTOR}`;
   var TEXT_INPUT_TYPES = [
     "text",
     "search",
@@ -829,6 +851,136 @@
       el.dispatchEvent(new Ctor(type, opts));
     }
   }
+  function eventCoords(el) {
+    const rect = el.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    return {
+      clientX,
+      clientY,
+      screenX: window.screenX + clientX,
+      screenY: window.screenY + clientY
+    };
+  }
+  function dispatchSafe(el, event) {
+    try {
+      el.dispatchEvent(event);
+    } catch (err) {
+      console.debug("[jari] page event handler threw:", err);
+    }
+    return !event.defaultPrevented;
+  }
+  function fireHoverSequence(el) {
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      ...eventCoords(el),
+      pointerId: 1,
+      pointerType: "mouse",
+      isPrimary: true
+    };
+    for (const type of [
+      "pointerover",
+      "pointerenter",
+      "mouseover",
+      "mouseenter",
+      "mousemove"
+    ]) {
+      const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
+      dispatchSafe(el, new Ctor(type, opts));
+    }
+  }
+  function firePressSequence(el) {
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      ...eventCoords(el),
+      pointerId: 1,
+      pointerType: "mouse",
+      isPrimary: true,
+      view: window,
+      detail: 1
+    };
+    dispatchSafe(el, new PointerEvent("pointerdown", { ...opts, buttons: 1 }));
+    const mousedownCanceled = !dispatchSafe(
+      el,
+      new MouseEvent("mousedown", { ...opts, buttons: 1 })
+    );
+    dispatchSafe(el, new PointerEvent("pointerup", { ...opts, buttons: 0 }));
+    dispatchSafe(el, new MouseEvent("mouseup", { ...opts, buttons: 0 }));
+    return mousedownCanceled;
+  }
+  function fireClick(el) {
+    dispatchSafe(
+      el,
+      new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        button: 0,
+        buttons: 0,
+        detail: 1,
+        ...eventCoords(el)
+      })
+    );
+  }
+  function elClick(el) {
+    let canceled = false;
+    const guard = (event) => {
+      canceled = event.defaultPrevented;
+    };
+    el.addEventListener("click", guard);
+    try {
+      el.click();
+    } catch (err) {
+      console.debug("[jari] el.click() threw:", err);
+    } finally {
+      el.removeEventListener("click", guard);
+    }
+    return canceled;
+  }
+  function hrefOf(el) {
+    const href = el.href || el.getAttribute?.("href");
+    return typeof href === "string" ? href : null;
+  }
+  function navigatesSameTab(el, href) {
+    if (!href) return false;
+    const scheme = href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+    if (!href.startsWith("/") && !(scheme && /^https?$/i.test(scheme))) {
+      return false;
+    }
+    const target2 = el.getAttribute?.("target");
+    if (target2 && target2.toLowerCase() !== "_self") return false;
+    if (el.hasAttribute?.("download")) return false;
+    return true;
+  }
+  function simulateClick(el) {
+    const startHref = location.href;
+    fireHoverSequence(el);
+    const mousedownCanceled = firePressSequence(el);
+    let clickCanceled;
+    if (mousedownCanceled) {
+      fireClick(el);
+      clickCanceled = true;
+    } else {
+      clickCanceled = elClick(el);
+    }
+    const href = hrefOf(el);
+    if (mousedownCanceled || clickCanceled || !navigatesSameTab(el, href)) return;
+    setTimeout(() => {
+      if (location.href === startHref) {
+        try {
+          window.location.assign(href);
+        } catch {
+        }
+      }
+    }, 300);
+  }
   function placeCaretAtEnd(el) {
     if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
       try {
@@ -856,46 +1008,76 @@
     el.focus();
     if (el.isConnected) firePointerSequence(el);
     if (el.isConnected && deepActiveElement() !== el) el.focus();
-    const target2 = el;
-    const shots = [0, 16, 32, 64, 128, 256];
-    for (const delay of shots) {
-      setTimeout(() => {
-        if (deepActiveElement() !== target2) return;
-        placeCaretAtEnd(target2);
-      }, delay);
-    }
+    placeCaretAtEnd(el);
+    const fightFocusStealer = () => {
+      if (el.isConnected) {
+        el.focus();
+        placeCaretAtEnd(el);
+      }
+      el.removeEventListener("focusout", fightFocusStealer);
+    };
+    el.addEventListener("focusout", fightFocusStealer);
+    setTimeout(() => {
+      el.removeEventListener("focusout", fightFocusStealer);
+    }, 300);
+  }
+  function focusSingleInput() {
+    if (mode !== "focus" || pendingTopLevel.length !== 1) return;
+    const el = pendingTopLevel[0];
+    cancel();
+    focusAndPlaceCaret(el);
   }
   var MODES = {
     click: {
-      selector: CLICKABLE_SELECTOR,
+      selector: STRONG_CLICKABLE_SELECTOR,
+      weak: WEAK_CLICKABLE_SELECTOR,
       pointerCursor: true,
       activate: activateClick
     },
     newtab: {
-      selector: CLICKABLE_SELECTOR,
+      selector: STRONG_CLICKABLE_SELECTOR,
       linkOnly: true,
       activate: openInNewTab
     },
-    yank: { selector: CLICKABLE_SELECTOR, linkOnly: true, activate: yankLink },
+    yank: {
+      selector: STRONG_CLICKABLE_SELECTOR,
+      linkOnly: true,
+      activate: yankLink
+    },
     focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
-    // background: same as newtab, but sticky — the hints stay up after a pick
-    // so the next label can be typed immediately (opening several links in a
-    // row). See onKeyDown for the keep-open handling.
     background: {
-      selector: CLICKABLE_SELECTOR,
+      selector: STRONG_CLICKABLE_SELECTOR,
       linkOnly: true,
       sticky: true,
       activate: openInNewTab
     }
   };
+  var ACTIVATABLE_SELECTOR = [
+    "a[href]",
+    "area[href]",
+    "button",
+    "input:not([type='hidden'])",
+    "select",
+    "textarea",
+    "[role='button']",
+    "[role='link']"
+  ].join(",");
   function activateClick(el) {
-    firePointerSequence(el);
-    el.click();
+    if (el.matches(FOCUS_SELECTOR) || el.querySelector(FOCUS_SELECTOR)) {
+      focusAndPlaceCaret(el);
+      return;
+    }
+    if (!el.matches(ACTIVATABLE_SELECTOR)) {
+      const inner = el.querySelector(ACTIVATABLE_SELECTOR);
+      if (inner) el = inner;
+    }
+    simulateClick(el);
   }
   function alphabet() {
     return settings.getHintChars() || settingsDefaults.hintChars;
   }
   var mode = null;
+  var needsRelay = false;
   var labels = /* @__PURE__ */ new Map();
   var overlays2 = /* @__PURE__ */ new Map();
   var typed = "";
@@ -905,6 +1087,7 @@
     if (hintsHost && hintsHost.isConnected) return hintsHost;
     hintsHost = document.createElement("div");
     hintsHost.className = "jari-hints-host";
+    hintsHost.setAttribute("aria-hidden", "true");
     hintsHost.style.cssText = "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483647;";
     document.body.appendChild(hintsHost);
     return hintsHost;
@@ -950,6 +1133,7 @@
       const rect = hintRect(el, el.getBoundingClientRect());
       const pos = labelPlacement(
         rect,
+        settings.getHintPosition(),
         window.scrollX,
         window.scrollY,
         window.innerWidth,
@@ -962,13 +1146,14 @@
       box.style.display = "";
       box.style.left = pos.left + "px";
       box.style.top = pos.top + "px";
+      if (pos.transform) box.style.transform = pos.transform;
     }
   }
-  var POINTER_CAP = 200;
   function isPointerCursor(style) {
     const cursor = style && style.cursor;
     return cursor === "pointer" || typeof cursor === "string" && cursor.startsWith("url(");
   }
+  var POINTER_CAP = 200;
   function isPointerCandidate(el) {
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return false;
@@ -980,66 +1165,123 @@
     if (style.visibility === "hidden") return false;
     return isPointerCursor(style);
   }
-  function queryClickables(selector, { pointerCursor = true } = {}) {
-    const out = [];
+  function isJsactionClick(el) {
+    const jsaction = el.getAttribute?.("jsaction");
+    if (!jsaction) return false;
+    for (const rawRule of jsaction.split(";")) {
+      const rule = rawRule.trim();
+      if (!rule) continue;
+      const split = rule.split(":");
+      if (split.length < 1 || split.length > 2) continue;
+      const eventType = split.length === 1 ? "click" : split[0];
+      if (eventType !== "click") continue;
+      const action = split.length === 1 ? rule : split[1];
+      const [namespace, actionName = "_"] = action.split(".");
+      if (namespace === "none" || actionName === "_") continue;
+      return true;
+    }
+    return false;
+  }
+  function queryClickables(strongSelector, { weak: weakSelector, pointerCursor = true } = {}) {
+    const candidates = [];
+    const weak = /* @__PURE__ */ new WeakSet();
     let pointerCount = 0;
     const visit = (root) => {
       for (const el of root.querySelectorAll("*")) {
-        if (el.matches(selector)) {
-          out.push(el);
+        if (el.matches(strongSelector) || isJsactionClick(el)) {
+          candidates.push(el);
+        } else if (weakSelector && el.matches(weakSelector)) {
+          candidates.push(el);
+          weak.add(el);
         } else if (pointerCursor && pointerCount < POINTER_CAP && isPointerCandidate(el)) {
           pointerCount++;
-          out.push(el);
+          candidates.push(el);
         }
         if (el.shadowRoot) visit(el.shadowRoot);
       }
     };
     visit(document);
-    return out;
+    return { candidates, weak };
   }
-  function start(nextMode) {
+  var pendingTopLevel = [];
+  var pendingRects = /* @__PURE__ */ new Map();
+  var pendingTotal = 0;
+  async function start(nextMode) {
+    if (!chrome.runtime?.id) {
+      console.debug(
+        "[jari] Extension context invalidated. Skipping hint coordination."
+      );
+      return;
+    }
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: "COORDINATE_HINTS",
+        mode: nextMode
+      });
+      needsRelay = Boolean(res && res.needsRelay);
+      if (res && res.drawLocally) {
+        const count = countHints(nextMode);
+        if (count === 0) {
+          cancel();
+          ui.toast("No matches");
+        } else if (nextMode === "focus" && pendingTopLevel.length === 1) {
+          focusSingleInput();
+        } else {
+          drawHints(0);
+        }
+      }
+    } catch (err) {
+      console.debug(
+        "[jari] Failed to coordinate hints (context likely invalidated):",
+        err
+      );
+      needsRelay = false;
+    }
+  }
+  function countHints(nextMode) {
     const config = MODES[nextMode];
-    if (!config) return;
+    if (!config) return 0;
     cancel();
-    const candidates = config.pointerCursor ? queryClickables(config.selector) : queryAll(config.selector);
-    const {
-      top: topLevel,
-      rects,
-      total: counted
-    } = scanElements(candidates, {
+    mode = nextMode;
+    const { candidates, weak } = config.pointerCursor ? queryClickables(config.selector, { weak: config.weak }) : { candidates: queryAll(config.selector), weak: /* @__PURE__ */ new WeakSet() };
+    const scanned = scanElements(candidates, {
       passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
       visible: isVisible,
       occluded: isOccluded,
       max: MAX_HINTS,
-      nested: treeItemNested
+      nested: (el, ancestor) => !weak.has(ancestor) && treeItemNested(el, ancestor)
     });
-    for (const el of topLevel) {
+    let top = scanned.top;
+    const rects = scanned.rects;
+    if (weak.size > 0) {
+      top = top.filter(
+        (el) => !weak.has(el) || !top.some((other) => other !== el && containsElement(el, other))
+      );
+    }
+    for (const el of top) {
       rects.set(el, hintRect(el, rects.get(el)));
     }
-    const hintCount = topLevel.length;
-    if (nextMode === "focus" && topLevel.length === 1) {
-      focusAndPlaceCaret(topLevel[0]);
-      return;
+    pendingTopLevel = top;
+    pendingRects = rects;
+    pendingTotal = scanned.total;
+    return top.length;
+  }
+  function drawHints(startIndex) {
+    const hintCount = pendingTopLevel.length;
+    if (hintCount === 0) return;
+    if (pendingTotal > MAX_HINTS) {
+      ui.toast(`Showing ${hintCount} of ${pendingTotal} hints`);
     }
-    if (topLevel.length === 0) {
-      ui.toast("No matches");
-      return;
-    }
-    mode = nextMode;
-    if (nextMode === "focus") {
-      ui.toast(`${hintCount} inputs \u2014 pick one`);
-    }
-    if (counted > MAX_HINTS) {
-      ui.toast(`Showing ${hintCount} of ${counted} hints`);
-    }
-    const hintLabels = generateLabels(hintCount);
+    const hintLabels = generateLabels(hintCount, startIndex);
     const host = getHintsHost();
     const fragment = document.createDocumentFragment();
+    const position = settings.getHintPosition();
     for (let i = 0; i < hintCount; i++) {
-      const el = topLevel[i];
+      const el = pendingTopLevel[i];
       const label = hintLabels[i];
+      const box = createHintOverlay(label, pendingRects.get(el), position);
+      if (!box) continue;
       labels.set(label, el);
-      const box = createHintOverlay(label, rects.get(el));
       overlays2.set(label, box);
       fragment.appendChild(box);
     }
@@ -1071,9 +1313,8 @@
     if (rect.width <= 0 || rect.height <= 0) return null;
     const portion = visiblePortion(rect);
     if (!portion) return null;
-    const MIN_VISIBLE = 4;
-    if (portion.right - portion.left < MIN_VISIBLE) return null;
-    if (portion.bottom - portion.top < MIN_VISIBLE) return null;
+    if (portion.right - portion.left < MIN_VISIBLE_HINT_SIZE) return null;
+    if (portion.bottom - portion.top < MIN_VISIBLE_HINT_SIZE) return null;
     const style = window.getComputedStyle(el);
     if (style.visibility === "hidden") return null;
     if (parseFloat(style.opacity) === 0) return null;
@@ -1089,8 +1330,10 @@
     const points = [[cx, cy]];
     const w = right - left;
     const h = bottom - top;
-    if (w >= 8) points.push([left + w * 0.25, cy], [left + w * 0.75, cy]);
-    if (h >= 8) points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
+    if (w >= OCCLUSION_SAMPLE_THRESHOLD)
+      points.push([left + w * 0.25, cy], [left + w * 0.75, cy]);
+    if (h >= OCCLUSION_SAMPLE_THRESHOLD)
+      points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
     return points;
   }
   function rectOverlapsScrollport(rect, node) {
@@ -1103,6 +1346,8 @@
     return rect.bottom > box.top && rect.top < box.bottom && rect.right > box.left && rect.left < box.right;
   }
   function isOccluded(el, rect) {
+    const portion = visiblePortion(rect);
+    if (!portion) return true;
     let node = el.parentElement || el.getRootNode().host;
     while (node && node !== document.documentElement && node !== document.body) {
       if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) {
@@ -1114,15 +1359,35 @@
       node = node.parentElement || node.getRootNode().host;
     }
     if (el.matches("input, textarea, select, [contenteditable]")) return false;
-    const portion = visiblePortion(rect);
-    if (!portion) return true;
     const root = el.getRootNode();
-    for (const [x, y] of occlusionSamples(portion)) {
+    const points = occlusionSamples(portion);
+    let occludedPoints = 0;
+    for (const [x, y] of points) {
       const top = root.elementFromPoint(x, y);
-      if (!top) continue;
-      if (containsElement(el, top) || containsElement(top, el)) return false;
+      if (!top) {
+        occludedPoints++;
+        continue;
+      }
+      if (containsElement(el, top) || containsElement(top, el) || flatContains(el, top) || flatContains(top, el)) {
+        return false;
+      } else {
+        occludedPoints++;
+      }
     }
-    return true;
+    return occludedPoints === points.length;
+  }
+  function flatParent(node) {
+    if (node.assignedSlot) return node.assignedSlot;
+    if (node.parentElement) return node.parentElement;
+    if (node.getRootNode().host) return node.getRootNode().host;
+    return null;
+  }
+  function flatContains(ancestor, node) {
+    let current = node;
+    while (current && current !== ancestor) {
+      current = flatParent(current);
+    }
+    return current === ancestor;
   }
   function isTreeItem(el) {
     return el.getAttribute?.("role") === "treeitem";
@@ -1160,16 +1425,19 @@
     }
     return { top, rects, total: counted };
   }
-  function generateLabels(count) {
+  function generateLabels(count, startIndex = 0) {
     const chars = alphabet();
     const n = chars.length;
     const labels2 = [];
     let i = 0;
     let length = 2;
-    while (i < count) {
+    const totalToGenerate = count + startIndex;
+    while (i < totalToGenerate) {
       const combos = Math.pow(n, length);
-      for (let k = 0; k < combos && i < count; k++, i++) {
-        labels2.push(toBase26(k, length, chars));
+      for (let k = 0; k < combos && i < totalToGenerate; k++, i++) {
+        if (i >= startIndex) {
+          labels2.push(toBase26(k, length, chars));
+        }
       }
       length++;
     }
@@ -1185,25 +1453,33 @@
     return s;
   }
   function hintRect(el, fallback) {
-    if (el.childElementCount === 0) {
-      const rects = el.getClientRects();
-      if (rects.length === 3) return rects[1];
-      if (rects.length === 2) return rects[0];
-    }
     return fallback;
   }
-  function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
+  function labelPlacement(rect, position, scrollX, scrollY, viewportWidth, viewportHeight) {
     const left = Math.max(rect.left, 0);
     const top = Math.max(rect.top, 0);
     const right = Math.min(rect.right, viewportWidth);
     const bottom = Math.min(rect.bottom, viewportHeight);
     if (right <= left || bottom <= top) return null;
+    const [vert, horiz] = position.split("-");
+    const cx = (left + right) / 2;
+    const cy = (top + bottom) / 2;
+    const anchorX = horiz === "center" ? cx : horiz === "right" ? right : left;
+    const anchorY = vert === "middle" ? cy : vert === "bottom" ? bottom : top;
+    const tx = horiz === "center" ? -50 : horiz === "right" ? -100 : 0;
+    const ty = vert === "middle" ? -50 : vert === "bottom" ? -100 : 0;
+    const half = LABEL_HEIGHT / 2;
+    const minX = tx === -100 ? LABEL_HEIGHT : tx === -50 ? half : 0;
+    const maxX = tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - half : viewportWidth - LABEL_HEIGHT;
+    const minY = ty === -100 ? LABEL_HEIGHT : ty === -50 ? half : 0;
+    const maxY = ty === -100 ? viewportHeight : ty === -50 ? viewportHeight - half : viewportHeight - LABEL_HEIGHT;
     return {
-      left: scrollX + left,
-      top: scrollY + Math.min(top, viewportHeight - LABEL_HEIGHT)
+      left: scrollX + Math.min(Math.max(anchorX, minX), maxX),
+      top: scrollY + Math.min(Math.max(anchorY, minY), maxY),
+      transform: `translate(${tx}%, ${ty}%)`
     };
   }
-  function createHintOverlay(label, rect) {
+  function createHintOverlay(label, rect, position) {
     const box = document.createElement("div");
     box.className = "jari-hint";
     for (const ch of label) {
@@ -1213,13 +1489,16 @@
     }
     const pos = labelPlacement(
       rect,
+      position,
       window.scrollX,
       window.scrollY,
       window.innerWidth,
       window.innerHeight
     );
+    if (!pos) return null;
     box.style.left = pos.left + "px";
     box.style.top = pos.top + "px";
+    if (pos.transform) box.style.transform = pos.transform;
     return box;
   }
   function openInNewTab(el) {
@@ -1228,8 +1507,7 @@
     if (scheme && urlSchemes.has(scheme)) {
       sendMessage("openInBackgroundTab", { url: href });
     } else {
-      firePointerSequence(el);
-      el.click();
+      simulateClick(el);
     }
   }
   function yankLink(el) {
@@ -1241,11 +1519,28 @@
   function onKeyDown(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (event.key === "Escape") {
-      cancel();
-      return;
+    const shouldRelay = needsRelay;
+    const state2 = handleHintKey(event.key);
+    if (shouldRelay) {
+      try {
+        const p = chrome.runtime.sendMessage({
+          type: "HINTS_KEY",
+          key: event.key,
+          remaining: state2.remaining,
+          closed: state2.closed
+        });
+        if (p && typeof p.catch === "function") p.catch(() => {
+        });
+      } catch {
+      }
     }
-    typed += event.key.toLowerCase();
+  }
+  function handleHintKey(key) {
+    if (key === "Escape") {
+      cancel();
+      return { remaining: 0, closed: true };
+    }
+    typed += key.toLowerCase();
     let exact = null;
     let partial = 0;
     for (const label of labels.keys()) {
@@ -1255,7 +1550,11 @@
     }
     if (exact && partial === 0) {
       const modeConfig = MODES[mode];
-      modeConfig.activate(labels.get(exact));
+      try {
+        modeConfig.activate(labels.get(exact));
+      } catch (err) {
+        console.debug("[jari] hint activation failed:", err);
+      }
       if (modeConfig.sticky) {
         const box = overlays2.get(exact);
         if (box) box.remove();
@@ -1263,16 +1562,20 @@
         labels.delete(exact);
         typed = "";
         updateHighlight();
-        if (labels.size === 0) cancel();
-        return;
+        if (labels.size === 0) {
+          cancel();
+          return { remaining: 0, closed: true };
+        }
+        return { remaining: labels.size, closed: false };
       }
       cancel();
-      return;
+      return { remaining: 0, closed: true };
     }
     if (!exact && partial === 0) {
       typed = "";
     }
     updateHighlight();
+    return { remaining: labels.size, closed: false };
   }
   function updateHighlight() {
     for (const [label, box] of overlays2) {
@@ -1296,12 +1599,14 @@
     labels.clear();
     typed = "";
     mode = null;
+    needsRelay = false;
   }
   var Hints = {
     start,
     cancel,
     onKeyDown,
     isActive,
+    placeCaretAtEnd,
     generateLabels,
     visiblePortion,
     isOccluded,
@@ -1313,10 +1618,29 @@
     treeItemNested,
     clickableSelector: CLICKABLE_SELECTOR,
     isPointerCursor,
+    isJsactionClick,
     queryClickables,
-    hintRect
+    flatContains,
+    hintRect,
+    simulateClick
   };
   register("hints", { close: cancel, onKeyDown, isActive });
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === "COUNT_HINTS") {
+      sendResponse(countHints(msg.mode));
+    } else if (msg.type === "DRAW_HINTS") {
+      drawHints(msg.startIndex);
+    } else if (msg.type === "HINTS_RESET") {
+      cancel();
+      if (msg.toast) ui.toast(msg.toast);
+    } else if (msg.type === "HINTS_KEY") {
+      sendResponse(handleHintKey(msg.key));
+    } else if (msg.type === "HINTS_FOCUS_SINGLE") {
+      focusSingleInput();
+    } else if (msg.type === "HINTS_CLOSE") {
+      cancel();
+    }
+  });
 
   // content/prompt.js
   var active = false;
@@ -1535,10 +1859,6 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         activate();
-      } else if (event.key === "Tab") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        move(event.shiftKey ? -1 : 1);
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -1547,6 +1867,10 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         move(-1);
+      } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        move(event.shiftKey ? -1 : 1);
       }
       return;
     }
@@ -1554,7 +1878,7 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       close();
-    } else if (event.key === "Tab") {
+    } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       event.stopImmediatePropagation();
       move(event.shiftKey ? -1 : 1);
@@ -1602,7 +1926,6 @@
 
   // content/catalog.js
   var COMMAND_CATALOG = {
-    // Scrolling
     scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
     scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
     scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
@@ -1616,10 +1939,8 @@
     cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas" },
     resetScrollArea: { category: "scrolling", label: "Reset to page scroll" },
     showScrollArea: { category: "scrolling", label: "Show scroll area" },
-    // View & zoom
     zoomIn: { category: "view", label: "Zoom in" },
     zoomOut: { category: "view", label: "Zoom out" },
-    // Tabs
     newTab: { category: "tabs", label: "New tab" },
     closeTab: { category: "tabs", label: "Close tab", repeatable: true },
     restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
@@ -1631,7 +1952,6 @@
     lastTab: { category: "tabs", label: "Jump to last tab" },
     tabSearch: { category: "tabs", label: "Tab search" },
     omnibar: { category: "tabs", label: "Open URL or search" },
-    // Tab actions
     splitTab: { category: "tabActions", label: "Move tab to new window" },
     splitOrMergeTab: { category: "tabActions", label: "Split tab / merge window" },
     moveTabLeft: { category: "tabActions", label: "Move tab left" },
@@ -1639,29 +1959,23 @@
     duplicateTab: { category: "tabActions", label: "Duplicate tab" },
     togglePin: { category: "tabActions", label: "Pin/unpin tab" },
     toggleMute: { category: "tabActions", label: "Mute/unmute tab" },
-    // History
     historyBack: { category: "history", label: "Go back in history" },
     historyForward: { category: "history", label: "Go forward in history" },
-    // Hints
     linkHints: { category: "hints", label: "Link hints" },
     linkHintsNewTab: { category: "hints", label: "Link hints (new tab)" },
     linkHintsBackground: { category: "hints", label: "Link hints (background, keep open)" },
     linkHintsYank: { category: "hints", label: "Copy link URL" },
     focusInput: { category: "hints", label: "Focus input" },
-    // Page
     reloadTab: { category: "page", label: "Reload" },
     hardReload: { category: "page", label: "Reload (bypass cache)" },
     goUp: { category: "page", label: "Go to parent path" },
     goToRoot: { category: "page", label: "Go to site root" },
     editUrl: { category: "page", label: "Edit current URL" },
-    // Clipboard
     copyUrl: { category: "clipboard", label: "Copy URL" },
     copyTitleUrl: { category: "clipboard", label: "Copy title + URL" },
-    // Modes
     toggleIgnore: { category: "modes", label: "Ignore mode" },
     passthrough: { category: "modes", label: "Passthrough keys (timed)" },
     toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
-    // Help & settings
     showHelp: { category: "help", label: "Show keybindings" },
     openOptions: { category: "help", label: "Open settings" }
   };
@@ -1883,7 +2197,6 @@ ${location.href}`;
     }
   }
   var commands = {
-    // Scrolling
     scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
     scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
     scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
@@ -1926,7 +2239,6 @@ ${location.href}`;
     showScrollArea: { ...COMMAND_CATALOG.showScrollArea, run: () => Scroll.showHighlight() },
     zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
-    // Tabs
     newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
     closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
     restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
@@ -1989,23 +2301,18 @@ ${location.href}`;
       ...COMMAND_CATALOG.editUrl,
       run: () => Prompt.openEditUrl()
     },
-    // Hints
     linkHints: { ...COMMAND_CATALOG.linkHints, run: () => Hints.start("click") },
     linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
     linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
     linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
     focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
-    // Page navigation
     historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
     historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
-    // Clipboard
     copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
     copyTitleUrl: { ...COMMAND_CATALOG.copyTitleUrl, run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
-    // Site-level control
     toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
     passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
     toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
-    // Help & settings
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
     openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") }
   };

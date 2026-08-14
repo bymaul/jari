@@ -1,9 +1,6 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 
-// content.js boots at import time (window.addEventListener, settings.load),
-// and settings.js registers a chrome.storage listener at module load, so the
-// browser globals must exist before any of those modules are imported.
 globalThis.window = {
   addEventListener: () => {},
   matchMedia: () => ({ matches: false }),
@@ -27,7 +24,10 @@ globalThis.chrome = {
     sync: { get: async () => ({}), set: async () => {} },
     onChanged: { addListener: () => {} },
   },
-  runtime: { sendMessage: async () => {} },
+  runtime: {
+    sendMessage: async () => {},
+    onMessage: { addListener: () => {} },
+  },
 };
 
 const { settings } = await import("../content/settings.js");
@@ -54,8 +54,6 @@ function key(partial = {}) {
   };
 }
 
-// A command that runs must have had its key claimed (preventDefault +
-// stopImmediatePropagation) so the page never sees it.
 function assertClaimed(ev) {
   assert.ok(ev.claimed, "expected the key to be claimed");
 }
@@ -233,20 +231,20 @@ test("ignore mode respects a rebound toggle key", () => {
   spyOn("scrollDown");
 
   handleKeydown(key({ key: "z" }));
-  handleKeydown(key({ key: "I" })); // no longer the toggle: must not exit
+  handleKeydown(key({ key: "I" }));
   const pass = key({ key: "j" });
   handleKeydown(pass);
   assert.equal(spiedCalls.scrollDown.length, 0);
   assertUnclaimed(pass);
 
-  handleKeydown(key({ key: "z" })); // the real toggle exits
+  handleKeydown(key({ key: "z" }));
   handleKeydown(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown.length, 1);
 });
 
 test("passthrough lets every key through until Escape", () => {
   spyOn("scrollDown");
-  const on = key({ key: "o" });
+  const on = key({ key: "p" });
   handleKeydown(on);
   assertClaimed(on);
 
@@ -266,7 +264,7 @@ test("passthrough lets every key through until Escape", () => {
 test("passthrough exits when the timeout expires", async () => {
   settings.set({ passthroughMs: 30 });
   spyOn("scrollDown");
-  handleKeydown(key({ key: "o" }));
+  handleKeydown(key({ key: "p" }));
   await new Promise((r) => setTimeout(r, 50));
   handleKeydown(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown.length, 1);

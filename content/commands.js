@@ -1,9 +1,3 @@
-// Jari: the command registry.
-// Each command is { category, label, run, repeatable? }. category groups
-// commands on the options page; category/label/repeatable come from the
-// COMMAND_CATALOG, run is implemented here.
-// run receives { count, event }. repeatable commands scale with the count
-// prefix (e.g. "3j", "5x").
 import { Url } from "./keymap.js";
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
@@ -16,9 +10,6 @@ import { COMMAND_CATALOG } from "./catalog.js";
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;
 
-// The ignore/passthrough modes are owned by the content entry point (they
-// share its keydown state). The registry must not import the entry, so the
-// entry wires the actions here; the run closures below call them at runtime.
 let ignoreToggle = () => {};
 let passthroughEnter = () => {};
 export function setModeActions({ ignore, passthrough } = {}) {
@@ -26,8 +17,6 @@ export function setModeActions({ ignore, passthrough } = {}) {
   if (passthrough) passthroughEnter = passthrough;
 }
 
-// Scrolling targets the window by default; "gs"/"gS" retarget it to a
-// page's nested scroll container (or back to the window).
 function getScrollElement() {
   return Scroll.getTarget();
 }
@@ -42,11 +31,7 @@ function clientHeightOf(el) {
   return el === window ? window.innerHeight : el.clientHeight;
 }
 
-// Manual smooth scrolling. Holding a key fires repeated keydowns; each
-// scrollBy({ behavior: "smooth" }) cancels the previous animation, which
-// stutters. Instead, accumulate the requested distance and animate it with
-// requestAnimationFrame until it is consumed.
-let smoothState = null; // { el, x, y, rafId }
+let smoothState = null;
 
 function scrollPosOf(el) {
   return el === window
@@ -54,8 +39,6 @@ function scrollPosOf(el) {
     : { x: el.scrollLeft, y: el.scrollTop };
 }
 
-// Respect the OS-level reduced-motion preference: when set, skip the smooth
-// animation and jump instantly even if smoothScroll is enabled.
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -81,8 +64,7 @@ function smoothScrollStep() {
     smoothState = null;
     return;
   }
-  // Ease-out toward the target, capped per frame so a large backlog (a held
-  // key) still scrolls at a steady, sane speed.
+
   const CAP = 150;
   const moveX =
     pendingX !== 0
@@ -98,9 +80,7 @@ function smoothScrollStep() {
   const after = scrollPosOf(el);
   const dx = after.x - before.x;
   const dy = after.y - before.y;
-  // Consume what actually moved; an axis that couldn't move (scroll limit
-  // reached) is dropped so the loop can end, while the other axis keeps
-  // animating.
+
   if (dx !== 0) smoothState.x -= dx;
   else smoothState.x = 0;
   if (dy !== 0) smoothState.y -= dy;
@@ -123,19 +103,12 @@ async function copyToClipboard(text, message) {
   ui.toast(message);
 }
 
-// Title + URL, formatted per the copyFormat setting: plain ("Title\nURL")
-// or a markdown link ("[Title](URL)").
 function copyTitleUrlText() {
   return settings.getCopyFormat() === "markdown"
     ? `[${document.title}](${location.href})`
     : `${document.title}\n${location.href}`;
 }
 
-// Read the clipboard. A hidden textarea + execCommand("paste") is the
-// reliable path from a content script (needs the "clipboardRead" permission
-// in the manifest); navigator.clipboard.readText() is the fallback on
-// secure pages. The caller treats the result as a URL — background
-// normalizeUrl turns bare hostnames into https.
 function pasteClipboard() {
   let text = "";
   try {
@@ -152,7 +125,7 @@ function pasteClipboard() {
 }
 
 export const commands = {
-  // Scrolling
+
   scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
   scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
   scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
@@ -196,7 +169,6 @@ export const commands = {
   zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
   zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
 
-  // Tabs
   newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
   closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
   restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
@@ -260,27 +232,22 @@ export const commands = {
     run: () => Prompt.openEditUrl(),
   },
 
-  // Hints
   linkHints: { ...COMMAND_CATALOG.linkHints, run: () => Hints.start("click") },
   linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
   linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
   linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
   focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
 
-  // Page navigation
   historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
   historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
 
-  // Clipboard
   copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
   copyTitleUrl: { ...COMMAND_CATALOG.copyTitleUrl, run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
 
-  // Site-level control
   toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
   passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
   toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
 
-  // Help & settings
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
   openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
 };

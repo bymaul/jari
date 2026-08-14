@@ -1,8 +1,3 @@
-// Jari: keybinding help overlay (?).
-// Categorized three-column modal listing every bound key and its command.
-// Rendered from the live keymap, so rebinds are reflected immediately.
-// On open the overlay takes focus and the help list owns the scroll:
-// j/k, G and ctrl+d/u/f/b move through it.
 import { balanceCategories } from "./keymap.js";
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
@@ -25,8 +20,7 @@ function open() {
   if (active) return;
   active = true;
   render();
-  // Give the overlay focus so the list owns the scroll (j/k etc.). The
-  // focus ring is suppressed in CSS — the modal must not show an outline.
+
   overlay.tabIndex = -1;
   overlay.focus();
 }
@@ -40,8 +34,6 @@ function render() {
   title.textContent = 'Jari keybindings';
   overlay.appendChild(title);
 
-  // Collect every binding: single keys and two-key pairs from the keymap.
-  // A command may be bound to more than one key, so keys accumulate.
   const byCommand = new Map();
   for (const [key, commandName] of Object.entries(settings.getKeymap())) {
     if (!byCommand.has(commandName)) byCommand.set(commandName, []);
@@ -57,8 +49,6 @@ function render() {
     byCategory.get(id).push({ keys, label: meta.label });
   }
 
-  // Split the categories across three columns, keeping each category whole
-  // and balancing by row count (category header + one row per command).
   const columns = balanceCategories(byCategory, COLUMNS);
 
   listEl = document.createElement('div');

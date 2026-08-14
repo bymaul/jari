@@ -16,12 +16,12 @@ test("parseRepeatCount clamps counts to at least 1", () => {
   assert.equal(Jari.parseRepeatCount(undefined), 1);
 });
 
-test("normalizeSettings fills defaults and drops invalid values", () => {
+test("normalizeSettings treats a stored keymap as authoritative and drops invalid values", () => {
   const s = Jari.normalizeSettings({ scrollStep: 100, smoothScroll: true, keymap: { j: "scrollTop" } });
   assert.equal(s.scrollStep, 100);
   assert.equal(s.smoothScroll, true);
   assert.equal(s.keymap.j, "scrollTop");
-  assert.equal(s.keymap.t, "omnibar");
+  assert.equal(s.keymap.t, undefined);
   assert.equal(s.timeoutMs, 1500);
   assert.equal(s.hintChars, "SADFJKLEWCMPGH");
   assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
@@ -34,6 +34,18 @@ test("normalizeSettings fills defaults and drops invalid values", () => {
 
   assert.equal(Jari.normalizeSettings({}).fuzzyMatching, true);
   assert.equal(Jari.normalizeSettings({ fuzzyMatching: false }).fuzzyMatching, false);
+});
+
+test("normalizeSettings fills defaults only when no keymap is stored", () => {
+  const s = Jari.normalizeSettings({});
+  assert.equal(s.keymap.t, "omnibar");
+  assert.equal(s.keymap.p, "passthrough");
+});
+
+test("rebinding away a default key removes the default binding", () => {
+  const s = Jari.normalizeSettings({ keymap: { z: "passthrough" } });
+  assert.equal(s.keymap.z, "passthrough");
+  assert.equal(s.keymap.p, undefined);
 });
 
 test("normalizeSettings validates hintChars, suggestionSources and copyFormat", () => {
@@ -54,6 +66,14 @@ test("normalizeSettings validates hintChars, suggestionSources and copyFormat", 
     ["tab", "bookmark"],
   );
   assert.equal(Jari.normalizeSettings({ copyFormat: "bogus" }).copyFormat, "plain");
+});
+
+test("normalizeSettings validates hintPosition", () => {
+  const s = Jari.normalizeSettings({ hintPosition: "bottom-right" });
+  assert.equal(s.hintPosition, "bottom-right");
+
+  assert.equal(Jari.normalizeSettings({ hintPosition: "bogus" }).hintPosition, "top-left");
+  assert.equal(Jari.normalizeSettings({ hintPosition: "middle-center" }).hintPosition, "middle-center");
 });
 
 test("fuzzyMatch returns null when chars are missing or out of order", () => {
