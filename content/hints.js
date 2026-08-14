@@ -893,6 +893,7 @@ function labelPlacement(
   scrollY,
   viewportWidth,
   viewportHeight,
+  width = LABEL_HEIGHT,
 ) {
   const left = Math.max(rect.left, 0);
   const top = Math.max(rect.top, 0);
@@ -910,9 +911,10 @@ function labelPlacement(
   const ty = vert === "middle" ? -50 : vert === "bottom" ? -100 : 0;
 
   const half = LABEL_HEIGHT / 2;
-  const minX = tx === -100 ? LABEL_HEIGHT : tx === -50 ? half : 0;
+  const widthHalf = width / 2;
+  const minX = tx === -100 ? width : tx === -50 ? widthHalf : 0;
   const maxX =
-    tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - half : viewportWidth - LABEL_HEIGHT;
+    tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - widthHalf : viewportWidth - width;
   const minY = ty === -100 ? LABEL_HEIGHT : ty === -50 ? half : 0;
   const maxY =
     ty === -100 ? viewportHeight : ty === -50 ? viewportHeight - half : viewportHeight - LABEL_HEIGHT;
@@ -924,6 +926,21 @@ function labelPlacement(
   };
 }
 
+// Measure the label's rendered width so edge clamping keeps the whole box on
+// screen even when it is wider than the LABEL_HEIGHT proxy. Attach offscreen
+// and detach synchronously so no paint happens in between.
+function measureHintWidth(box) {
+  const host = document.createElement("div");
+  host.style.cssText =
+    "position:fixed;left:-10000px;top:0;pointer-events:none;visibility:hidden;";
+  document.body.appendChild(host);
+  host.appendChild(box);
+  const width = box.offsetWidth;
+  host.removeChild(box);
+  document.body.removeChild(host);
+  return width;
+}
+
 function createHintOverlay(label, rect, position) {
   const box = document.createElement("div");
   box.className = "jari-hint";
@@ -932,6 +949,7 @@ function createHintOverlay(label, rect, position) {
     span.textContent = ch;
     box.appendChild(span);
   }
+  const width = measureHintWidth(box);
   const pos = labelPlacement(
     rect,
     position,
@@ -939,6 +957,7 @@ function createHintOverlay(label, rect, position) {
     window.scrollY,
     window.innerWidth,
     window.innerHeight,
+    width,
   );
   if (!pos) return null;
   box.style.left = pos.left + "px";

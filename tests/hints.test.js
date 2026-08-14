@@ -218,8 +218,24 @@ test("labelPlacement clamps labels on screen at the fold edges", () => {
   );
 });
 
-test("labelPlacement returns null when the element is off-screen or has no box", () => {
-  assert.equal(
+test("labelPlacement clamps with the measured label width, not the height proxy", () => {
+  const nearRight = { left: 795, top: 100, right: 810, bottom: 130 };
+  assert.deepEqual(
+    Hints.labelPlacement(nearRight, "top-left", 0, 0, 800, 600, 26),
+    { left: 774, top: 100, transform: "translate(0%, 0%)" },
+  );
+  assert.deepEqual(
+    Hints.labelPlacement(nearRight, "middle-center", 0, 0, 800, 600, 26),
+    { left: 787, top: 115, transform: "translate(-50%, -50%)" },
+  );
+  const nearLeft = { left: 0, top: 100, right: 20, bottom: 130 };
+  assert.deepEqual(
+    Hints.labelPlacement(nearLeft, "middle-center", 0, 0, 800, 600, 26),
+    { left: 13, top: 115, transform: "translate(-50%, -50%)" },
+  );
+});
+
+test("labelPlacement returns null when the element is off-screen or has no box", () => {  assert.equal(
     Hints.labelPlacement(
       { left: 100, top: -200, right: 600, bottom: -100 },
       "top-left",
@@ -1107,6 +1123,7 @@ function hintStubElement(name, rect) {
     children: [],
     style: {},
     className: "",
+    offsetWidth: 20,
     isConnected: true,
     listeners: {},
     set textContent(value) {
@@ -1125,6 +1142,11 @@ function hintStubElement(name, rect) {
     appendChild(child) {
       this.children.push(child);
     },
+    removeChild(child) {
+      const i = this.children.indexOf(child);
+      if (i !== -1) this.children.splice(i, 1);
+      return child;
+    },
     remove() {
       this.isConnected = false;
     },
@@ -1142,7 +1164,7 @@ function hintStubDocument(candidate) {
   return {
     created,
     activeElement: null,
-    body: { appendChild() {} },
+    body: { appendChild() {}, removeChild() {} },
     documentElement: {},
     querySelectorAll: () => (candidate ? [candidate] : []),
     createElement: (tag) => {
