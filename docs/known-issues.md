@@ -139,20 +139,6 @@ intercept it (Chromium issue 41081444; Firefox ignores `preventDefault` for
 it). Prompt navigation therefore only uses Tab/Shift+Tab and Up/Down arrows;
 the prompt-navigation option was removed.
 
-## Fullscreen — Escape closes fullscreen before the prompt
-
-**Step:** In an element-fullscreen page (e.g. YouTube), press `t`, then `Esc`.
-
-**Expected:** the prompt closes first; a second `Esc` exits fullscreen.
-
-**Actual:** (pre-fix) Escape exited fullscreen before (or while) the prompt
-closed.
-
-**Status:** open. A Chromium `navigator.keyboard.lock(["Escape"])` attempt was
-tried and then reverted: it kept Escape reaching the page so the overlay could
-close first, but the overall behavior was still wrong in manual Chrome testing
-and added fragility. Currently Escape exits fullscreen before the prompt
-closes. Revisit only with a browser-side repro.
 ## Instagram feed — no hints after scrolling
 
 **Step:** On the desktop feed, scroll down a few posts, then press `f`.
@@ -220,11 +206,11 @@ tests required the full rect center to be on-screen and uncovered.
 main page they do not appear over the frame, and when they do appear they
 render **behind** the frame (the frame paints on top of the hint boxes).
 
-**Status:** open. Notes from the first pass: Gmail's compose window renders in
+**Status:** resolved. Notes from the first pass: Gmail's compose window renders in
 its own frame. Content scripts only see the frame that has focus, so hints
 reach compose when focus is inside it. If hints appear there but not from the
 main page, that is a frame-traversal limitation (hints don't cross frames).
-The z-order problem (hints behind the frame) is separate and also unresolved.
+The z-order problem (hints behind the frame) is separate and also resolved.
 
 ## Notion — `i` editor focus
 
@@ -236,28 +222,15 @@ immediately.
 **Actual:** no focus lands in the block. `f` does detect the editor inputs as
 hint targets; activating one also fails to focus the editor.
 
-**Status:** partially addressed. Caret placement when focus *does* land is now
-fixed (`placeCaretAtEnd` in `focusAndPlaceCaret`): focusing a prefilled
+**Status:** open. Caret placement when focus *does* land is fixed
+(`placeCaretAtEnd` in `focusAndPlaceCaret`): focusing a prefilled
 `<input>`/`<textarea>` moves the caret to the end, and focusing a
 `contenteditable` (light-DOM or inside a shadow root) collapses the selection
 at the end. Verified end-to-end in the headless harness (input, textarea,
 contenteditable, and a shadow-hosted contenteditable; typing after focus
-appends at the end). The remaining Notion problem is that programmatic focus
-still does not land in Notion's editor block at all, which the caret fix does
-not address. Notion only renders editable blocks (`contenteditable="true"`)
-when signed in; publicly shared pages are read-only
-(`contenteditable="false"`), so headless validation against Notion requires a
-logged-in profile.
-
-## Google Docs — `Esc` in hint mode
-
-**Step:** Press `f`, then `Esc` while a hint label is highlighted.
-
-**Expected:** hints close; the focused element (e.g. a toolbar item) blurs and
-any selection highlight clears.
-
-**Actual:** hints close but focus stays on the activated element.
-
-**Status:** open (low priority). Feature request, not a regression: `Esc`
-already closes hint mode; blurring the activated element is the desired
-addition.
+appends at the end). The remaining Notion problem: programmatic focus now
+lands, but only on the page title's editable, not on body text blocks - so
+`i` puts the caret in the title instead of the paragraph you are reading.
+Notion only renders editable blocks (`contenteditable="true"`) when signed
+in; publicly shared pages are read-only (`contenteditable="false"`), so
+headless validation against Notion requires a logged-in profile.
