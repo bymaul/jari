@@ -116,6 +116,15 @@ function eventCoords(el) {
   };
 }
 
+function dispatchSafe(el, event) {
+  try {
+    el.dispatchEvent(event);
+  } catch (err) {
+    console.debug("[jari] page event handler threw:", err);
+  }
+  return !event.defaultPrevented;
+}
+
 function fireHoverSequence(el) {
   const opts = {
     bubbles: true,
@@ -135,7 +144,7 @@ function fireHoverSequence(el) {
     "mousemove",
   ]) {
     const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
-    el.dispatchEvent(new Ctor(type, opts));
+    dispatchSafe(el, new Ctor(type, opts));
   }
 }
 
@@ -152,16 +161,19 @@ function firePressSequence(el) {
     view: window,
     detail: 1,
   };
-  el.dispatchEvent(new PointerEvent("pointerdown", { ...opts, buttons: 1 }));
-  const mousedown = new MouseEvent("mousedown", { ...opts, buttons: 1 });
-  const mousedownCanceled = el.dispatchEvent(mousedown) === false;
-  el.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0 }));
-  el.dispatchEvent(new MouseEvent("mouseup", { ...opts, buttons: 0 }));
+  dispatchSafe(el, new PointerEvent("pointerdown", { ...opts, buttons: 1 }));
+  const mousedownCanceled = !dispatchSafe(
+    el,
+    new MouseEvent("mousedown", { ...opts, buttons: 1 }),
+  );
+  dispatchSafe(el, new PointerEvent("pointerup", { ...opts, buttons: 0 }));
+  dispatchSafe(el, new MouseEvent("mouseup", { ...opts, buttons: 0 }));
   return mousedownCanceled;
 }
 
 function fireClick(el) {
-  el.dispatchEvent(
+  dispatchSafe(
+    el,
     new MouseEvent("click", {
       bubbles: true,
       cancelable: true,
@@ -183,6 +195,8 @@ function elClick(el) {
   el.addEventListener("click", guard);
   try {
     el.click();
+  } catch (err) {
+    console.debug("[jari] el.click() threw:", err);
   } finally {
     el.removeEventListener("click", guard);
   }
@@ -897,8 +911,9 @@ function onKeyDown(event) {
   event.preventDefault();
   event.stopImmediatePropagation();
 
+  const shouldRelay = needsRelay;
   const state = handleHintKey(event.key);
-  if (needsRelay) {
+  if (shouldRelay) {
     try {
       const p = chrome.runtime.sendMessage({
         type: "HINTS_KEY",
@@ -931,7 +946,11 @@ function handleHintKey(key) {
 
   if (exact && partial === 0) {
     const modeConfig = MODES[mode];
-    modeConfig.activate(labels.get(exact));
+    try {
+      modeConfig.activate(labels.get(exact));
+    } catch (err) {
+      console.debug("[jari] hint activation failed:", err);
+    }
     if (modeConfig.sticky) {
 
       const box = overlays.get(exact);

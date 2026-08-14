@@ -6,7 +6,36 @@ current status.
 
 ## Resolved
 
-## Hint activation — pages that intercept clicks (menus) navigated anyway
+## Hint activation on framed pages left the other frames' hints on screen
+
+**Step:** Press `f` on a page with multiple frames (e.g. a logged-in Google SERP
+with account/menu frames), then type the full label for a hint in the main
+frame.
+
+**Expected:** activating the hint closes hint mode everywhere - the main frame
+and every other frame that drew hints.
+
+**Actual:** (pre-fix) the activated frame's hints cleared, but the hints drawn
+in the other frames stayed on screen. The background coordinates hints across
+frames (`coordinateHints` counts hints in every frame and relays keys via
+`HINTS_KEY`), so the other frames were never told to close.
+
+**Root cause:** in the content script, `onKeyDown` gated the closing
+`HINTS_KEY` message on the `needsRelay` flag *after* calling `handleHintKey`.
+Activating a hint calls `cancel()`, which resets `needsRelay` to `false`, so
+the message announcing `closed: true` was dropped. The background therefore
+never sent `HINTS_CLOSE` to the remaining frames. A partial keypress relayed
+fine; only the final, closing keypress was lost.
+
+**Status:** resolved. `onKeyDown` now snapshots `needsRelay` before
+`handleHintKey`, so the closing key is always relayed and the background closes
+every frame that took part. Regression coverage: the
+"onKeyDown still relays the closing key when activation cancels the relay
+session" test in `tests/hints.test.js` (drives the real `COUNT_HINTS` /
+`DRAW_HINTS` message path), the existing `coordinateHints`/`relayHintKey` tests
+in `tests/background.test.js`, and the multi-frame E2E harness
+(`frames.html` fixture + `sw-instr.mjs`): after activating the avatar hint the
+background sends `HINTS_CLOSE` to both frames and all hints clear.
 
 **Step:** Press `f` on a page where clicking a target opens a menu instead of
 navigating (e.g. Google's profile picture on SERPs).
@@ -38,6 +67,13 @@ harness (`clicktest.mjs`): an intercepted menu link does not navigate, plain
 links still navigate, and arm-on-hover / hover-reveal targets activate without
 a real hover. Verify Google's avatar menu on a logged-in profile (the headless
 browser is logged out and bot-walled).
+
+Follow-up: simulated clicks also survive page handlers that throw. `dispatchSafe`
+guards every dispatched hover/press event, `el.click()` is wrapped, and hint
+activation is wrapped so a throwing page handler cannot leave the page in a
+half-clicked state. Regression coverage: the "simulateClick survives page
+handlers that throw" and "simulateClick survives handlers that cancel and then
+throw" tests in `tests/hints.test.js`.
 
 
 ## Rebinding or unbinding a default key left the old binding active

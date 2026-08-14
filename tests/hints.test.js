@@ -1166,6 +1166,94 @@ test("start skips the local draw when the background relays to other frames", as
   }
 });
 
+test("onKeyDown still relays the closing key when activation cancels the relay session", async () => {
+  const candidate = hintStubElement("a", {
+    left: 100,
+    top: 100,
+    right: 300,
+    bottom: 200,
+    width: 200,
+    height: 100,
+  });
+  const document = hintStubDocument(candidate);
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousId = chrome.runtime.id;
+  const previousSend = chrome.runtime.sendMessage;
+  const previousChars = settings.getHintChars;
+  const previousPosition = settings.getHintPosition;
+  const previousRAF = globalThis.requestAnimationFrame;
+  const previousCAF = globalThis.cancelAnimationFrame;
+  const sent = [];
+  chrome.runtime.id = "test-id";
+  settings.getHintChars = () => "SADFJKLEWCMPGH";
+  settings.getHintPosition = () => "top-left";
+  globalThis.requestAnimationFrame = () => 0;
+  globalThis.cancelAnimationFrame = () => {};
+  globalThis.document = document;
+  globalThis.window = {
+    innerWidth: 1000,
+    innerHeight: 800,
+    scrollX: 0,
+    scrollY: 0,
+    getComputedStyle: () => ({
+      visibility: "visible",
+      opacity: "1",
+      cursor: "default",
+    }),
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  let resolveCoordinate;
+  const coordinate = new Promise((resolve) => {
+    resolveCoordinate = resolve;
+  });
+  chrome.runtime.sendMessage = (msg) => {
+    if (msg.type === "HINTS_KEY") {
+      sent.push({ key: msg.key, remaining: msg.remaining, closed: msg.closed });
+    }
+    if (msg.type === "COORDINATE_HINTS") {
+      return coordinate;
+    }
+    return {};
+  };
+  const onMessage = (type, payload) => {
+    for (const fn of chrome.runtime.onMessage._listeners) {
+      const response = fn({ type, ...payload }, {}, () => {});
+      if (response !== undefined) return response;
+    }
+  };
+  try {
+    const startPromise = Hints.start("click");
+    onMessage("COUNT_HINTS", { mode: "click" });
+    onMessage("DRAW_HINTS", { startIndex: 0 });
+    resolveCoordinate({ needsRelay: true });
+    await startPromise;
+    assert.equal(Hints.isActive(), true);
+    const hintBox = document.created.find((el) => el.className === "jari-hint");
+    assert.ok(hintBox);
+    assert.deepEqual(hintBox.children.map((span) => span._text), ["S", "S"]);
+    const event = (key) => ({ key, preventDefault() {}, stopImmediatePropagation() {} });
+    Hints.onKeyDown(event("s"));
+    Hints.onKeyDown(event("s"));
+    assert.equal(Hints.isActive(), false);
+    assert.deepEqual(sent, [
+      { key: "s", remaining: 1, closed: false },
+      { key: "s", remaining: 0, closed: true },
+    ]);
+  } finally {
+    Hints.cancel();
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    chrome.runtime.id = previousId;
+    chrome.runtime.sendMessage = previousSend;
+    settings.getHintChars = previousChars;
+    settings.getHintPosition = previousPosition;
+    globalThis.requestAnimationFrame = previousRAF;
+    globalThis.cancelAnimationFrame = previousCAF;
+  }
+});
+
 class MockEvent {
   constructor(type, init = {}) {
     this.type = type;
@@ -1196,6 +1284,8 @@ function simulateStubElement({
   download = false,
   onMousedown = null,
   onClick = null,
+  mousedownThrows = false,
+  clickThrows = false,
 } = {}) {
   const handlers = new Map();
   const el = {
@@ -1236,6 +1326,16 @@ function simulateStubElement({
   };
   if (onMousedown) el.addEventListener("mousedown", onMousedown);
   if (onClick) el.addEventListener("click", onClick);
+  if (mousedownThrows) {
+    el.addEventListener("mousedown", () => {
+      throw new Error("page mousedown boom");
+    });
+  }
+  if (clickThrows) {
+    el.addEventListener("click", () => {
+      throw new Error("page click boom");
+    });
+  }
   return el;
 }
 
@@ -1377,6 +1477,34 @@ test("simulateClick skips the fallback for non-http links", () => {
     const el = simulateStubElement({ href: "mailto:test@example.com" });
     Hints.simulateClick(el);
     assert.equal(el.clickCount, 1);
+    assert.deepEqual(assigns, []);
+  });
+});
+
+test("simulateClick survives page handlers that throw", () => {
+  withSimulateEnvironment(() => {
+    const el = simulateStubElement({
+      href: "/target",
+      mousedownThrows: true,
+      clickThrows: true,
+    });
+    assert.doesNotThrow(() => Hints.simulateClick(el));
+    assert.equal(el.clickCount, 1);
+  });
+});
+
+test("simulateClick survives handlers that cancel and then throw", () => {
+  withSimulateEnvironment(({ assigns }) => {
+    const el = simulateStubElement({
+      href: "/target",
+      onMousedown: (e) => {
+        e.preventDefault();
+        throw new Error("boom");
+      },
+    });
+    assert.doesNotThrow(() => Hints.simulateClick(el));
+    assert.equal(el.clickCount, 0);
+    assert.ok(el.dispatched.some((e) => e.type === "click"));
     assert.deepEqual(assigns, []);
   });
 });

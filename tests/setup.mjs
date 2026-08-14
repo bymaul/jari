@@ -1,6 +1,11 @@
 globalThis.chrome = {
   runtime: {
-    onMessage: { addListener() {} },
+    onMessage: {
+      _listeners: [],
+      addListener(fn) {
+        this._listeners.push(fn);
+      },
+    },
     sendMessage() {},
     lastError: null,
   },
