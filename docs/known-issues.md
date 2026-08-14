@@ -6,6 +6,40 @@ current status.
 
 ## Resolved
 
+## Hint activation — pages that intercept clicks (menus) navigated anyway
+
+**Step:** Press `f` on a page where clicking a target opens a menu instead of
+navigating (e.g. Google's profile picture on SERPs).
+
+**Expected:** activating the hint mirrors a real click - the menu opens and the
+page stays put.
+
+**Actual:** (pre-fix) `activateClick` fired a bare pointer/mouse press and a
+synthetic click, then force-navigated with `window.location.assign(href)` after
+300ms whenever the URL had not changed (the b110d53 SERP guarantee). Pages that
+intercept the click - Google's avatar opens its menu on mousedown - still got
+force-navigated to the link.
+
+**Status:** resolved in cfc5b3d. `simulateClick` now dispatches a realistic interaction: a
+hover sequence (`pointerover`/`pointerenter`/`mouseover`/`mouseenter`/
+`mousemove`), a full press (`pointerId`, `pointerType: mouse`, `isPrimary`,
+`buttons`/`detail`/`view`, screen coordinates), and then `el.click()` so the
+browser only applies default link navigation when the page does not cancel it.
+If the page cancels mousedown, a plain click is dispatched so handlers still
+run without navigating. The `location.assign` fallback survives only as a
+safety net for same-tab http(s) links that neither navigated nor canceled the
+click (`target=_blank` and `download` links are excluded). Hover events also
+arm hover-dependent UI, so buttons that only respond after a mouseover work
+without the user hovering first; hover simulation runs on activation only, and
+elements hidden via `opacity:0`/`visibility:hidden` are still not scanned, so a
+hover-revealed target must live inside a hintable container. Regression
+coverage: `simulateClick` tests in `tests/hints.test.js` and the fixture
+harness (`clicktest.mjs`): an intercepted menu link does not navigate, plain
+links still navigate, and arm-on-hover / hover-reveal targets activate without
+a real hover. Verify Google's avatar menu on a logged-in profile (the headless
+browser is logged out and bot-walled).
+
+
 ## Rebinding or unbinding a default key left the old binding active
 
 **Step:** On the options page, rebind the passthrough key from `p` to `z` and
