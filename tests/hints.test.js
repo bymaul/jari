@@ -128,61 +128,101 @@ test("visiblePortion rejects rects entirely outside the viewport", () => {
   });
 });
 
-test("labelPlacement converts a viewport rect to document coordinates", () => {
+test("labelPlacement anchors the label at the requested grid cell", () => {
+  const rect = { left: 100, top: 100, right: 300, bottom: 200 };
+  const pos = (position) =>
+    Hints.labelPlacement(rect, position, 0, 300, 1000, 800);
 
-  assert.deepEqual(
-    Hints.labelPlacement(
-      { left: 100, top: 100, right: 300, bottom: 200 },
-      0,
-      300,
-      1000,
-      800,
-    ),
-    { left: 100, top: 400 },
-  );
-
-  assert.deepEqual(
-    Hints.labelPlacement(
-      { left: 100, top: 0, right: 300, bottom: 20 },
-      40,
-      0,
-      1000,
-      800,
-    ),
-    { left: 140, top: 0 },
-  );
+  assert.deepEqual(pos("top-left"), {
+    left: 100,
+    top: 400,
+    transform: "translate(0%, 0%)",
+  });
+  assert.deepEqual(pos("top-center"), {
+    left: 200,
+    top: 400,
+    transform: "translate(-50%, 0%)",
+  });
+  assert.deepEqual(pos("top-right"), {
+    left: 300,
+    top: 400,
+    transform: "translate(-100%, 0%)",
+  });
+  assert.deepEqual(pos("middle-left"), {
+    left: 100,
+    top: 450,
+    transform: "translate(0%, -50%)",
+  });
+  assert.deepEqual(pos("middle-center"), {
+    left: 200,
+    top: 450,
+    transform: "translate(-50%, -50%)",
+  });
+  assert.deepEqual(pos("middle-right"), {
+    left: 300,
+    top: 450,
+    transform: "translate(-100%, -50%)",
+  });
+  assert.deepEqual(pos("bottom-left"), {
+    left: 100,
+    top: 500,
+    transform: "translate(0%, -100%)",
+  });
+  assert.deepEqual(pos("bottom-center"), {
+    left: 200,
+    top: 500,
+    transform: "translate(-50%, -100%)",
+  });
+  assert.deepEqual(pos("bottom-right"), {
+    left: 300,
+    top: 500,
+    transform: "translate(-100%, -100%)",
+  });
 });
 
 test("labelPlacement clamps labels on screen at the fold edges", () => {
-
   assert.deepEqual(
     Hints.labelPlacement(
       { left: 0, top: -50, right: 100, bottom: 10 },
+      "top-left",
       0,
       0,
       1000,
       800,
     ),
-    { left: 0, top: 0 },
+    { left: 0, top: 0, transform: "translate(0%, 0%)" },
   );
 
   assert.deepEqual(
     Hints.labelPlacement(
       { left: 0, top: 790, right: 100, bottom: 900 },
+      "top-left",
       0,
       0,
       1000,
       800,
     ),
-    { left: 0, top: 780 },
+    { left: 0, top: 780, transform: "translate(0%, 0%)" },
+  );
+
+  assert.deepEqual(
+    Hints.labelPlacement(
+      { left: 950, top: 0, right: 1050, bottom: 20 },
+      "middle-right",
+      0,
+      0,
+      1000,
+      800,
+    ),
+    { left: 1000, top: 10, transform: "translate(-100%, -50%)" },
   );
 });
 
 test("labelPlacement returns null when the element is off-screen or has no box", () => {
-
   assert.equal(
     Hints.labelPlacement(
       { left: 100, top: -200, right: 600, bottom: -100 },
+      "top-left",
       0,
       0,
       1000,
@@ -193,6 +233,18 @@ test("labelPlacement returns null when the element is off-screen or has no box",
   assert.equal(
     Hints.labelPlacement(
       { left: 0, top: 900, right: 100, bottom: 1000 },
+      "top-left",
+      0,
+      0,
+      1000,
+      800,
+    ),
+    null,
+  );
+  assert.equal(
+    Hints.labelPlacement(
+      { left: 1100, top: 0, right: 1200, bottom: 100 },
+      "top-left",
       0,
       0,
       1000,
@@ -204,6 +256,7 @@ test("labelPlacement returns null when the element is off-screen or has no box",
   assert.equal(
     Hints.labelPlacement(
       { left: 0, top: 0, right: 0, bottom: 0 },
+      "top-left",
       0,
       0,
       1000,
@@ -902,109 +955,15 @@ test("flatContains leaves DOM containment untouched and stops at the top", () =>
   assert.equal(Hints.flatContains(orphan, leaf), false);
 });
 
-test("hintRect anchors the label to the bottom-most line of a wrapped anchor", () => {
+test("hintRect returns the fallback rect", () => {
   const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
-  const anchor = {
+  const el = {
     getClientRects: () => [
       { left: 8, top: 406, right: 300, bottom: 422 },
       { left: 8, top: 376, right: 250, bottom: 392 },
     ],
   };
-  assert.deepEqual(Hints.hintRect(anchor, fallback), {
-    left: 8,
-    top: 406,
-    right: 300,
-    bottom: 422,
-  });
-});
-
-test("hintRect keeps a single-line element at its own line", () => {
-  const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
-  const single = {
-    getClientRects: () => [{ left: 8, top: 10, right: 90, bottom: 30 }],
-  };
-  assert.deepEqual(Hints.hintRect(single, fallback), {
-    left: 8,
-    top: 10,
-    right: 90,
-    bottom: 30,
-  });
-});
-
-test("hintRect anchors tall elements to their bottom", () => {
-  const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
-  const tall = {
-    getClientRects: () => [{ left: 8, top: 0, right: 300, bottom: 100 }],
-  };
-  assert.deepEqual(Hints.hintRect(tall, fallback), {
-    left: 8,
-    top: 80,
-    right: 300,
-    bottom: 100,
-  });
-});
-
-test("hintRect keeps the scan rect when there are no client rects", () => {
-  const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
-  const none = { getClientRects: () => [] };
-  assert.deepEqual(Hints.hintRect(none, fallback), fallback);
-});
-
-test("hintRect skips a client rect below the fold and anchors to the last visible line", () => {
-  const original = globalThis.window;
-  globalThis.window = { innerHeight: 600 };
-  try {
-    const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
-    const wrapped = {
-      getClientRects: () => [
-        { left: 8, top: 440, right: 250, bottom: 456 },
-        { left: 8, top: 609, right: 300, bottom: 625 },
-      ],
-    };
-    assert.deepEqual(Hints.hintRect(wrapped, fallback), {
-      left: 8,
-      top: 440,
-      right: 250,
-      bottom: 456,
-    });
-  } finally {
-    globalThis.window = original;
-  }
-});
-
-test("hintRect falls back to the scan rect when every client rect is off-screen", () => {
-  const original = globalThis.window;
-  globalThis.window = { innerHeight: 600 };
-  try {
-    const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
-    const below = {
-      getClientRects: () => [
-        { left: 8, top: 700, right: 300, bottom: 720 },
-      ],
-    };
-    assert.deepEqual(Hints.hintRect(below, fallback), fallback);
-  } finally {
-    globalThis.window = original;
-  }
-});
-
-test("hintRect clamps the label anchor above the fold for a line that dips below it", () => {
-  const original = globalThis.window;
-  globalThis.window = { innerHeight: 600 };
-  try {
-    const fallback = { left: 0, top: 0, right: 100, bottom: 20 };
-    const dipping = {
-      getClientRects: () => [{ left: 8, top: 590, right: 300, bottom: 640 }],
-    };
-    assert.deepEqual(Hints.hintRect(dipping, fallback), {
-      left: 8,
-      top: 580,
-      right: 300,
-      bottom: 640,
-    });
-  } finally {
-    globalThis.window = original;
-  }
+  assert.deepEqual(Hints.hintRect(el, fallback), fallback);
 });
 
 test("placeCaretAtEnd moves the caret to the end of an input and textarea", () => {
@@ -1066,4 +1025,143 @@ test("placeCaretAtEnd collapses the selection at the end of a contenteditable", 
 
 test("placeCaretAtEnd never throws on stub-hostile elements", () => {
   assert.doesNotThrow(() => Hints.placeCaretAtEnd({ tagName: "INPUT" }));
+});
+
+function hintStubElement(name, rect) {
+  const el = {
+    name,
+    tagName: "A",
+    disabled: false,
+    parentElement: null,
+    children: [],
+    style: {},
+    className: "",
+    isConnected: true,
+    listeners: {},
+    set textContent(value) {
+      this._text = value;
+    },
+    get textContent() {
+      return this._text;
+    },
+    matches: (sel) => sel.includes("a[href]"),
+    closest: () => null,
+    getAttribute: (attr) =>
+      attr === "href" ? "https://example.com" : null,
+    getBoundingClientRect: () => rect,
+    getRootNode: () => ({ host: null, elementFromPoint: () => el }),
+    setAttribute() {},
+    appendChild(child) {
+      this.children.push(child);
+    },
+    remove() {
+      this.isConnected = false;
+    },
+    addEventListener(type, fn) {
+      (this.listeners[type] ||= []).push(fn);
+    },
+    removeEventListener() {},
+    classList: { toggle() {}, add() {} },
+  };
+  return el;
+}
+
+function hintStubDocument(candidate) {
+  const created = [];
+  return {
+    created,
+    activeElement: null,
+    body: { appendChild() {} },
+    documentElement: {},
+    querySelectorAll: () => (candidate ? [candidate] : []),
+    createElement: (tag) => {
+      const el = hintStubElement(tag, {
+        left: 100,
+        top: 100,
+        right: 300,
+        bottom: 200,
+        width: 200,
+        height: 100,
+      });
+      created.push(el);
+      return el;
+    },
+    createDocumentFragment: () => ({ appendChild() {} }),
+  };
+}
+
+test("start draws hints locally when the background asks it to (extension page)", async () => {
+  const candidate = hintStubElement("a", {
+    left: 100,
+    top: 100,
+    right: 300,
+    bottom: 200,
+    width: 200,
+    height: 100,
+  });
+  const document = hintStubDocument(candidate);
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousId = chrome.runtime.id;
+  const previousSend = chrome.runtime.sendMessage;
+  const previousChars = settings.getHintChars;
+  const previousPosition = settings.getHintPosition;
+  const previousRAF = globalThis.requestAnimationFrame;
+  const previousCAF = globalThis.cancelAnimationFrame;
+  chrome.runtime.id = "test-id";
+  chrome.runtime.sendMessage = async () => ({
+    needsRelay: false,
+    drawLocally: true,
+  });
+  settings.getHintChars = () => "SADFJKLEWCMPGH";
+  settings.getHintPosition = () => "top-left";
+  globalThis.requestAnimationFrame = () => 0;
+  globalThis.cancelAnimationFrame = () => {};
+  globalThis.document = document;
+  globalThis.window = {
+    innerWidth: 1000,
+    innerHeight: 800,
+    scrollX: 0,
+    scrollY: 0,
+    getComputedStyle: () => ({
+      visibility: "visible",
+      opacity: "1",
+      cursor: "default",
+    }),
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  try {
+    await Hints.start("click");
+    assert.equal(Hints.isActive(), true);
+    assert.ok(document.created.some((el) => el.className === "jari-hint"));
+  } finally {
+    Hints.cancel();
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    chrome.runtime.id = previousId;
+    chrome.runtime.sendMessage = previousSend;
+    settings.getHintChars = previousChars;
+    settings.getHintPosition = previousPosition;
+    globalThis.requestAnimationFrame = previousRAF;
+    globalThis.cancelAnimationFrame = previousCAF;
+  }
+});
+
+test("start skips the local draw when the background relays to other frames", async () => {
+  const document = hintStubDocument(null);
+  const previousDocument = globalThis.document;
+  const previousId = chrome.runtime.id;
+  const previousSend = chrome.runtime.sendMessage;
+  chrome.runtime.id = "test-id";
+  chrome.runtime.sendMessage = async () => ({ needsRelay: true });
+  globalThis.document = document;
+  try {
+    await Hints.start("click");
+    assert.equal(Hints.isActive(), false);
+  } finally {
+    globalThis.document = previousDocument;
+    chrome.runtime.id = previousId;
+    chrome.runtime.sendMessage = previousSend;
+  }
 });

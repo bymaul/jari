@@ -98,6 +98,8 @@ export const settingsDefaults = {
 
   hintChars: "sadfjklewcmpgh",
 
+  hintPosition: "top-left",
+
   suggestionSources: suggestionSources.slice(),
 
   copyFormat: "plain",
@@ -202,6 +204,9 @@ export function normalizeSettings(data) {
         ? d.passthroughMs
         : settingsDefaults.passthroughMs,
     hintChars: normalizeHintChars(d.hintChars),
+    hintPosition: HINT_POSITIONS.includes(d.hintPosition)
+      ? d.hintPosition
+      : settingsDefaults.hintPosition,
     suggestionSources: Array.isArray(d.suggestionSources)
       ? d.suggestionSources.filter((s) => suggestionSources.includes(s))
       : settingsDefaults.suggestionSources.slice(),
@@ -209,6 +214,18 @@ export function normalizeSettings(data) {
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
   };
 }
+
+const HINT_POSITIONS = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "middle-left",
+  "middle-center",
+  "middle-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+];
 
 function normalizeHintChars(raw) {
   if (typeof raw !== "string") return settingsDefaults.hintChars.toUpperCase();

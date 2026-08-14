@@ -6,6 +6,57 @@ current status.
 
 ## Resolved
 
+## Options page — hints, `f`/`F`/`i` did nothing
+
+**Step:** Open Jari's settings page and press `f` / `F` / `i`.
+
+**Expected:** hints appear over the settings page and activate, or the single
+input is focused.
+
+**Actual:** the key is consumed but nothing is drawn or focused.
+
+**Status:** open. Hint drawing moved from per-frame local drawing to
+background coordination in b110d53, and the background's `coordinateHints`
+reads `sender.tab.id`. Extension pages (the options page is one) message the
+background with no `sender.tab`, so the handler threw, and even without the
+throw `chrome.tabs.sendMessage` can never reach an extension page. The handler
+now answers extension pages with `{ needsRelay: false, drawLocally: true }`
+and the content script draws hints locally in that case, but the page still
+shows no hints in manual Chrome testing. Not yet root-caused; suspected
+remaining differences from a normal page: the `<script>` tag loads the bundle
+into the page realm instead of an isolated world, `event.isTrusted`/message
+routing on `chrome-extension://` pages, or the scan finding no candidates in
+the options DOM. Needs a browser-side repro before the next attempt.
+
+## Ctrl+N / Ctrl+P prompt navigation — impossible in Chrome and Firefox
+
+**Step:** Set a prompt navigation mode that includes Ctrl+N/Ctrl+P and press
+it in the omnibar.
+
+**Expected:** the selection moves.
+
+**Actual:** Ctrl+N opens a new browser window regardless of what the page does.
+
+**Status:** wontfix — browsers reserve Ctrl+N/T/W (new window / new tab /
+close tab) and never deliver the keydown to page scripts, so no extension can
+intercept it (Chromium issue 41081444; Firefox ignores `preventDefault` for
+it). Prompt navigation therefore only uses Tab/Shift+Tab and Up/Down arrows;
+the prompt-navigation option was removed.
+
+## Fullscreen — Escape closes fullscreen before the prompt
+
+**Step:** In an element-fullscreen page (e.g. YouTube), press `t`, then `Esc`.
+
+**Expected:** the prompt closes first; a second `Esc` exits fullscreen.
+
+**Actual:** (pre-fix) Escape exited fullscreen before (or while) the prompt
+closed.
+
+**Status:** open. A Chromium `navigator.keyboard.lock(["Escape"])` attempt was
+tried and then reverted: it kept Escape reaching the page so the overlay could
+close first, but the overall behavior was still wrong in manual Chrome testing
+and added fragility. Currently Escape exits fullscreen before the prompt
+closes. Revisit only with a browser-side repro.
 ## Instagram feed — no hints after scrolling
 
 **Step:** On the desktop feed, scroll down a few posts, then press `f`.

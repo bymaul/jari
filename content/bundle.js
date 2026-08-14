@@ -89,6 +89,7 @@
     timeoutMs: 1500,
     passthroughMs: 1500,
     hintChars: "sadfjklewcmpgh",
+    hintPosition: "top-left",
     suggestionSources: suggestionSources.slice(),
     copyFormat: "plain"
   };
@@ -164,10 +165,22 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       hintChars: normalizeHintChars(d.hintChars),
+      hintPosition: HINT_POSITIONS.includes(d.hintPosition) ? d.hintPosition : settingsDefaults.hintPosition,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat
     };
   }
+  var HINT_POSITIONS = [
+    "top-left",
+    "top-center",
+    "top-right",
+    "middle-left",
+    "middle-center",
+    "middle-right",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right"
+  ];
   function normalizeHintChars(raw) {
     if (typeof raw !== "string") return settingsDefaults.hintChars.toUpperCase();
     const chars = [...new Set(raw.toUpperCase())].filter((c) => /[A-Z0-9]/.test(c)).join("");
@@ -303,6 +316,7 @@
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
     hintChars: settingsDefaults.hintChars,
+    hintPosition: settingsDefaults.hintPosition,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     copyFormat: settingsDefaults.copyFormat
   };
@@ -316,6 +330,7 @@
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
     state.hintChars = s.hintChars;
+    state.hintPosition = s.hintPosition;
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
   }
@@ -338,6 +353,7 @@
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
         hintChars: state.hintChars,
+        hintPosition: state.hintPosition,
         suggestionSources: state.suggestionSources,
         copyFormat: state.copyFormat
       }
@@ -377,6 +393,9 @@
   function getHintChars() {
     return state.hintChars;
   }
+  function getHintPosition() {
+    return state.hintPosition;
+  }
   function getSuggestionSources() {
     return state.suggestionSources;
   }
@@ -409,6 +428,7 @@
     getTimeoutMs,
     getPassthroughMs,
     getHintChars,
+    getHintPosition,
     getSuggestionSources,
     getCopyFormat,
     toggleDisabled
@@ -1016,6 +1036,7 @@
       const rect = hintRect(el, el.getBoundingClientRect());
       const pos = labelPlacement(
         rect,
+        settings.getHintPosition(),
         window.scrollX,
         window.scrollY,
         window.innerWidth,
@@ -1028,6 +1049,7 @@
       box.style.display = "";
       box.style.left = pos.left + "px";
       box.style.top = pos.top + "px";
+      if (pos.transform) box.style.transform = pos.transform;
     }
   }
   function isPointerCursor(style) {
@@ -1100,6 +1122,17 @@
         mode: nextMode
       });
       needsRelay = Boolean(res && res.needsRelay);
+      if (res && res.drawLocally) {
+        const count = countHints(nextMode);
+        if (count === 0) {
+          cancel();
+          ui.toast("No matches");
+        } else if (nextMode === "focus" && pendingTopLevel.length === 1) {
+          focusSingleInput();
+        } else {
+          drawHints(0);
+        }
+      }
     } catch (err) {
       console.debug(
         "[jari] Failed to coordinate hints (context likely invalidated):",
@@ -1145,10 +1178,11 @@
     const hintLabels = generateLabels(hintCount, startIndex);
     const host = getHintsHost();
     const fragment = document.createDocumentFragment();
+    const position = settings.getHintPosition();
     for (let i = 0; i < hintCount; i++) {
       const el = pendingTopLevel[i];
       const label = hintLabels[i];
-      const box = createHintOverlay(label, pendingRects.get(el));
+      const box = createHintOverlay(label, pendingRects.get(el), position);
       if (!box) continue;
       labels.set(label, el);
       overlays2.set(label, box);
@@ -1322,36 +1356,33 @@
     return s;
   }
   function hintRect(el, fallback) {
-    const vh = globalThis.window?.innerHeight || globalThis.document?.documentElement?.clientHeight;
-    let bottom = -1;
-    let left = 0;
-    let right = 0;
-    let baseTop = 0;
-    for (const rect of el.getClientRects()) {
-      if (vh && (rect.bottom <= 0 || rect.top >= vh)) continue;
-      if (rect.bottom > bottom) {
-        bottom = rect.bottom;
-        left = rect.left;
-        right = rect.right;
-        baseTop = rect.top;
-      }
-    }
-    if (bottom < 0) return fallback;
-    const top = vh ? Math.min(Math.max(baseTop, bottom - LABEL_HEIGHT), vh - LABEL_HEIGHT) : Math.max(baseTop, bottom - LABEL_HEIGHT);
-    return { left, top, right, bottom };
+    return fallback;
   }
-  function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
+  function labelPlacement(rect, position, scrollX, scrollY, viewportWidth, viewportHeight) {
     const left = Math.max(rect.left, 0);
     const top = Math.max(rect.top, 0);
     const right = Math.min(rect.right, viewportWidth);
     const bottom = Math.min(rect.bottom, viewportHeight);
     if (right <= left || bottom <= top) return null;
+    const [vert, horiz] = position.split("-");
+    const cx = (left + right) / 2;
+    const cy = (top + bottom) / 2;
+    const anchorX = horiz === "center" ? cx : horiz === "right" ? right : left;
+    const anchorY = vert === "middle" ? cy : vert === "bottom" ? bottom : top;
+    const tx = horiz === "center" ? -50 : horiz === "right" ? -100 : 0;
+    const ty = vert === "middle" ? -50 : vert === "bottom" ? -100 : 0;
+    const half = LABEL_HEIGHT / 2;
+    const minX = tx === -100 ? LABEL_HEIGHT : tx === -50 ? half : 0;
+    const maxX = tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - half : viewportWidth - LABEL_HEIGHT;
+    const minY = ty === -100 ? LABEL_HEIGHT : ty === -50 ? half : 0;
+    const maxY = ty === -100 ? viewportHeight : ty === -50 ? viewportHeight - half : viewportHeight - LABEL_HEIGHT;
     return {
-      left: scrollX + left,
-      top: scrollY + Math.min(top, viewportHeight - LABEL_HEIGHT)
+      left: scrollX + Math.min(Math.max(anchorX, minX), maxX),
+      top: scrollY + Math.min(Math.max(anchorY, minY), maxY),
+      transform: `translate(${tx}%, ${ty}%)`
     };
   }
-  function createHintOverlay(label, rect) {
+  function createHintOverlay(label, rect, position) {
     const box = document.createElement("div");
     box.className = "jari-hint";
     for (const ch of label) {
@@ -1361,6 +1392,7 @@
     }
     const pos = labelPlacement(
       rect,
+      position,
       window.scrollX,
       window.scrollY,
       window.innerWidth,
@@ -1369,6 +1401,7 @@
     if (!pos) return null;
     box.style.left = pos.left + "px";
     box.style.top = pos.top + "px";
+    if (pos.transform) box.style.transform = pos.transform;
     return box;
   }
   function openInNewTab(el) {
@@ -1724,10 +1757,6 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         activate();
-      } else if (event.key === "Tab") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        move(event.shiftKey ? -1 : 1);
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -1736,6 +1765,10 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         move(-1);
+      } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        move(event.shiftKey ? -1 : 1);
       }
       return;
     }
@@ -1743,7 +1776,7 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       close();
-    } else if (event.key === "Tab") {
+    } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       event.stopImmediatePropagation();
       move(event.shiftKey ? -1 : 1);

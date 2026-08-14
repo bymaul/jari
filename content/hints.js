@@ -309,6 +309,7 @@ function repositionHints() {
     const rect = hintRect(el, el.getBoundingClientRect());
     const pos = labelPlacement(
       rect,
+      settings.getHintPosition(),
       window.scrollX,
       window.scrollY,
       window.innerWidth,
@@ -321,6 +322,7 @@ function repositionHints() {
     box.style.display = "";
     box.style.left = pos.left + "px";
     box.style.top = pos.top + "px";
+    if (pos.transform) box.style.transform = pos.transform;
   }
 }
 
@@ -412,6 +414,17 @@ async function start(nextMode) {
       mode: nextMode,
     });
     needsRelay = Boolean(res && res.needsRelay);
+    if (res && res.drawLocally) {
+      const count = countHints(nextMode);
+      if (count === 0) {
+        cancel();
+        ui.toast("No matches");
+      } else if (nextMode === "focus" && pendingTopLevel.length === 1) {
+        focusSingleInput();
+      } else {
+        drawHints(0);
+      }
+    }
   } catch (err) {
     console.debug(
       "[jari] Failed to coordinate hints (context likely invalidated):",
@@ -474,11 +487,12 @@ function drawHints(startIndex) {
 
   const host = getHintsHost();
   const fragment = document.createDocumentFragment();
+  const position = settings.getHintPosition();
 
   for (let i = 0; i < hintCount; i++) {
     const el = pendingTopLevel[i];
     const label = hintLabels[i];
-    const box = createHintOverlay(label, pendingRects.get(el));
+    const box = createHintOverlay(label, pendingRects.get(el), position);
     if (!box) continue;
     labels.set(label, el);
     overlays.set(label, box);
@@ -705,41 +719,48 @@ function toBase26(value, length, chars) {
 }
 
 function hintRect(el, fallback) {
-  const vh =
-    globalThis.window?.innerHeight || globalThis.document?.documentElement?.clientHeight;
-  let bottom = -1;
-  let left = 0;
-  let right = 0;
-  let baseTop = 0;
-  for (const rect of el.getClientRects()) {
-    if (vh && (rect.bottom <= 0 || rect.top >= vh)) continue;
-    if (rect.bottom > bottom) {
-      bottom = rect.bottom;
-      left = rect.left;
-      right = rect.right;
-      baseTop = rect.top;
-    }
-  }
-  if (bottom < 0) return fallback;
-  const top = vh
-    ? Math.min(Math.max(baseTop, bottom - LABEL_HEIGHT), vh - LABEL_HEIGHT)
-    : Math.max(baseTop, bottom - LABEL_HEIGHT);
-  return { left, top, right, bottom };
+  return fallback;
 }
 
-function labelPlacement(rect, scrollX, scrollY, viewportWidth, viewportHeight) {
+function labelPlacement(
+  rect,
+  position,
+  scrollX,
+  scrollY,
+  viewportWidth,
+  viewportHeight,
+) {
   const left = Math.max(rect.left, 0);
   const top = Math.max(rect.top, 0);
   const right = Math.min(rect.right, viewportWidth);
   const bottom = Math.min(rect.bottom, viewportHeight);
   if (right <= left || bottom <= top) return null;
+
+  const [vert, horiz] = position.split("-");
+  const cx = (left + right) / 2;
+  const cy = (top + bottom) / 2;
+  const anchorX = horiz === "center" ? cx : horiz === "right" ? right : left;
+  const anchorY = vert === "middle" ? cy : vert === "bottom" ? bottom : top;
+
+  const tx = horiz === "center" ? -50 : horiz === "right" ? -100 : 0;
+  const ty = vert === "middle" ? -50 : vert === "bottom" ? -100 : 0;
+
+  const half = LABEL_HEIGHT / 2;
+  const minX = tx === -100 ? LABEL_HEIGHT : tx === -50 ? half : 0;
+  const maxX =
+    tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - half : viewportWidth - LABEL_HEIGHT;
+  const minY = ty === -100 ? LABEL_HEIGHT : ty === -50 ? half : 0;
+  const maxY =
+    ty === -100 ? viewportHeight : ty === -50 ? viewportHeight - half : viewportHeight - LABEL_HEIGHT;
+
   return {
-    left: scrollX + left,
-    top: scrollY + Math.min(top, viewportHeight - LABEL_HEIGHT),
+    left: scrollX + Math.min(Math.max(anchorX, minX), maxX),
+    top: scrollY + Math.min(Math.max(anchorY, minY), maxY),
+    transform: `translate(${tx}%, ${ty}%)`,
   };
 }
 
-function createHintOverlay(label, rect) {
+function createHintOverlay(label, rect, position) {
   const box = document.createElement("div");
   box.className = "jari-hint";
   for (const ch of label) {
@@ -749,6 +770,7 @@ function createHintOverlay(label, rect) {
   }
   const pos = labelPlacement(
     rect,
+    position,
     window.scrollX,
     window.scrollY,
     window.innerWidth,
@@ -757,6 +779,7 @@ function createHintOverlay(label, rect) {
   if (!pos) return null;
   box.style.left = pos.left + "px";
   box.style.top = pos.top + "px";
+  if (pos.transform) box.style.transform = pos.transform;
   return box;
 }
 

@@ -259,10 +259,6 @@ function onKeyDown(event) {
       event.preventDefault();
       event.stopImmediatePropagation();
       activate();
-    } else if (event.key === "Tab") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      move(event.shiftKey ? -1 : 1);
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -271,6 +267,15 @@ function onKeyDown(event) {
       event.preventDefault();
       event.stopImmediatePropagation();
       move(-1);
+    } else if (
+      event.key === "Tab" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      move(event.shiftKey ? -1 : 1);
     }
     return;
   }
@@ -278,7 +283,12 @@ function onKeyDown(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     close();
-  } else if (event.key === "Tab") {
+  } else if (
+    event.key === "Tab" &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  ) {
     event.preventDefault();
     event.stopImmediatePropagation();
     move(event.shiftKey ? -1 : 1);

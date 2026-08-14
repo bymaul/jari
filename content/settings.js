@@ -16,6 +16,7 @@ const state = {
   timeoutMs: settingsDefaults.timeoutMs,
   passthroughMs: settingsDefaults.passthroughMs,
   hintChars: settingsDefaults.hintChars,
+  hintPosition: settingsDefaults.hintPosition,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   copyFormat: settingsDefaults.copyFormat,
 };
@@ -30,6 +31,7 @@ function merge(data) {
   state.timeoutMs = s.timeoutMs;
   state.passthroughMs = s.passthroughMs;
   state.hintChars = s.hintChars;
+  state.hintPosition = s.hintPosition;
   state.suggestionSources = s.suggestionSources;
   state.copyFormat = s.copyFormat;
 }
@@ -54,6 +56,7 @@ function persist() {
       timeoutMs: state.timeoutMs,
       passthroughMs: state.passthroughMs,
       hintChars: state.hintChars,
+      hintPosition: state.hintPosition,
       suggestionSources: state.suggestionSources,
       copyFormat: state.copyFormat,
     },
@@ -105,6 +108,10 @@ function getHintChars() {
   return state.hintChars;
 }
 
+function getHintPosition() {
+  return state.hintPosition;
+}
+
 function getSuggestionSources() {
   return state.suggestionSources;
 }
@@ -140,6 +147,7 @@ export const settings = {
   getTimeoutMs,
   getPassthroughMs,
   getHintChars,
+  getHintPosition,
   getSuggestionSources,
   getCopyFormat,
   toggleDisabled,

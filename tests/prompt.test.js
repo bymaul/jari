@@ -73,9 +73,13 @@ async function withSendMessage(response, fn) {
   }
 }
 
-function keyEvent(key) {
+function keyEvent(key, modifiers = {}) {
   return {
     key,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
     preventDefaultCalls: 0,
     stopPropagationCalls: 0,
     stopImmediatePropagationCalls: 0,
@@ -88,6 +92,7 @@ function keyEvent(key) {
     stopImmediatePropagation() {
       this.stopImmediatePropagationCalls++;
     },
+    ...modifiers,
   };
 }
 
@@ -157,5 +162,53 @@ test("close() does not force focus back onto a disconnected element", async () =
     assert.strictEqual(document.activeElement, input);
     Prompt.close();
     assert.strictEqual(focusCalls, 0);
+  });
+});
+
+test("Tab moves the selection forward and Shift+Tab moves it back", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    await withSendMessage(
+      [TAB, { id: 2, title: "Two", url: "https://two.example", windowId: 1 }],
+      () => Prompt.open(),
+    );
+    const lis = document.created.filter((el) => el.tagName === "li");
+    assert.equal(lis.length, 2);
+    const views = [0, 0];
+    lis.forEach((li, i) => {
+      li.scrollIntoView = () => {
+        views[i]++;
+      };
+    });
+
+    const tab = keyEvent("Tab");
+    Prompt.onKeyDown(tab);
+    assert.equal(tab.preventDefaultCalls, 1);
+    assert.equal(tab.stopImmediatePropagationCalls, 1);
+    assert.deepEqual(views, [0, 1]);
+
+    const shiftTab = keyEvent("Tab", { shiftKey: true });
+    Prompt.onKeyDown(shiftTab);
+    assert.equal(shiftTab.preventDefaultCalls, 1);
+    assert.deepEqual(views, [1, 1]);
+
+    const shiftTabAgain = keyEvent("Tab", { shiftKey: true });
+    Prompt.onKeyDown(shiftTabAgain);
+    assert.equal(shiftTabAgain.preventDefaultCalls, 1);
+    assert.deepEqual(views, [1, 2]);
+
+    Prompt.close();
+  });
+});
+
+test("Ctrl+Tab is left to the browser and does not move the selection", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    await withSendMessage([TAB], () => Prompt.open());
+    const ctrlTab = keyEvent("Tab", { ctrlKey: true });
+    Prompt.onKeyDown(ctrlTab);
+    assert.equal(ctrlTab.preventDefaultCalls, 0);
+    assert.equal(ctrlTab.stopImmediatePropagationCalls, 0);
+    Prompt.close();
   });
 });

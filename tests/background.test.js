@@ -137,6 +137,21 @@ test("coordinateHints relays when hints live only in another frame", async () =>
   assert.equal(res.needsRelay, true);
 });
 
+test("coordinateHints asks extension pages to draw locally instead of relaying", async () => {
+  const sent = chromeStub({
+    frames: [],
+    countFor: () => 0,
+    keyResponse: null,
+  });
+  const res = await coordinateHints(
+    { mode: "click" },
+    { frameId: 0 },
+  );
+  assert.equal(res.needsRelay, false);
+  assert.equal(res.drawLocally, true);
+  assert.equal(sent.length, 0);
+});
+
 test("coordinateHints resets every frame with a toast when nothing matches", async () => {
   const sent = chromeStub({
     frames: [{ frameId: 0 }, { frameId: 1 }],

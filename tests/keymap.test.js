@@ -68,6 +68,14 @@ test("normalizeSettings validates hintChars, suggestionSources and copyFormat", 
   assert.equal(Jari.normalizeSettings({ copyFormat: "bogus" }).copyFormat, "plain");
 });
 
+test("normalizeSettings validates hintPosition", () => {
+  const s = Jari.normalizeSettings({ hintPosition: "bottom-right" });
+  assert.equal(s.hintPosition, "bottom-right");
+
+  assert.equal(Jari.normalizeSettings({ hintPosition: "bogus" }).hintPosition, "top-left");
+  assert.equal(Jari.normalizeSettings({ hintPosition: "middle-center" }).hintPosition, "middle-center");
+});
+
 test("fuzzyMatch returns null when chars are missing or out of order", () => {
   assert.equal(Jari.fuzzyMatch("xyz", "abcdef"), null);
   assert.equal(Jari.fuzzyMatch("ba", "abc"), null);

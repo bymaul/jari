@@ -347,6 +347,9 @@
   var hintFrames = /* @__PURE__ */ new Map();
   chrome.tabs.onRemoved.addListener((tabId) => hintFrames.delete(tabId));
   async function coordinateHints(message, sender) {
+    if (!sender.tab) {
+      return { needsRelay: false, drawLocally: true };
+    }
     const tabId = sender.tab.id;
     const mode = message.mode;
     let frames;
