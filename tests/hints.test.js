@@ -763,6 +763,12 @@ test("rectsNearIdentical accepts fully overlapping rects and rejects partial one
   assert.ok(!Hints.rectsNearIdentical(FULL_RECT, { left: 120, top: 0, right: 220, bottom: 80 }));
 });
 
+test("rectsNearIdentical rejects a tiny rect contained in a large one", () => {
+  const big = { left: 0, top: 0, right: 300, bottom: 74 };
+  const small = { left: 40, top: 12, right: 68, bottom: 32 };
+  assert.ok(!Hints.rectsNearIdentical(big, small));
+});
+
 test("dedupeOverlapping keeps only the element on top at the shared center", () => {
   const a = mockEl("a");
   const b = mockEl("b");

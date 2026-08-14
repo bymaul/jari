@@ -592,8 +592,9 @@ function rectsNearIdentical(a, b) {
   const areaA = (a.right - a.left) * (a.bottom - a.top);
   const areaB = (b.right - b.left) * (b.bottom - b.top);
   const minArea = Math.min(areaA, areaB);
+  const maxArea = Math.max(areaA, areaB);
   if (minArea <= 0) return false;
-  return intersection / minArea >= 0.9;
+  return intersection / minArea >= 0.9 && maxArea / minArea <= 4;
 }
 
 function pickForOverlap(a, b, rects) {
