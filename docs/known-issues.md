@@ -107,18 +107,22 @@ input is focused.
 
 **Actual:** the key is consumed but nothing is drawn or focused.
 
-**Status:** open. Hint drawing moved from per-frame local drawing to
+**Status:** resolved. Hint drawing moved from per-frame local drawing to
 background coordination in b110d53, and the background's `coordinateHints`
-reads `sender.tab.id`. Extension pages (the options page is one) message the
-background with no `sender.tab`, so the handler threw, and even without the
-throw `chrome.tabs.sendMessage` can never reach an extension page. The handler
-now answers extension pages with `{ needsRelay: false, drawLocally: true }`
-and the content script draws hints locally in that case, but the page still
-shows no hints in manual Chrome testing. Not yet root-caused; suspected
-remaining differences from a normal page: the `<script>` tag loads the bundle
-into the page realm instead of an isolated world, `event.isTrusted`/message
-routing on `chrome-extension://` pages, or the scan finding no candidates in
-the options DOM. Needs a browser-side repro before the next attempt.
+reads `sender.tab.id`. Because the options page opens in a real tab
+(`open_in_tab: true`), its messages carry a defined `sender.tab`, so the
+handler did not take the extension-page branch and instead treated the page
+like a web content script: it called `chrome.webNavigation.getAllFrames` for
+the extension tab, which returns `[]`, hit the `total === 0` path, and
+answered `{ needsRelay: false }` without `drawLocally`. The content script's
+`start()` therefore skipped local drawing entirely.
+
+`coordinateHints` now also returns `{ needsRelay: false, drawLocally: true }`
+when the sender URL is `chrome-extension://`, regardless of `sender.tab`, so
+Jari's own pages always draw hints locally (the SW can never reach an
+extension page with `chrome.tabs.sendMessage` anyway). Verified end-to-end in
+the headless repro (`options-instr2.mjs`): pressing `f` on the settings page
+now draws hints, hint activation focuses the target, and Escape clears them.
 
 ## Ctrl+N / Ctrl+P prompt navigation — impossible in Chrome and Firefox
 

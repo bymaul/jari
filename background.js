@@ -347,7 +347,8 @@
   var hintFrames = /* @__PURE__ */ new Map();
   chrome.tabs.onRemoved.addListener((tabId) => hintFrames.delete(tabId));
   async function coordinateHints(message, sender) {
-    if (!sender.tab) {
+    const fromExtensionPage = sender.url && sender.url.startsWith("chrome-extension://");
+    if (!sender.tab || fromExtensionPage) {
       return { needsRelay: false, drawLocally: true };
     }
     const tabId = sender.tab.id;
