@@ -232,34 +232,71 @@
   function queryTerms(query2) {
     return String(query2).trim().toLowerCase().split(/\s+/).filter(Boolean);
   }
-  function matchTerm(term, t, text) {
+  var SCORE_BASE = 2;
+  var SCORE_RUN = 12;
+  var SCORE_BOUNDARY = 8;
+  var SCORE_CAMEL = 14;
+  var SCORE_GAP = -3;
+  var SCORE_LEADING = -1;
+  var MAX_ALIGNMENT_STARTS = 64;
+  function isBoundaryAt(t, i) {
+    return i === 0 || !/[\w]/.test(t[i - 1]);
+  }
+  function scoreAlignment(indices, t, text) {
     let score = 0;
-    let consecutive = 0;
-    let last = -1;
-    const indices = [];
-    for (const ch of term) {
-      const i = t.indexOf(ch, last + 1);
-      if (i === -1) return null;
-      indices.push(i);
-      if (i === last + 1) {
-        consecutive += 1;
-        score += 14 + consecutive;
-      } else {
-        consecutive = 0;
-        score += 2;
-        score -= (i - last) * 3;
+    let prev = -1;
+    for (const i of indices) {
+      score += SCORE_BASE;
+      if (prev !== -1) {
+        const gap = i - prev - 1;
+        score += gap === 0 ? SCORE_RUN : SCORE_GAP * gap;
       }
-      if (i === 0 || !/[\w]/.test(t[i - 1]))
-        score += 12;
-      else if (text[i] !== text[i].toLowerCase()) score += 8;
-      last = i;
+      if (isBoundaryAt(t, i)) score += SCORE_BOUNDARY;
+      else if (text[i] !== text[i].toLowerCase()) score += SCORE_CAMEL;
+      prev = i;
     }
-    return { score, indices };
+    score += SCORE_LEADING * indices[0];
+    return score;
+  }
+  function bestAlignment(term, t, text) {
+    const n = t.length;
+    const q = term.length;
+    if (q === 0 || q > n) return null;
+    let best = null;
+    if (q === 1) {
+      for (let i = 0; i < n; i++) {
+        if (t[i] !== term) continue;
+        const score = scoreAlignment([i], t, text);
+        if (!best || score > best.score) best = { score, indices: [i] };
+      }
+      return best;
+    }
+    let starts = 0;
+    for (let s = 0; s < n && starts < MAX_ALIGNMENT_STARTS; s++) {
+      if (t[s] !== term[0]) continue;
+      starts++;
+      const indices = [s];
+      let pos = s + 1;
+      let ok = true;
+      for (let j = 1; j < q; j++) {
+        const i = t.indexOf(term[j], pos);
+        if (i === -1) {
+          ok = false;
+          break;
+        }
+        indices.push(i);
+        pos = i + 1;
+      }
+      if (!ok) continue;
+      const score = scoreAlignment(indices, t, text);
+      if (!best || score > best.score) best = { score, indices };
+    }
+    return best;
   }
   function matchTerms(query2, text) {
     const terms = queryTerms(query2);
     const t = String(text).toLowerCase();
-    return { terms, results: terms.map((term) => matchTerm(term, t, text)) };
+    return { terms, results: terms.map((term) => bestAlignment(term, t, text)) };
   }
   function fuzzyMatch(query2, text) {
     const { terms, results } = matchTerms(query2, text);
@@ -278,6 +315,26 @@
     const indices = [];
     for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
+  }
+  var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
+  function rankMatches(query2, list, fuzzy = true) {
+    const q = String(query2).trim();
+    if (!fuzzy) {
+      return list.filter((item) => substringMatch(q, item.title + " " + (item.url || "")));
+    }
+    return list.map((item) => {
+      const hay = item.title + " " + (item.url || "");
+      const match = fuzzyMatch(q, hay);
+      if (!match) return null;
+      const first = match.indices[0];
+      const last = match.indices[match.indices.length - 1];
+      return { item, match, span: last - first + 1, hayLength: hay.length };
+    }).filter(Boolean).sort((a, b) => {
+      if (b.match.score !== a.match.score) return b.match.score - a.match.score;
+      if (a.span !== b.span) return a.span - b.span;
+      if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
+      return (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3);
+    });
   }
   function substringMatch(query2, text) {
     const terms = queryTerms(query2);
@@ -1030,6 +1087,11 @@
       linkOnly: true,
       activate: yankLink
     },
+    yanktext: {
+      selector: STRONG_CLICKABLE_SELECTOR,
+      linkOnly: true,
+      activate: yankLinkText
+    },
     focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
     background: {
       selector: STRONG_CLICKABLE_SELECTOR,
@@ -1066,9 +1128,12 @@
   var needsRelay = false;
   var labels = /* @__PURE__ */ new Map();
   var overlays2 = /* @__PURE__ */ new Map();
+  var hintWidths = /* @__PURE__ */ new WeakMap();
   var typed = "";
   var hintsHost = null;
   var blockWheel = null;
+  var rescanObserver = null;
+  var rescanTimer = null;
   function getHintsHost() {
     if (hintsHost && hintsHost.isConnected) return hintsHost;
     hintsHost = document.createElement("div");
@@ -1107,6 +1172,61 @@
       scrollTracking = null;
     }
   }
+  var RESCAN_DEBOUNCE_MS = 200;
+  var RESCAN_ATTRIBUTES = /* @__PURE__ */ new Set([
+    "class",
+    "style",
+    "href",
+    "src",
+    "jsaction",
+    "onclick"
+  ]);
+  function isJariNode(target2) {
+    return target2 && typeof target2.closest === "function" && target2.closest(".jari-hints-host, .jari-measure, .jari-status-stack");
+  }
+  function onRescanMutation(records) {
+    for (const record of records) {
+      if (isJariNode(record.target)) continue;
+      if (record.type === "attributes") {
+        if (!RESCAN_ATTRIBUTES.has(record.attributeName)) continue;
+      } else if (record.type === "childList" && record.addedNodes.length === 0) {
+        continue;
+      }
+      scheduleRescan();
+      return;
+    }
+  }
+  function scheduleRescan() {
+    if (rescanTimer !== null) return;
+    rescanTimer = setTimeout(() => {
+      rescanTimer = null;
+      if (!isActive()) return;
+      try {
+        const p = chrome.runtime.sendMessage({ type: "RESCAN_HINTS" });
+        if (p && typeof p.catch === "function") p.catch(() => {
+        });
+      } catch {
+      }
+    }, RESCAN_DEBOUNCE_MS);
+  }
+  function setRescanTracking(on) {
+    if (typeof MutationObserver === "undefined") return;
+    if (on && !rescanObserver) {
+      rescanObserver = new MutationObserver(onRescanMutation);
+      try {
+        rescanObserver.observe(document.documentElement, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: [...RESCAN_ATTRIBUTES]
+        });
+      } catch {
+      }
+    } else if (!on && rescanObserver) {
+      rescanObserver.disconnect();
+      rescanObserver = null;
+    }
+  }
   function scheduleHintReposition() {
     if (trackingFrame !== null) return;
     trackingFrame = requestAnimationFrame(repositionHints);
@@ -1117,13 +1237,15 @@
       const box = overlays2.get(label);
       if (!box) continue;
       const rect = hintRect(el, el.getBoundingClientRect());
+      const width = hintWidths.get(box) || box.offsetWidth || LABEL_HEIGHT;
       const pos = labelPlacement(
         rect,
         settings.getHintPosition(),
         window.scrollX,
         window.scrollY,
         window.innerWidth,
-        window.innerHeight
+        window.innerHeight,
+        width
       );
       if (!pos) {
         box.style.display = "none";
@@ -1134,6 +1256,7 @@
       box.style.top = pos.top + "px";
       if (pos.transform) box.style.transform = pos.transform;
     }
+    deOverlapBoxes();
   }
   function isPointerCursor(style) {
     const cursor = style && style.cursor;
@@ -1213,7 +1336,7 @@
         } else if (nextMode === "focus" && pendingTopLevel.length === 1) {
           focusSingleInput();
         } else {
-          drawHints(0);
+          drawHints(0, needsRelay);
         }
       }
     } catch (err) {
@@ -1227,8 +1350,10 @@
   function countHints(nextMode) {
     const config = MODES[nextMode];
     if (!config) return 0;
+    const previousTyped = typed;
     cancel();
     mode = nextMode;
+    typed = previousTyped;
     const { candidates, weak } = config.pointerCursor ? queryClickables(config.selector, { weak: config.weak }) : { candidates: queryAll(config.selector), weak: /* @__PURE__ */ new WeakSet() };
     const scanned = scanElements(candidates, {
       passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
@@ -1244,6 +1369,10 @@
         (el) => !weak.has(el) || !top.some((other) => other !== el && containsElement(el, other))
       );
     }
+    top = dedupeOverlapping(top, rects);
+    top = changeHintablesToLargestChild(top, candidates, rects, {
+      linkOnly: config.linkOnly
+    });
     for (const el of top) {
       rects.set(el, hintRect(el, rects.get(el)));
     }
@@ -1252,7 +1381,79 @@
     pendingTotal = scanned.total;
     return top.length;
   }
-  function drawHints(startIndex) {
+  function elementArea(rect) {
+    return (rect.right - rect.left) * (rect.bottom - rect.top);
+  }
+  function changeHintablesToLargestChild(top, candidates, rects, { linkOnly } = {}) {
+    return top.map((el) => {
+      const baseArea = elementArea(rects.get(el) || {});
+      let best = el;
+      let bestArea = baseArea;
+      for (const cand of candidates) {
+        if (cand === el || !flatContains(el, cand)) continue;
+        if (linkOnly && !linkHref(cand)) continue;
+        const area = elementArea(rects.get(cand) || {});
+        if (area > bestArea) {
+          bestArea = area;
+          best = cand;
+        }
+      }
+      return best;
+    });
+  }
+  function rectsNearIdentical(a, b) {
+    const left = Math.max(a.left, b.left);
+    const topY = Math.max(a.top, b.top);
+    const right = Math.min(a.right, b.right);
+    const bottom = Math.min(a.bottom, b.bottom);
+    if (right <= left || bottom <= topY) return false;
+    const intersection = (right - left) * (bottom - topY);
+    const areaA = (a.right - a.left) * (a.bottom - a.top);
+    const areaB = (b.right - b.left) * (b.bottom - b.top);
+    const minArea = Math.min(areaA, areaB);
+    const maxArea = Math.max(areaA, areaB);
+    if (minArea <= 0) return false;
+    return intersection / minArea >= 0.9 && maxArea / minArea <= 4;
+  }
+  function pickForOverlap(a, b, rects) {
+    const ra = rects.get(a);
+    const rb = rects.get(b);
+    const left = Math.max(ra.left, rb.left);
+    const topY = Math.max(ra.top, rb.top);
+    const right = Math.min(ra.right, rb.right);
+    const bottom = Math.min(ra.bottom, rb.bottom);
+    const cx = (left + right) / 2;
+    const cy = (topY + bottom) / 2;
+    let hit;
+    try {
+      hit = document.elementFromPoint(cx, cy);
+    } catch {
+      hit = null;
+    }
+    const inA = hit && flatContains(a, hit);
+    const inB = hit && flatContains(b, hit);
+    if (inA && !inB) return a;
+    if (inB && !inA) return b;
+    const areaA = (ra.right - ra.left) * (ra.bottom - ra.top);
+    const areaB = (rb.right - rb.left) * (rb.bottom - rb.top);
+    return areaA <= areaB ? a : b;
+  }
+  function dedupeOverlapping(top, rects) {
+    const drop = /* @__PURE__ */ new Set();
+    for (let i = 0; i < top.length; i++) {
+      for (let j = i + 1; j < top.length; j++) {
+        const a = top[i];
+        const b = top[j];
+        if (drop.has(a) || drop.has(b)) continue;
+        if (!rectsNearIdentical(rects.get(a), rects.get(b))) continue;
+        const keepEl = pickForOverlap(a, b, rects);
+        drop.add(keepEl === a ? b : a);
+      }
+    }
+    return top.filter((el) => !drop.has(el));
+  }
+  function drawHints(startIndex, relay) {
+    if (relay !== void 0) needsRelay = relay;
     const hintCount = pendingTopLevel.length;
     if (hintCount === 0) return;
     if (pendingTotal > MAX_HINTS) {
@@ -1272,8 +1473,14 @@
       fragment.appendChild(box);
     }
     host.appendChild(fragment);
+    deOverlapBoxes();
     setWheelBlocking(true);
     setScrollTracking(true);
+    setRescanTracking(true);
+    if (typed && ![...labels.keys()].some((l) => l.toLowerCase().startsWith(typed))) {
+      typed = "";
+    }
+    updateHighlight();
   }
   function isInteractive(el) {
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
@@ -1441,7 +1648,7 @@
   function hintRect(el, fallback) {
     return fallback;
   }
-  function labelPlacement(rect, position, scrollX, scrollY, viewportWidth, viewportHeight) {
+  function labelPlacement(rect, position, scrollX, scrollY, viewportWidth, viewportHeight, width = LABEL_HEIGHT) {
     const left = Math.max(rect.left, 0);
     const top = Math.max(rect.top, 0);
     const right = Math.min(rect.right, viewportWidth);
@@ -1455,8 +1662,9 @@
     const tx = horiz === "center" ? -50 : horiz === "right" ? -100 : 0;
     const ty = vert === "middle" ? -50 : vert === "bottom" ? -100 : 0;
     const half = LABEL_HEIGHT / 2;
-    const minX = tx === -100 ? LABEL_HEIGHT : tx === -50 ? half : 0;
-    const maxX = tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - half : viewportWidth - LABEL_HEIGHT;
+    const widthHalf = width / 2;
+    const minX = tx === -100 ? width : tx === -50 ? widthHalf : 0;
+    const maxX = tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - widthHalf : viewportWidth - width;
     const minY = ty === -100 ? LABEL_HEIGHT : ty === -50 ? half : 0;
     const maxY = ty === -100 ? viewportHeight : ty === -50 ? viewportHeight - half : viewportHeight - LABEL_HEIGHT;
     return {
@@ -1464,6 +1672,19 @@
       top: scrollY + Math.min(Math.max(anchorY, minY), maxY),
       transform: `translate(${tx}%, ${ty}%)`
     };
+  }
+  function measureHintWidth(box) {
+    const host = document.createElement("div");
+    host.className = "jari-measure";
+    host.style.cssText = "position:fixed;left:-10000px;top:0;pointer-events:none;visibility:hidden;";
+    document.body.appendChild(host);
+    host.appendChild(box);
+    const rect = box.getBoundingClientRect ? box.getBoundingClientRect() : null;
+    const width = rect && rect.width ? rect.width : box.offsetWidth;
+    host.removeChild(box);
+    document.body.removeChild(host);
+    hintWidths.set(box, width);
+    return width;
   }
   function createHintOverlay(label, rect, position) {
     const box = document.createElement("div");
@@ -1473,19 +1694,73 @@
       span.textContent = ch;
       box.appendChild(span);
     }
+    const width = measureHintWidth(box);
     const pos = labelPlacement(
       rect,
       position,
       window.scrollX,
       window.scrollY,
       window.innerWidth,
-      window.innerHeight
+      window.innerHeight,
+      width
     );
     if (!pos) return null;
     box.style.left = pos.left + "px";
     box.style.top = pos.top + "px";
     if (pos.transform) box.style.transform = pos.transform;
     return box;
+  }
+  var DE_OVERLAP_PAD = 2;
+  function resolveOverlap(a, b, viewportWidth, viewportHeight, pad = DE_OVERLAP_PAD) {
+    const bw = b.right - b.left;
+    const bh = b.bottom - b.top;
+    const dyDown = a.bottom + pad - b.top;
+    const dxRight = a.right + pad - b.left;
+    const dyUp = b.bottom - a.top + pad;
+    const dxLeft = b.right - a.left + pad;
+    if (dyDown > 0 && b.top + dyDown + bh <= viewportHeight + pad) {
+      return { dx: 0, dy: dyDown };
+    }
+    if (dxRight > 0 && b.left + dxRight + bw <= viewportWidth + pad) {
+      return { dx: dxRight, dy: 0 };
+    }
+    if (dyUp > 0 && b.top - dyUp >= -pad) {
+      return { dx: 0, dy: -dyUp };
+    }
+    if (dxLeft > 0 && b.left - dxLeft >= -pad) {
+      return { dx: -dxLeft, dy: 0 };
+    }
+    return null;
+  }
+  function deOverlapBoxes() {
+    if (overlays2.size < 2) return;
+    const vw = window.innerWidth || document.documentElement.clientWidth;
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    const entries = [...overlays2.values()].map((box) => ({
+      box,
+      r: box.getBoundingClientRect ? box.getBoundingClientRect() : null
+    }));
+    if (entries.some((e) => !e.r)) return;
+    for (let pass = 0; pass < 3; pass++) {
+      let moved = false;
+      for (let i = 0; i < entries.length; i++) {
+        for (let j = i + 1; j < entries.length; j++) {
+          const a = entries[i].r;
+          const b = entries[j].r;
+          if (!(a.right > b.left && b.right > a.left && a.bottom > b.top && b.bottom > a.top)) {
+            continue;
+          }
+          const move2 = resolveOverlap(a, b, vw, vh);
+          if (!move2) continue;
+          const box = entries[j].box;
+          box.style.left = (parseFloat(box.style.left) || 0) + move2.dx + "px";
+          box.style.top = (parseFloat(box.style.top) || 0) + move2.dy + "px";
+          entries[j].r = box.getBoundingClientRect();
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
   }
   function openInNewTab(el) {
     const href = el.href || el.getAttribute?.("href");
@@ -1496,10 +1771,25 @@
       simulateClick(el);
     }
   }
+  function linkLabel(el) {
+    const text = (el.textContent || "").trim().replace(/\s+/g, " ");
+    return text || (el.getAttribute?.("aria-label") || "").trim();
+  }
+  function yankTextFor(el) {
+    const href = hrefOf(el);
+    if (!href) return null;
+    return settings.getCopyFormat() === "markdown" ? `[${linkLabel(el)}](${href})` : href;
+  }
   function yankLink(el) {
-    const href = el.href || el.getAttribute?.("href");
-    if (href) {
-      ui.copyText(href).then(() => ui.toast("Copied"));
+    const text = yankTextFor(el);
+    if (text != null) {
+      ui.copyText(text).then(() => ui.toast("Copied"));
+    }
+  }
+  function yankLinkText(el) {
+    const text = linkLabel(el);
+    if (text) {
+      ui.copyText(text).then(() => ui.toast("Copied"));
     }
   }
   function onKeyDown(event) {
@@ -1575,6 +1865,11 @@
   function cancel() {
     setWheelBlocking(false);
     setScrollTracking(false);
+    setRescanTracking(false);
+    if (rescanTimer !== null) {
+      clearTimeout(rescanTimer);
+      rescanTimer = null;
+    }
     if (trackingFrame !== null) {
       cancelAnimationFrame(trackingFrame);
       trackingFrame = null;
@@ -1608,14 +1903,20 @@
     queryClickables,
     flatContains,
     hintRect,
-    simulateClick
+    simulateClick,
+    rectsNearIdentical,
+    dedupeOverlapping,
+    changeHintablesToLargestChild,
+    resolveOverlap,
+    yankTextFor,
+    setRescanTracking
   };
   register("hints", { close: cancel, onKeyDown, isActive });
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === "COUNT_HINTS") {
       sendResponse(countHints(msg.mode));
     } else if (msg.type === "DRAW_HINTS") {
-      drawHints(msg.startIndex);
+      drawHints(msg.startIndex, msg.needsRelay);
     } else if (msg.type === "HINTS_RESET") {
       cancel();
       if (msg.toast) ui.toast(msg.toast);
@@ -1709,12 +2010,7 @@
     }, 130);
   }
   function rank(list, query2) {
-    const fuzzy = settings.isFuzzyMatching();
-    return list.map((item) => {
-      const hay = item.title + " " + (item.url || "");
-      const match = fuzzy ? fuzzyMatch(query2, hay) : substringMatch(query2, hay) ? { score: 0, indices: null } : null;
-      return match ? { item, match } : null;
-    }).filter(Boolean).sort((a, b) => fuzzy ? b.match.score - a.match.score : 0);
+    return rankMatches(query2, list, settings.isFuzzyMatching());
   }
   function rankTabs(q, list) {
     return rank(list, q).map((x) => x.item);
@@ -1951,6 +2247,7 @@
     linkHintsNewTab: { category: "hints", label: "Link hints (new tab)" },
     linkHintsBackground: { category: "hints", label: "Link hints (background, keep open)" },
     linkHintsYank: { category: "hints", label: "Copy link URL" },
+    linkHintsYankText: { category: "hints", label: "Copy link text" },
     focusInput: { category: "hints", label: "Focus input" },
     reloadTab: { category: "page", label: "Reload" },
     hardReload: { category: "page", label: "Reload (bypass cache)" },
@@ -2287,6 +2584,7 @@ ${location.href}`;
     linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
     linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
     linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
+    linkHintsYankText: { ...COMMAND_CATALOG.linkHintsYankText, run: () => Hints.start("yanktext") },
     focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
     historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
     historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
