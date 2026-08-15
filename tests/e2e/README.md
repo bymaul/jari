@@ -43,6 +43,18 @@ with `DEBUG_PORT`.
   clears them.
 - `webpage-smoke.js` - content-script coordination on a real page: hints draw
   and Escape cancels.
+- `right-edge-label.js` - labels are measured by real width and clamped so a
+  hint near the right viewport edge stays fully on screen, both on first draw
+  and after a scroll reposition.
+- `stacked-hints.js` - sibling elements with near-identical rects get a single
+  label each (`rectsNearIdentical`/`dedupeOverlapping`): no overlapping hint
+  boxes over one target.
+- `serp-diag.js` - mirrors live Google SERP geometry (title wrapper with a
+  small About-this-result button inside): every visible result title keeps its
+  hint despite the contained small rect.
+- `prompt-overlay.js` - the prompt overlay stays left-aligned and borderless
+  against page styles (`text-align`, `outline`, `box-shadow`), on a hostile
+  fixture that sets all of them on `body` and inputs.
 - `largest-child.js` - labels on a big wrapper descend to the largest child
   element (`changeHintablesToLargestChild`): the hint sits on the overflowing
   child link and activation navigates.
