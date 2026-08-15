@@ -1,4 +1,4 @@
-import { Url, fuzzyIndices, fuzzyMatch, substringMatch } from "./keymap.js";
+import { Url, fuzzyIndices, rankMatches } from "./keymap.js";
 import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
 import { register } from "./overlays.js";
@@ -92,19 +92,7 @@ function handleOpenInput(queryText) {
 }
 
 function rank(list, query) {
-  const fuzzy = settings.isFuzzyMatching();
-  return list
-    .map((item) => {
-      const hay = item.title + " " + (item.url || "");
-      const match = fuzzy
-        ? fuzzyMatch(query, hay)
-        : substringMatch(query, hay)
-          ? { score: 0, indices: null }
-          : null;
-      return match ? { item, match } : null;
-    })
-    .filter(Boolean)
-    .sort((a, b) => (fuzzy ? b.match.score - a.match.score : 0));
+  return rankMatches(query, list, settings.isFuzzyMatching());
 }
 
 function rankTabs(q, list) {

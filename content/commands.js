@@ -236,6 +236,7 @@ export const commands = {
   linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
   linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
   linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
+  linkHintsYankText: { ...COMMAND_CATALOG.linkHintsYankText, run: () => Hints.start("yanktext") },
   focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
 
   historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },

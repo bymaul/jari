@@ -44,6 +44,7 @@ export const COMMAND_CATALOG = {
   linkHintsNewTab: { category: "hints", label: "Link hints (new tab)" },
   linkHintsBackground: { category: "hints", label: "Link hints (background, keep open)" },
   linkHintsYank: { category: "hints", label: "Copy link URL" },
+  linkHintsYankText: { category: "hints", label: "Copy link text" },
   focusInput: { category: "hints", label: "Focus input" },
 
   reloadTab: { category: "page", label: "Reload" },

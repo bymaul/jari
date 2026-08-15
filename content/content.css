@@ -75,6 +75,9 @@
   font-size: var(--jari-cmplt-font-size) !important;
   max-height: 75vh;
   overflow: hidden;
+  /* Pages that set text-align on body would otherwise center the header and
+     every row of the prompt and help overlays; Jari's UI is always LTR. */
+  text-align: left !important;
 }
 
 /* --- Prompt overlay (completion list) — tabs, omnibar, merge picker --- */
@@ -83,6 +86,7 @@
   color: #cdcdcd !important;
   font-size: var(--jari-cmplt-font-size);
   font-family: var(--jari-cmplt-font-family);
+  outline: none !important;
 }
 
 .jari-prompt input {
@@ -93,14 +97,19 @@
   line-height: var(--jari-cmdl-line-height);
   color: #cdcdcd;
   background: #1c1c24;
-  border: unset;
-  outline: none;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  text-align: left !important;
   padding: 0 0 0 0.5ex;
 }
 
 .jari-prompt input:focus,
-.jari-prompt input:focus-visible {
-  outline: none;
+.jari-prompt input:focus-visible,
+.jari-prompt input:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .jari-prompt-header {

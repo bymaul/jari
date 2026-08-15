@@ -102,6 +102,24 @@ test("fuzzyMatch rewards camel-case boundaries", () => {
   assert.ok(camel > plain);
 });
 
+test("fuzzyMatch picks the tightest alignment over a greedy first-char scan", () => {
+  assert.deepEqual(Jari.fuzzyMatch("ob", "o x ob").indices, [4, 5]);
+  assert.deepEqual(Jari.fuzzyMatch("er", "e x er").indices, [4, 5]);
+  assert.deepEqual(Jari.fuzzyMatch("ab", "abxb").indices, [0, 1]);
+});
+
+test("fuzzyMatch ranks an uppercase boundary above a separator boundary", () => {
+  assert.ok(
+    Jari.fuzzyMatch("gh", "GitHub").score > Jari.fuzzyMatch("gh", "g h").score,
+  );
+});
+
+test("fuzzyMatch prefers a match at the start of the text", () => {
+  assert.ok(
+    Jari.fuzzyMatch("hub", "GitHub").score > Jari.fuzzyMatch("hub", "ZZZ hub").score,
+  );
+});
+
 test("fuzzyMatch multi-term requires every term and sums scores", () => {
   assert.deepEqual(Jari.fuzzyMatch("pria youtube", "Pria on YouTube").indices, [
     0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14,
@@ -113,6 +131,59 @@ test("fuzzyMatch multi-term requires every term and sums scores", () => {
   assert.equal(Jari.fuzzyMatch("pria youtube", "Pria only"), null);
   assert.equal(Jari.fuzzyMatch("pria   youtube", "Pria on YouTube") === null, false);
   assert.equal(Jari.fuzzyMatch("", "anything"), null);
+});
+
+test("rankMatches orders by score, then tightness, then text length", () => {
+  const items = [
+    { title: "g h", url: "https://g-h.example", source: "history" },
+    { title: "GitHub", url: "https://github.com", source: "tab" },
+    { title: "GitHub Actions", url: "https://github.com/actions", source: "history" },
+    { title: "Go home", url: "https://home.example", source: "history" },
+  ];
+  const titles = Jari.rankMatches("gh", items).map((x) => x.item.title);
+  assert.deepEqual(titles, ["GitHub", "GitHub Actions", "g h", "Go home"]);
+});
+
+test("rankMatches breaks score ties by shorter text, then source", () => {
+  const items = [
+    { title: "GitHub Actions", url: "https://github.com/actions", source: "history" },
+    { title: "GitHub", url: "https://github.com", source: "tab" },
+  ];
+  assert.deepEqual(
+    Jari.rankMatches("gh", items).map((x) => x.item.title),
+    ["GitHub", "GitHub Actions"],
+  );
+
+  const sameHay = [
+    { title: "Foo", url: "https://foo.example", source: "bookmark" },
+    { title: "Foo", url: "https://foo.example", source: "history" },
+  ];
+  assert.deepEqual(
+    Jari.rankMatches("foo", sameHay).map((x) => x.item.source),
+    ["history", "bookmark"],
+  );
+});
+
+test("rankMatches prefers a title match over a URL-only match", () => {
+  const items = [
+    { title: "Archive", url: "https://example.com/projects/github" },
+    { title: "GitHub", url: "https://github.com" },
+  ];
+  assert.deepEqual(
+    Jari.rankMatches("hub", items).map((x) => x.item.title),
+    ["GitHub", "Archive"],
+  );
+});
+
+test("rankMatches with fuzzy matching off keeps the original order", () => {
+  const items = [
+    { title: "zzz foo", url: "https://z.example" },
+    { title: "foo", url: "https://f.example" },
+  ];
+  assert.deepEqual(
+    Jari.rankMatches("foo", items, false).map((x) => x.title),
+    ["zzz foo", "foo"],
+  );
 });
 
 test("fuzzyIndices skips terms that are not in the field", () => {

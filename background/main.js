@@ -1,4 +1,9 @@
-import { handlers, coordinateHints, relayHintKey } from "./handlers.js";
+import {
+  handlers,
+  coordinateHints,
+  relayHintKey,
+  handleRescan,
+} from "./handlers.js";
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "COORDINATE_HINTS") {
@@ -10,6 +15,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "HINTS_KEY") {
     relayHintKey(message, sender);
+    return;
+  }
+
+  if (message.type === "RESCAN_HINTS") {
+    handleRescan(message, sender);
     return;
   }
 
