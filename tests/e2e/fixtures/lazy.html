@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>lazy rescan</title>
+</head>
+<body style="margin:0;font:14px sans-serif;">
+  <a href="/a" id="a">Link A</a>
+  <div id="late-slot"></div>
+  <script>
+    setTimeout(() => {
+      const a = document.createElement("a");
+      a.href = "/b";
+      a.id = "late";
+      a.textContent = "Link B";
+      document.getElementById("late-slot").appendChild(a);
+    }, 3000);
+  </script>
+</body>
+</html>

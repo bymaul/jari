@@ -313,6 +313,11 @@ const MODES = {
     linkOnly: true,
     activate: yankLink,
   },
+  yanktext: {
+    selector: STRONG_CLICKABLE_SELECTOR,
+    linkOnly: true,
+    activate: yankLinkText,
+  },
   focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
   background: {
     selector: STRONG_CLICKABLE_SELECTOR,
@@ -361,6 +366,8 @@ const hintWidths = new WeakMap();
 let typed = "";
 let hintsHost = null;
 let blockWheel = null;
+let rescanObserver = null;
+let rescanTimer = null;
 
 function getHintsHost() {
   if (hintsHost && hintsHost.isConnected) return hintsHost;
@@ -406,6 +413,72 @@ function setScrollTracking(on) {
   }
 }
 
+// While hints are open, watch the page for content appearing late (lazy
+// lists, SPA renders, dynamic menus). When the DOM changes, re-run the whole
+// coordination flow so new clickables get hints and their global labels stay
+// in sync with the other frames. The observer only reacts to changes outside
+// our own hint/measure/status DOM and is silent when hints are closed.
+const RESCAN_DEBOUNCE_MS = 200;
+const RESCAN_ATTRIBUTES = new Set([
+  "class",
+  "style",
+  "href",
+  "src",
+  "jsaction",
+  "onclick",
+]);
+
+function isJariNode(target) {
+  return (
+    target &&
+    typeof target.closest === "function" &&
+    target.closest(".jari-hints-host, .jari-measure, .jari-status-stack")
+  );
+}
+
+function onRescanMutation(records) {
+  for (const record of records) {
+    if (isJariNode(record.target)) continue;
+    if (record.type === "attributes") {
+      if (!RESCAN_ATTRIBUTES.has(record.attributeName)) continue;
+    } else if (record.type === "childList" && record.addedNodes.length === 0) {
+      continue;
+    }
+    scheduleRescan();
+    return;
+  }
+}
+
+function scheduleRescan() {
+  if (rescanTimer !== null) return;
+  rescanTimer = setTimeout(() => {
+    rescanTimer = null;
+    if (!isActive()) return;
+    try {
+      const p = chrome.runtime.sendMessage({ type: "RESCAN_HINTS" });
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } catch {}
+  }, RESCAN_DEBOUNCE_MS);
+}
+
+function setRescanTracking(on) {
+  if (typeof MutationObserver === "undefined") return;
+  if (on && !rescanObserver) {
+    rescanObserver = new MutationObserver(onRescanMutation);
+    try {
+      rescanObserver.observe(document.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: [...RESCAN_ATTRIBUTES],
+      });
+    } catch {}
+  } else if (!on && rescanObserver) {
+    rescanObserver.disconnect();
+    rescanObserver = null;
+  }
+}
+
 function scheduleHintReposition() {
   if (trackingFrame !== null) return;
   trackingFrame = requestAnimationFrame(repositionHints);
@@ -436,6 +509,7 @@ function repositionHints() {
     box.style.top = pos.top + "px";
     if (pos.transform) box.style.transform = pos.transform;
   }
+  deOverlapBoxes();
 }
 
 function isPointerCursor(style) {
@@ -534,7 +608,7 @@ async function start(nextMode) {
       } else if (nextMode === "focus" && pendingTopLevel.length === 1) {
         focusSingleInput();
       } else {
-        drawHints(0);
+        drawHints(0, needsRelay);
       }
     }
   } catch (err) {
@@ -550,8 +624,10 @@ function countHints(nextMode) {
   const config = MODES[nextMode];
   if (!config) return 0;
 
+  const previousTyped = typed;
   cancel();
   mode = nextMode;
+  typed = previousTyped;
 
   const { candidates, weak } = config.pointerCursor
     ? queryClickables(config.selector, { weak: config.weak })
@@ -578,6 +654,9 @@ function countHints(nextMode) {
   }
 
   top = dedupeOverlapping(top, rects);
+  top = changeHintablesToLargestChild(top, candidates, rects, {
+    linkOnly: config.linkOnly,
+  });
 
   for (const el of top) {
     rects.set(el, hintRect(el, rects.get(el)));
@@ -587,6 +666,33 @@ function countHints(nextMode) {
   pendingRects = rects;
   pendingTotal = scanned.total;
   return top.length;
+}
+
+function elementArea(rect) {
+  return (rect.right - rect.left) * (rect.bottom - rect.top);
+}
+
+// When a hinted element contains a descendant that was itself a viable hint
+// candidate but renders bigger (e.g. a small wrapper whose clickable child
+// overflows it), move the hint onto that child so the label sits on the
+// largest clickable part and clicks land on the real target - the wrapper
+// still receives them through event bubbling.
+function changeHintablesToLargestChild(top, candidates, rects, { linkOnly } = {}) {
+  return top.map((el) => {
+    const baseArea = elementArea(rects.get(el) || {});
+    let best = el;
+    let bestArea = baseArea;
+    for (const cand of candidates) {
+      if (cand === el || !flatContains(el, cand)) continue;
+      if (linkOnly && !linkHref(cand)) continue;
+      const area = elementArea(rects.get(cand) || {});
+      if (area > bestArea) {
+        bestArea = area;
+        best = cand;
+      }
+    }
+    return best;
+  });
 }
 
 function rectsNearIdentical(a, b) {
@@ -647,7 +753,8 @@ function dedupeOverlapping(top, rects) {
   return top.filter((el) => !drop.has(el));
 }
 
-function drawHints(startIndex) {
+function drawHints(startIndex, relay) {
+  if (relay !== undefined) needsRelay = relay;
   const hintCount = pendingTopLevel.length;
   if (hintCount === 0) return;
 
@@ -672,8 +779,18 @@ function drawHints(startIndex) {
   }
 
   host.appendChild(fragment);
+  deOverlapBoxes();
   setWheelBlocking(true);
   setScrollTracking(true);
+  setRescanTracking(true);
+
+  // A rescan redraws with a fresh label set; keep the typed prefix only while
+  // it still matches some label, so mid-typing a lazy-page update doesn't
+  // strand the user on a stale prefix.
+  if (typed && ![...labels.keys()].some((l) => l.toLowerCase().startsWith(typed))) {
+    typed = "";
+  }
+  updateHighlight();
 }
 
 function isInteractive(el) {
@@ -941,6 +1058,7 @@ function labelPlacement(
 // overhang, and caches it on the box (see hintWidths).
 function measureHintWidth(box) {
   const host = document.createElement("div");
+  host.className = "jari-measure";
   host.style.cssText =
     "position:fixed;left:-10000px;top:0;pointer-events:none;visibility:hidden;";
   document.body.appendChild(host);
@@ -978,6 +1096,81 @@ function createHintOverlay(label, rect, position) {
   return box;
 }
 
+const DE_OVERLAP_PAD = 2;
+
+// Where can the later box (b) go to stop overlapping the earlier one (a),
+// staying inside the viewport? Prefers pushing straight down, then right,
+// then up, then left. Returns { dx, dy } or null when nowhere fits.
+function resolveOverlap(
+  a,
+  b,
+  viewportWidth,
+  viewportHeight,
+  pad = DE_OVERLAP_PAD,
+) {
+  const bw = b.right - b.left;
+  const bh = b.bottom - b.top;
+  const dyDown = a.bottom + pad - b.top;
+  const dxRight = a.right + pad - b.left;
+  const dyUp = b.bottom - a.top + pad;
+  const dxLeft = b.right - a.left + pad;
+  if (dyDown > 0 && b.top + dyDown + bh <= viewportHeight + pad) {
+    return { dx: 0, dy: dyDown };
+  }
+  if (dxRight > 0 && b.left + dxRight + bw <= viewportWidth + pad) {
+    return { dx: dxRight, dy: 0 };
+  }
+  if (dyUp > 0 && b.top - dyUp >= -pad) {
+    return { dx: 0, dy: -dyUp };
+  }
+  if (dxLeft > 0 && b.left - dxLeft >= -pad) {
+    return { dx: -dxLeft, dy: 0 };
+  }
+  return null;
+}
+
+// Push hint labels apart when distinct targets sit close enough that their
+// labels would cover each other. Labels are positioned independently (each
+// clamped to the viewport), so the nudges here only resolve label-on-label
+// collisions; the near-identical-rect dedupe still handles same-target pairs.
+function deOverlapBoxes() {
+  if (overlays.size < 2) return;
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const entries = [...overlays.values()].map((box) => ({
+    box,
+    r: box.getBoundingClientRect ? box.getBoundingClientRect() : null,
+  }));
+  if (entries.some((e) => !e.r)) return;
+  for (let pass = 0; pass < 3; pass++) {
+    let moved = false;
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i].r;
+        const b = entries[j].r;
+        if (
+          !(
+            a.right > b.left &&
+            b.right > a.left &&
+            a.bottom > b.top &&
+            b.bottom > a.top
+          )
+        ) {
+          continue;
+        }
+        const move = resolveOverlap(a, b, vw, vh);
+        if (!move) continue;
+        const box = entries[j].box;
+        box.style.left = (parseFloat(box.style.left) || 0) + move.dx + "px";
+        box.style.top = (parseFloat(box.style.top) || 0) + move.dy + "px";
+        entries[j].r = box.getBoundingClientRect();
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+}
+
 function openInNewTab(el) {
   const href = el.href || el.getAttribute?.("href");
 
@@ -990,10 +1183,32 @@ function openInNewTab(el) {
   }
 }
 
+function linkLabel(el) {
+  const text = (el.textContent || "").trim().replace(/\s+/g, " ");
+  return text || (el.getAttribute?.("aria-label") || "").trim();
+}
+
+// What yf copies is driven by the shared copyFormat setting: "plain" copies
+// the bare URL, "markdown" copies [label](url) like copyTitleUrl does.
+function yankTextFor(el) {
+  const href = hrefOf(el);
+  if (!href) return null;
+  return settings.getCopyFormat() === "markdown"
+    ? `[${linkLabel(el)}](${href})`
+    : href;
+}
+
 function yankLink(el) {
-  const href = el.href || el.getAttribute?.("href");
-  if (href) {
-    ui.copyText(href).then(() => ui.toast("Copied"));
+  const text = yankTextFor(el);
+  if (text != null) {
+    ui.copyText(text).then(() => ui.toast("Copied"));
+  }
+}
+
+function yankLinkText(el) {
+  const text = linkLabel(el);
+  if (text) {
+    ui.copyText(text).then(() => ui.toast("Copied"));
   }
 }
 
@@ -1078,6 +1293,11 @@ function updateHighlight() {
 function cancel() {
   setWheelBlocking(false);
   setScrollTracking(false);
+  setRescanTracking(false);
+  if (rescanTimer !== null) {
+    clearTimeout(rescanTimer);
+    rescanTimer = null;
+  }
   if (trackingFrame !== null) {
     cancelAnimationFrame(trackingFrame);
     trackingFrame = null;
@@ -1115,6 +1335,10 @@ export const Hints = {
   simulateClick,
   rectsNearIdentical,
   dedupeOverlapping,
+  changeHintablesToLargestChild,
+  resolveOverlap,
+  yankTextFor,
+  setRescanTracking,
 };
 
 register("hints", { close: cancel, onKeyDown, isActive });
@@ -1123,7 +1347,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "COUNT_HINTS") {
     sendResponse(countHints(msg.mode));
   } else if (msg.type === "DRAW_HINTS") {
-    drawHints(msg.startIndex);
+    drawHints(msg.startIndex, msg.needsRelay);
   } else if (msg.type === "HINTS_RESET") {
     cancel();
     if (msg.toast) ui.toast(msg.toast);

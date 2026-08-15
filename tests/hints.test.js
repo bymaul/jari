@@ -1607,3 +1607,179 @@ test("simulateClick survives handlers that cancel and then throw", () => {
     assert.deepEqual(assigns, []);
   });
 });
+
+function withCopyFormat(format, fn) {
+  const original = settings.getCopyFormat;
+  settings.getCopyFormat = () => format;
+  try {
+    fn();
+  } finally {
+    settings.getCopyFormat = original;
+  }
+}
+
+function linkStub({ text = "", href = "https://example.com/x", ariaLabel = null } = {}) {
+  return {
+    href,
+    textContent: text,
+    getAttribute: (name) => (name === "href" ? href : name === "aria-label" ? ariaLabel : null),
+  };
+}
+
+test("yankTextFor copies the bare URL by default", () => {
+  withCopyFormat("plain", () => {
+    assert.strictEqual(
+      Hints.yankTextFor(linkStub({ text: "  Example   link " })),
+      "https://example.com/x",
+    );
+  });
+});
+
+test("yankTextFor copies [label](url) in markdown mode", () => {
+  withCopyFormat("markdown", () => {
+    assert.strictEqual(
+      Hints.yankTextFor(linkStub({ text: "  Example\n link  " })),
+      "[Example link](https://example.com/x)",
+    );
+  });
+});
+
+test("yankTextFor falls back to the aria-label and returns null without an href", () => {
+  withCopyFormat("markdown", () => {
+    assert.strictEqual(
+      Hints.yankTextFor(linkStub({ text: "", ariaLabel: "Open" })),
+      "[Open](https://example.com/x)",
+    );
+  });
+  withCopyFormat("plain", () => {
+    assert.strictEqual(Hints.yankTextFor(linkStub({ href: null })), null);
+  });
+});
+
+function rectEl(id, { parent = null, host = null, rect, href = null } = {}) {
+  return {
+    id,
+    parentElement: parent,
+    href,
+    getRootNode: () => ({ host }),
+    getAttribute: (name) => (name === "href" ? href : null),
+    getBoundingClientRect: () => rect,
+  };
+}
+
+function rectFor({ l, t, r, b }) {
+  return { left: l, top: t, right: r, bottom: b };
+}
+
+test("changeHintablesToLargestChild swaps to a bigger descendant and keeps smaller ones", () => {
+  const wrapper = rectEl("wrapper", {
+    rect: rectFor({ l: 0, t: 0, r: 50, b: 50 }),
+  });
+  const child = rectEl("child", {
+    parent: wrapper,
+    rect: rectFor({ l: 0, t: 0, r: 200, b: 100 }),
+  });
+  const small = rectEl("small", {
+    parent: wrapper,
+    rect: rectFor({ l: 0, t: 0, r: 20, b: 20 }),
+  });
+  const rects = new Map([
+    [wrapper, rectFor({ l: 0, t: 0, r: 50, b: 50 })],
+    [child, rectFor({ l: 0, t: 0, r: 200, b: 100 })],
+    [small, rectFor({ l: 0, t: 0, r: 20, b: 20 })],
+  ]);
+  const top = Hints.changeHintablesToLargestChild([wrapper], [child, small], rects);
+  assert.deepEqual(top, [child]);
+});
+
+test("changeHintablesToLargestChild keeps the element when no descendant is bigger", () => {
+  const wrapper = rectEl("wrapper", {
+    rect: rectFor({ l: 0, t: 0, r: 200, b: 100 }),
+  });
+  const child = rectEl("child", {
+    parent: wrapper,
+    rect: rectFor({ l: 0, t: 0, r: 50, b: 50 }),
+  });
+  const rects = new Map([
+    [wrapper, rectFor({ l: 0, t: 0, r: 200, b: 100 })],
+    [child, rectFor({ l: 0, t: 0, r: 50, b: 50 })],
+  ]);
+  const top = Hints.changeHintablesToLargestChild([wrapper], [child], rects);
+  assert.deepEqual(top, [wrapper]);
+});
+
+test("changeHintablesToLargestChild ignores unrelated and unmeasured elements", () => {
+  const wrapper = rectEl("wrapper", {
+    rect: rectFor({ l: 0, t: 0, r: 50, b: 50 }),
+  });
+  const unrelated = rectEl("other", {
+    rect: rectFor({ l: 0, t: 0, r: 500, b: 500 }),
+  });
+  const noRect = rectEl("no-rect", { parent: wrapper });
+  const rects = new Map([
+    [wrapper, rectFor({ l: 0, t: 0, r: 50, b: 50 })],
+    [unrelated, rectFor({ l: 0, t: 0, r: 500, b: 500 })],
+  ]);
+  const top = Hints.changeHintablesToLargestChild([wrapper], [unrelated, noRect], rects);
+  assert.deepEqual(top, [wrapper]);
+});
+
+test("changeHintablesToLargestChild honors linkOnly so it never swaps a yank target to a non-link", () => {
+  const link = rectEl("link", {
+    href: "/x",
+    rect: rectFor({ l: 0, t: 0, r: 50, b: 50 }),
+  });
+  const button = rectEl("button", {
+    parent: link,
+    rect: rectFor({ l: 0, t: 0, r: 200, b: 100 }),
+  });
+  const rects = new Map([
+    [link, rectFor({ l: 0, t: 0, r: 50, b: 50 })],
+    [button, rectFor({ l: 0, t: 0, r: 200, b: 100 })],
+  ]);
+  assert.deepEqual(
+    Hints.changeHintablesToLargestChild([link], [button], rects, { linkOnly: true }),
+    [link],
+  );
+  assert.deepEqual(
+    Hints.changeHintablesToLargestChild([link], [button], rects),
+    [button],
+  );
+});
+
+test("changeHintablesToLargestChild sees through shadow boundaries", () => {
+  const host = rectEl("host", {
+    rect: rectFor({ l: 0, t: 0, r: 50, b: 50 }),
+  });
+  const shadowButton = rectEl("shadow-button", {
+    host,
+    rect: rectFor({ l: 0, t: 0, r: 200, b: 100 }),
+  });
+  const rects = new Map([
+    [host, rectFor({ l: 0, t: 0, r: 50, b: 50 })],
+    [shadowButton, rectFor({ l: 0, t: 0, r: 200, b: 100 })],
+  ]);
+  const top = Hints.changeHintablesToLargestChild([host], [shadowButton], rects);
+  assert.deepEqual(top, [shadowButton]);
+});
+
+test("resolveOverlap pushes the later box down when it fits", () => {
+  const a = { left: 0, top: 0, right: 100, bottom: 20 };
+  const b = { left: 0, top: 10, right: 100, bottom: 30 };
+  assert.deepEqual(Hints.resolveOverlap(a, b, 800, 600), { dx: 0, dy: 12 });
+});
+
+test("resolveOverlap pushes right when the viewport bottom is full", () => {
+  const a = { left: 0, top: 580, right: 100, bottom: 600 };
+  const b = { left: 0, top: 590, right: 100, bottom: 610 };
+  assert.deepEqual(Hints.resolveOverlap(a, b, 800, 600), { dx: 102, dy: 0 });
+});
+
+test("resolveOverlap pushes up or left when down and right are blocked", () => {
+  const a = { left: 0, top: 20, right: 100, bottom: 40 };
+  const b = { left: 0, top: 30, right: 100, bottom: 50 };
+  assert.deepEqual(Hints.resolveOverlap(a, b, 100, 50), { dx: 0, dy: -32 });
+  const fullA = { left: 0, top: 0, right: 100, bottom: 20 };
+  const fullB = { left: 0, top: 10, right: 100, bottom: 30 };
+  assert.deepEqual(Hints.resolveOverlap(fullA, fullB, 100, 0), null);
+});

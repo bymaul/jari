@@ -384,8 +384,14 @@ async function focusWindow(windowId) {
 }
 
 const hintFrames = new Map();
+const hintModes = new Map();
+const lastRescan = new Map();
 
-chrome.tabs.onRemoved.addListener((tabId) => hintFrames.delete(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  hintFrames.delete(tabId);
+  hintModes.delete(tabId);
+  lastRescan.delete(tabId);
+});
 
 export async function coordinateHints(message, sender) {
   const fromExtensionPage =
@@ -393,9 +399,10 @@ export async function coordinateHints(message, sender) {
   if (!sender.tab || fromExtensionPage) {
     return { needsRelay: false, drawLocally: true };
   }
-  const tabId = sender.tab.id;
-  const mode = message.mode;
+  return coordinateHintsForTab(sender.tab.id, message.mode, sender.frameId);
+}
 
+async function coordinateHintsForTab(tabId, mode, senderFrameId) {
   let frames;
   try {
     frames = await chrome.webNavigation.getAllFrames({ tabId });
@@ -438,10 +445,11 @@ export async function coordinateHints(message, sender) {
       }
     }
     hintFrames.delete(tabId);
+    hintModes.delete(tabId);
     return { needsRelay: false };
   }
 
-  if (message.mode === "focus" && total === 1) {
+  if (mode === "focus" && total === 1) {
     const frameId = [...counts.entries()].find(([, count]) => count === 1)?.[0];
     for (const frame of frames) {
       if (frame.frameId === frameId) continue;
@@ -467,6 +475,7 @@ export async function coordinateHints(message, sender) {
       }
     }
     hintFrames.delete(tabId);
+    hintModes.delete(tabId);
     return { needsRelay: false };
   }
 
@@ -476,7 +485,12 @@ export async function coordinateHints(message, sender) {
     try {
       chrome.tabs.sendMessage(
         tabId,
-        { type: "DRAW_HINTS", startIndex: currentIndex, total },
+        {
+          type: "DRAW_HINTS",
+          startIndex: currentIndex,
+          total,
+          needsRelay: counts.size > 1 || !counts.has(frame.frameId),
+        },
         { frameId: frame.frameId },
       );
       currentIndex += count;
@@ -486,10 +500,28 @@ export async function coordinateHints(message, sender) {
   }
 
   hintFrames.set(tabId, new Set(counts.keys()));
+  hintModes.set(tabId, mode);
 
   return {
-    needsRelay: counts.size > 1 || !counts.has(sender.frameId),
+    needsRelay: counts.size > 1 || !counts.has(senderFrameId),
   };
+}
+
+// A content script saw the page change while its hints are open (late-rendered
+// content). Re-run the whole coordination so new clickables get hints in every
+// frame and the global label indices stay consistent. Debounced so the many
+// mutations of one update (and observers firing in several frames at once)
+// collapse into a single re-coordination.
+export async function handleRescan(message, sender) {
+  if (!sender.tab) return;
+  const tabId = sender.tab.id;
+  const mode = hintModes.get(tabId);
+  if (!mode) return;
+  const now = Date.now();
+  const last = lastRescan.get(tabId) || 0;
+  if (now - last < 400) return;
+  lastRescan.set(tabId, now);
+  await coordinateHintsForTab(tabId, mode, sender.frameId);
 }
 
 async function getHintFrameIds(tabId) {
@@ -534,6 +566,7 @@ export async function relayHintKey(message, sender) {
 async function closeAllHints(tabId) {
   const open = hintFrames.get(tabId);
   if (open) hintFrames.delete(tabId);
+  hintModes.delete(tabId);
 
   let frameIds;
   if (open && open.size) {
