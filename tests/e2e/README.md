@@ -43,6 +43,18 @@ with `DEBUG_PORT`.
   clears them.
 - `webpage-smoke.js` - content-script coordination on a real page: hints draw
   and Escape cancels.
+- `largest-child.js` - labels on a big wrapper descend to the largest child
+  element (`changeHintablesToLargestChild`): the hint sits on the overflowing
+  child link and activation navigates.
+- `dense-hints.js` - colliding labels are nudged apart (`resolveOverlap`):
+  three stacked short links get non-overlapping hint rects.
+- `lazy-rescan.js` - a link injected while hints are open triggers a
+  MutationObserver rescan: a new hint appears over the fresh link within a few
+  seconds, and picking it navigates.
+- `frames.js` - cross-frame coordination: hints draw in the top frame and a
+  same-origin iframe with globally unique labels, picking an iframe label
+  from the top frame activates it via the background key relay, and hints
+  close in every frame.
 
 ## Notes
 
