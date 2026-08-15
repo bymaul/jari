@@ -36,5 +36,3 @@ considered and dropped.
 (`yankTextFor`, `changeHintablesToLargestChild`, `resolveOverlap`); E2E in
 `tests/e2e/` (`largest-child.js`, `dense-hints.js`, `lazy-rescan.js`,
 `frames.js`).
-
-## Open
