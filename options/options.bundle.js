@@ -811,7 +811,6 @@
   }
 
   // content/hints.js
-  var MAX_HINTS = 100;
   var LABEL_HEIGHT = 20;
   var STRONG_CLICKABLE_SELECTOR = [
     "a[href]",
@@ -1332,7 +1331,6 @@
   }
   var pendingTopLevel = [];
   var pendingRects = /* @__PURE__ */ new Map();
-  var pendingTotal = 0;
   async function start(nextMode) {
     if (!chrome.runtime?.id) {
       console.debug(
@@ -1372,14 +1370,17 @@
     mode = nextMode;
     typed = previousTyped;
     savedGeneration = hintGeneration;
-    const { candidates, weak, shadowRoots } = config.pointerCursor ? queryClickables(config.selector, { weak: config.weak }) : { candidates: queryAll(config.selector), weak: /* @__PURE__ */ new WeakSet(), shadowRoots: /* @__PURE__ */ new Set() };
+    const { candidates, weak, shadowRoots } = config.pointerCursor ? queryClickables(config.selector, { weak: config.weak }) : {
+      candidates: queryAll(config.selector),
+      weak: /* @__PURE__ */ new WeakSet(),
+      shadowRoots: /* @__PURE__ */ new Set()
+    };
     rescanShadowRoots = shadowRoots;
     setRescanTracking(true);
     const scanned = scanElements(candidates, {
       passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
       visible: isVisible,
       occluded: isOccluded,
-      max: MAX_HINTS,
       nested: (el, ancestor) => !weak.has(ancestor) && treeItemNested(el, ancestor)
     });
     let top = scanned.top;
@@ -1398,7 +1399,6 @@
     }
     pendingTopLevel = top;
     pendingRects = rects;
-    pendingTotal = scanned.total;
     return top.length;
   }
   function elementArea(rect) {
@@ -1477,9 +1477,6 @@
     if (relay !== void 0) needsRelay = relay;
     const hintCount = pendingTopLevel.length;
     if (hintCount === 0) return;
-    if (pendingTotal > MAX_HINTS) {
-      ui.toast(`Showing ${hintCount} of ${pendingTotal} hints`);
-    }
     overlays2.clear();
     labels.clear();
     const hintLabels = generateLabels(hintCount, startIndex);
@@ -1615,23 +1612,17 @@
   function treeItemNested(el, ancestor) {
     return !(isTreeItem(el) && isTreeItem(ancestor));
   }
-  function scanElements(candidates, { passes, visible, occluded, max, nested = () => true }) {
+  function scanElements(candidates, { passes, visible, occluded, nested = () => true }) {
     const top = [];
     const viableSet = /* @__PURE__ */ new Set();
     const rects = /* @__PURE__ */ new Map();
-    let counted = 0;
     for (const el of candidates) {
       if (!passes(el)) continue;
-      if (top.length >= max) {
-        if (visible(el)) counted++;
-        continue;
-      }
       const rect = visible(el);
       if (!rect) continue;
       if (occluded(el, rect)) continue;
       viableSet.add(el);
       rects.set(el, rect);
-      counted++;
       let node = el.parentElement || el.getRootNode().host;
       let isNested = false;
       while (node) {
@@ -1643,7 +1634,7 @@
       }
       if (!isNested) top.push(el);
     }
-    return { top, rects, total: counted };
+    return { top, rects };
   }
   function generateLabels(count, startIndex = 0) {
     const chars = alphabet();
