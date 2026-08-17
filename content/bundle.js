@@ -1147,7 +1147,10 @@
   var hintsHost = null;
   var blockWheel = null;
   var rescanObserver = null;
+  var rescanShadowRoots = /* @__PURE__ */ new Set();
   var rescanTimer = null;
+  var hintGeneration = 0;
+  var savedGeneration = 0;
   function getHintsHost() {
     if (hintsHost && hintsHost.isConnected) return hintsHost;
     hintsHost = document.createElement("div");
@@ -1225,18 +1228,31 @@
   }
   function setRescanTracking(on) {
     if (typeof MutationObserver === "undefined") return;
-    if (on && !rescanObserver) {
-      rescanObserver = new MutationObserver(onRescanMutation);
-      try {
-        rescanObserver.observe(document.documentElement, {
-          subtree: true,
-          childList: true,
-          attributes: true,
-          attributeFilter: [...RESCAN_ATTRIBUTES]
-        });
-      } catch {
+    if (on) {
+      if (!rescanObserver) {
+        rescanObserver = new MutationObserver(onRescanMutation);
+        try {
+          rescanObserver.observe(document.documentElement, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: [...RESCAN_ATTRIBUTES]
+          });
+        } catch {
+        }
       }
-    } else if (!on && rescanObserver) {
+      for (const root of rescanShadowRoots) {
+        try {
+          rescanObserver.observe(root, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: [...RESCAN_ATTRIBUTES]
+          });
+        } catch {
+        }
+      }
+    } else if (rescanObserver) {
       rescanObserver.disconnect();
       rescanObserver = null;
     }
@@ -1309,7 +1325,9 @@
     const candidates = [];
     const weak = /* @__PURE__ */ new WeakSet();
     let pointerCount = 0;
+    const shadowRoots = /* @__PURE__ */ new Set();
     const visit = (root) => {
+      if (root !== document) shadowRoots.add(root);
       for (const el of root.querySelectorAll("*")) {
         if (el.matches(strongSelector) || isJsactionClick(el)) {
           candidates.push(el);
@@ -1324,7 +1342,7 @@
       }
     };
     visit(document);
-    return { candidates, weak };
+    return { candidates, weak, shadowRoots };
   }
   var pendingTopLevel = [];
   var pendingRects = /* @__PURE__ */ new Map();
@@ -1365,10 +1383,12 @@
     const config = MODES[nextMode];
     if (!config) return 0;
     const previousTyped = typed;
-    cancel();
     mode = nextMode;
     typed = previousTyped;
-    const { candidates, weak } = config.pointerCursor ? queryClickables(config.selector, { weak: config.weak }) : { candidates: queryAll(config.selector), weak: /* @__PURE__ */ new WeakSet() };
+    savedGeneration = hintGeneration;
+    const { candidates, weak, shadowRoots } = config.pointerCursor ? queryClickables(config.selector, { weak: config.weak }) : { candidates: queryAll(config.selector), weak: /* @__PURE__ */ new WeakSet(), shadowRoots: /* @__PURE__ */ new Set() };
+    rescanShadowRoots = shadowRoots;
+    setRescanTracking(true);
     const scanned = scanElements(candidates, {
       passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
       visible: isVisible,
@@ -1467,14 +1487,18 @@
     return top.filter((el) => !drop.has(el));
   }
   function drawHints(startIndex, relay) {
+    if (hintGeneration !== savedGeneration) return;
     if (relay !== void 0) needsRelay = relay;
     const hintCount = pendingTopLevel.length;
     if (hintCount === 0) return;
     if (pendingTotal > MAX_HINTS) {
       ui.toast(`Showing ${hintCount} of ${pendingTotal} hints`);
     }
+    overlays2.clear();
+    labels.clear();
     const hintLabels = generateLabels(hintCount, startIndex);
     const host = getHintsHost();
+    host.textContent = "";
     const fragment = document.createDocumentFragment();
     const position = settings.getHintPosition();
     for (let i = 0; i < hintCount; i++) {
@@ -1498,6 +1522,9 @@
   }
   function isInteractive(el) {
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
+    if (el.type === "hidden") return false;
+    if (el.hidden) return false;
+    if (el.getAttribute("contenteditable") === "false") return false;
     if (el.closest(overlaySelectors)) return false;
     if (el.tagName === "A" || el.tagName === "AREA") {
       const href = el.getAttribute("href");
@@ -1877,9 +1904,11 @@
     }
   }
   function cancel() {
+    hintGeneration++;
     setWheelBlocking(false);
     setScrollTracking(false);
     setRescanTracking(false);
+    rescanShadowRoots.clear();
     if (rescanTimer !== null) {
       clearTimeout(rescanTimer);
       rescanTimer = null;
@@ -1923,7 +1952,8 @@
     changeHintablesToLargestChild,
     resolveOverlap,
     yankTextFor,
-    setRescanTracking
+    setRescanTracking,
+    isInteractive
   };
   register("hints", { close: cancel, onKeyDown, isActive });
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
