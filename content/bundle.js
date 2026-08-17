@@ -987,9 +987,9 @@
     );
   }
   function elClick(el) {
-    let canceled = false;
+    let lastClickEvent = null;
     const guard = (event) => {
-      canceled = event.defaultPrevented;
+      lastClickEvent = event;
     };
     el.addEventListener("click", guard);
     try {
@@ -999,7 +999,7 @@
     } finally {
       el.removeEventListener("click", guard);
     }
-    return canceled;
+    return lastClickEvent?.defaultPrevented ?? false;
   }
   function hrefOf(el) {
     const href = el.href || el.getAttribute?.("href");
