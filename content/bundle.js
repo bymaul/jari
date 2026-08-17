@@ -2478,11 +2478,16 @@
       smoothState = null;
       return;
     }
-    const CAP = 150;
-    const moveX = pendingX !== 0 ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.25))) : 0;
-    const moveY = pendingY !== 0 ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.25))) : 0;
+    if (Math.abs(pendingX) < 1 && Math.abs(pendingY) < 1) {
+      el.scrollBy({ left: pendingX, top: pendingY, behavior: "instant" });
+      smoothState = null;
+      return;
+    }
+    const CAP = 80;
+    const moveX = pendingX !== 0 ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4))) : 0;
+    const moveY = pendingY !== 0 ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.4))) : 0;
     const before = scrollPosOf(el);
-    el.scrollBy({ left: moveX, top: moveY, behavior: "auto" });
+    el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
     const after = scrollPosOf(el);
     const dx = after.x - before.x;
     const dy = after.y - before.y;
@@ -2497,7 +2502,7 @@
     if (settings.isSmoothScroll() && !prefersReducedMotion()) {
       smoothScrollBy(el, x * count, y * count);
     } else {
-      el.scrollBy({ left: x * count, top: y * count, behavior: "auto" });
+      el.scrollBy({ left: x * count, top: y * count, behavior: "instant" });
     }
   }
   async function copyToClipboard(text, message) {
@@ -2533,7 +2538,7 @@ ${location.href}`;
       run: () => {
         const el = getScrollElement();
         if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
-        else el.scrollTo({ top: 0, behavior: "auto" });
+        else el.scrollTo({ top: 0, behavior: "instant" });
       }
     },
     scrollBottom: {
@@ -2542,7 +2547,7 @@ ${location.href}`;
         const el = getScrollElement();
         const target2 = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
         if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target2 - scrollPosOf(el).y);
-        else el.scrollTo({ top: target2, behavior: "auto" });
+        else el.scrollTo({ top: target2, behavior: "instant" });
       }
     },
     scrollPageDown: {
