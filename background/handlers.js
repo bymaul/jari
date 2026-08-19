@@ -8,6 +8,8 @@ export function normalizeUrl(raw) {
   if (typeof raw !== "string") return null;
   const url = raw.trim();
   if (!url || /\s/.test(url)) return null;
+  if (/^localhost(:\d+)?(\/.*)?$/i.test(url) || /^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(url))
+    return "http://" + url;
   if (url.startsWith("//")) return "https:" + url;
   const m = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
   if (!m) return "https://" + url;

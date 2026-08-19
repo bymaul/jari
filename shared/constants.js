@@ -1,10 +1,9 @@
-export const urlSchemes = new Set(["http", "https", "file", "about"]);
+export const urlSchemes = new Set(["http", "https", "file", "about", "chrome"]);
 
 export const blockedUrlSchemes = new Set([
   "javascript",
   "data",
   "vbscript",
-  "chrome",
   "chrome-extension",
   "edge",
   "moz-extension",
