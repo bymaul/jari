@@ -2,7 +2,7 @@
 
 (() => {
   // shared/constants.js
-  var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about"]);
+  var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about", "chrome"]);
   var suggestionSources = ["tab", "history", "bookmark"];
   var MIN_SCROLL_AREA_SIZE = 16;
 
@@ -1002,8 +1002,29 @@
     if (el.hasAttribute?.("download")) return false;
     return true;
   }
+  function flashElement(el) {
+    try {
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const flash2 = document.createElement("div");
+      flash2.style.cssText = `
+      position:fixed;pointer-events:none;z-index:2147483647;
+      left:${rect.left}px;top:${rect.top}px;
+      width:${rect.width}px;height:${rect.height}px;
+      background:rgba(100,149,237,0.35);border-radius:2px;
+      transition:opacity 0.15s ease-out;
+    `;
+      document.body.appendChild(flash2);
+      requestAnimationFrame(() => {
+        flash2.style.opacity = "0";
+        setTimeout(() => flash2.remove(), 200);
+      });
+    } catch {
+    }
+  }
   function simulateClick(el) {
     const startHref = location.href;
+    flashElement(el);
     fireHoverSequence(el);
     const mousedownCanceled = firePressSequence(el);
     let clickCanceled;
@@ -1130,6 +1151,7 @@
   var typed = "";
   var hintsHost = null;
   var blockWheel = null;
+  var holdKeyup = null;
   var rescanObserver = null;
   var rescanShadowRoots = /* @__PURE__ */ new Set();
   var rescanTimer = null;
@@ -1168,8 +1190,10 @@
         capture: true,
         passive: true
       });
+      window.addEventListener("resize", scrollTracking, { passive: true });
     } else if (!on && scrollTracking) {
       window.removeEventListener("scroll", scrollTracking, { capture: true });
+      window.removeEventListener("resize", scrollTracking);
       scrollTracking = null;
     }
   }
@@ -1298,10 +1322,11 @@
       const cursor = style.cursor;
       if (cursor === "pointer" || typeof cursor === "string" && cursor.startsWith("url(")) {
         if (el.closest(
-          "a, button, input, select, textarea, [onclick], [role=button], [role=link], [role=menuitem], [role=tab], summary, [contenteditable='true'], [data-true-script-script]"
+          "a, button, input, select, textarea, [onclick], [role=button], [role=link], [role=menuitem], [role=tab], summary, [contenteditable='true']"
         )) {
           return true;
         }
+        return true;
       }
     } catch {
     }
@@ -1344,6 +1369,9 @@
     walk(document);
     return { elements, shadowRoots };
   }
+  function isFormElement(el) {
+    return typeof el.matches === "function" && el.matches("input, textarea, select, form") || el.contentEditable === "true";
+  }
   function filterOverlapElements(elements) {
     const filtered2 = [];
     const ancestors = /* @__PURE__ */ new Set();
@@ -1358,10 +1386,19 @@
         parent = parent.parentElement || parent.getRootNode().host;
       }
       if (!dominated) {
+        if (isFormElement(el)) {
+          filtered2.push(el);
+          ancestors.add(el);
+          continue;
+        }
         const rect = el.getBoundingClientRect();
         let covered = false;
         try {
-          const top = document.elementFromPoint(
+          const root = el.getRootNode();
+          const top = root === document ? document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2
+          ) : root.elementFromPoint(
             rect.left + rect.width / 2,
             rect.top + rect.height / 2
           );
@@ -1374,7 +1411,28 @@
         }
       }
     }
-    return filtered2;
+    return collapseAncestors(filtered2);
+  }
+  function collapseAncestors(elements) {
+    const result = [];
+    for (const el of elements) {
+      let dominated = false;
+      for (let i = 0; i < result.length; i++) {
+        if (result[i].contains(el)) {
+          if (!(result[i].tagName === "A" && result[i].hasAttribute("href"))) {
+            result[i] = el;
+          }
+          dominated = true;
+          break;
+        }
+        if (el.contains(result[i])) {
+          dominated = true;
+          break;
+        }
+      }
+      if (!dominated) result.push(el);
+    }
+    return result;
   }
   var pendingTopLevel = [];
   var pendingRects = /* @__PURE__ */ new Map();
@@ -1527,6 +1585,19 @@
     return s;
   }
   function hintRect(el, fallback) {
+    if (el.childElementCount === 0) {
+      const rects = el.getClientRects();
+      if (rects.length === 3) {
+        return rects[1];
+      } else if (rects.length === 2) {
+        return rects[0];
+      }
+    } else if (el.childElementCount === 1 && el.firstElementChild.textContent) {
+      const childRect = el.firstElementChild.getBoundingClientRect();
+      if (childRect.width >= 4 && childRect.height >= 4) {
+        return childRect;
+      }
+    }
     return fallback;
   }
   function labelPlacement(rect, position, scrollX, scrollY, viewportWidth, viewportHeight, width = LABEL_HEIGHT) {
@@ -1676,6 +1747,18 @@
   function onKeyDown(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (event.key === " " && hintsHost) {
+      hintsHost.style.visibility = "hidden";
+      if (!holdKeyup) {
+        holdKeyup = (e) => {
+          if (e.key === " " && hintsHost) {
+            hintsHost.style.visibility = "";
+          }
+        };
+        window.addEventListener("keyup", holdKeyup);
+      }
+      return;
+    }
     const shouldRelay = needsRelay;
     const state2 = handleHintKey(event.key);
     if (shouldRelay) {
@@ -1696,6 +1779,11 @@
     if (key === "Escape") {
       cancel();
       return { remaining: 0, closed: true };
+    }
+    if (key === "Backspace") {
+      typed = typed.slice(0, -1);
+      updateHighlight();
+      return { remaining: labels.size, closed: false };
     }
     typed += key.toLowerCase();
     let exact = null;
@@ -1729,7 +1817,8 @@
       return { remaining: 0, closed: true };
     }
     if (!exact && partial === 0) {
-      typed = "";
+      cancel();
+      return { remaining: 0, closed: true };
     }
     updateHighlight();
     return { remaining: labels.size, closed: false };
@@ -1748,6 +1837,10 @@
     setWheelBlocking(false);
     setScrollTracking(false);
     setRescanTracking(false);
+    if (holdKeyup) {
+      window.removeEventListener("keyup", holdKeyup);
+      holdKeyup = null;
+    }
     rescanShadowRoots.clear();
     if (rescanTimer !== null) {
       clearTimeout(rescanTimer);
@@ -1782,7 +1875,11 @@
     resolveOverlap,
     yankTextFor,
     setRescanTracking,
-    isInteractive
+    isInteractive,
+    isElementClickable,
+    isElementDrawn,
+    getVisibleElements,
+    filterOverlapElements
   };
   register("hints", { close: cancel, onKeyDown, isActive });
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
