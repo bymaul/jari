@@ -5,8 +5,6 @@
   var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about"]);
   var suggestionSources = ["tab", "history", "bookmark"];
   var MIN_SCROLL_AREA_SIZE = 16;
-  var MIN_VISIBLE_HINT_SIZE = 4;
-  var OCCLUSION_SAMPLE_THRESHOLD = 8;
 
   // content/keymap.js
   var Events = {
@@ -91,7 +89,8 @@
     hintChars: "sadfjklewcmpgh",
     hintPosition: "top-left",
     suggestionSources: suggestionSources.slice(),
-    copyFormat: "plain"
+    copyFormat: "plain",
+    clickableSelector: ""
   };
   var prefixKeys = new Set(Object.keys(prefixes));
   var modifierKeys = /* @__PURE__ */ new Set([
@@ -140,14 +139,6 @@
     visit(document);
     return out;
   }
-  function containsElement(container, target2) {
-    let node = target2;
-    while (node) {
-      if (node === container) return true;
-      node = node.parentElement || node.getRootNode().host;
-    }
-    return false;
-  }
   function normalizeSettings(data) {
     const d = data || {};
     const storedKeymap = {};
@@ -167,7 +158,8 @@
       hintChars: normalizeHintChars(d.hintChars),
       hintPosition: HINT_POSITIONS.includes(d.hintPosition) ? d.hintPosition : settingsDefaults.hintPosition,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
-      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat
+      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
+      clickableSelector: typeof d.clickableSelector === "string" ? d.clickableSelector : settingsDefaults.clickableSelector
     };
   }
   var HINT_POSITIONS = [
@@ -375,7 +367,8 @@
     hintChars: settingsDefaults.hintChars,
     hintPosition: settingsDefaults.hintPosition,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
-    copyFormat: settingsDefaults.copyFormat
+    copyFormat: settingsDefaults.copyFormat,
+    clickableSelector: settingsDefaults.clickableSelector
   };
   function merge(data) {
     const s = normalizeSettings(data);
@@ -390,6 +383,7 @@
     state.hintPosition = s.hintPosition;
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
+    state.clickableSelector = s.clickableSelector;
   }
   async function load() {
     try {
@@ -412,7 +406,8 @@
         hintChars: state.hintChars,
         hintPosition: state.hintPosition,
         suggestionSources: state.suggestionSources,
-        copyFormat: state.copyFormat
+        copyFormat: state.copyFormat,
+        clickableSelector: state.clickableSelector
       }
     });
   }
@@ -459,6 +454,9 @@
   function getCopyFormat() {
     return state.copyFormat;
   }
+  function getClickableSelector() {
+    return state.clickableSelector;
+  }
   function toggleDisabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -488,6 +486,7 @@
     getHintPosition,
     getSuggestionSources,
     getCopyFormat,
+    getClickableSelector,
     toggleDisabled
   };
 
@@ -826,7 +825,7 @@
 
   // content/hints.js
   var LABEL_HEIGHT = 20;
-  var STRONG_CLICKABLE_SELECTOR = [
+  var CLICKABLE_SELECTOR = [
     "a[href]",
     "area[href]",
     "button",
@@ -852,18 +851,6 @@
     "[\\@click]",
     "[v-on\\:click]"
   ].join(",");
-  var WEAK_CLICKABLE_SELECTOR = [
-    "[class*='button' i]",
-    "[class*='btn' i]",
-    "[class*='link' i]",
-    "[class*='clickable' i]",
-    "[class*='cursor-pointer' i]",
-    "[aria-haspopup='true']",
-    "[aria-pressed]",
-    "[aria-expanded]",
-    "[aria-controls]"
-  ].join(",");
-  var CLICKABLE_SELECTOR = `${STRONG_CLICKABLE_SELECTOR},${WEAK_CLICKABLE_SELECTOR}`;
   var TEXT_INPUT_TYPES = [
     "text",
     "search",
@@ -1085,29 +1072,27 @@
   }
   var MODES = {
     click: {
-      selector: STRONG_CLICKABLE_SELECTOR,
-      weak: WEAK_CLICKABLE_SELECTOR,
-      pointerCursor: true,
+      clickable: true,
       activate: activateClick
     },
     newtab: {
-      selector: STRONG_CLICKABLE_SELECTOR,
+      clickable: true,
       linkOnly: true,
       activate: openInNewTab
     },
     yank: {
-      selector: STRONG_CLICKABLE_SELECTOR,
+      clickable: true,
       linkOnly: true,
       activate: yankLink
     },
     yanktext: {
-      selector: STRONG_CLICKABLE_SELECTOR,
+      clickable: true,
       linkOnly: true,
       activate: yankLinkText
     },
     focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
     background: {
-      selector: STRONG_CLICKABLE_SELECTOR,
+      clickable: true,
       linkOnly: true,
       sticky: true,
       activate: openInNewTab
@@ -1287,22 +1272,6 @@
     }
     deOverlapBoxes();
   }
-  function isPointerCursor(style) {
-    const cursor = style && style.cursor;
-    return cursor === "pointer" || typeof cursor === "string" && cursor.startsWith("url(");
-  }
-  var POINTER_CAP = 200;
-  function isPointerCandidate(el) {
-    const rect = el.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return false;
-    const vw = window.innerWidth || document.documentElement.clientWidth;
-    const vh = window.innerHeight || document.documentElement.clientHeight;
-    if (rect.left >= vw || rect.top >= vh || rect.right <= 0 || rect.bottom <= 0)
-      return false;
-    const style = window.getComputedStyle(el);
-    if (style.visibility === "hidden") return false;
-    return isPointerCursor(style);
-  }
   function isJsactionClick(el) {
     const jsaction = el.getAttribute?.("jsaction");
     if (!jsaction) return false;
@@ -1320,28 +1289,92 @@
     }
     return false;
   }
-  function queryClickables(strongSelector, { weak: weakSelector, pointerCursor = true } = {}) {
-    const candidates = [];
-    const weak = /* @__PURE__ */ new WeakSet();
-    let pointerCount = 0;
-    const shadowRoots = /* @__PURE__ */ new Set();
-    const visit = (root) => {
-      if (root !== document) shadowRoots.add(root);
-      for (const el of root.querySelectorAll("*")) {
-        if (el.matches(strongSelector) || isJsactionClick(el)) {
-          candidates.push(el);
-        } else if (weakSelector && el.matches(weakSelector)) {
-          candidates.push(el);
-          weak.add(el);
-        } else if (pointerCursor && pointerCount < POINTER_CAP && isPointerCandidate(el)) {
-          pointerCount++;
-          candidates.push(el);
+  function isElementClickable(el) {
+    if (el.tagName === "AREA") return el.hasAttribute("href");
+    if (el.matches(CLICKABLE_SELECTOR)) return true;
+    if (isJsactionClick(el)) return true;
+    try {
+      const style = window.getComputedStyle(el);
+      const cursor = style.cursor;
+      if (cursor === "pointer" || typeof cursor === "string" && cursor.startsWith("url(")) {
+        if (el.closest(
+          "a, button, input, select, textarea, [onclick], [role=button], [role=link], [role=menuitem], [role=tab], summary, [contenteditable='true'], [data-true-script-script]"
+        )) {
+          return true;
         }
-        if (el.shadowRoot) visit(el.shadowRoot);
       }
+    } catch {
+    }
+    const userSelector = settings.getClickableSelector();
+    if (userSelector) {
+      try {
+        if (el.matches(userSelector)) return true;
+      } catch {
+      }
+    }
+    return false;
+  }
+  function isElementDrawn(el, rect) {
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    if (el.offsetWidth <= 0 && el.offsetHeight <= 0 && el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")
+      return false;
+    try {
+      const style = window.getComputedStyle(el);
+      if (style.visibility === "hidden") return false;
+      if (parseFloat(style.opacity) === 0) return false;
+    } catch {
+      return false;
+    }
+    if (typeof el.checkVisibility === "function" && !el.checkVisibility({ opacityProperty: true })) {
+      return false;
+    }
+    return true;
+  }
+  function getVisibleElements(filter) {
+    const elements = [];
+    const shadowRoots = /* @__PURE__ */ new Set();
+    const walk = (root) => {
+      if (root !== document) shadowRoots.add(root);
+      const children = root.querySelectorAll("*");
+      for (const el of children) {
+        if (el.shadowRoot) walk(el.shadowRoot);
+      }
+      filter(Array.from(children), elements, shadowRoots);
     };
-    visit(document);
-    return { candidates, weak, shadowRoots };
+    walk(document);
+    return { elements, shadowRoots };
+  }
+  function filterOverlapElements(elements) {
+    const filtered2 = [];
+    const ancestors = /* @__PURE__ */ new Set();
+    for (const el of elements) {
+      let dominated = false;
+      let parent = el.parentElement || el.getRootNode().host;
+      while (parent) {
+        if (ancestors.has(parent)) {
+          dominated = true;
+          break;
+        }
+        parent = parent.parentElement || parent.getRootNode().host;
+      }
+      if (!dominated) {
+        const rect = el.getBoundingClientRect();
+        let covered = false;
+        try {
+          const top = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2
+          );
+          if (top && top !== el && !el.contains(top)) covered = true;
+        } catch {
+        }
+        if (!covered) {
+          filtered2.push(el);
+          ancestors.add(el);
+        }
+      }
+    }
+    return filtered2;
   }
   var pendingTopLevel = [];
   var pendingRects = /* @__PURE__ */ new Map();
@@ -1384,107 +1417,44 @@
     mode = nextMode;
     typed = previousTyped;
     savedGeneration = hintGeneration;
-    const { candidates, weak, shadowRoots } = config.pointerCursor ? queryClickables(config.selector, { weak: config.weak }) : {
-      candidates: queryAll(config.selector),
-      weak: /* @__PURE__ */ new WeakSet(),
-      shadowRoots: /* @__PURE__ */ new Set()
-    };
+    let filter;
+    if (config.selector) {
+      filter = (children, elements2) => {
+        for (const el of children) {
+          if (el.matches(config.selector) && isInteractive(el)) {
+            elements2.push(el);
+          }
+        }
+      };
+    } else if (config.clickable) {
+      filter = (children, elements2) => {
+        for (const el of children) {
+          if (isElementClickable(el) && isInteractive(el)) {
+            const rect = el.getBoundingClientRect();
+            if (isElementDrawn(el, rect)) {
+              elements2.push(el);
+            }
+          }
+        }
+      };
+    } else {
+      return 0;
+    }
+    const { elements, shadowRoots } = getVisibleElements(filter);
     rescanShadowRoots = shadowRoots;
     setRescanTracking(true);
-    const scanned = scanElements(candidates, {
-      passes: (el) => isInteractive(el) && (!config.linkOnly || linkHref(el)),
-      visible: isVisible,
-      occluded: isOccluded,
-      nested: (el, ancestor) => !weak.has(ancestor) && treeItemNested(el, ancestor)
-    });
-    let top = scanned.top;
-    const rects = scanned.rects;
-    if (weak.size > 0) {
-      top = top.filter(
-        (el) => !weak.has(el) || !top.some((other) => other !== el && containsElement(el, other))
-      );
+    let filtered2 = elements;
+    filtered2 = filterOverlapElements(filtered2);
+    if (config.linkOnly) {
+      filtered2 = filtered2.filter((el) => linkHref(el));
     }
-    top = dedupeOverlapping(top, rects);
-    top = changeHintablesToLargestChild(top, candidates, rects, {
-      linkOnly: config.linkOnly
-    });
-    for (const el of top) {
-      rects.set(el, hintRect(el, rects.get(el)));
+    const rects = /* @__PURE__ */ new Map();
+    for (const el of filtered2) {
+      rects.set(el, hintRect(el, el.getBoundingClientRect()));
     }
-    pendingTopLevel = top;
+    pendingTopLevel = filtered2;
     pendingRects = rects;
-    return top.length;
-  }
-  function elementArea(rect) {
-    return (rect.right - rect.left) * (rect.bottom - rect.top);
-  }
-  function changeHintablesToLargestChild(top, candidates, rects, { linkOnly } = {}) {
-    return top.map((el) => {
-      const baseArea = elementArea(rects.get(el) || {});
-      let best = el;
-      let bestArea = baseArea;
-      for (const cand of candidates) {
-        if (cand === el || !flatContains(el, cand)) continue;
-        if (linkOnly && !linkHref(cand)) continue;
-        const area = elementArea(rects.get(cand) || {});
-        if (area > bestArea) {
-          bestArea = area;
-          best = cand;
-        }
-      }
-      return best;
-    });
-  }
-  function rectsNearIdentical(a, b) {
-    const left = Math.max(a.left, b.left);
-    const topY = Math.max(a.top, b.top);
-    const right = Math.min(a.right, b.right);
-    const bottom = Math.min(a.bottom, b.bottom);
-    if (right <= left || bottom <= topY) return false;
-    const intersection = (right - left) * (bottom - topY);
-    const areaA = (a.right - a.left) * (a.bottom - a.top);
-    const areaB = (b.right - b.left) * (b.bottom - b.top);
-    const minArea = Math.min(areaA, areaB);
-    const maxArea = Math.max(areaA, areaB);
-    if (minArea <= 0) return false;
-    return intersection / minArea >= 0.9 && maxArea / minArea <= 4;
-  }
-  function pickForOverlap(a, b, rects) {
-    const ra = rects.get(a);
-    const rb = rects.get(b);
-    const left = Math.max(ra.left, rb.left);
-    const topY = Math.max(ra.top, rb.top);
-    const right = Math.min(ra.right, rb.right);
-    const bottom = Math.min(ra.bottom, rb.bottom);
-    const cx = (left + right) / 2;
-    const cy = (topY + bottom) / 2;
-    let hit;
-    try {
-      hit = document.elementFromPoint(cx, cy);
-    } catch {
-      hit = null;
-    }
-    const inA = hit && flatContains(a, hit);
-    const inB = hit && flatContains(b, hit);
-    if (inA && !inB) return a;
-    if (inB && !inA) return b;
-    const areaA = (ra.right - ra.left) * (ra.bottom - ra.top);
-    const areaB = (rb.right - rb.left) * (rb.bottom - rb.top);
-    return areaA <= areaB ? a : b;
-  }
-  function dedupeOverlapping(top, rects) {
-    const drop = /* @__PURE__ */ new Set();
-    for (let i = 0; i < top.length; i++) {
-      for (let j = i + 1; j < top.length; j++) {
-        const a = top[i];
-        const b = top[j];
-        if (drop.has(a) || drop.has(b)) continue;
-        if (!rectsNearIdentical(rects.get(a), rects.get(b))) continue;
-        const keepEl = pickForOverlap(a, b, rects);
-        drop.add(keepEl === a ? b : a);
-      }
-    }
-    return top.filter((el) => !drop.has(el));
+    return filtered2.length;
   }
   function drawHints(startIndex, relay) {
     if (hintGeneration !== savedGeneration) return;
@@ -1528,127 +1498,6 @@
       if (href === null || href.trim() === "") return false;
     }
     return true;
-  }
-  function visiblePortion(rect) {
-    const vw = window.innerWidth || document.documentElement.clientWidth;
-    const vh = window.innerHeight || document.documentElement.clientHeight;
-    const left = Math.max(rect.left, 0);
-    const top = Math.max(rect.top, 0);
-    const right = Math.min(rect.right, vw);
-    const bottom = Math.min(rect.bottom, vh);
-    if (right <= left || bottom <= top) return null;
-    return { left, top, right, bottom };
-  }
-  function isVisible(el) {
-    const rect = el.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
-    const portion = visiblePortion(rect);
-    if (!portion) return null;
-    if (portion.right - portion.left < MIN_VISIBLE_HINT_SIZE) return null;
-    if (portion.bottom - portion.top < MIN_VISIBLE_HINT_SIZE) return null;
-    const style = window.getComputedStyle(el);
-    if (style.visibility === "hidden") return null;
-    if (parseFloat(style.opacity) === 0) return null;
-    if (typeof el.checkVisibility === "function" && !el.checkVisibility({ opacityProperty: true })) {
-      return null;
-    }
-    return rect;
-  }
-  function occlusionSamples(portion) {
-    const { left, top, right, bottom } = portion;
-    const cx = (left + right) / 2;
-    const cy = (top + bottom) / 2;
-    const points = [[cx, cy]];
-    const w = right - left;
-    const h = bottom - top;
-    if (w >= OCCLUSION_SAMPLE_THRESHOLD)
-      points.push([left + w * 0.25, cy], [left + w * 0.75, cy]);
-    if (h >= OCCLUSION_SAMPLE_THRESHOLD)
-      points.push([cx, top + h * 0.25], [cx, top + h * 0.75]);
-    return points;
-  }
-  function rectOverlapsScrollport(rect, node) {
-    const box = node.getBoundingClientRect();
-    const vw = globalThis.window?.innerWidth;
-    const vh = globalThis.window?.innerHeight;
-    if (vh != null && (box.bottom <= 0 || box.top >= vh || box.right <= 0 || box.left >= vw)) {
-      return true;
-    }
-    return rect.bottom > box.top && rect.top < box.bottom && rect.right > box.left && rect.left < box.right;
-  }
-  function isOccluded(el, rect) {
-    const portion = visiblePortion(rect);
-    if (!portion) return true;
-    let node = el.parentElement || el.getRootNode().host;
-    while (node && node !== document.documentElement && node !== document.body) {
-      if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) {
-        const style = window.getComputedStyle(node);
-        if (style.overflowX !== "visible" || style.overflowY !== "visible") {
-          if (!rectOverlapsScrollport(rect, node)) return true;
-        }
-      }
-      node = node.parentElement || node.getRootNode().host;
-    }
-    if (el.matches("input, textarea, select, [contenteditable]")) return false;
-    const root = el.getRootNode();
-    const points = occlusionSamples(portion);
-    let occludedPoints = 0;
-    for (const [x, y] of points) {
-      const top = root.elementFromPoint(x, y);
-      if (!top) {
-        occludedPoints++;
-        continue;
-      }
-      if (containsElement(el, top) || containsElement(top, el) || flatContains(el, top) || flatContains(top, el)) {
-        return false;
-      } else {
-        occludedPoints++;
-      }
-    }
-    return occludedPoints === points.length;
-  }
-  function flatParent(node) {
-    if (node.assignedSlot) return node.assignedSlot;
-    if (node.parentElement) return node.parentElement;
-    if (node.getRootNode().host) return node.getRootNode().host;
-    return null;
-  }
-  function flatContains(ancestor, node) {
-    let current = node;
-    while (current && current !== ancestor) {
-      current = flatParent(current);
-    }
-    return current === ancestor;
-  }
-  function isTreeItem(el) {
-    return el.getAttribute?.("role") === "treeitem";
-  }
-  function treeItemNested(el, ancestor) {
-    return !(isTreeItem(el) && isTreeItem(ancestor));
-  }
-  function scanElements(candidates, { passes, visible, occluded, nested = () => true }) {
-    const top = [];
-    const viableSet = /* @__PURE__ */ new Set();
-    const rects = /* @__PURE__ */ new Map();
-    for (const el of candidates) {
-      if (!passes(el)) continue;
-      const rect = visible(el);
-      if (!rect) continue;
-      if (occluded(el, rect)) continue;
-      viableSet.add(el);
-      rects.set(el, rect);
-      let node = el.parentElement || el.getRootNode().host;
-      let isNested = false;
-      while (node) {
-        if (viableSet.has(node) && nested(el, node)) {
-          isNested = true;
-          break;
-        }
-        node = node.parentElement || node.getRootNode().host;
-      }
-      if (!isNested) top.push(el);
-    }
-    return { top, rects };
   }
   function generateLabels(count, startIndex = 0) {
     const chars = alphabet();
@@ -1923,24 +1772,13 @@
     isActive,
     placeCaretAtEnd,
     generateLabels,
-    visiblePortion,
-    isOccluded,
-    scanElements,
     setWheelBlocking,
     setScrollTracking,
     labelPlacement,
-    rectOverlapsScrollport,
-    treeItemNested,
     clickableSelector: CLICKABLE_SELECTOR,
-    isPointerCursor,
     isJsactionClick,
-    queryClickables,
-    flatContains,
     hintRect,
     simulateClick,
-    rectsNearIdentical,
-    dedupeOverlapping,
-    changeHintablesToLargestChild,
     resolveOverlap,
     yankTextFor,
     setRescanTracking,
