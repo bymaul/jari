@@ -103,6 +103,8 @@ export const settingsDefaults = {
   suggestionSources: suggestionSources.slice(),
 
   copyFormat: "plain",
+
+  clickableSelector: "",
 };
 
 export const prefixKeys = new Set(Object.keys(prefixes));
@@ -212,6 +214,10 @@ export function normalizeSettings(data) {
       : settingsDefaults.suggestionSources.slice(),
     copyFormat:
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
+    clickableSelector:
+      typeof d.clickableSelector === "string"
+        ? d.clickableSelector
+        : settingsDefaults.clickableSelector,
   };
 }
 
