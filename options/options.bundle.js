@@ -2,7 +2,7 @@
 
 (() => {
   // shared/constants.js
-  var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about"]);
+  var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about", "chrome"]);
   var suggestionSources = ["tab", "history", "bookmark"];
   var MIN_SCROLL_AREA_SIZE = 16;
 
