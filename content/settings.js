@@ -15,8 +15,6 @@ const state = {
   fuzzyMatching: settingsDefaults.fuzzyMatching,
   timeoutMs: settingsDefaults.timeoutMs,
   passthroughMs: settingsDefaults.passthroughMs,
-  hintChars: settingsDefaults.hintChars,
-  hintPosition: settingsDefaults.hintPosition,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   copyFormat: settingsDefaults.copyFormat,
   clickableSelector: settingsDefaults.clickableSelector,
@@ -31,8 +29,6 @@ function merge(data) {
   state.fuzzyMatching = s.fuzzyMatching;
   state.timeoutMs = s.timeoutMs;
   state.passthroughMs = s.passthroughMs;
-  state.hintChars = s.hintChars;
-  state.hintPosition = s.hintPosition;
   state.suggestionSources = s.suggestionSources;
   state.copyFormat = s.copyFormat;
   state.clickableSelector = s.clickableSelector;
@@ -57,8 +53,6 @@ function persist() {
       fuzzyMatching: state.fuzzyMatching,
       timeoutMs: state.timeoutMs,
       passthroughMs: state.passthroughMs,
-      hintChars: state.hintChars,
-      hintPosition: state.hintPosition,
       suggestionSources: state.suggestionSources,
       copyFormat: state.copyFormat,
       clickableSelector: state.clickableSelector,
@@ -107,14 +101,6 @@ function getPassthroughMs() {
   return state.passthroughMs;
 }
 
-function getHintChars() {
-  return state.hintChars;
-}
-
-function getHintPosition() {
-  return state.hintPosition;
-}
-
 function getSuggestionSources() {
   return state.suggestionSources;
 }
@@ -153,8 +139,6 @@ export const settings = {
   isFuzzyMatching,
   getTimeoutMs,
   getPassthroughMs,
-  getHintChars,
-  getHintPosition,
   getSuggestionSources,
   getCopyFormat,
   getClickableSelector,

@@ -2,7 +2,6 @@
 
 (() => {
   // shared/constants.js
-  var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about", "chrome"]);
   var suggestionSources = ["tab", "history", "bookmark"];
   var MIN_SCROLL_AREA_SIZE = 16;
 
@@ -35,10 +34,6 @@
     gw: "splitOrMergeTab",
     S: "historyBack",
     D: "historyForward",
-    f: "linkHints",
-    F: "linkHintsNewTab",
-    gf: "linkHintsBackground",
-    i: "focusInput",
     r: "reloadTab",
     R: "hardReload",
     Y: "copyTitleUrl",
@@ -58,7 +53,6 @@
     g0: "firstTab",
     g$: "lastTab",
     ";e": "openOptions",
-    yf: "linkHintsYank",
     yy: "copyUrl"
   };
   var prefixes = {
@@ -74,7 +68,6 @@
     { id: "tabs", label: "Tabs" },
     { id: "tabActions", label: "Tab actions" },
     { id: "history", label: "History" },
-    { id: "hints", label: "Hints" },
     { id: "page", label: "Page" },
     { id: "clipboard", label: "Clipboard" },
     { id: "modes", label: "Modes" },
@@ -86,8 +79,6 @@
     fuzzyMatching: true,
     timeoutMs: 1500,
     passthroughMs: 1500,
-    hintChars: "sadfjklewcmpgh",
-    hintPosition: "top-left",
     suggestionSources: suggestionSources.slice(),
     copyFormat: "plain",
     clickableSelector: ""
@@ -113,14 +104,7 @@
     parts.push(event.key);
     return parts.join("+");
   }
-  var overlaySelectors = ".jari-overlay, .jari-hint, .jari-scroll-highlight";
-  function deepActiveElement() {
-    let el = document.activeElement;
-    while (el && el.shadowRoot && el.shadowRoot.activeElement) {
-      el = el.shadowRoot.activeElement;
-    }
-    return el;
-  }
+  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight";
   function queryAll(selector, onShadowRoot) {
     const out = [];
     const visit = (root) => {
@@ -151,28 +135,10 @@
       fuzzyMatching: typeof d.fuzzyMatching === "boolean" ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
-      hintChars: normalizeHintChars(d.hintChars),
-      hintPosition: HINT_POSITIONS.includes(d.hintPosition) ? d.hintPosition : settingsDefaults.hintPosition,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       clickableSelector: typeof d.clickableSelector === "string" ? d.clickableSelector : settingsDefaults.clickableSelector
     };
-  }
-  var HINT_POSITIONS = [
-    "top-left",
-    "top-center",
-    "top-right",
-    "middle-left",
-    "middle-center",
-    "middle-right",
-    "bottom-left",
-    "bottom-center",
-    "bottom-right"
-  ];
-  function normalizeHintChars(raw) {
-    if (typeof raw !== "string") return settingsDefaults.hintChars.toUpperCase();
-    const chars = [...new Set(raw.toUpperCase())].filter((c) => /[A-Z0-9]/.test(c)).join("");
-    return chars.length >= 4 ? chars : settingsDefaults.hintChars.toUpperCase();
   }
   var Url = {
     parentUrlOf(href) {
@@ -360,8 +326,6 @@
     fuzzyMatching: settingsDefaults.fuzzyMatching,
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
-    hintChars: settingsDefaults.hintChars,
-    hintPosition: settingsDefaults.hintPosition,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     copyFormat: settingsDefaults.copyFormat,
     clickableSelector: settingsDefaults.clickableSelector
@@ -375,8 +339,6 @@
     state.fuzzyMatching = s.fuzzyMatching;
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
-    state.hintChars = s.hintChars;
-    state.hintPosition = s.hintPosition;
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
     state.clickableSelector = s.clickableSelector;
@@ -399,8 +361,6 @@
         fuzzyMatching: state.fuzzyMatching,
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
-        hintChars: state.hintChars,
-        hintPosition: state.hintPosition,
         suggestionSources: state.suggestionSources,
         copyFormat: state.copyFormat,
         clickableSelector: state.clickableSelector
@@ -438,12 +398,6 @@
   function getPassthroughMs() {
     return state.passthroughMs;
   }
-  function getHintChars() {
-    return state.hintChars;
-  }
-  function getHintPosition() {
-    return state.hintPosition;
-  }
   function getSuggestionSources() {
     return state.suggestionSources;
   }
@@ -478,8 +432,6 @@
     isFuzzyMatching,
     getTimeoutMs,
     getPassthroughMs,
-    getHintChars,
-    getHintPosition,
     getSuggestionSources,
     getCopyFormat,
     getClickableSelector,
@@ -809,1082 +761,6 @@
     overlays.push({ name, ...api });
   }
 
-  // content/hints.js
-  var LABEL_HEIGHT = 20;
-  var CLICKABLE_SELECTOR = [
-    "a[href]",
-    "area[href]",
-    "button",
-    "summary",
-    "input:not([type='hidden'])",
-    "select",
-    "textarea",
-    "[contenteditable='true']",
-    "[role='button']",
-    "[role='link']",
-    "[role='menuitem']",
-    "[role='menuitemcheckbox']",
-    "[role='menuitemradio']",
-    "[role='tab']",
-    "[role='checkbox']",
-    "[role='radio']",
-    "[role='switch']",
-    "[role='option']",
-    "[role='combobox']",
-    "[role='treeitem']",
-    "[onclick]",
-    "[ng-click]",
-    "[\\@click]",
-    "[v-on\\:click]"
-  ].join(",");
-  var TEXT_INPUT_TYPES = [
-    "text",
-    "search",
-    "url",
-    "tel",
-    "email",
-    "password",
-    "number",
-    "date",
-    "datetime-local",
-    "month",
-    "week",
-    "time"
-  ];
-  var FOCUS_SELECTOR = [
-    `input:not([type]), input[type="${TEXT_INPUT_TYPES.join('"], input[type="')}"]`,
-    "textarea",
-    "[contenteditable='true']",
-    "[contenteditable='plaintext-only']",
-    "[role='textbox']",
-    "[role='searchbox']",
-    "[role='combobox']",
-    "[role='spinbutton']"
-  ].join(",");
-  function linkHref(el) {
-    const href = el.href || el.getAttribute?.("href");
-    return typeof href === "string" && href.trim() !== "";
-  }
-  function firePointerSequence(el) {
-    const rect = el.getBoundingClientRect();
-    const opts = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      button: 0,
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2
-    };
-    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
-      const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
-      el.dispatchEvent(new Ctor(type, opts));
-    }
-  }
-  function eventCoords(el) {
-    const rect = el.getBoundingClientRect();
-    const clientX = rect.left + rect.width / 2;
-    const clientY = rect.top + rect.height / 2;
-    return {
-      clientX,
-      clientY,
-      screenX: window.screenX + clientX,
-      screenY: window.screenY + clientY
-    };
-  }
-  function dispatchSafe(el, event) {
-    try {
-      el.dispatchEvent(event);
-    } catch (err) {
-      console.debug("[jari] page event handler threw:", err);
-    }
-    return !event.defaultPrevented;
-  }
-  function fireHoverSequence(el) {
-    const opts = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      button: 0,
-      ...eventCoords(el),
-      pointerId: 1,
-      pointerType: "mouse",
-      isPrimary: true
-    };
-    for (const type of [
-      "pointerover",
-      "pointerenter",
-      "mouseover",
-      "mouseenter",
-      "mousemove"
-    ]) {
-      const Ctor = type.startsWith("pointer") ? PointerEvent : MouseEvent;
-      dispatchSafe(el, new Ctor(type, opts));
-    }
-  }
-  function firePressSequence(el) {
-    const opts = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      button: 0,
-      ...eventCoords(el),
-      pointerId: 1,
-      pointerType: "mouse",
-      isPrimary: true,
-      view: window,
-      detail: 1
-    };
-    dispatchSafe(el, new PointerEvent("pointerdown", { ...opts, buttons: 1 }));
-    const mousedownCanceled = !dispatchSafe(
-      el,
-      new MouseEvent("mousedown", { ...opts, buttons: 1 })
-    );
-    dispatchSafe(el, new PointerEvent("pointerup", { ...opts, buttons: 0 }));
-    dispatchSafe(el, new MouseEvent("mouseup", { ...opts, buttons: 0 }));
-    return mousedownCanceled;
-  }
-  function fireClick(el) {
-    dispatchSafe(
-      el,
-      new MouseEvent("click", {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window,
-        button: 0,
-        buttons: 0,
-        detail: 1,
-        ...eventCoords(el)
-      })
-    );
-  }
-  function elClick(el) {
-    let lastClickEvent = null;
-    const guard = (event) => {
-      lastClickEvent = event;
-    };
-    el.addEventListener("click", guard);
-    try {
-      el.click();
-    } catch (err) {
-      console.debug("[jari] el.click() threw:", err);
-    } finally {
-      el.removeEventListener("click", guard);
-    }
-    return lastClickEvent?.defaultPrevented ?? false;
-  }
-  function hrefOf(el) {
-    const href = el.href || el.getAttribute?.("href");
-    return typeof href === "string" ? href : null;
-  }
-  function navigatesSameTab(el, href) {
-    if (!href) return false;
-    const scheme = href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
-    if (!href.startsWith("/") && !(scheme && /^https?$/i.test(scheme))) {
-      return false;
-    }
-    const target2 = el.getAttribute?.("target");
-    if (target2 && target2.toLowerCase() !== "_self") return false;
-    if (el.hasAttribute?.("download")) return false;
-    return true;
-  }
-  function flashElement(el) {
-    try {
-      const rect = el.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return;
-      const flash2 = document.createElement("div");
-      flash2.style.cssText = `
-      position:fixed;pointer-events:none;z-index:2147483647;
-      left:${rect.left}px;top:${rect.top}px;
-      width:${rect.width}px;height:${rect.height}px;
-      background:rgba(100,149,237,0.35);border-radius:2px;
-      transition:opacity 0.15s ease-out;
-    `;
-      document.body.appendChild(flash2);
-      requestAnimationFrame(() => {
-        flash2.style.opacity = "0";
-        setTimeout(() => flash2.remove(), 200);
-      });
-    } catch {
-    }
-  }
-  function simulateClick(el) {
-    const startHref = location.href;
-    flashElement(el);
-    fireHoverSequence(el);
-    const mousedownCanceled = firePressSequence(el);
-    let clickCanceled;
-    if (mousedownCanceled) {
-      fireClick(el);
-      clickCanceled = true;
-    } else {
-      clickCanceled = elClick(el);
-    }
-    const href = hrefOf(el);
-    if (mousedownCanceled || clickCanceled || !navigatesSameTab(el, href)) return;
-    setTimeout(() => {
-      if (location.href === startHref) {
-        try {
-          window.location.assign(href);
-        } catch {
-        }
-      }
-    }, 300);
-  }
-  function placeCaretAtEnd(el) {
-    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
-      try {
-        const len = el.value ? el.value.length : 0;
-        el.setSelectionRange(len, len);
-      } catch {
-      }
-      return;
-    }
-    try {
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch {
-    }
-  }
-  function focusAndPlaceCaret(el) {
-    const editable = el.querySelector(
-      '[contenteditable="true"], [contenteditable="plaintext-only"], input:not([type="hidden"]), textarea'
-    );
-    if (editable) el = editable;
-    el.focus();
-    if (el.isConnected) firePointerSequence(el);
-    if (el.isConnected && deepActiveElement() !== el) el.focus();
-    placeCaretAtEnd(el);
-    const fightFocusStealer = () => {
-      if (el.isConnected) {
-        el.focus();
-        placeCaretAtEnd(el);
-      }
-      el.removeEventListener("focusout", fightFocusStealer);
-    };
-    el.addEventListener("focusout", fightFocusStealer);
-    setTimeout(() => {
-      el.removeEventListener("focusout", fightFocusStealer);
-    }, 300);
-  }
-  function focusSingleInput() {
-    if (mode !== "focus" || pendingTopLevel.length !== 1) return;
-    const el = pendingTopLevel[0];
-    cancel();
-    focusAndPlaceCaret(el);
-  }
-  var MODES = {
-    click: {
-      clickable: true,
-      activate: activateClick
-    },
-    newtab: {
-      clickable: true,
-      linkOnly: true,
-      activate: openInNewTab
-    },
-    yank: {
-      clickable: true,
-      linkOnly: true,
-      activate: yankLink
-    },
-    yanktext: {
-      clickable: true,
-      linkOnly: true,
-      activate: yankLinkText
-    },
-    focus: { selector: FOCUS_SELECTOR, activate: focusAndPlaceCaret },
-    background: {
-      clickable: true,
-      linkOnly: true,
-      sticky: true,
-      activate: openInNewTab
-    }
-  };
-  var ACTIVATABLE_SELECTOR = [
-    "a[href]",
-    "area[href]",
-    "button",
-    "input:not([type='hidden'])",
-    "select",
-    "textarea",
-    "[role='button']",
-    "[role='link']"
-  ].join(",");
-  function activateClick(el) {
-    if (el.matches(FOCUS_SELECTOR) || el.querySelector(FOCUS_SELECTOR)) {
-      focusAndPlaceCaret(el);
-      return;
-    }
-    if (!el.matches(ACTIVATABLE_SELECTOR)) {
-      const inner = el.querySelector(ACTIVATABLE_SELECTOR);
-      if (inner) el = inner;
-    }
-    simulateClick(el);
-  }
-  function alphabet() {
-    return settings.getHintChars() || settingsDefaults.hintChars;
-  }
-  var mode = null;
-  var needsRelay = false;
-  var labels = /* @__PURE__ */ new Map();
-  var overlays2 = /* @__PURE__ */ new Map();
-  var hintWidths = /* @__PURE__ */ new WeakMap();
-  var typed = "";
-  var hintsHost = null;
-  var blockWheel = null;
-  var holdKeyup = null;
-  var rescanObserver = null;
-  var rescanShadowRoots = /* @__PURE__ */ new Set();
-  var rescanTimer = null;
-  var hintGeneration = 0;
-  var savedGeneration = 0;
-  function getHintsHost() {
-    if (hintsHost && hintsHost.isConnected) return hintsHost;
-    hintsHost = document.createElement("div");
-    hintsHost.className = "jari-hints-host";
-    hintsHost.setAttribute("aria-hidden", "true");
-    hintsHost.style.cssText = "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483647;";
-    document.body.appendChild(hintsHost);
-    return hintsHost;
-  }
-  function isActive() {
-    return mode !== null;
-  }
-  function setWheelBlocking(on) {
-    if (on && !blockWheel) {
-      blockWheel = (event) => event.preventDefault();
-      window.addEventListener("wheel", blockWheel, {
-        capture: true,
-        passive: false
-      });
-    } else if (!on && blockWheel) {
-      window.removeEventListener("wheel", blockWheel, { capture: true });
-      blockWheel = null;
-    }
-  }
-  var scrollTracking = null;
-  var trackingFrame = null;
-  function setScrollTracking(on) {
-    if (on && !scrollTracking) {
-      scrollTracking = () => scheduleHintReposition();
-      window.addEventListener("scroll", scrollTracking, {
-        capture: true,
-        passive: true
-      });
-      window.addEventListener("resize", scrollTracking, { passive: true });
-    } else if (!on && scrollTracking) {
-      window.removeEventListener("scroll", scrollTracking, { capture: true });
-      window.removeEventListener("resize", scrollTracking);
-      scrollTracking = null;
-    }
-  }
-  var RESCAN_DEBOUNCE_MS = 200;
-  var RESCAN_ATTRIBUTES = /* @__PURE__ */ new Set([
-    "class",
-    "style",
-    "href",
-    "src",
-    "jsaction",
-    "onclick"
-  ]);
-  function isJariNode(target2) {
-    return target2 && typeof target2.closest === "function" && target2.closest(".jari-hints-host, .jari-measure, .jari-status-stack");
-  }
-  function onRescanMutation(records) {
-    for (const record of records) {
-      if (isJariNode(record.target)) continue;
-      if (record.type === "attributes") {
-        if (!RESCAN_ATTRIBUTES.has(record.attributeName)) continue;
-      } else if (record.type === "childList" && record.addedNodes.length === 0) {
-        continue;
-      }
-      scheduleRescan();
-      return;
-    }
-  }
-  function scheduleRescan() {
-    if (rescanTimer !== null) return;
-    rescanTimer = setTimeout(() => {
-      rescanTimer = null;
-      if (!isActive()) return;
-      try {
-        const p = chrome.runtime.sendMessage({ type: "RESCAN_HINTS" });
-        if (p && typeof p.catch === "function") p.catch(() => {
-        });
-      } catch {
-      }
-    }, RESCAN_DEBOUNCE_MS);
-  }
-  function setRescanTracking(on) {
-    if (typeof MutationObserver === "undefined") return;
-    if (on) {
-      if (!rescanObserver) {
-        rescanObserver = new MutationObserver(onRescanMutation);
-        try {
-          rescanObserver.observe(document.documentElement, {
-            subtree: true,
-            childList: true,
-            attributes: true,
-            attributeFilter: [...RESCAN_ATTRIBUTES]
-          });
-        } catch {
-        }
-      }
-      for (const root of rescanShadowRoots) {
-        try {
-          rescanObserver.observe(root, {
-            subtree: true,
-            childList: true,
-            attributes: true,
-            attributeFilter: [...RESCAN_ATTRIBUTES]
-          });
-        } catch {
-        }
-      }
-    } else if (rescanObserver) {
-      rescanObserver.disconnect();
-      rescanObserver = null;
-    }
-  }
-  function scheduleHintReposition() {
-    if (trackingFrame !== null) return;
-    trackingFrame = requestAnimationFrame(repositionHints);
-  }
-  function repositionHints() {
-    trackingFrame = null;
-    for (const [label, el] of labels) {
-      const box = overlays2.get(label);
-      if (!box) continue;
-      const rect = hintRect(el, el.getBoundingClientRect());
-      const width = hintWidths.get(box) || box.offsetWidth || LABEL_HEIGHT;
-      const pos = labelPlacement(
-        rect,
-        settings.getHintPosition(),
-        window.scrollX,
-        window.scrollY,
-        window.innerWidth,
-        window.innerHeight,
-        width
-      );
-      if (!pos) {
-        box.style.display = "none";
-        continue;
-      }
-      box.style.display = "";
-      box.style.left = pos.left + "px";
-      box.style.top = pos.top + "px";
-      if (pos.transform) box.style.transform = pos.transform;
-    }
-    deOverlapBoxes();
-  }
-  function isJsactionClick(el) {
-    const jsaction = el.getAttribute?.("jsaction");
-    if (!jsaction) return false;
-    for (const rawRule of jsaction.split(";")) {
-      const rule = rawRule.trim();
-      if (!rule) continue;
-      const split = rule.split(":");
-      if (split.length < 1 || split.length > 2) continue;
-      const eventType = split.length === 1 ? "click" : split[0];
-      if (eventType !== "click") continue;
-      const action = split.length === 1 ? rule : split[1];
-      const [namespace, actionName = "_"] = action.split(".");
-      if (namespace === "none" || actionName === "_") continue;
-      return true;
-    }
-    return false;
-  }
-  function isElementClickable(el) {
-    if (el.tagName === "AREA") return el.hasAttribute("href");
-    if (el.matches(CLICKABLE_SELECTOR)) return true;
-    if (isJsactionClick(el)) return true;
-    try {
-      const style = window.getComputedStyle(el);
-      const cursor = style.cursor;
-      if (cursor === "pointer" || typeof cursor === "string" && cursor.startsWith("url(")) {
-        if (el.closest(
-          "a, button, input, select, textarea, [onclick], [role=button], [role=link], [role=menuitem], [role=tab], summary, [contenteditable='true']"
-        )) {
-          return true;
-        }
-        return true;
-      }
-    } catch {
-    }
-    const userSelector = settings.getClickableSelector();
-    if (userSelector) {
-      try {
-        if (el.matches(userSelector)) return true;
-      } catch {
-      }
-    }
-    return false;
-  }
-  function isElementDrawn(el, rect) {
-    if (rect.width <= 0 || rect.height <= 0) return false;
-    if (el.offsetWidth <= 0 && el.offsetHeight <= 0 && el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")
-      return false;
-    try {
-      const style = window.getComputedStyle(el);
-      if (style.visibility === "hidden") return false;
-      if (parseFloat(style.opacity) === 0) return false;
-    } catch {
-      return false;
-    }
-    if (typeof el.checkVisibility === "function" && !el.checkVisibility({ opacityProperty: true })) {
-      return false;
-    }
-    return true;
-  }
-  function getVisibleElements(filter) {
-    const elements = [];
-    const shadowRoots = /* @__PURE__ */ new Set();
-    const walk = (root) => {
-      if (root !== document) shadowRoots.add(root);
-      const children = root.querySelectorAll("*");
-      for (const el of children) {
-        if (el.shadowRoot) walk(el.shadowRoot);
-      }
-      filter(Array.from(children), elements, shadowRoots);
-    };
-    walk(document);
-    return { elements, shadowRoots };
-  }
-  function isFormElement(el) {
-    return typeof el.matches === "function" && el.matches("input, textarea, select, form") || el.contentEditable === "true";
-  }
-  function filterOverlapElements(elements) {
-    const filtered2 = [];
-    const ancestors = /* @__PURE__ */ new Set();
-    for (const el of elements) {
-      let dominated = false;
-      let parent = el.parentElement || el.getRootNode().host;
-      while (parent) {
-        if (ancestors.has(parent)) {
-          dominated = true;
-          break;
-        }
-        parent = parent.parentElement || parent.getRootNode().host;
-      }
-      if (!dominated) {
-        if (isFormElement(el)) {
-          filtered2.push(el);
-          ancestors.add(el);
-          continue;
-        }
-        const rect = el.getBoundingClientRect();
-        let covered = false;
-        try {
-          const root = el.getRootNode();
-          const top = root === document ? document.elementFromPoint(
-            rect.left + rect.width / 2,
-            rect.top + rect.height / 2
-          ) : root.elementFromPoint(
-            rect.left + rect.width / 2,
-            rect.top + rect.height / 2
-          );
-          if (top && top !== el && !el.contains(top)) covered = true;
-        } catch {
-        }
-        if (!covered) {
-          filtered2.push(el);
-          ancestors.add(el);
-        }
-      }
-    }
-    return collapseAncestors(filtered2);
-  }
-  function collapseAncestors(elements) {
-    const result = [];
-    for (const el of elements) {
-      let dominated = false;
-      for (let i = 0; i < result.length; i++) {
-        if (result[i].contains(el)) {
-          if (!(result[i].tagName === "A" && result[i].hasAttribute("href"))) {
-            result[i] = el;
-          }
-          dominated = true;
-          break;
-        }
-        if (el.contains(result[i])) {
-          dominated = true;
-          break;
-        }
-      }
-      if (!dominated) result.push(el);
-    }
-    return result;
-  }
-  var pendingTopLevel = [];
-  var pendingRects = /* @__PURE__ */ new Map();
-  async function start(nextMode) {
-    if (!chrome.runtime?.id) {
-      console.debug(
-        "[jari] Extension context invalidated. Skipping hint coordination."
-      );
-      return;
-    }
-    try {
-      const res = await chrome.runtime.sendMessage({
-        type: "COORDINATE_HINTS",
-        mode: nextMode
-      });
-      needsRelay = Boolean(res && res.needsRelay);
-      if (res && res.drawLocally) {
-        const count = countHints(nextMode);
-        if (count === 0) {
-          cancel();
-          ui.toast("No matches");
-        } else if (nextMode === "focus" && pendingTopLevel.length === 1) {
-          focusSingleInput();
-        } else {
-          drawHints(0, needsRelay);
-        }
-      }
-    } catch (err) {
-      console.debug(
-        "[jari] Failed to coordinate hints (context likely invalidated):",
-        err
-      );
-      needsRelay = false;
-    }
-  }
-  function countHints(nextMode) {
-    const config = MODES[nextMode];
-    if (!config) return 0;
-    const previousTyped = typed;
-    mode = nextMode;
-    typed = previousTyped;
-    savedGeneration = hintGeneration;
-    let filter;
-    if (config.selector) {
-      filter = (children, elements2) => {
-        for (const el of children) {
-          if (el.matches(config.selector) && isInteractive(el)) {
-            elements2.push(el);
-          }
-        }
-      };
-    } else if (config.clickable) {
-      filter = (children, elements2) => {
-        for (const el of children) {
-          if (isElementClickable(el) && isInteractive(el)) {
-            const rect = el.getBoundingClientRect();
-            if (isElementDrawn(el, rect)) {
-              elements2.push(el);
-            }
-          }
-        }
-      };
-    } else {
-      return 0;
-    }
-    const { elements, shadowRoots } = getVisibleElements(filter);
-    rescanShadowRoots = shadowRoots;
-    setRescanTracking(true);
-    let filtered2 = elements;
-    filtered2 = filterOverlapElements(filtered2);
-    if (config.linkOnly) {
-      filtered2 = filtered2.filter((el) => linkHref(el));
-    }
-    const rects = /* @__PURE__ */ new Map();
-    for (const el of filtered2) {
-      rects.set(el, hintRect(el, el.getBoundingClientRect()));
-    }
-    pendingTopLevel = filtered2;
-    pendingRects = rects;
-    return filtered2.length;
-  }
-  function drawHints(startIndex, relay) {
-    if (hintGeneration !== savedGeneration) return;
-    if (relay !== void 0) needsRelay = relay;
-    const hintCount = pendingTopLevel.length;
-    if (hintCount === 0) return;
-    overlays2.clear();
-    labels.clear();
-    const hintLabels = generateLabels(hintCount, startIndex);
-    const host = getHintsHost();
-    host.textContent = "";
-    const fragment = document.createDocumentFragment();
-    const position = settings.getHintPosition();
-    for (let i = 0; i < hintCount; i++) {
-      const el = pendingTopLevel[i];
-      const label = hintLabels[i];
-      const box = createHintOverlay(label, pendingRects.get(el), position);
-      if (!box) continue;
-      labels.set(label, el);
-      overlays2.set(label, box);
-      fragment.appendChild(box);
-    }
-    host.appendChild(fragment);
-    deOverlapBoxes();
-    setWheelBlocking(true);
-    setScrollTracking(true);
-    setRescanTracking(true);
-    if (typed && ![...labels.keys()].some((l) => l.toLowerCase().startsWith(typed))) {
-      typed = "";
-    }
-    updateHighlight();
-  }
-  function isInteractive(el) {
-    if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
-    if (el.type === "hidden") return false;
-    if (el.hidden) return false;
-    if (el.getAttribute("contenteditable") === "false") return false;
-    if (el.closest(overlaySelectors)) return false;
-    if (el.tagName === "A" || el.tagName === "AREA") {
-      const href = el.getAttribute("href");
-      if (href === null || href.trim() === "") return false;
-    }
-    return true;
-  }
-  function generateLabels(count, startIndex = 0) {
-    const chars = alphabet();
-    const n = chars.length;
-    const labels2 = [];
-    let i = 0;
-    let length = 2;
-    const totalToGenerate = count + startIndex;
-    while (i < totalToGenerate) {
-      const combos = Math.pow(n, length);
-      for (let k = 0; k < combos && i < totalToGenerate; k++, i++) {
-        if (i >= startIndex) {
-          labels2.push(toBase26(k, length, chars));
-        }
-      }
-      length++;
-    }
-    return labels2;
-  }
-  function toBase26(value, length, chars) {
-    const n = chars.length;
-    let s = "";
-    for (let p = 0; p < length; p++) {
-      s = chars[value % n] + s;
-      value = Math.floor(value / n);
-    }
-    return s;
-  }
-  function hintRect(el, fallback) {
-    if (el.childElementCount === 0) {
-      const rects = el.getClientRects();
-      if (rects.length === 3) {
-        return rects[1];
-      } else if (rects.length === 2) {
-        return rects[0];
-      }
-    } else if (el.childElementCount === 1 && el.firstElementChild.textContent) {
-      const childRect = el.firstElementChild.getBoundingClientRect();
-      if (childRect.width >= 4 && childRect.height >= 4) {
-        return childRect;
-      }
-    }
-    return fallback;
-  }
-  function labelPlacement(rect, position, scrollX, scrollY, viewportWidth, viewportHeight, width = LABEL_HEIGHT) {
-    const left = Math.max(rect.left, 0);
-    const top = Math.max(rect.top, 0);
-    const right = Math.min(rect.right, viewportWidth);
-    const bottom = Math.min(rect.bottom, viewportHeight);
-    if (right <= left || bottom <= top) return null;
-    const [vert, horiz] = position.split("-");
-    const cx = (left + right) / 2;
-    const cy = (top + bottom) / 2;
-    const anchorX = horiz === "center" ? cx : horiz === "right" ? right : left;
-    const anchorY = vert === "middle" ? cy : vert === "bottom" ? bottom : top;
-    const tx = horiz === "center" ? -50 : horiz === "right" ? -100 : 0;
-    const ty = vert === "middle" ? -50 : vert === "bottom" ? -100 : 0;
-    const half = LABEL_HEIGHT / 2;
-    const widthHalf = width / 2;
-    const minX = tx === -100 ? width : tx === -50 ? widthHalf : 0;
-    const maxX = tx === -100 ? viewportWidth : tx === -50 ? viewportWidth - widthHalf : viewportWidth - width;
-    const minY = ty === -100 ? LABEL_HEIGHT : ty === -50 ? half : 0;
-    const maxY = ty === -100 ? viewportHeight : ty === -50 ? viewportHeight - half : viewportHeight - LABEL_HEIGHT;
-    return {
-      left: scrollX + Math.min(Math.max(anchorX, minX), maxX),
-      top: scrollY + Math.min(Math.max(anchorY, minY), maxY),
-      transform: `translate(${tx}%, ${ty}%)`
-    };
-  }
-  function measureHintWidth(box) {
-    const host = document.createElement("div");
-    host.className = "jari-measure";
-    host.style.cssText = "position:fixed;left:-10000px;top:0;pointer-events:none;visibility:hidden;";
-    document.body.appendChild(host);
-    host.appendChild(box);
-    const rect = box.getBoundingClientRect ? box.getBoundingClientRect() : null;
-    const width = rect && rect.width ? rect.width : box.offsetWidth;
-    host.removeChild(box);
-    document.body.removeChild(host);
-    hintWidths.set(box, width);
-    return width;
-  }
-  function createHintOverlay(label, rect, position) {
-    const box = document.createElement("div");
-    box.className = "jari-hint";
-    for (const ch of label) {
-      const span = document.createElement("span");
-      span.textContent = ch;
-      box.appendChild(span);
-    }
-    const width = measureHintWidth(box);
-    const pos = labelPlacement(
-      rect,
-      position,
-      window.scrollX,
-      window.scrollY,
-      window.innerWidth,
-      window.innerHeight,
-      width
-    );
-    if (!pos) return null;
-    box.style.left = pos.left + "px";
-    box.style.top = pos.top + "px";
-    if (pos.transform) box.style.transform = pos.transform;
-    return box;
-  }
-  var DE_OVERLAP_PAD = 2;
-  function resolveOverlap(a, b, viewportWidth, viewportHeight, pad = DE_OVERLAP_PAD) {
-    const bw = b.right - b.left;
-    const bh = b.bottom - b.top;
-    const dyDown = a.bottom + pad - b.top;
-    const dxRight = a.right + pad - b.left;
-    const dyUp = b.bottom - a.top + pad;
-    const dxLeft = b.right - a.left + pad;
-    if (dyDown > 0 && b.top + dyDown + bh <= viewportHeight + pad) {
-      return { dx: 0, dy: dyDown };
-    }
-    if (dxRight > 0 && b.left + dxRight + bw <= viewportWidth + pad) {
-      return { dx: dxRight, dy: 0 };
-    }
-    if (dyUp > 0 && b.top - dyUp >= -pad) {
-      return { dx: 0, dy: -dyUp };
-    }
-    if (dxLeft > 0 && b.left - dxLeft >= -pad) {
-      return { dx: -dxLeft, dy: 0 };
-    }
-    return null;
-  }
-  function deOverlapBoxes() {
-    if (overlays2.size < 2) return;
-    const vw = window.innerWidth || document.documentElement.clientWidth;
-    const vh = window.innerHeight || document.documentElement.clientHeight;
-    const entries = [...overlays2.values()].map((box) => ({
-      box,
-      r: box.getBoundingClientRect ? box.getBoundingClientRect() : null
-    }));
-    if (entries.some((e) => !e.r)) return;
-    for (let pass = 0; pass < 3; pass++) {
-      let moved = false;
-      for (let i = 0; i < entries.length; i++) {
-        for (let j = i + 1; j < entries.length; j++) {
-          const a = entries[i].r;
-          const b = entries[j].r;
-          if (!(a.right > b.left && b.right > a.left && a.bottom > b.top && b.bottom > a.top)) {
-            continue;
-          }
-          const move2 = resolveOverlap(a, b, vw, vh);
-          if (!move2) continue;
-          const box = entries[j].box;
-          box.style.left = (parseFloat(box.style.left) || 0) + move2.dx + "px";
-          box.style.top = (parseFloat(box.style.top) || 0) + move2.dy + "px";
-          entries[j].r = box.getBoundingClientRect();
-          moved = true;
-        }
-      }
-      if (!moved) break;
-    }
-  }
-  function openInNewTab(el) {
-    const href = el.href || el.getAttribute?.("href");
-    const scheme = href && href.match(/^([a-z][a-z0-9+.-]*):/i)?.[1].toLowerCase();
-    if (scheme && urlSchemes.has(scheme)) {
-      sendMessage("openInBackgroundTab", { url: href });
-    } else {
-      simulateClick(el);
-    }
-  }
-  function linkLabel(el) {
-    const text = (el.textContent || "").trim().replace(/\s+/g, " ");
-    return text || (el.getAttribute?.("aria-label") || "").trim();
-  }
-  function yankTextFor(el) {
-    const href = hrefOf(el);
-    if (!href) return null;
-    return settings.getCopyFormat() === "markdown" ? `[${linkLabel(el)}](${href})` : href;
-  }
-  function yankLink(el) {
-    const text = yankTextFor(el);
-    if (text != null) {
-      ui.copyText(text).then(() => ui.toast("Copied"));
-    }
-  }
-  function yankLinkText(el) {
-    const text = linkLabel(el);
-    if (text) {
-      ui.copyText(text).then(() => ui.toast("Copied"));
-    }
-  }
-  function onKeyDown(event) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (event.key === " " && hintsHost) {
-      hintsHost.style.visibility = "hidden";
-      if (!holdKeyup) {
-        holdKeyup = (e) => {
-          if (e.key === " " && hintsHost) {
-            hintsHost.style.visibility = "";
-          }
-        };
-        window.addEventListener("keyup", holdKeyup);
-      }
-      return;
-    }
-    const shouldRelay = needsRelay;
-    const state2 = handleHintKey(event.key);
-    if (shouldRelay) {
-      try {
-        const p = chrome.runtime.sendMessage({
-          type: "HINTS_KEY",
-          key: event.key,
-          remaining: state2.remaining,
-          closed: state2.closed
-        });
-        if (p && typeof p.catch === "function") p.catch(() => {
-        });
-      } catch {
-      }
-    }
-  }
-  function handleHintKey(key) {
-    if (key === "Escape") {
-      cancel();
-      return { remaining: 0, closed: true };
-    }
-    if (key === "Backspace") {
-      typed = typed.slice(0, -1);
-      updateHighlight();
-      return { remaining: labels.size, closed: false };
-    }
-    typed += key.toLowerCase();
-    let exact = null;
-    let partial = 0;
-    for (const label of labels.keys()) {
-      const lower = label.toLowerCase();
-      if (lower === typed) exact = label;
-      else if (lower.startsWith(typed)) partial++;
-    }
-    if (exact && partial === 0) {
-      const modeConfig = MODES[mode];
-      try {
-        modeConfig.activate(labels.get(exact));
-      } catch (err) {
-        console.debug("[jari] hint activation failed:", err);
-      }
-      if (modeConfig.sticky) {
-        const box = overlays2.get(exact);
-        if (box) box.remove();
-        overlays2.delete(exact);
-        labels.delete(exact);
-        typed = "";
-        updateHighlight();
-        if (labels.size === 0) {
-          cancel();
-          return { remaining: 0, closed: true };
-        }
-        return { remaining: labels.size, closed: false };
-      }
-      cancel();
-      return { remaining: 0, closed: true };
-    }
-    if (!exact && partial === 0) {
-      cancel();
-      return { remaining: 0, closed: true };
-    }
-    updateHighlight();
-    return { remaining: labels.size, closed: false };
-  }
-  function updateHighlight() {
-    for (const [label, box] of overlays2) {
-      const matches = label.toLowerCase().startsWith(typed);
-      box.classList.toggle("jari-hint-dim", !matches);
-      for (let i = 0; i < box.children.length; i++) {
-        box.children[i].classList.toggle("muted", matches && i < typed.length);
-      }
-    }
-  }
-  function cancel() {
-    hintGeneration++;
-    setWheelBlocking(false);
-    setScrollTracking(false);
-    setRescanTracking(false);
-    if (holdKeyup) {
-      window.removeEventListener("keyup", holdKeyup);
-      holdKeyup = null;
-    }
-    rescanShadowRoots.clear();
-    if (rescanTimer !== null) {
-      clearTimeout(rescanTimer);
-      rescanTimer = null;
-    }
-    if (trackingFrame !== null) {
-      cancelAnimationFrame(trackingFrame);
-      trackingFrame = null;
-    }
-    if (hintsHost) hintsHost.remove();
-    hintsHost = null;
-    overlays2.clear();
-    labels.clear();
-    typed = "";
-    mode = null;
-    needsRelay = false;
-  }
-  var Hints = {
-    start,
-    cancel,
-    onKeyDown,
-    isActive,
-    placeCaretAtEnd,
-    generateLabels,
-    setWheelBlocking,
-    setScrollTracking,
-    labelPlacement,
-    clickableSelector: CLICKABLE_SELECTOR,
-    isJsactionClick,
-    hintRect,
-    simulateClick,
-    resolveOverlap,
-    yankTextFor,
-    setRescanTracking,
-    isInteractive,
-    isElementClickable,
-    isElementDrawn,
-    getVisibleElements,
-    filterOverlapElements
-  };
-  register("hints", { close: cancel, onKeyDown, isActive });
-  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.type === "COUNT_HINTS") {
-      sendResponse(countHints(msg.mode));
-    } else if (msg.type === "DRAW_HINTS") {
-      drawHints(msg.startIndex, msg.needsRelay);
-    } else if (msg.type === "HINTS_RESET") {
-      cancel();
-      if (msg.toast) ui.toast(msg.toast);
-    } else if (msg.type === "HINTS_KEY") {
-      sendResponse(handleHintKey(msg.key));
-    } else if (msg.type === "HINTS_FOCUS_SINGLE") {
-      focusSingleInput();
-    } else if (msg.type === "HINTS_CLOSE") {
-      cancel();
-    }
-  });
-
   // content/prompt.js
   var active = false;
   var overlay = null;
@@ -1894,32 +770,32 @@
   var filtered = [];
   var selected = 0;
   var query = "";
-  var mode2 = "tabs";
+  var mode = "tabs";
   var suggestSeq = 0;
   var suggestTimer = null;
   var restoreFocus = null;
-  function isActive2() {
+  function isActive() {
     return active;
   }
   async function open() {
     if (active) return;
     tabs = await sendMessage("listTabs") || [];
     if (tabs.length === 0) return;
-    mode2 = "tabs";
+    mode = "tabs";
     active = true;
     render("Tabs", "Search tabs...");
   }
   function openOmnibar() {
     if (active) return;
     tabs = [];
-    mode2 = "open";
+    mode = "open";
     active = true;
     render("Open", "Search or type URL");
   }
   function openEditUrl() {
     if (active) return;
     tabs = [];
-    mode2 = "edit";
+    mode = "edit";
     active = true;
     render("Edit URL", "Search or type URL");
     inputEl.value = location.href;
@@ -1928,7 +804,7 @@
   function openMerge(data) {
     if (active) return;
     tabs = data && data.tabs || [];
-    mode2 = "merge";
+    mode = "merge";
     active = true;
     render("Merge into", "Choose a window...");
   }
@@ -1980,7 +856,7 @@
     inputEl.addEventListener("input", () => {
       const q = inputEl.value.trim();
       query = q;
-      if (mode2 === "open" || mode2 === "edit") {
+      if (mode === "open" || mode === "edit") {
         handleOpenInput(q);
       } else {
         filtered = q ? rankTabs(q, tabs) : tabs;
@@ -2063,7 +939,7 @@
   function renderList() {
     const rows = filtered.slice(0, 50);
     listEl.textContent = "";
-    if (mode2 === "open" || mode2 === "edit") {
+    if (mode === "open" || mode === "edit") {
       for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
       highlight();
       return;
@@ -2086,7 +962,7 @@
     selected = (selected + delta + filtered.length) % filtered.length;
     highlight();
   }
-  function onKeyDown2(event) {
+  function onKeyDown(event) {
     const inInput = document.activeElement === inputEl;
     if (inInput) {
       if (event.key === "Escape") {
@@ -2125,15 +1001,15 @@
   function activate() {
     const item = filtered[selected];
     if (!item) {
-      if (mode2 === "open" && !inputEl.value.trim()) sendMessage("createTab");
+      if (mode === "open" && !inputEl.value.trim()) sendMessage("createTab");
       close();
       return;
     }
-    if (mode2 === "merge") {
+    if (mode === "merge") {
       sendMessage("mergeTab", { targetWindowId: item.windowId });
-    } else if (mode2 === "open" || mode2 === "edit") {
-      if (item.kind === "search") sendMessage("search", { query: inputEl.value, newTab: mode2 === "open" });
-      else if (item.url) sendMessage(mode2 === "open" ? "createTab" : "navigate", { url: item.url });
+    } else if (mode === "open" || mode === "edit") {
+      if (item.kind === "search") sendMessage("search", { query: inputEl.value, newTab: mode === "open" });
+      else if (item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
     } else {
       sendMessage("activateTab", { id: item.id });
     }
@@ -2152,15 +1028,15 @@
     filtered = [];
     selected = 0;
     query = "";
-    mode2 = "tabs";
+    mode = "tabs";
     active = false;
     if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
       restoreFocus.focus();
     }
     restoreFocus = null;
   }
-  var Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown: onKeyDown2, isActive: isActive2 };
-  register("prompt", { close, onKeyDown: onKeyDown2, isActive: isActive2 });
+  var Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
+  register("prompt", { close, onKeyDown, isActive });
 
   // content/catalog.js
   var COMMAND_CATALOG = {
@@ -2199,12 +1075,6 @@
     toggleMute: { category: "tabActions", label: "Mute/unmute tab" },
     historyBack: { category: "history", label: "Go back in history" },
     historyForward: { category: "history", label: "Go forward in history" },
-    linkHints: { category: "hints", label: "Link hints" },
-    linkHintsNewTab: { category: "hints", label: "Link hints (new tab)" },
-    linkHintsBackground: { category: "hints", label: "Link hints (background, keep open)" },
-    linkHintsYank: { category: "hints", label: "Copy link URL" },
-    linkHintsYankText: { category: "hints", label: "Copy link text" },
-    focusInput: { category: "hints", label: "Focus input" },
     reloadTab: { category: "page", label: "Reload" },
     hardReload: { category: "page", label: "Reload (bypass cache)" },
     goUp: { category: "page", label: "Go to parent path" },
@@ -2226,7 +1096,7 @@
   var overlay2 = null;
   var listEl2 = null;
   var gPending = false;
-  function isActive3() {
+  function isActive2() {
     return active2;
   }
   function open2() {
@@ -2294,7 +1164,7 @@
     overlay2.appendChild(footer);
     document.body.appendChild(overlay2);
   }
-  function onKeyDown3(event) {
+  function onKeyDown2(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     if (event.key === "Escape") {
@@ -2340,8 +1210,8 @@
     gPending = false;
     active2 = false;
   }
-  var Help = { open: open2, close: close2, onKeyDown: onKeyDown3, isActive: isActive3 };
-  register("help", { close: close2, onKeyDown: onKeyDown3, isActive: isActive3 });
+  var Help = { open: open2, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
+  register("help", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
 
   // content/commands.js
   var PAGE_RATIO = 0.9;
@@ -2541,12 +1411,6 @@ ${location.href}`;
       ...COMMAND_CATALOG.editUrl,
       run: () => Prompt.openEditUrl()
     },
-    linkHints: { ...COMMAND_CATALOG.linkHints, run: () => Hints.start("click") },
-    linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
-    linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
-    linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
-    linkHintsYankText: { ...COMMAND_CATALOG.linkHintsYankText, run: () => Hints.start("yanktext") },
-    focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
     historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
     historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
     copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
@@ -2571,8 +1435,6 @@ ${location.href}`;
   var fuzzyMatchingEl = document.querySelector("#fuzzy-matching");
   var timeoutEl = document.querySelector("#timeout");
   var passthroughEl = document.querySelector("#passthrough-timeout");
-  var hintCharsEl = document.querySelector("#hint-chars");
-  var hintPositionEl = document.querySelector("#hint-position");
   var sourceTabEl = document.querySelector("#source-tab");
   var sourceHistoryEl = document.querySelector("#source-history");
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
@@ -2588,8 +1450,6 @@ ${location.href}`;
     fuzzyMatchingEl.checked = settings.isFuzzyMatching();
     timeoutEl.value = settings.getTimeoutMs();
     passthroughEl.value = settings.getPassthroughMs();
-    hintCharsEl.value = settings.getHintChars();
-    hintPositionEl.value = settings.getHintPosition();
     const sources = settings.getSuggestionSources();
     sourceTabEl.checked = sources.includes("tab");
     sourceHistoryEl.checked = sources.includes("history");
@@ -2746,8 +1606,6 @@ ${location.href}`;
       fuzzyMatching: fuzzyMatchingEl.checked,
       timeoutMs: parseInt(timeoutEl.value, 10),
       passthroughMs: parseInt(passthroughEl.value, 10),
-      hintChars: hintCharsEl.value,
-      hintPosition: hintPositionEl.value,
       suggestionSources: sources,
       copyFormat: copyFormatEl.value
     };
@@ -2766,8 +1624,6 @@ ${location.href}`;
       fuzzyMatching: SETTINGS_DEFAULTS.fuzzyMatching,
       timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
       passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
-      hintChars: SETTINGS_DEFAULTS.hintChars,
-      hintPosition: SETTINGS_DEFAULTS.hintPosition,
       suggestionSources: SETTINGS_DEFAULTS.suggestionSources.slice(),
       copyFormat: SETTINGS_DEFAULTS.copyFormat
     }).then(() => status("Reset to defaults")).catch(() => status("Save failed"));
@@ -2776,8 +1632,6 @@ ${location.href}`;
     fuzzyMatchingEl.checked = SETTINGS_DEFAULTS.fuzzyMatching;
     timeoutEl.value = SETTINGS_DEFAULTS.timeoutMs;
     passthroughEl.value = SETTINGS_DEFAULTS.passthroughMs;
-    hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
-    hintPositionEl.value = SETTINGS_DEFAULTS.hintPosition;
     sourceTabEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("tab");
     sourceHistoryEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("history");
     sourceBookmarkEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("bookmark");

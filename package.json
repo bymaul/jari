@@ -7,7 +7,6 @@
   "scripts": {
     "lint": "eslint .",
     "test": "node --test",
-    "bench": "node benchmarks/hints.js",
     "build:chrome": "node build.js chrome",
     "build:firefox": "node build.js firefox"
   },

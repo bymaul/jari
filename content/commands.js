@@ -2,7 +2,6 @@ import { Url } from "./keymap.js";
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
 import { Scroll } from "./scroll.js";
-import { Hints } from "./hints.js";
 import { Prompt } from "./prompt.js";
 import { Help } from "./help.js";
 import { COMMAND_CATALOG } from "./catalog.js";
@@ -236,13 +235,6 @@ export const commands = {
     ...COMMAND_CATALOG.editUrl,
     run: () => Prompt.openEditUrl(),
   },
-
-  linkHints: { ...COMMAND_CATALOG.linkHints, run: () => Hints.start("click") },
-  linkHintsNewTab: { ...COMMAND_CATALOG.linkHintsNewTab, run: () => Hints.start("newtab") },
-  linkHintsBackground: { ...COMMAND_CATALOG.linkHintsBackground, run: () => Hints.start("background") },
-  linkHintsYank: { ...COMMAND_CATALOG.linkHintsYank, run: () => Hints.start("yank") },
-  linkHintsYankText: { ...COMMAND_CATALOG.linkHintsYankText, run: () => Hints.start("yanktext") },
-  focusInput: { ...COMMAND_CATALOG.focusInput, run: () => Hints.start("focus") },
 
   historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
   historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },

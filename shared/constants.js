@@ -13,5 +13,4 @@ export const blockedUrlSchemes = new Set([
 export const suggestionSources = ["tab", "history", "bookmark"];
 
 export const MIN_SCROLL_AREA_SIZE = 16;
-export const MIN_VISIBLE_HINT_SIZE = 4;
 export const OCCLUSION_SAMPLE_THRESHOLD = 8;

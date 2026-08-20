@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jari — Settings</title>
     <link rel="stylesheet" href="options.css" />
-    <!-- content.css styles Jari's own UI (help overlay, hints, showcmd) on
+    <!-- content.css styles Jari's own UI (help overlay, showcmd) on
          this page too. -->
     <link rel="stylesheet" href="../content/content.css" />
   </head>
@@ -63,41 +63,6 @@
             <label class="check"><input id="source-tab" type="checkbox" /> Tabs</label>
             <label class="check"><input id="source-history" type="checkbox" /> History</label>
             <label class="check"><input id="source-bookmark" type="checkbox" /> Bookmarks</label>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Hints</h2>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="hint-chars">Hint characters</label>
-            <p class="hint">
-              Used for <code data-key="linkHints"></code>/<code data-key="linkHintsNewTab"></code>/<code data-key="linkHintsBackground"></code>/<code data-key="linkHintsYank"></code>
-              labels. Any run of unique characters works.
-            </p>
-          </div>
-          <div class="setting-control">
-            <input id="hint-chars" type="text" />
-          </div>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="hint-position">Hint label position</label>
-            <p class="hint">Where the label is anchored on each <code data-key="linkHints"></code> target.</p>
-          </div>
-          <div class="setting-control">
-            <select id="hint-position">
-              <option value="top-left">Top left</option>
-              <option value="top-center">Top center</option>
-              <option value="top-right">Top right</option>
-              <option value="middle-left">Middle left</option>
-              <option value="middle-center">Middle center</option>
-              <option value="middle-right">Middle right</option>
-              <option value="bottom-left">Bottom left</option>
-              <option value="bottom-center">Bottom center</option>
-              <option value="bottom-right">Bottom right</option>
-            </select>
           </div>
         </div>
       </section>
@@ -182,7 +147,7 @@
     </footer>
 
     <!-- The bundled content scripts are loaded here too so Jari works on the
-         settings page itself (scroll, hints, help, ignore mode, ...). -->
+         settings page itself (scroll, help, ignore mode, ...). -->
     <script src="../content/bundle.js"></script>
     <script src="options.bundle.js"></script>
   </body>

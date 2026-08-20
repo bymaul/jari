@@ -34,10 +34,7 @@ export const keymapDefaults = {
   S: "historyBack",
   D: "historyForward",
 
-  f: "linkHints",
-  F: "linkHintsNewTab",
-  gf: "linkHintsBackground",
-  i: "focusInput",
+
 
   r: "reloadTab",
   R: "hardReload",
@@ -62,7 +59,7 @@ export const keymapDefaults = {
   g0: "firstTab",
   g$: "lastTab",
   ";e": "openOptions",
-  yf: "linkHintsYank",
+
   yy: "copyUrl",
 };
 
@@ -80,7 +77,6 @@ export const categories = [
   { id: "tabs", label: "Tabs" },
   { id: "tabActions", label: "Tab actions" },
   { id: "history", label: "History" },
-  { id: "hints", label: "Hints" },
   { id: "page", label: "Page" },
   { id: "clipboard", label: "Clipboard" },
   { id: "modes", label: "Modes" },
@@ -95,10 +91,6 @@ export const settingsDefaults = {
   timeoutMs: 1500,
 
   passthroughMs: 1500,
-
-  hintChars: "sadfjklewcmpgh",
-
-  hintPosition: "top-left",
 
   suggestionSources: suggestionSources.slice(),
 
@@ -137,7 +129,7 @@ export function parseRepeatCount(raw) {
 }
 
 export const overlaySelectors =
-  ".jari-overlay, .jari-hint, .jari-scroll-highlight";
+  ".jari-overlay, .jari-scroll-highlight";
 
 export function deepActiveElement() {
   let el = document.activeElement;
@@ -205,10 +197,6 @@ export function normalizeSettings(data) {
       Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
         ? d.passthroughMs
         : settingsDefaults.passthroughMs,
-    hintChars: normalizeHintChars(d.hintChars),
-    hintPosition: HINT_POSITIONS.includes(d.hintPosition)
-      ? d.hintPosition
-      : settingsDefaults.hintPosition,
     suggestionSources: Array.isArray(d.suggestionSources)
       ? d.suggestionSources.filter((s) => suggestionSources.includes(s))
       : settingsDefaults.suggestionSources.slice(),
@@ -219,26 +207,6 @@ export function normalizeSettings(data) {
         ? d.clickableSelector
         : settingsDefaults.clickableSelector,
   };
-}
-
-const HINT_POSITIONS = [
-  "top-left",
-  "top-center",
-  "top-right",
-  "middle-left",
-  "middle-center",
-  "middle-right",
-  "bottom-left",
-  "bottom-center",
-  "bottom-right",
-];
-
-function normalizeHintChars(raw) {
-  if (typeof raw !== "string") return settingsDefaults.hintChars.toUpperCase();
-  const chars = [...new Set(raw.toUpperCase())]
-    .filter((c) => /[A-Z0-9]/.test(c))
-    .join("");
-  return chars.length >= 4 ? chars : settingsDefaults.hintChars.toUpperCase();
 }
 
 export const Url = {

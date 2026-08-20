@@ -23,8 +23,6 @@ const smoothScrollEl = document.querySelector("#smooth-scroll");
 const fuzzyMatchingEl = document.querySelector("#fuzzy-matching");
 const timeoutEl = document.querySelector("#timeout");
 const passthroughEl = document.querySelector("#passthrough-timeout");
-const hintCharsEl = document.querySelector("#hint-chars");
-const hintPositionEl = document.querySelector("#hint-position");
 const sourceTabEl = document.querySelector("#source-tab");
 const sourceHistoryEl = document.querySelector("#source-history");
 const sourceBookmarkEl = document.querySelector("#source-bookmark");
@@ -42,8 +40,6 @@ async function load() {
   fuzzyMatchingEl.checked = settings.isFuzzyMatching();
   timeoutEl.value = settings.getTimeoutMs();
   passthroughEl.value = settings.getPassthroughMs();
-  hintCharsEl.value = settings.getHintChars();
-  hintPositionEl.value = settings.getHintPosition();
   const sources = settings.getSuggestionSources();
   sourceTabEl.checked = sources.includes("tab");
   sourceHistoryEl.checked = sources.includes("history");
@@ -232,8 +228,6 @@ function collectBehaviorSettings() {
     fuzzyMatching: fuzzyMatchingEl.checked,
     timeoutMs: parseInt(timeoutEl.value, 10),
     passthroughMs: parseInt(passthroughEl.value, 10),
-    hintChars: hintCharsEl.value,
-    hintPosition: hintPositionEl.value,
     suggestionSources: sources,
     copyFormat: copyFormatEl.value,
   };
@@ -260,8 +254,6 @@ function reset() {
       fuzzyMatching: SETTINGS_DEFAULTS.fuzzyMatching,
       timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
       passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
-      hintChars: SETTINGS_DEFAULTS.hintChars,
-      hintPosition: SETTINGS_DEFAULTS.hintPosition,
       suggestionSources: SETTINGS_DEFAULTS.suggestionSources.slice(),
       copyFormat: SETTINGS_DEFAULTS.copyFormat,
     })
@@ -272,8 +264,7 @@ function reset() {
   fuzzyMatchingEl.checked = SETTINGS_DEFAULTS.fuzzyMatching;
   timeoutEl.value = SETTINGS_DEFAULTS.timeoutMs;
   passthroughEl.value = SETTINGS_DEFAULTS.passthroughMs;
-  hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
-  hintPositionEl.value = SETTINGS_DEFAULTS.hintPosition;
+
   sourceTabEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("tab");
   sourceHistoryEl.checked =
     SETTINGS_DEFAULTS.suggestionSources.includes("history");

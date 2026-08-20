@@ -23,7 +23,6 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
   assert.equal(s.keymap.j, "scrollTop");
   assert.equal(s.keymap.t, undefined);
   assert.equal(s.timeoutMs, 1500);
-  assert.equal(s.hintChars, "SADFJKLEWCMPGH");
   assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
   assert.equal(s.copyFormat, "plain");
 
@@ -48,32 +47,20 @@ test("rebinding away a default key removes the default binding", () => {
   assert.equal(s.keymap.p, undefined);
 });
 
-test("normalizeSettings validates hintChars, suggestionSources and copyFormat", () => {
+test("normalizeSettings validates suggestionSources and copyFormat", () => {
   const s = Jari.normalizeSettings({
-    hintChars: "sadfjklewcmpgh",
     suggestionSources: ["tab"],
     copyFormat: "markdown",
   });
-  assert.equal(s.hintChars, "SADFJKLEWCMPGH");
   assert.deepEqual(s.suggestionSources, ["tab"]);
   assert.equal(s.copyFormat, "markdown");
 
-  assert.equal(Jari.normalizeSettings({ hintChars: "ab" }).hintChars, "SADFJKLEWCMPGH");
-  assert.equal(Jari.normalizeSettings({ hintChars: "aabbccdd" }).hintChars, "ABCD");
   assert.deepEqual(Jari.normalizeSettings({ suggestionSources: [] }).suggestionSources, []);
   assert.deepEqual(
     Jari.normalizeSettings({ suggestionSources: ["tab", "bogus", "bookmark"] }).suggestionSources,
     ["tab", "bookmark"],
   );
   assert.equal(Jari.normalizeSettings({ copyFormat: "bogus" }).copyFormat, "plain");
-});
-
-test("normalizeSettings validates hintPosition", () => {
-  const s = Jari.normalizeSettings({ hintPosition: "bottom-right" });
-  assert.equal(s.hintPosition, "bottom-right");
-
-  assert.equal(Jari.normalizeSettings({ hintPosition: "bogus" }).hintPosition, "top-left");
-  assert.equal(Jari.normalizeSettings({ hintPosition: "middle-center" }).hintPosition, "middle-center");
 });
 
 test("fuzzyMatch returns null when chars are missing or out of order", () => {
@@ -204,11 +191,10 @@ test("balanceCategories spreads categories across the columns", () => {
   const byCategory = new Map([
     ["scrolling", ["scrollDown", "scrollUp"]],
     ["tabs", ["tabSearch"]],
-    ["hints", ["linkHints", "linkHintsNewTab"]],
   ]);
   const columns = Jari.balanceCategories(byCategory, 3);
   const total = columns.reduce((n, col) => n + col.length, 0);
-  assert.equal(total, 3);
+  assert.equal(total, 2);
   for (const col of columns) {
     for (const cat of col) assert.ok(byCategory.has(cat.id));
   }
