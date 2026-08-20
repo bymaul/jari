@@ -1,3 +1,9 @@
+<div align="center">
+<img src="icons/jari.png"
+     title="Helium" alt="Helium logo" width="120" />
+ <h1>Jari</h1>
+</div>
+
 **Jari** _/ja·ri/_ <ins>noun</ins> 1. The web at your control. 2. A tool to keep your hands firmly on the home row. 2. Simple keyboard-driven navigation for modern browsers.
 
 ## Features
