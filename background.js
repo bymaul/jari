@@ -2,6 +2,9 @@
 
 (() => {
   // shared/constants.js
+  var suggestionSources = ["tab", "history", "bookmark"];
+
+  // shared/url.js
   var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about", "chrome"]);
   var blockedUrlSchemes = /* @__PURE__ */ new Set([
     "javascript",
@@ -12,9 +15,6 @@
     "moz-extension",
     "view-source"
   ]);
-  var suggestionSources = ["tab", "history", "bookmark"];
-
-  // background/handlers.js
   function normalizeUrl(raw) {
     if (typeof raw !== "string") return null;
     const url = raw.trim();
@@ -31,6 +31,8 @@
     if (/^(\d+)(\/.*)?$/.test(rest)) return "https://" + url;
     return null;
   }
+
+  // background/handlers.js
   function clampCount(count, max = 20) {
     const n = Math.floor(count);
     return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : 1;
@@ -93,12 +95,6 @@
     },
     nextTab: async (sender, { count = 1 } = {}) => {
       return switchTab(sender.tab, clampCount(count));
-    },
-    splitTab: async (sender) => {
-      if (sender.tab && sender.tab.id) {
-        await chrome.windows.create({ tabId: sender.tab.id });
-      }
-      return { ok: true };
     },
     splitOrMerge: async (sender) => {
       const tab = sender.tab;
@@ -318,12 +314,8 @@
       try {
         await chrome.tabs[method](tab.id);
       } catch {
+        return { ok: true };
       }
-      return { ok: true };
-    }
-    try {
-      await chrome.tabs.executeScript(tab.id, { code: `history.go(${delta})` });
-    } catch {
     }
     return { ok: true };
   }

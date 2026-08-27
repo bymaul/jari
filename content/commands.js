@@ -1,4 +1,4 @@
-import { Url } from "./keymap.js";
+import { Url } from "../shared/url.js";
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
 import { Scroll } from "./scroll.js";
@@ -198,9 +198,8 @@ export const commands = {
   nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
   firstTab: { ...COMMAND_CATALOG.firstTab, run: () => sendMessage("firstTab") },
   lastTab: { ...COMMAND_CATALOG.lastTab, run: () => sendMessage("lastTab") },
-  splitTab: { ...COMMAND_CATALOG.splitTab, run: () => sendMessage("splitTab") },
-  splitOrMergeTab: {
-    ...COMMAND_CATALOG.splitOrMergeTab,
+  splitMerge: {
+    ...COMMAND_CATALOG.splitMerge,
     run: async () => {
       const res = await sendMessage("splitOrMerge");
       if (res && res.needMerge) Prompt.openMerge(res);

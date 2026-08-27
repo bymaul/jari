@@ -6,12 +6,13 @@ import {
   prefixKeys,
   settingsDefaults,
 } from "../content/keymap.js";
+import { normalizeHost } from "../shared/url.js";
+import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
-import { commands } from "../content/commands.js";
 import { ui } from "../content/ui.js";
 
 const SETTINGS_DEFAULTS = settingsDefaults;
-const COMMANDS = commands;
+const COMMANDS = COMMAND_CATALOG;
 
 const tableEl = document.querySelector("#keymap-table");
 const saveBtn = document.querySelector("#save");
@@ -62,7 +63,6 @@ function renderKeymap() {
   const filter = keymapFilterEl.value.trim().toLowerCase();
   const byCategory = new Map();
   for (const [name, cmd] of Object.entries(COMMANDS)) {
-    if (cmd.hidden) continue;
     const id = cmd.category || "other";
     if (filter && !matchesFilter(name, cmd, filter)) continue;
     if (!byCategory.has(id)) byCategory.set(id, []);
@@ -292,31 +292,13 @@ function renderDisabled() {
     btn.type = "button";
     btn.textContent = "Enable";
     btn.addEventListener("click", () => {
-      settings.set({ disabledSites: sites.filter((s) => s !== site) });
+      settings.update({ disabledSites: sites.filter((s) => s !== site) });
       renderDisabled();
     });
     li.appendChild(siteSpan);
     li.appendChild(btn);
     disabledList.appendChild(li);
   }
-}
-
-function normalizeHost(raw) {
-  let host = raw.trim().toLowerCase();
-  if (!host) return "";
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
-    try {
-      host = new URL(host).hostname;
-    } catch {
-      return "";
-    }
-  }
-  host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
-  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
-    host,
-  )
-    ? host
-    : "";
 }
 
 function addDisabledSite() {
@@ -330,7 +312,7 @@ function addDisabledSite() {
   if (sites.includes(host)) {
     status("Already disabled: " + host);
   } else {
-    settings.set({ disabledSites: [...sites, host] });
+    settings.update({ disabledSites: [...sites, host] });
     status("Disabled: " + host);
   }
   siteInputEl.value = "";

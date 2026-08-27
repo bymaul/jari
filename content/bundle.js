@@ -31,7 +31,7 @@
     L: "nextTab",
     "<<": "moveTabLeft",
     ">>": "moveTabRight",
-    gw: "splitOrMergeTab",
+    gw: "splitMerge",
     S: "historyBack",
     D: "historyForward",
     r: "reloadTab",
@@ -80,8 +80,7 @@
     timeoutMs: 1500,
     passthroughMs: 1500,
     suggestionSources: suggestionSources.slice(),
-    copyFormat: "plain",
-    clickableSelector: ""
+    copyFormat: "plain"
   };
   var prefixKeys = new Set(Object.keys(prefixes));
   var modifierKeys = /* @__PURE__ */ new Set([
@@ -147,169 +146,8 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
-      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
-      clickableSelector: typeof d.clickableSelector === "string" ? d.clickableSelector : settingsDefaults.clickableSelector
+      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat
     };
-  }
-  var Url = {
-    parentUrlOf(href) {
-      try {
-        const url = new URL(href);
-        let path = url.pathname;
-        if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
-        const idx = path.lastIndexOf("/");
-        path = idx > 0 ? path.slice(0, idx) : "/";
-        url.pathname = path;
-        url.search = "";
-        url.hash = "";
-        return url.href;
-      } catch {
-        return href;
-      }
-    },
-    rootUrlOf(href) {
-      try {
-        const url = new URL(href);
-        url.pathname = "/";
-        url.search = "";
-        url.hash = "";
-        return url.href;
-      } catch {
-        return href;
-      }
-    },
-    isSamePath(a, b) {
-      try {
-        return new URL(a).pathname === new URL(b).pathname;
-      } catch {
-        return a === b;
-      }
-    },
-    looksLikeUrl(text) {
-      const s = text.trim();
-      if (!s || /\s/.test(s)) return false;
-      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith("//")) return true;
-      if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
-      return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
-    },
-    suggestionTerm(query2) {
-      const idx = query2.search(/\s/);
-      if (idx === -1) return query2;
-      return Url.looksLikeUrl(query2.slice(0, idx)) ? query2.slice(idx).trim() : query2;
-    }
-  };
-  function queryTerms(query2) {
-    return String(query2).trim().toLowerCase().split(/\s+/).filter(Boolean);
-  }
-  var SCORE_BASE = 2;
-  var SCORE_RUN = 12;
-  var SCORE_BOUNDARY = 8;
-  var SCORE_CAMEL = 14;
-  var SCORE_GAP = -3;
-  var SCORE_LEADING = -1;
-  var MAX_ALIGNMENT_STARTS = 64;
-  function isBoundaryAt(t, i) {
-    return i === 0 || !/[\w]/.test(t[i - 1]);
-  }
-  function scoreAlignment(indices, t, text) {
-    let score = 0;
-    let prev = -1;
-    for (const i of indices) {
-      score += SCORE_BASE;
-      if (prev !== -1) {
-        const gap = i - prev - 1;
-        score += gap === 0 ? SCORE_RUN : SCORE_GAP * gap;
-      }
-      if (isBoundaryAt(t, i)) score += SCORE_BOUNDARY;
-      else if (text[i] !== text[i].toLowerCase()) score += SCORE_CAMEL;
-      prev = i;
-    }
-    score += SCORE_LEADING * indices[0];
-    return score;
-  }
-  function bestAlignment(term, t, text) {
-    const n = t.length;
-    const q = term.length;
-    if (q === 0 || q > n) return null;
-    let best = null;
-    if (q === 1) {
-      for (let i = 0; i < n; i++) {
-        if (t[i] !== term) continue;
-        const score = scoreAlignment([i], t, text);
-        if (!best || score > best.score) best = { score, indices: [i] };
-      }
-      return best;
-    }
-    let starts = 0;
-    for (let s = 0; s < n && starts < MAX_ALIGNMENT_STARTS; s++) {
-      if (t[s] !== term[0]) continue;
-      starts++;
-      const indices = [s];
-      let pos = s + 1;
-      let ok = true;
-      for (let j = 1; j < q; j++) {
-        const i = t.indexOf(term[j], pos);
-        if (i === -1) {
-          ok = false;
-          break;
-        }
-        indices.push(i);
-        pos = i + 1;
-      }
-      if (!ok) continue;
-      const score = scoreAlignment(indices, t, text);
-      if (!best || score > best.score) best = { score, indices };
-    }
-    return best;
-  }
-  function matchTerms(query2, text) {
-    const terms = queryTerms(query2);
-    const t = String(text).toLowerCase();
-    return { terms, results: terms.map((term) => bestAlignment(term, t, text)) };
-  }
-  function fuzzyMatch(query2, text) {
-    const { terms, results } = matchTerms(query2, text);
-    if (terms.length === 0 || results.some((r) => !r)) return null;
-    const indices = [];
-    let total = 0;
-    results.forEach((r) => {
-      total += r.score;
-      indices.push(...r.indices);
-    });
-    indices.sort((a, b) => a - b);
-    return { score: total, indices };
-  }
-  function fuzzyIndices(query2, text) {
-    const { results } = matchTerms(query2, text);
-    const indices = [];
-    for (const r of results) if (r) indices.push(...r.indices);
-    return indices.sort((a, b) => a - b);
-  }
-  var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
-  function rankMatches(query2, list, fuzzy = true) {
-    const q = String(query2).trim();
-    if (!fuzzy) {
-      return list.filter((item) => substringMatch(q, item.title + " " + (item.url || "")));
-    }
-    return list.map((item) => {
-      const hay = item.title + " " + (item.url || "");
-      const match = fuzzyMatch(q, hay);
-      if (!match) return null;
-      const first = match.indices[0];
-      const last = match.indices[match.indices.length - 1];
-      return { item, match, span: last - first + 1, hayLength: hay.length };
-    }).filter(Boolean).sort((a, b) => {
-      if (b.match.score !== a.match.score) return b.match.score - a.match.score;
-      if (a.span !== b.span) return a.span - b.span;
-      if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
-      return (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3);
-    });
-  }
-  function substringMatch(query2, text) {
-    const terms = queryTerms(query2);
-    if (terms.length === 0) return false;
-    const t = String(text).toLowerCase();
-    return terms.every((term) => t.includes(term));
   }
   function balanceCategories(byCategory, columnCount = 3) {
     const columns = Array.from({ length: columnCount }, () => []);
@@ -338,8 +176,7 @@
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
-    copyFormat: settingsDefaults.copyFormat,
-    clickableSelector: settingsDefaults.clickableSelector
+    copyFormat: settingsDefaults.copyFormat
   };
   function merge(data) {
     const s = normalizeSettings(data);
@@ -352,7 +189,6 @@
     state.passthroughMs = s.passthroughMs;
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
-    state.clickableSelector = s.clickableSelector;
   }
   async function load() {
     try {
@@ -373,8 +209,7 @@
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
-        copyFormat: state.copyFormat,
-        clickableSelector: state.clickableSelector
+        copyFormat: state.copyFormat
       }
     });
   }
@@ -415,9 +250,6 @@
   function getCopyFormat() {
     return state.copyFormat;
   }
-  function getClickableSelector() {
-    return state.clickableSelector;
-  }
   function toggleDisabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -445,7 +277,6 @@
     getPassthroughMs,
     getSuggestionSources,
     getCopyFormat,
-    getClickableSelector,
     toggleDisabled
   };
 
@@ -553,6 +384,55 @@
     statusContainer,
     buildCategoryTable,
     withHiddenTextarea
+  };
+
+  // shared/url.js
+  var Url = {
+    parentUrlOf(href) {
+      try {
+        const url = new URL(href);
+        let path = url.pathname;
+        if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+        const idx = path.lastIndexOf("/");
+        path = idx > 0 ? path.slice(0, idx) : "/";
+        url.pathname = path;
+        url.search = "";
+        url.hash = "";
+        return url.href;
+      } catch {
+        return href;
+      }
+    },
+    rootUrlOf(href) {
+      try {
+        const url = new URL(href);
+        url.pathname = "/";
+        url.search = "";
+        url.hash = "";
+        return url.href;
+      } catch {
+        return href;
+      }
+    },
+    isSamePath(a, b) {
+      try {
+        return new URL(a).pathname === new URL(b).pathname;
+      } catch {
+        return a === b;
+      }
+    },
+    looksLikeUrl(text) {
+      const s = text.trim();
+      if (!s || /\s/.test(s)) return false;
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith("//")) return true;
+      if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
+      return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
+    },
+    suggestionTerm(query2) {
+      const idx = query2.search(/\s/);
+      if (idx === -1) return query2;
+      return Url.looksLikeUrl(query2.slice(0, idx)) ? query2.slice(idx).trim() : query2;
+    }
   };
 
   // content/scroll.js
@@ -765,6 +645,121 @@
     }, HIGHLIGHT_MS);
   }
   var Scroll = { getTarget, cycle, resetToGlobal, showHighlight };
+
+  // content/rank.js
+  var SCORE_BASE = 2;
+  var SCORE_RUN = 12;
+  var SCORE_BOUNDARY = 8;
+  var SCORE_CAMEL = 14;
+  var SCORE_GAP = -3;
+  var SCORE_LEADING = -1;
+  var MAX_ALIGNMENT_STARTS = 64;
+  function queryTerms(query2) {
+    return String(query2).trim().toLowerCase().split(/\s+/).filter(Boolean);
+  }
+  function isBoundaryAt(t, i) {
+    return i === 0 || !/[\w]/.test(t[i - 1]);
+  }
+  function scoreAlignment(indices, t, text) {
+    let score = 0;
+    let prev = -1;
+    for (const i of indices) {
+      score += SCORE_BASE;
+      if (prev !== -1) {
+        const gap = i - prev - 1;
+        score += gap === 0 ? SCORE_RUN : SCORE_GAP * gap;
+      }
+      if (isBoundaryAt(t, i)) score += SCORE_BOUNDARY;
+      else if (text[i] !== text[i].toLowerCase()) score += SCORE_CAMEL;
+      prev = i;
+    }
+    score += SCORE_LEADING * indices[0];
+    return score;
+  }
+  function bestAlignment(term, t, text) {
+    const n = t.length;
+    const q = term.length;
+    if (q === 0 || q > n) return null;
+    let best = null;
+    if (q === 1) {
+      for (let i = 0; i < n; i++) {
+        if (t[i] !== term) continue;
+        const score = scoreAlignment([i], t, text);
+        if (!best || score > best.score) best = { score, indices: [i] };
+      }
+      return best;
+    }
+    let starts = 0;
+    for (let s = 0; s < n && starts < MAX_ALIGNMENT_STARTS; s++) {
+      if (t[s] !== term[0]) continue;
+      starts++;
+      const indices = [s];
+      let pos = s + 1;
+      let ok = true;
+      for (let j = 1; j < q; j++) {
+        const i = t.indexOf(term[j], pos);
+        if (i === -1) {
+          ok = false;
+          break;
+        }
+        indices.push(i);
+        pos = i + 1;
+      }
+      if (!ok) continue;
+      const score = scoreAlignment(indices, t, text);
+      if (!best || score > best.score) best = { score, indices };
+    }
+    return best;
+  }
+  function matchTerms(query2, text) {
+    const terms = queryTerms(query2);
+    const t = String(text).toLowerCase();
+    return { terms, results: terms.map((term) => bestAlignment(term, t, text)) };
+  }
+  function fuzzyMatch(query2, text) {
+    const { terms, results } = matchTerms(query2, text);
+    if (terms.length === 0 || results.some((r) => !r)) return null;
+    const indices = [];
+    let total = 0;
+    results.forEach((r) => {
+      total += r.score;
+      indices.push(...r.indices);
+    });
+    indices.sort((a, b) => a - b);
+    return { score: total, indices };
+  }
+  function fuzzyIndices(query2, text) {
+    const { results } = matchTerms(query2, text);
+    const indices = [];
+    for (const r of results) if (r) indices.push(...r.indices);
+    return indices.sort((a, b) => a - b);
+  }
+  function substringMatch(query2, text) {
+    const terms = queryTerms(query2);
+    if (terms.length === 0) return false;
+    const t = String(text).toLowerCase();
+    return terms.every((term) => t.includes(term));
+  }
+  var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
+  function rankMatches(query2, list, fuzzy = true) {
+    const q = String(query2).trim();
+    if (!fuzzy) {
+      return list.filter((item) => substringMatch(q, item.title + " " + (item.url || "")));
+    }
+    return list.map((item) => {
+      const hay = item.title + " " + (item.url || "");
+      const match = fuzzyMatch(q, hay);
+      if (!match) return null;
+      const first = match.indices[0];
+      const last = match.indices[match.indices.length - 1];
+      return { item, match, span: last - first + 1, hayLength: hay.length };
+    }).filter(Boolean).sort((a, b) => {
+      if (b.match.score !== a.match.score) return b.match.score - a.match.score;
+      if (a.span !== b.span) return a.span - b.span;
+      if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
+      return (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3);
+    });
+  }
 
   // content/overlays.js
   var overlays = [];
@@ -1087,8 +1082,7 @@
     lastTab: { category: "tabs", label: "Jump to last tab" },
     tabSearch: { category: "tabs", label: "Tab search" },
     omnibar: { category: "tabs", label: "Open URL or search" },
-    splitTab: { category: "tabActions", label: "Move tab to new window" },
-    splitOrMergeTab: { category: "tabActions", label: "Split tab / merge window" },
+    splitMerge: { category: "tabActions", label: "Split / merge" },
     moveTabLeft: { category: "tabActions", label: "Move tab left" },
     moveTabRight: { category: "tabActions", label: "Move tab right" },
     duplicateTab: { category: "tabActions", label: "Duplicate tab" },
@@ -1399,9 +1393,8 @@ ${location.href}`;
     nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
     firstTab: { ...COMMAND_CATALOG.firstTab, run: () => sendMessage("firstTab") },
     lastTab: { ...COMMAND_CATALOG.lastTab, run: () => sendMessage("lastTab") },
-    splitTab: { ...COMMAND_CATALOG.splitTab, run: () => sendMessage("splitTab") },
-    splitOrMergeTab: {
-      ...COMMAND_CATALOG.splitOrMergeTab,
+    splitMerge: {
+      ...COMMAND_CATALOG.splitMerge,
       run: async () => {
         const res = await sendMessage("splitOrMerge");
         if (res && res.needMerge) Prompt.openMerge(res);
@@ -1450,7 +1443,6 @@ ${location.href}`;
   // content/content.js
   var pendingCount = "";
   var pendingPrefix = null;
-  var typedSeq = "";
   var timer = null;
   var ignoreMode = false;
   var passthroughMode = false;
@@ -1459,7 +1451,6 @@ ${location.href}`;
   function clearPending() {
     pendingCount = "";
     pendingPrefix = null;
-    typedSeq = "";
     ui.showcmd(null);
   }
   function restartTimer() {
@@ -1562,10 +1553,11 @@ ${location.href}`;
     const overlay3 = Overlays.active();
     if (overlay3) return overlay3.onKeyDown(event);
     const key = canonicalKey(event);
-    const prefixWasPending = pendingPrefix !== null;
+    const prefixKey = pendingPrefix;
+    const prefixWasPending = prefixKey !== null;
     let commandName = null;
     if (prefixWasPending) {
-      commandName = settings.getKeymap()[pendingPrefix + key] || null;
+      commandName = settings.getKeymap()[prefixKey + key] || null;
       pendingPrefix = null;
       ui.showcmd(null);
     }
@@ -1595,8 +1587,7 @@ ${location.href}`;
     }
     if (!commandName && /^[0-9]$/.test(key)) {
       if (pendingCount.length < 9) pendingCount += key;
-      typedSeq += key;
-      ui.showcmd(typedSeq);
+      ui.showcmd(pendingCount);
       event.preventDefault();
       event.stopImmediatePropagation();
       restartTimer();
@@ -1604,8 +1595,7 @@ ${location.href}`;
     }
     if (!commandName && prefixes[key]) {
       pendingPrefix = key;
-      typedSeq += key;
-      ui.showcmd(typedSeq);
+      ui.showcmd(pendingCount + key);
       event.preventDefault();
       event.stopImmediatePropagation();
       restartTimer();
@@ -1616,13 +1606,11 @@ ${location.href}`;
       clearPending();
       return;
     }
+    const countStr = pendingCount;
     const count = parseRepeatCount(pendingCount);
-    const hadCount = pendingCount !== "";
+    const hadCount = countStr !== "";
     pendingCount = "";
-    typedSeq += key;
-    const seq = typedSeq || key;
-    typedSeq = "";
-    if (hadCount || prefixWasPending) ui.flash(seq);
+    if (hadCount || prefixWasPending) ui.flash(countStr + (prefixKey || "") + key);
     restartTimer();
     run(commandName, count, event);
   }
@@ -1647,7 +1635,6 @@ ${location.href}`;
     passthroughTimer = null;
     pendingCount = "";
     pendingPrefix = null;
-    typedSeq = "";
     ignoreMode = false;
     passthroughMode = false;
     if (pills.ignore) hidePill("ignore");

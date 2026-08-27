@@ -17,7 +17,6 @@ const state = {
   passthroughMs: settingsDefaults.passthroughMs,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   copyFormat: settingsDefaults.copyFormat,
-  clickableSelector: settingsDefaults.clickableSelector,
 };
 
 function merge(data) {
@@ -31,7 +30,6 @@ function merge(data) {
   state.passthroughMs = s.passthroughMs;
   state.suggestionSources = s.suggestionSources;
   state.copyFormat = s.copyFormat;
-  state.clickableSelector = s.clickableSelector;
 }
 
 async function load() {
@@ -55,7 +53,6 @@ function persist() {
       passthroughMs: state.passthroughMs,
       suggestionSources: state.suggestionSources,
       copyFormat: state.copyFormat,
-      clickableSelector: state.clickableSelector,
     },
   });
 }
@@ -109,10 +106,6 @@ function getCopyFormat() {
   return state.copyFormat;
 }
 
-function getClickableSelector() {
-  return state.clickableSelector;
-}
-
 function toggleDisabled() {
   const host = location.hostname;
   const idx = state.disabledSites.indexOf(host);
@@ -141,6 +134,5 @@ export const settings = {
   getPassthroughMs,
   getSuggestionSources,
   getCopyFormat,
-  getClickableSelector,
   toggleDisabled,
 };

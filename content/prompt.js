@@ -1,4 +1,5 @@
-import { Url, fuzzyIndices, rankMatches } from "./keymap.js";
+import { Url } from "../shared/url.js";
+import { fuzzyIndices, rankMatches } from "./rank.js";
 import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
 import { register } from "./overlays.js";

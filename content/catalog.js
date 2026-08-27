@@ -29,8 +29,7 @@ export const COMMAND_CATALOG = {
   tabSearch: { category: "tabs", label: "Tab search" },
   omnibar: { category: "tabs", label: "Open URL or search" },
 
-  splitTab: { category: "tabActions", label: "Move tab to new window" },
-  splitOrMergeTab: { category: "tabActions", label: "Split tab / merge window" },
+  splitMerge: { category: "tabActions", label: "Split / merge" },
   moveTabLeft: { category: "tabActions", label: "Move tab left" },
   moveTabRight: { category: "tabActions", label: "Move tab right" },
   duplicateTab: { category: "tabActions", label: "Duplicate tab" },

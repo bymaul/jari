@@ -49,7 +49,7 @@ ignore/passthrough modes — every key rebindable from the options page.
 | `g$` | Jump to last tab                     |
 | `<<` | Move tab left                        |
 | `>>` | Move tab right                       |
-| `gw` | Split tab / merge window             |
+| `gw` | Split / merge tab/window             |
 | `gp` | Open clipboard URL in current tab    |
 | `gP` | Open clipboard URL in background tab |
 
@@ -101,7 +101,6 @@ These commands exist but ship unbound — bind one from the options page:
 | `scrollPageDown` / `scrollPageUp`         | Scroll page down / up      |
 | `scrollHalfPageDown` / `scrollHalfPageUp` | Scroll half page down / up |
 | `newTab`                                  | New tab                    |
-| `splitTab`                                | Move tab to new window     |
 | `duplicateTab`                            | Duplicate tab              |
 | `togglePin`                               | Pin/unpin tab              |
 | `toggleMute`                              | Mute/unmute tab            |
@@ -145,4 +144,3 @@ npm test
 - `shared/` — constants shared by every bundle (compiled into each one)
 - `background.js`, `content/bundle.js`, `options/options.bundle.js` — generated bundles
 - `build.js` — bundles content/options/background and generates `manifest.json`
-- `docs/` — site-testing checklist and known issues

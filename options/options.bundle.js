@@ -3,7 +3,6 @@
 (() => {
   // shared/constants.js
   var suggestionSources = ["tab", "history", "bookmark"];
-  var MIN_SCROLL_AREA_SIZE = 16;
 
   // content/keymap.js
   var Events = {
@@ -31,7 +30,7 @@
     L: "nextTab",
     "<<": "moveTabLeft",
     ">>": "moveTabRight",
-    gw: "splitOrMergeTab",
+    gw: "splitMerge",
     S: "historyBack",
     D: "historyForward",
     r: "reloadTab",
@@ -80,8 +79,7 @@
     timeoutMs: 1500,
     passthroughMs: 1500,
     suggestionSources: suggestionSources.slice(),
-    copyFormat: "plain",
-    clickableSelector: ""
+    copyFormat: "plain"
   };
   var prefixKeys = new Set(Object.keys(prefixes));
   var modifierKeys = /* @__PURE__ */ new Set([
@@ -104,21 +102,6 @@
     parts.push(event.key);
     return parts.join("+");
   }
-  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight";
-  function queryAll(selector, onShadowRoot) {
-    const out = [];
-    const visit = (root) => {
-      for (const el of root.querySelectorAll("*")) {
-        if (el.matches(selector)) out.push(el);
-        if (el.shadowRoot) {
-          if (onShadowRoot) onShadowRoot(el.shadowRoot);
-          visit(el.shadowRoot);
-        }
-      }
-    };
-    visit(document);
-    return out;
-  }
   function normalizeSettings(data) {
     const d = data || {};
     const storedKeymap = {};
@@ -136,169 +119,8 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
-      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
-      clickableSelector: typeof d.clickableSelector === "string" ? d.clickableSelector : settingsDefaults.clickableSelector
+      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat
     };
-  }
-  var Url = {
-    parentUrlOf(href) {
-      try {
-        const url = new URL(href);
-        let path = url.pathname;
-        if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
-        const idx = path.lastIndexOf("/");
-        path = idx > 0 ? path.slice(0, idx) : "/";
-        url.pathname = path;
-        url.search = "";
-        url.hash = "";
-        return url.href;
-      } catch {
-        return href;
-      }
-    },
-    rootUrlOf(href) {
-      try {
-        const url = new URL(href);
-        url.pathname = "/";
-        url.search = "";
-        url.hash = "";
-        return url.href;
-      } catch {
-        return href;
-      }
-    },
-    isSamePath(a, b) {
-      try {
-        return new URL(a).pathname === new URL(b).pathname;
-      } catch {
-        return a === b;
-      }
-    },
-    looksLikeUrl(text) {
-      const s = text.trim();
-      if (!s || /\s/.test(s)) return false;
-      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith("//")) return true;
-      if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
-      return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
-    },
-    suggestionTerm(query2) {
-      const idx = query2.search(/\s/);
-      if (idx === -1) return query2;
-      return Url.looksLikeUrl(query2.slice(0, idx)) ? query2.slice(idx).trim() : query2;
-    }
-  };
-  function queryTerms(query2) {
-    return String(query2).trim().toLowerCase().split(/\s+/).filter(Boolean);
-  }
-  var SCORE_BASE = 2;
-  var SCORE_RUN = 12;
-  var SCORE_BOUNDARY = 8;
-  var SCORE_CAMEL = 14;
-  var SCORE_GAP = -3;
-  var SCORE_LEADING = -1;
-  var MAX_ALIGNMENT_STARTS = 64;
-  function isBoundaryAt(t, i) {
-    return i === 0 || !/[\w]/.test(t[i - 1]);
-  }
-  function scoreAlignment(indices, t, text) {
-    let score = 0;
-    let prev = -1;
-    for (const i of indices) {
-      score += SCORE_BASE;
-      if (prev !== -1) {
-        const gap = i - prev - 1;
-        score += gap === 0 ? SCORE_RUN : SCORE_GAP * gap;
-      }
-      if (isBoundaryAt(t, i)) score += SCORE_BOUNDARY;
-      else if (text[i] !== text[i].toLowerCase()) score += SCORE_CAMEL;
-      prev = i;
-    }
-    score += SCORE_LEADING * indices[0];
-    return score;
-  }
-  function bestAlignment(term, t, text) {
-    const n = t.length;
-    const q = term.length;
-    if (q === 0 || q > n) return null;
-    let best = null;
-    if (q === 1) {
-      for (let i = 0; i < n; i++) {
-        if (t[i] !== term) continue;
-        const score = scoreAlignment([i], t, text);
-        if (!best || score > best.score) best = { score, indices: [i] };
-      }
-      return best;
-    }
-    let starts = 0;
-    for (let s = 0; s < n && starts < MAX_ALIGNMENT_STARTS; s++) {
-      if (t[s] !== term[0]) continue;
-      starts++;
-      const indices = [s];
-      let pos = s + 1;
-      let ok = true;
-      for (let j = 1; j < q; j++) {
-        const i = t.indexOf(term[j], pos);
-        if (i === -1) {
-          ok = false;
-          break;
-        }
-        indices.push(i);
-        pos = i + 1;
-      }
-      if (!ok) continue;
-      const score = scoreAlignment(indices, t, text);
-      if (!best || score > best.score) best = { score, indices };
-    }
-    return best;
-  }
-  function matchTerms(query2, text) {
-    const terms = queryTerms(query2);
-    const t = String(text).toLowerCase();
-    return { terms, results: terms.map((term) => bestAlignment(term, t, text)) };
-  }
-  function fuzzyMatch(query2, text) {
-    const { terms, results } = matchTerms(query2, text);
-    if (terms.length === 0 || results.some((r) => !r)) return null;
-    const indices = [];
-    let total = 0;
-    results.forEach((r) => {
-      total += r.score;
-      indices.push(...r.indices);
-    });
-    indices.sort((a, b) => a - b);
-    return { score: total, indices };
-  }
-  function fuzzyIndices(query2, text) {
-    const { results } = matchTerms(query2, text);
-    const indices = [];
-    for (const r of results) if (r) indices.push(...r.indices);
-    return indices.sort((a, b) => a - b);
-  }
-  var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
-  function rankMatches(query2, list, fuzzy = true) {
-    const q = String(query2).trim();
-    if (!fuzzy) {
-      return list.filter((item) => substringMatch(q, item.title + " " + (item.url || "")));
-    }
-    return list.map((item) => {
-      const hay = item.title + " " + (item.url || "");
-      const match = fuzzyMatch(q, hay);
-      if (!match) return null;
-      const first = match.indices[0];
-      const last = match.indices[match.indices.length - 1];
-      return { item, match, span: last - first + 1, hayLength: hay.length };
-    }).filter(Boolean).sort((a, b) => {
-      if (b.match.score !== a.match.score) return b.match.score - a.match.score;
-      if (a.span !== b.span) return a.span - b.span;
-      if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
-      return (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3);
-    });
-  }
-  function substringMatch(query2, text) {
-    const terms = queryTerms(query2);
-    if (terms.length === 0) return false;
-    const t = String(text).toLowerCase();
-    return terms.every((term) => t.includes(term));
   }
   function balanceCategories(byCategory, columnCount = 3) {
     const columns = Array.from({ length: columnCount }, () => []);
@@ -316,6 +138,73 @@
     return columns;
   }
 
+  // shared/url.js
+  function normalizeHost(raw) {
+    let host = raw.trim().toLowerCase();
+    if (!host) return "";
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
+      try {
+        host = new URL(host).hostname;
+      } catch {
+        return "";
+      }
+    }
+    host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
+      host
+    ) ? host : "";
+  }
+
+  // content/catalog.js
+  var COMMAND_CATALOG = {
+    scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
+    scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
+    scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
+    scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
+    scrollTop: { category: "scrolling", label: "Scroll to top" },
+    scrollBottom: { category: "scrolling", label: "Scroll to bottom" },
+    scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
+    scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
+    scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
+    scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
+    cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas" },
+    resetScrollArea: { category: "scrolling", label: "Reset to page scroll" },
+    showScrollArea: { category: "scrolling", label: "Show scroll area" },
+    zoomIn: { category: "view", label: "Zoom in" },
+    zoomOut: { category: "view", label: "Zoom out" },
+    newTab: { category: "tabs", label: "New tab" },
+    closeTab: { category: "tabs", label: "Close tab", repeatable: true },
+    restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
+    pasteOpen: { category: "tabs", label: "Open clipboard URL in current tab" },
+    pasteOpenBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
+    previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
+    nextTab: { category: "tabs", label: "Next tab", repeatable: true },
+    firstTab: { category: "tabs", label: "Jump to first tab" },
+    lastTab: { category: "tabs", label: "Jump to last tab" },
+    tabSearch: { category: "tabs", label: "Tab search" },
+    omnibar: { category: "tabs", label: "Open URL or search" },
+    splitMerge: { category: "tabActions", label: "Split / merge" },
+    moveTabLeft: { category: "tabActions", label: "Move tab left" },
+    moveTabRight: { category: "tabActions", label: "Move tab right" },
+    duplicateTab: { category: "tabActions", label: "Duplicate tab" },
+    togglePin: { category: "tabActions", label: "Pin/unpin tab" },
+    toggleMute: { category: "tabActions", label: "Mute/unmute tab" },
+    historyBack: { category: "history", label: "Go back in history" },
+    historyForward: { category: "history", label: "Go forward in history" },
+    reloadTab: { category: "page", label: "Reload" },
+    hardReload: { category: "page", label: "Reload (bypass cache)" },
+    goUp: { category: "page", label: "Go to parent path" },
+    goToRoot: { category: "page", label: "Go to site root" },
+    editUrl: { category: "page", label: "Edit current URL" },
+    copyUrl: { category: "clipboard", label: "Copy URL" },
+    copyTitleUrl: { category: "clipboard", label: "Copy title + URL" },
+    toggleIgnore: { category: "modes", label: "Ignore mode" },
+    passthrough: { category: "modes", label: "Passthrough keys (timed)" },
+    toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
+    showHelp: { category: "help", label: "Show keybindings" },
+    openOptions: { category: "help", label: "Open settings" }
+  };
+
   // content/settings.js
   var STORAGE_KEY = "settings";
   var state = {
@@ -327,8 +216,7 @@
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
-    copyFormat: settingsDefaults.copyFormat,
-    clickableSelector: settingsDefaults.clickableSelector
+    copyFormat: settingsDefaults.copyFormat
   };
   function merge(data) {
     const s = normalizeSettings(data);
@@ -341,7 +229,6 @@
     state.passthroughMs = s.passthroughMs;
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
-    state.clickableSelector = s.clickableSelector;
   }
   async function load() {
     try {
@@ -362,8 +249,7 @@
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
-        copyFormat: state.copyFormat,
-        clickableSelector: state.clickableSelector
+        copyFormat: state.copyFormat
       }
     });
   }
@@ -404,9 +290,6 @@
   function getCopyFormat() {
     return state.copyFormat;
   }
-  function getClickableSelector() {
-    return state.clickableSelector;
-  }
   function toggleDisabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -434,23 +317,10 @@
     getPassthroughMs,
     getSuggestionSources,
     getCopyFormat,
-    getClickableSelector,
     toggleDisabled
   };
 
   // content/ui.js
-  function sendMessage(action, payload = {}) {
-    return new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage({ action, ...payload }, (response) => {
-          if (chrome.runtime.lastError) return resolve(null);
-          resolve(response);
-        });
-      } catch {
-        resolve(null);
-      }
-    });
-  }
   var statusStack = null;
   function statusContainer() {
     if (!statusStack) {
@@ -544,887 +414,9 @@
     withHiddenTextarea
   };
 
-  // content/scroll.js
-  var target = null;
-  var HIGHLIGHT_MS = 300;
-  var resolved = false;
-  var autoPicked = false;
-  function getTarget() {
-    if (target !== null && !target.isConnected) {
-      target = null;
-      autoPicked = false;
-      resolved = false;
-    }
-    if (target !== null && autoPicked && !resolved) {
-      target = null;
-    }
-    if (target === null && !resolved) {
-      resolved = true;
-      if (!pageCanScroll()) {
-        const areas = findScrollableElements();
-        if (areas.length > 0) {
-          target = nearestArea(areas) || areas[0];
-          autoPicked = true;
-        }
-      }
-    }
-    return target === null ? window : target;
-  }
-  var scanEpoch = 0;
-  var cachedEpoch = -1;
-  var cachedAreas = null;
-  var mutationTimeout = null;
-  function invalidateScrollCache() {
-    if (mutationTimeout) {
-      clearTimeout(mutationTimeout);
-    }
-    mutationTimeout = setTimeout(() => {
-      scanEpoch++;
-      resolved = false;
-      mutationTimeout = null;
-    }, 150);
-  }
-  var observedRoots = /* @__PURE__ */ new Set();
-  function ensureObserved(root) {
-    if (observedRoots.has(root)) return;
-    observedRoots.add(root);
-    if (typeof window.MutationObserver !== "undefined") {
-      new window.MutationObserver(invalidateScrollCache).observe(root, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["class", "style"]
-      });
-    }
-  }
-  if (typeof window.MutationObserver !== "undefined") {
-    new window.MutationObserver(() => {
-      scanEpoch++;
-      resolved = false;
-    }).observe(document, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "style"]
-    });
-  }
-  function isScrollVisible(el) {
-    let node = el;
-    while (node) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        if (node.hasAttribute("hidden")) return false;
-        const style = window.getComputedStyle(node);
-        if (style.display === "none" || style.visibility === "hidden")
-          return false;
-        if (parseFloat(style.opacity) === 0) return false;
-      }
-      node = node.getRootNode().host || node.parentElement;
-    }
-    return true;
-  }
-  function findScrollableElements() {
-    if (cachedEpoch === scanEpoch && cachedAreas) return cachedAreas;
-    cachedEpoch = scanEpoch;
-    const areas = [];
-    const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
-    for (const el of queryAll("*", ensureObserved)) {
-      if (roots.has(el)) continue;
-      if (el.closest(overlaySelectors)) continue;
-      const tag = el.tagName;
-      if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
-      if (el.clientHeight < MIN_SCROLL_AREA_SIZE && el.clientWidth < MIN_SCROLL_AREA_SIZE)
-        continue;
-      if (!isScrollVisible(el)) continue;
-      const canY = el.scrollHeight > el.clientHeight + 1;
-      const canX = el.scrollWidth > el.clientWidth + 1;
-      if (!canY && !canX) continue;
-      const style = window.getComputedStyle(el);
-      const overflowY = style.overflowY;
-      const overflowX = style.overflowX;
-      const scrollableY = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && canY;
-      const scrollableX = (overflowX === "auto" || overflowX === "scroll" || overflowX === "overlay") && canX;
-      if (scrollableY || scrollableX) areas.push(el);
-    }
-    cachedAreas = areas;
-    return areas;
-  }
-  function pageCanScroll() {
-    const el = document.scrollingElement || document.documentElement;
-    if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
-    const y = window.getComputedStyle(el).overflowY;
-    if (y === "hidden" || y === "clip") return false;
-    if (y === "visible" && document.body) {
-      const bodyY = window.getComputedStyle(document.body).overflowY;
-      if (bodyY === "hidden" || bodyY === "clip") return false;
-    }
-    return true;
-  }
-  function nearestArea(areas) {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const cx = vw / 2;
-    const cy = vh / 2;
-    let best = null;
-    let bestScore = -Infinity;
-    for (const el of areas) {
-      const r = el.getBoundingClientRect();
-      const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
-      const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
-      const coverage = coveredW * coveredH / (vw * vh);
-      const containsCenter = r.left <= cx && cx <= r.right && r.top <= cy && cy <= r.bottom;
-      const score = coverage + (containsCenter ? 1 : 0);
-      if (score > bestScore) {
-        bestScore = score;
-        best = el;
-      }
-    }
-    return best;
-  }
-  function cycle() {
-    const areas = findScrollableElements();
-    const pageScrolls = pageCanScroll();
-    const stops = pageScrolls ? [null, ...areas] : areas;
-    if (stops.length === 0) {
-      target = null;
-      ui.toast("No scroll areas");
-      return;
-    }
-    const idx = stops.indexOf(target);
-    if (idx === -1) {
-      target = pageScrolls ? null : nearestArea(areas) || areas[0];
-    } else if (pageScrolls && idx === 0) {
-      target = nearestArea(areas) || areas[0] || null;
-    } else {
-      target = stops[(idx + 1) % stops.length];
-    }
-    autoPicked = false;
-    showHighlight();
-  }
-  function resetToGlobal() {
-    if (pageCanScroll()) {
-      target = null;
-    } else {
-      const areas = findScrollableElements();
-      if (areas.length === 0) {
-        target = null;
-        ui.toast("No scroll areas");
-        return;
-      }
-      target = nearestArea(areas) || areas[0];
-    }
-    autoPicked = false;
-    showHighlight();
-  }
-  var highlightEl = null;
-  var highlightTimer = null;
-  function showHighlight() {
-    let area = getTarget();
-    if (area === window && !pageCanScroll()) {
-      const areas = findScrollableElements();
-      if (areas.length === 0) return;
-      target = nearestArea(areas) || areas[0];
-      autoPicked = false;
-      area = target;
-    }
-    const rect = area === window ? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight
-    } : area.getBoundingClientRect();
-    clearTimeout(highlightTimer);
-    if (highlightEl) highlightEl.remove();
-    const el = document.createElement("div");
-    el.className = "jari-scroll-highlight";
-    el.style.left = rect.left + "px";
-    el.style.top = rect.top + "px";
-    el.style.width = rect.width + "px";
-    el.style.height = rect.height + "px";
-    const label = document.createElement("span");
-    label.className = "jari-scroll-highlight-label";
-    label.textContent = area === window ? "global scroll" : "current scroll area";
-    el.appendChild(label);
-    document.body.appendChild(el);
-    highlightEl = el;
-    highlightTimer = setTimeout(() => {
-      if (highlightEl === el) {
-        highlightEl.remove();
-        highlightEl = null;
-      }
-    }, HIGHLIGHT_MS);
-  }
-  var Scroll = { getTarget, cycle, resetToGlobal, showHighlight };
-
-  // content/overlays.js
-  var overlays = [];
-  function register(name, api) {
-    overlays.push({ name, ...api });
-  }
-
-  // content/prompt.js
-  var active = false;
-  var overlay = null;
-  var inputEl = null;
-  var listEl = null;
-  var tabs = [];
-  var filtered = [];
-  var selected = 0;
-  var query = "";
-  var mode = "tabs";
-  var suggestSeq = 0;
-  var suggestTimer = null;
-  var restoreFocus = null;
-  function isActive() {
-    return active;
-  }
-  async function open() {
-    if (active) return;
-    tabs = await sendMessage("listTabs") || [];
-    if (tabs.length === 0) return;
-    mode = "tabs";
-    active = true;
-    render("Tabs", "Search tabs...");
-  }
-  function openOmnibar() {
-    if (active) return;
-    tabs = [];
-    mode = "open";
-    active = true;
-    render("Open", "Search or type URL");
-  }
-  function openEditUrl() {
-    if (active) return;
-    tabs = [];
-    mode = "edit";
-    active = true;
-    render("Edit URL", "Search or type URL");
-    inputEl.value = location.href;
-    handleOpenInput(inputEl.value);
-  }
-  function openMerge(data) {
-    if (active) return;
-    tabs = data && data.tabs || [];
-    mode = "merge";
-    active = true;
-    render("Merge into", "Choose a window...");
-  }
-  function handleOpenInput(queryText) {
-    const q = queryText.trim();
-    const term = Url.suggestionTerm(q);
-    query = term;
-    if (!q) {
-      clearTimeout(suggestTimer);
-      suggestSeq++;
-      filtered = [];
-      selected = 0;
-      renderList();
-      return;
-    }
-    const row = Url.looksLikeUrl(q) ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
-    filtered = [row];
-    selected = 0;
-    renderList();
-    clearTimeout(suggestTimer);
-    const seq = ++suggestSeq;
-    suggestTimer = setTimeout(async () => {
-      if (!active || seq !== suggestSeq) return;
-      const res = await sendMessage("suggest", { query: term }) || [];
-      if (!active || seq !== suggestSeq) return;
-      const suggestions = rank(res, term).map(({ item, match }) => ({
-        kind: "suggestion",
-        title: item.title,
-        url: item.url,
-        match
-      }));
-      filtered = [row, ...suggestions];
-      selected = 0;
-      renderList();
-    }, 130);
-  }
-  function rank(list, query2) {
-    return rankMatches(query2, list, settings.isFuzzyMatching());
-  }
-  function rankTabs(q, list) {
-    return rank(list, q).map((x) => x.item);
-  }
-  function render(title, placeholder) {
-    overlay = document.createElement("div");
-    overlay.className = "jari-overlay jari-prompt";
-    inputEl = document.createElement("input");
-    inputEl.type = "text";
-    inputEl.placeholder = placeholder;
-    inputEl.addEventListener("input", () => {
-      const q = inputEl.value.trim();
-      query = q;
-      if (mode === "open" || mode === "edit") {
-        handleOpenInput(q);
-      } else {
-        filtered = q ? rankTabs(q, tabs) : tabs;
-        selected = 0;
-        renderList();
-      }
-    });
-    inputEl.addEventListener("keydown", (event) => event.stopPropagation());
-    listEl = document.createElement("ul");
-    listEl.className = "jari-prompt-list";
-    const header = document.createElement("div");
-    header.className = "jari-prompt-header";
-    header.textContent = title;
-    overlay.appendChild(listEl);
-    overlay.appendChild(header);
-    overlay.appendChild(inputEl);
-    document.body.appendChild(overlay);
-    filtered = tabs;
-    renderList();
-    restoreFocus = document.activeElement;
-    inputEl.focus();
-  }
-  function renderText(el, text, indices) {
-    if (!indices || indices.length === 0) {
-      el.textContent = text;
-      return;
-    }
-    const matched = new Set(indices);
-    const frag = document.createDocumentFragment();
-    let run = "";
-    for (let i = 0; i < text.length; i++) {
-      if (matched.has(i)) {
-        if (run) {
-          frag.appendChild(document.createTextNode(run));
-          run = "";
-        }
-        const mark = document.createElement("span");
-        mark.className = "jari-match";
-        mark.textContent = text[i];
-        frag.appendChild(mark);
-      } else {
-        run += text[i];
-      }
-    }
-    if (run) frag.appendChild(document.createTextNode(run));
-    el.appendChild(frag);
-  }
-  function makeSpan(className) {
-    const el = document.createElement("span");
-    el.className = className;
-    return el;
-  }
-  function renderTitleUrl(li, titleText, urlText, q) {
-    const title = makeSpan("title");
-    const url = makeSpan("url");
-    if (q && settings.isFuzzyMatching()) {
-      renderText(title, titleText, fuzzyIndices(q, titleText));
-      renderText(url, urlText, fuzzyIndices(q, urlText));
-    } else {
-      title.textContent = titleText;
-      url.textContent = urlText;
-    }
-    li.appendChild(title);
-    li.appendChild(url);
-    return li;
-  }
-  function renderSuggestionRow(row) {
-    const li = document.createElement("li");
-    const titleText = row.kind === "search" ? `Search for "${row.title}"` : row.kind === "url" ? `Open ${row.title}` : row.title || "(untitled)";
-    const urlText = row.kind === "suggestion" ? row.url || "" : "";
-    return renderTitleUrl(li, titleText, urlText, row.kind === "suggestion" ? query : "");
-  }
-  function renderTabRow(tab, winLabel) {
-    const li = document.createElement("li");
-    const win = makeSpan("jari-win-tag");
-    win.textContent = "#" + winLabel;
-    li.appendChild(win);
-    return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query);
-  }
-  function renderList() {
-    const rows = filtered.slice(0, 50);
-    listEl.textContent = "";
-    if (mode === "open" || mode === "edit") {
-      for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
-      highlight();
-      return;
-    }
-    const winLabels = /* @__PURE__ */ new Map();
-    let winIndex = 0;
-    for (const tab of rows) {
-      if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
-    }
-    for (const tab of rows) listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId)));
-    highlight();
-  }
-  function highlight() {
-    Array.from(listEl.children).forEach((li, i) => li.classList.toggle("selected", i === selected));
-    const el = listEl.children[selected];
-    if (el) el.scrollIntoView({ block: "nearest" });
-  }
-  function move(delta) {
-    if (filtered.length === 0) return;
-    selected = (selected + delta + filtered.length) % filtered.length;
-    highlight();
-  }
-  function onKeyDown(event) {
-    const inInput = document.activeElement === inputEl;
-    if (inInput) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        close();
-      } else if (event.key === "Enter") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        activate();
-      } else if (event.key === "ArrowDown") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        move(1);
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        move(-1);
-      } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        move(event.shiftKey ? -1 : 1);
-      }
-      return;
-    }
-    if (event.key === "Escape" || event.key === "Enter") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      close();
-    } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      move(event.shiftKey ? -1 : 1);
-    }
-  }
-  function activate() {
-    const item = filtered[selected];
-    if (!item) {
-      if (mode === "open" && !inputEl.value.trim()) sendMessage("createTab");
-      close();
-      return;
-    }
-    if (mode === "merge") {
-      sendMessage("mergeTab", { targetWindowId: item.windowId });
-    } else if (mode === "open" || mode === "edit") {
-      if (item.kind === "search") sendMessage("search", { query: inputEl.value, newTab: mode === "open" });
-      else if (item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
-    } else {
-      sendMessage("activateTab", { id: item.id });
-    }
-    close();
-  }
-  function close() {
-    clearTimeout(suggestTimer);
-    suggestSeq++;
-    if (overlay) {
-      overlay.remove();
-      overlay = null;
-    }
-    inputEl = null;
-    listEl = null;
-    tabs = [];
-    filtered = [];
-    selected = 0;
-    query = "";
-    mode = "tabs";
-    active = false;
-    if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
-      restoreFocus.focus();
-    }
-    restoreFocus = null;
-  }
-  var Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
-  register("prompt", { close, onKeyDown, isActive });
-
-  // content/catalog.js
-  var COMMAND_CATALOG = {
-    scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
-    scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
-    scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
-    scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
-    scrollTop: { category: "scrolling", label: "Scroll to top" },
-    scrollBottom: { category: "scrolling", label: "Scroll to bottom" },
-    scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
-    scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
-    scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
-    scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-    cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas" },
-    resetScrollArea: { category: "scrolling", label: "Reset to page scroll" },
-    showScrollArea: { category: "scrolling", label: "Show scroll area" },
-    zoomIn: { category: "view", label: "Zoom in" },
-    zoomOut: { category: "view", label: "Zoom out" },
-    newTab: { category: "tabs", label: "New tab" },
-    closeTab: { category: "tabs", label: "Close tab", repeatable: true },
-    restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
-    pasteOpen: { category: "tabs", label: "Open clipboard URL in current tab" },
-    pasteOpenBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
-    previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
-    nextTab: { category: "tabs", label: "Next tab", repeatable: true },
-    firstTab: { category: "tabs", label: "Jump to first tab" },
-    lastTab: { category: "tabs", label: "Jump to last tab" },
-    tabSearch: { category: "tabs", label: "Tab search" },
-    omnibar: { category: "tabs", label: "Open URL or search" },
-    splitTab: { category: "tabActions", label: "Move tab to new window" },
-    splitOrMergeTab: { category: "tabActions", label: "Split tab / merge window" },
-    moveTabLeft: { category: "tabActions", label: "Move tab left" },
-    moveTabRight: { category: "tabActions", label: "Move tab right" },
-    duplicateTab: { category: "tabActions", label: "Duplicate tab" },
-    togglePin: { category: "tabActions", label: "Pin/unpin tab" },
-    toggleMute: { category: "tabActions", label: "Mute/unmute tab" },
-    historyBack: { category: "history", label: "Go back in history" },
-    historyForward: { category: "history", label: "Go forward in history" },
-    reloadTab: { category: "page", label: "Reload" },
-    hardReload: { category: "page", label: "Reload (bypass cache)" },
-    goUp: { category: "page", label: "Go to parent path" },
-    goToRoot: { category: "page", label: "Go to site root" },
-    editUrl: { category: "page", label: "Edit current URL" },
-    copyUrl: { category: "clipboard", label: "Copy URL" },
-    copyTitleUrl: { category: "clipboard", label: "Copy title + URL" },
-    toggleIgnore: { category: "modes", label: "Ignore mode" },
-    passthrough: { category: "modes", label: "Passthrough keys (timed)" },
-    toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
-    showHelp: { category: "help", label: "Show keybindings" },
-    openOptions: { category: "help", label: "Open settings" }
-  };
-
-  // content/help.js
-  var STEP = 50;
-  var COLUMNS = 3;
-  var active2 = false;
-  var overlay2 = null;
-  var listEl2 = null;
-  var gPending = false;
-  function isActive2() {
-    return active2;
-  }
-  function open2() {
-    if (active2) return;
-    active2 = true;
-    render2();
-    overlay2.tabIndex = -1;
-    overlay2.focus();
-  }
-  function render2() {
-    overlay2 = document.createElement("div");
-    overlay2.className = "jari-overlay jari-help";
-    const title = document.createElement("div");
-    title.className = "jari-help-title";
-    title.textContent = "Jari keybindings";
-    overlay2.appendChild(title);
-    const byCommand = /* @__PURE__ */ new Map();
-    for (const [key, commandName] of Object.entries(settings.getKeymap())) {
-      if (!byCommand.has(commandName)) byCommand.set(commandName, []);
-      byCommand.get(commandName).push(key);
-    }
-    const byCategory = /* @__PURE__ */ new Map();
-    for (const [commandName, keys] of byCommand) {
-      const meta = COMMAND_CATALOG[commandName];
-      if (!meta) continue;
-      const id = meta.category || "other";
-      if (!byCategory.has(id)) byCategory.set(id, []);
-      byCategory.get(id).push({ keys, label: meta.label });
-    }
-    const columns = balanceCategories(byCategory, COLUMNS);
-    listEl2 = document.createElement("div");
-    listEl2.className = "jari-help-list";
-    const grid = document.createElement("div");
-    grid.className = "jari-help-columns";
-    for (const col of columns) {
-      const colEl = document.createElement("div");
-      colEl.className = "jari-help-column";
-      for (const cat of col) {
-        colEl.appendChild(
-          ui.buildCategoryTable(cat, "jari-help-cat-header", (tbody) => {
-            for (const { keys, label } of byCategory.get(cat.id)) {
-              const tr = document.createElement("tr");
-              const keyTd = document.createElement("td");
-              keyTd.className = "jari-help-key";
-              keyTd.textContent = keys.join(", ");
-              const labelTd = document.createElement("td");
-              labelTd.className = "jari-help-label";
-              labelTd.textContent = label;
-              tr.appendChild(keyTd);
-              tr.appendChild(labelTd);
-              tbody.appendChild(tr);
-            }
-          })
-        );
-      }
-      grid.appendChild(colEl);
-    }
-    listEl2.appendChild(grid);
-    overlay2.appendChild(listEl2);
-    const footer = document.createElement("div");
-    footer.className = "jari-help-footer";
-    const footerBar = document.createElement("span");
-    footerBar.textContent = "j/k scroll | 0-9 count | esc close";
-    footer.appendChild(footerBar);
-    overlay2.appendChild(footer);
-    document.body.appendChild(overlay2);
-  }
-  function onKeyDown2(event) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (event.key === "Escape") {
-      close2();
-      return;
-    }
-    if (event.key === "g") {
-      gPending = true;
-      return;
-    }
-    if (gPending) {
-      gPending = false;
-      if (event.key === "g") listEl2.scrollTo(0, 0);
-      return;
-    }
-    if (event.ctrlKey) {
-      if (event.key === "d") listEl2.scrollBy(0, listEl2.clientHeight * 0.5);
-      else if (event.key === "u") listEl2.scrollBy(0, -listEl2.clientHeight * 0.5);
-      else if (event.key === "f") listEl2.scrollBy(0, listEl2.clientHeight * 0.9);
-      else if (event.key === "b") listEl2.scrollBy(0, -listEl2.clientHeight * 0.9);
-      return;
-    }
-    switch (event.key) {
-      case "G":
-        listEl2.scrollTo(0, listEl2.scrollHeight);
-        break;
-      case "j":
-      case "ArrowDown":
-        listEl2.scrollBy(0, STEP);
-        break;
-      case "k":
-      case "ArrowUp":
-        listEl2.scrollBy(0, -STEP);
-        break;
-    }
-  }
-  function close2() {
-    if (overlay2) {
-      overlay2.remove();
-      overlay2 = null;
-    }
-    listEl2 = null;
-    gPending = false;
-    active2 = false;
-  }
-  var Help = { open: open2, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
-  register("help", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
-
-  // content/commands.js
-  var PAGE_RATIO = 0.9;
-  var HALF_RATIO = 0.5;
-  var ignoreToggle = () => {
-  };
-  var passthroughEnter = () => {
-  };
-  function getScrollElement() {
-    return Scroll.getTarget();
-  }
-  function scrollHeightOf(el) {
-    return el === window ? (document.scrollingElement || document.documentElement || document.body).scrollHeight : el.scrollHeight;
-  }
-  function clientHeightOf(el) {
-    return el === window ? window.innerHeight : el.clientHeight;
-  }
-  var smoothState = null;
-  function scrollPosOf(el) {
-    return el === window ? { x: window.scrollX, y: window.scrollY } : { x: el.scrollLeft, y: el.scrollTop };
-  }
-  function prefersReducedMotion() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-  function smoothScrollBy(el, x, y) {
-    if (smoothState === null || smoothState.el !== el) {
-      smoothState = { el, x: 0, y: 0, rafId: null };
-    }
-    smoothState.x += x;
-    smoothState.y += y;
-    if (smoothState.rafId === null) {
-      smoothState.rafId = requestAnimationFrame(smoothScrollStep);
-    }
-  }
-  function smoothScrollStep() {
-    if (!smoothState) return;
-    smoothState.rafId = null;
-    const { el } = smoothState;
-    const pendingX = smoothState.x;
-    const pendingY = smoothState.y;
-    if (pendingX === 0 && pendingY === 0) {
-      smoothState = null;
-      return;
-    }
-    if (Math.abs(pendingX) < 1 && Math.abs(pendingY) < 1) {
-      el.scrollBy({ left: pendingX, top: pendingY, behavior: "instant" });
-      smoothState = null;
-      return;
-    }
-    const CAP = 80;
-    const moveX = pendingX !== 0 ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4))) : 0;
-    const moveY = pendingY !== 0 ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.4))) : 0;
-    const before = scrollPosOf(el);
-    el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
-    const after = scrollPosOf(el);
-    const dx = after.x - before.x;
-    const dy = after.y - before.y;
-    if (dx !== 0) smoothState.x -= dx;
-    else smoothState.x = 0;
-    if (dy !== 0) smoothState.y -= dy;
-    else smoothState.y = 0;
-    smoothState.rafId = requestAnimationFrame(smoothScrollStep);
-  }
-  function scrollBy({ x = 0, y = 0, count = 1 }) {
-    const el = getScrollElement();
-    if (settings.isSmoothScroll() && !prefersReducedMotion()) {
-      smoothScrollBy(el, x * count, y * count);
-    } else {
-      el.scrollBy({ left: x * count, top: y * count, behavior: "instant" });
-    }
-  }
-  async function copyToClipboard(text, message) {
-    await ui.copyText(text);
-    ui.toast(message);
-  }
-  function copyTitleUrlText() {
-    return settings.getCopyFormat() === "markdown" ? `[${document.title}](${location.href})` : `${document.title}
-${location.href}`;
-  }
-  function pasteClipboard() {
-    let text = "";
-    try {
-      ui.withHiddenTextarea((ta) => {
-        if (document.execCommand("paste")) text = ta.value.trim();
-      });
-    } catch {
-    }
-    if (text) return Promise.resolve(text);
-    try {
-      return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
-    } catch {
-      return Promise.resolve("");
-    }
-  }
-  var commands = {
-    scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
-    scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
-    scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
-    scrollRight: { ...COMMAND_CATALOG.scrollRight, run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }) },
-    scrollTop: {
-      ...COMMAND_CATALOG.scrollTop,
-      run: () => {
-        const el = getScrollElement();
-        if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
-        else el.scrollTo({ top: 0, behavior: "instant" });
-      }
-    },
-    scrollBottom: {
-      ...COMMAND_CATALOG.scrollBottom,
-      run: () => {
-        const el = getScrollElement();
-        const target2 = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
-        if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target2 - scrollPosOf(el).y);
-        else el.scrollTo({ top: target2, behavior: "instant" });
-      }
-    },
-    scrollPageDown: {
-      ...COMMAND_CATALOG.scrollPageDown,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count })
-    },
-    scrollPageUp: {
-      ...COMMAND_CATALOG.scrollPageUp,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count })
-    },
-    scrollHalfPageDown: {
-      ...COMMAND_CATALOG.scrollHalfPageDown,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count })
-    },
-    scrollHalfPageUp: {
-      ...COMMAND_CATALOG.scrollHalfPageUp,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count })
-    },
-    cycleScrollArea: { ...COMMAND_CATALOG.cycleScrollArea, run: () => Scroll.cycle() },
-    resetScrollArea: { ...COMMAND_CATALOG.resetScrollArea, run: () => Scroll.resetToGlobal() },
-    showScrollArea: { ...COMMAND_CATALOG.showScrollArea, run: () => Scroll.showHighlight() },
-    zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
-    zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
-    newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
-    closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
-    restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
-    pasteOpen: {
-      ...COMMAND_CATALOG.pasteOpen,
-      run: async () => {
-        const text = await pasteClipboard();
-        if (!text) return ui.toast("Clipboard empty");
-        const res = await sendMessage("navigate", { url: text });
-        if (res && !res.ok) ui.toast("Not a URL");
-      }
-    },
-    pasteOpenBackground: {
-      ...COMMAND_CATALOG.pasteOpenBackground,
-      run: async () => {
-        const text = await pasteClipboard();
-        if (!text) return ui.toast("Clipboard empty");
-        const res = await sendMessage("openInBackgroundTab", { url: text });
-        if (res && !res.ok) ui.toast("Not a URL");
-      }
-    },
-    previousTab: { ...COMMAND_CATALOG.previousTab, run: (c) => sendMessage("previousTab", { count: c.count }) },
-    nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
-    firstTab: { ...COMMAND_CATALOG.firstTab, run: () => sendMessage("firstTab") },
-    lastTab: { ...COMMAND_CATALOG.lastTab, run: () => sendMessage("lastTab") },
-    splitTab: { ...COMMAND_CATALOG.splitTab, run: () => sendMessage("splitTab") },
-    splitOrMergeTab: {
-      ...COMMAND_CATALOG.splitOrMergeTab,
-      run: async () => {
-        const res = await sendMessage("splitOrMerge");
-        if (res && res.needMerge) Prompt.openMerge(res);
-      }
-    },
-    moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
-    moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
-    duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
-    togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
-    toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
-    tabSearch: { ...COMMAND_CATALOG.tabSearch, run: () => Prompt.open() },
-    omnibar: { ...COMMAND_CATALOG.omnibar, run: () => Prompt.openOmnibar() },
-    reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
-    hardReload: { ...COMMAND_CATALOG.hardReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
-    goUp: {
-      ...COMMAND_CATALOG.goUp,
-      run: () => {
-        const target2 = Url.parentUrlOf(location.href);
-        if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
-        sendMessage("navigate", { url: target2 });
-      }
-    },
-    goToRoot: {
-      ...COMMAND_CATALOG.goToRoot,
-      run: () => {
-        const target2 = Url.rootUrlOf(location.href);
-        if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
-        sendMessage("navigate", { url: target2 });
-      }
-    },
-    editUrl: {
-      ...COMMAND_CATALOG.editUrl,
-      run: () => Prompt.openEditUrl()
-    },
-    historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
-    historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
-    copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
-    copyTitleUrl: { ...COMMAND_CATALOG.copyTitleUrl, run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
-    toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
-    passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
-    toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
-    showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
-    openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") }
-  };
-
   // options/options.js
   var SETTINGS_DEFAULTS = settingsDefaults;
-  var COMMANDS = commands;
+  var COMMANDS = COMMAND_CATALOG;
   var tableEl = document.querySelector("#keymap-table");
   var saveBtn = document.querySelector("#save");
   var resetBtn = document.querySelector("#reset");
@@ -1466,7 +458,6 @@ ${location.href}`;
     const filter = keymapFilterEl.value.trim().toLowerCase();
     const byCategory = /* @__PURE__ */ new Map();
     for (const [name, cmd] of Object.entries(COMMANDS)) {
-      if (cmd.hidden) continue;
       const id = cmd.category || "other";
       if (filter && !matchesFilter(name, cmd, filter)) continue;
       if (!byCategory.has(id)) byCategory.set(id, []);
@@ -1656,28 +647,13 @@ ${location.href}`;
       btn.type = "button";
       btn.textContent = "Enable";
       btn.addEventListener("click", () => {
-        settings.set({ disabledSites: sites.filter((s) => s !== site) });
+        settings.update({ disabledSites: sites.filter((s) => s !== site) });
         renderDisabled();
       });
       li.appendChild(siteSpan);
       li.appendChild(btn);
       disabledList.appendChild(li);
     }
-  }
-  function normalizeHost(raw) {
-    let host = raw.trim().toLowerCase();
-    if (!host) return "";
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
-      try {
-        host = new URL(host).hostname;
-      } catch {
-        return "";
-      }
-    }
-    host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
-    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
-      host
-    ) ? host : "";
   }
   function addDisabledSite() {
     const host = normalizeHost(siteInputEl.value);
@@ -1690,7 +666,7 @@ ${location.href}`;
     if (sites.includes(host)) {
       status("Already disabled: " + host);
     } else {
-      settings.set({ disabledSites: [...sites, host] });
+      settings.update({ disabledSites: [...sites, host] });
       status("Disabled: " + host);
     }
     siteInputEl.value = "";

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { containsElement, deepActiveElement, queryAll } from "../content/keymap.js";
+import { deepActiveElement, queryAll } from "../content/keymap.js";
 
 function element(name, { shadowRoot, parent, host } = {}) {
   return {
@@ -76,26 +76,6 @@ test("queryAll without shadow roots returns only light-DOM matches", () => {
     assert.strictEqual(matches[0], lightBtn);
     assert.deepEqual(seen, []);
   });
-});
-
-test("containsElement covers self and light-DOM ancestors", () => {
-  const parent = element("div");
-  const child = element("div", { parent });
-  const other = element("span");
-  assert.ok(containsElement(parent, child));
-  assert.ok(containsElement(child, child));
-  assert.ok(!containsElement(child, parent));
-  assert.ok(!containsElement(parent, other));
-});
-
-test("containsElement crosses shadow boundaries to the host", () => {
-  const host = element("div");
-  const shadowBtn = element("button", { host });
-  const deep = element("span", { parent: shadowBtn, host });
-  const other = element("div");
-  assert.ok(containsElement(host, shadowBtn));
-  assert.ok(containsElement(host, deep));
-  assert.ok(!containsElement(other, deep));
 });
 
 test("deepActiveElement crosses shadow boundaries to the focused element", () => {

@@ -1,26 +1,5 @@
-import {
-  blockedUrlSchemes,
-  suggestionSources,
-  urlSchemes,
-} from "../shared/constants.js";
-
-export function normalizeUrl(raw) {
-  if (typeof raw !== "string") return null;
-  const url = raw.trim();
-  if (!url || /\s/.test(url)) return null;
-  if (/^localhost(:\d+)?(\/.*)?$/i.test(url) || /^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(url))
-    return "http://" + url;
-  if (url.startsWith("//")) return "https:" + url;
-  const m = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
-  if (!m) return "https://" + url;
-  const scheme = m[1].toLowerCase();
-  if (urlSchemes.has(scheme)) return url;
-  if (blockedUrlSchemes.has(scheme)) return null;
-
-  const rest = url.slice(m[0].length);
-  if (/^(\d+)(\/.*)?$/.test(rest)) return "https://" + url;
-  return null;
-}
+import { suggestionSources } from "../shared/constants.js";
+import { normalizeUrl } from "../shared/url.js";
 
 export function clampCount(count, max = 20) {
   const n = Math.floor(count);
@@ -91,13 +70,6 @@ export const handlers = {
   },
   nextTab: async (sender, { count = 1 } = {}) => {
     return switchTab(sender.tab, clampCount(count));
-  },
-
-  splitTab: async (sender) => {
-    if (sender.tab && sender.tab.id) {
-      await chrome.windows.create({ tabId: sender.tab.id });
-    }
-    return { ok: true };
   },
 
   splitOrMerge: async (sender) => {
@@ -352,14 +324,8 @@ async function goHistory(tab, delta) {
     try {
       await chrome.tabs[method](tab.id);
     } catch {
-
+      return { ok: true };
     }
-    return { ok: true };
-  }
-  try {
-    await chrome.tabs.executeScript(tab.id, { code: `history.go(${delta})` });
-  } catch {
-
   }
   return { ok: true };
 }

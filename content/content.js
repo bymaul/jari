@@ -6,7 +6,6 @@ import { Overlays } from "./overlays.js";
 
 let pendingCount = '';
 let pendingPrefix = null;
-let typedSeq = '';
 let timer = null;
 let ignoreMode = false;
 let passthroughMode = false;
@@ -16,7 +15,6 @@ const pills = {};
 function clearPending() {
   pendingCount = '';
   pendingPrefix = null;
-  typedSeq = '';
   ui.showcmd(null);
 }
 
@@ -149,10 +147,11 @@ function handleKeydown(event) {
 
   const key = canonicalKey(event);
 
-  const prefixWasPending = pendingPrefix !== null;
+  const prefixKey = pendingPrefix;
+  const prefixWasPending = prefixKey !== null;
   let commandName = null;
   if (prefixWasPending) {
-    commandName = settings.getKeymap()[pendingPrefix + key] || null;
+    commandName = settings.getKeymap()[prefixKey + key] || null;
     pendingPrefix = null;
     ui.showcmd(null);
   }
@@ -186,8 +185,7 @@ function handleKeydown(event) {
 
   if (!commandName && /^[0-9]$/.test(key)) {
     if (pendingCount.length < 9) pendingCount += key;
-    typedSeq += key;
-    ui.showcmd(typedSeq);
+    ui.showcmd(pendingCount);
     event.preventDefault();
     event.stopImmediatePropagation();
     restartTimer();
@@ -196,8 +194,7 @@ function handleKeydown(event) {
 
   if (!commandName && prefixes[key]) {
     pendingPrefix = key;
-    typedSeq += key;
-    ui.showcmd(typedSeq);
+    ui.showcmd(pendingCount + key);
     event.preventDefault();
     event.stopImmediatePropagation();
     restartTimer();
@@ -211,15 +208,12 @@ function handleKeydown(event) {
     return;
   }
 
+  const countStr = pendingCount;
   const count = parseRepeatCount(pendingCount);
-  const hadCount = pendingCount !== '';
+  const hadCount = countStr !== '';
   pendingCount = '';
 
-  typedSeq += key;
-  const seq = typedSeq || key;
-  typedSeq = '';
-
-  if (hadCount || prefixWasPending) ui.flash(seq);
+  if (hadCount || prefixWasPending) ui.flash(countStr + (prefixKey || "") + key);
   restartTimer();
 
   run(commandName, count, event);
@@ -253,7 +247,6 @@ export function __resetState() {
   passthroughTimer = null;
   pendingCount = '';
   pendingPrefix = null;
-  typedSeq = '';
   ignoreMode = false;
   passthroughMode = false;
   if (pills.ignore) hidePill('ignore');
