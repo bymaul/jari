@@ -114,10 +114,10 @@ function renderKeymap() {
     grid.appendChild(col);
   }
   tableEl.appendChild(grid);
-  refreshKeyHints();
+  refreshKeyLabels();
 }
 
-function refreshKeyHints() {
+function refreshKeyLabels() {
   for (const el of document.querySelectorAll("[data-key]")) {
     el.textContent = keyFor(el.dataset.key) || "unbound";
   }

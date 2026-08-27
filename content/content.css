@@ -1,7 +1,7 @@
 /* Jari content styles — injected into pages via manifest "css".
    Jari's own UI (help overlay, tab search, toast) follows the
    site's light/dark scheme, with both palettes styled to match the settings
-   page: warm neutrals, tight borders, gold hint labels. */
+   page: warm neutrals, tight borders. */
 
 :root {
   /* Generic */

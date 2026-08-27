@@ -74,15 +74,15 @@ h2 {
   padding-bottom: 6px;
 }
 
-p.hint {
+p.helper {
   color: var(--muted);
   font-size: 12px;
   margin: 0;
   line-height: 1.5;
 }
 
-/* The intro hint on the keybindings card sits between the heading and table. */
-section.card > p.hint {
+/* The intro helper text on the keybindings card sits between the heading and table. */
+section.card > p.helper {
   margin-bottom: 10px;
 }
 
@@ -94,7 +94,7 @@ code {
   color: var(--fg);
 }
 
-/* Settings rows: each setting carries the label and a one-line hint on the
+/* Settings rows: each setting carries the label and a one-line helper on the
    left, the control right-aligned on the same line. */
 .setting {
   display: flex;

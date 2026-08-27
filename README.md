@@ -9,7 +9,7 @@
 ## Features
 
 Keyboard-driven browsing with everything on the home row: scrolling with repeat
-counts, tab and history management, link hints, a fuzzy-search omnibar, and
+counts, tab and history management, a fuzzy-search omnibar, and
 ignore/passthrough modes — every key rebindable from the options page.
 
 ## Default keybindings
@@ -59,16 +59,6 @@ ignore/passthrough modes — every key rebindable from the options page.
 | --- | --------------------- |
 | `S` | Go back in history    |
 | `D` | Go forward in history |
-
-### Hints
-
-| Key  | Command                                |
-| ---- | -------------------------------------- |
-| `f`  | Link hints (click)                     |
-| `F`  | Link hints (new tab)                   |
-| `gf` | Link hints (background tab, keep open) |
-| `yf` | Copy link URL                          |
-| `i`  | Focus nearest input                    |
 
 ### Page
 

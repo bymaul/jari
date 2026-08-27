@@ -83,9 +83,9 @@ function render() {
 
   const footer = document.createElement('div');
   footer.className = 'jari-help-footer';
-  const hint = document.createElement('span');
-  hint.textContent = 'j/k scroll | 0-9 count | esc close';
-  footer.appendChild(hint);
+  const footerBar = document.createElement('span');
+  footerBar.textContent = 'j/k scroll | 0-9 count | esc close';
+  footer.appendChild(footerBar);
   overlay.appendChild(footer);
 
   document.body.appendChild(overlay);
