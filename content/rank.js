@@ -1,21 +1,10 @@
-// Bounded scoring weights for one term's alignment. Scores are only compared
-// between candidates for the same query, so the absolute scale is less
-// important than the ordering they produce:
-//   - a consecutive run beats the same chars scattered,
-//   - an uppercase (camel/title-case) boundary beats a separator boundary,
-//   - a match at the start of the text beats one buried later,
-//   - nothing is unbounded, so a single term can never dominate the list.
-const SCORE_BASE = 2; // every matched char
-const SCORE_RUN = 12; // per char that continues a consecutive run
-const SCORE_BOUNDARY = 8; // first char, or after a non-word char
-const SCORE_CAMEL = 14; // starts an uppercase char (camelCase, title word)
-const SCORE_GAP = -3; // per filler char between two matched chars
-const SCORE_LEADING = -1; // per unmatched char before the match
+const SCORE_BASE = 2;
+const SCORE_RUN = 12;
+const SCORE_BOUNDARY = 8;
+const SCORE_CAMEL = 14;
+const SCORE_GAP = -3;
+const SCORE_LEADING = -1;
 
-// Best-start greedy alignment: try each occurrence of the first char as the
-// start, greedily match forward, score that alignment, keep the best one.
-// This finds the tightest, best-bonused alignment that a single left-to-right
-// pass would miss (e.g. "ob" in "o x ob" matches [4,5], not [0,5]).
 const MAX_ALIGNMENT_STARTS = 64;
 
 function queryTerms(query) {
@@ -114,14 +103,12 @@ export function substringMatch(query, text) {
 
 const SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
 
-// Rank a list of { title, url, source } items against a query. Fuzzy scoring
-// sorts by score, then by how tight the match window is, then by text length,
-// then by source (tabs before history before bookmarks). With fuzzy matching
-// off it falls back to substring filtering that keeps the original order.
 export function rankMatches(query, list, fuzzy = true) {
   const q = String(query).trim();
   if (!fuzzy) {
-    return list.filter((item) => substringMatch(q, item.title + " " + (item.url || "")));
+    return list.filter((item) =>
+      substringMatch(q, item.title + " " + (item.url || "")),
+    );
   }
   return list
     .map((item) => {
@@ -137,6 +124,8 @@ export function rankMatches(query, list, fuzzy = true) {
       if (b.match.score !== a.match.score) return b.match.score - a.match.score;
       if (a.span !== b.span) return a.span - b.span;
       if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
-      return (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3);
+      return (
+        (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3)
+      );
     });
 }

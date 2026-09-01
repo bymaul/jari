@@ -1,10 +1,4 @@
-/* Jari content styles — injected into pages via manifest "css".
-   Jari's own UI (help overlay, tab search, toast) follows the
-   site's light/dark scheme, with both palettes styled to match the settings
-   page: warm neutrals, tight borders. */
-
 :root {
-  /* Generic */
   --jari-font-family: monospace;
   --jari-font-family-sans: sans-serif;
   --jari-font-size: 12pt;
@@ -13,21 +7,18 @@
   --jari-fg: #333738;
   --jari-muted: #606079;
 
-  /* Status pill (toast) */
   --jari-status-font-family: var(--jari-font-family);
   --jari-status-font-size: var(--jari-small-font-size);
   --jari-status-bg: var(--jari-bg);
   --jari-status-fg: var(--jari-fg);
   --jari-status-border: 1px solid #c5c5cf;
 
-  /* Command line */
   --jari-cmdl-bg: var(--jari-bg);
   --jari-cmdl-fg: var(--jari-fg);
   --jari-cmdl-line-height: 1.5;
   --jari-cmdl-font-family: monospace;
   --jari-cmdl-font-size: calc(var(--jari-font-size) * 0.75);
 
-  /* Completion lists */
   --jari-cmplt-option-height: 1.4em;
   --jari-cmplt-fg: var(--jari-fg);
   --jari-cmplt-bg: var(--jari-bg);
@@ -60,8 +51,6 @@
   }
 }
 
-/* --- Overlay chrome: command line + completion lists pin to the bottom,
-   full width. !important keeps pages from restyling the UI. */
 .jari-overlay {
   position: fixed !important;
   left: 0;
@@ -75,12 +64,9 @@
   font-size: var(--jari-cmplt-font-size) !important;
   max-height: 75vh;
   overflow: hidden;
-  /* Pages that set text-align on body would otherwise center the header and
-     every row of the prompt and help overlays; Jari's UI is always LTR. */
   text-align: left !important;
 }
 
-/* --- Prompt overlay (completion list) — tabs, omnibar, merge picker --- */
 .jari-prompt {
   background: #1c1c24 !important;
   color: #cdcdcd !important;
@@ -171,18 +157,12 @@
   background: var(--jari-of-bg);
 }
 
-/* Fuzzy-matched characters in completion rows: gold, bold, readable on both
-   the plain row and the dark selected bar (declared after .selected so it
-   wins the specificity tie on selected rows). */
 .jari-prompt-list li .jari-match,
 .jari-prompt-list li.selected .jari-match {
   color: #e0a363;
   font-weight: bold;
 }
 
-/* --- Help (?) --- */
-/* Bottom bar (inherits .jari-overlay's pinning). The overlay is focused on
-   open; the ring is suppressed so no ugly outline shows. */
 .jari-help {
   background: var(--jari-cmplt-bg);
   color: var(--jari-cmplt-fg);
@@ -270,16 +250,10 @@
   color: var(--jari-of-fg);
 }
 
-/* --- Bottom-right corner UI: one flex row pinned flush to the bottom so the
-   mode pill, showcmd echo and toasts sit side by side instead of stacking.
-   The container is pointer-transparent; the children paint their own
-   backgrounds. Self-contained: does not reuse .jari-overlay so the
-   completion palette's !important background/color/font cannot bleed into
-   it. --- */
 .jari-status-stack {
   position: fixed;
-  right: 5em;
-  bottom: 0;
+  right: 0.25em;
+  bottom: 0.25em;
   z-index: 2147483647;
   display: flex;
   flex-direction: row;
@@ -288,8 +262,6 @@
   pointer-events: none;
 }
 
-/* order fixes the row regardless of DOM insertion order, left to right:
-   toast, mode pill, showcmd (at the corner). */
 .jari-toast {
   order: 0;
   box-sizing: border-box;
@@ -299,13 +271,10 @@
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: var(--jari-status-border);
-  border-bottom: 0;
   padding: 0.25ex 1em;
   pointer-events: none;
 }
 
-/* --- Mode pill (I / o): persistent while a mode is active. Hidden in
-   fullscreen so it never covers fullscreen content. --- */
 .jari-pill {
   order: 1;
   font-family: var(--jari-status-font-family);
@@ -313,13 +282,22 @@
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: var(--jari-status-border);
-  border-bottom: 0;
   padding: 0.25ex 1ex;
   pointer-events: none;
 }
 
-/* --- Scroll-area highlight (w / gs / gS): translucent wash over the active
-   scroll container with a "current scroll area" label, auto-dismissing. --- */
+.jari-showcmd {
+  order: 2;
+  font-family: var(--jari-cmdl-font-family);
+  font-size: var(--jari-cmdl-font-size);
+  line-height: 1.4;
+  background: var(--jari-cmdl-bg);
+  color: var(--jari-cmdl-fg);
+  border: var(--jari-status-border);
+  padding: 0.125ex 0.75ex;
+  pointer-events: none;
+}
+
 .jari-scroll-highlight {
   position: fixed;
   z-index: 2147483646 !important;
@@ -345,7 +323,6 @@
   padding: 0.25ex 0.5ex;
 }
 
-/* --- Hints (f / F / gf / i): per-element labels over clickable / link / input targets --- */
 .jari-hints {
   position: fixed !important;
   left: 0 !important;
@@ -355,6 +332,8 @@
   overflow: visible !important;
   pointer-events: none !important;
   z-index: 2147483647 !important;
+  isolation: isolate !important;
+  contain: layout paint !important;
 }
 
 .jari-hint {
@@ -376,6 +355,7 @@
   pointer-events: none !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35) !important;
   text-align: left !important;
+  isolation: isolate !important;
 }
 
 .jari-hint-matched {
@@ -386,18 +366,4 @@
 .jari-hint-hidden {
   opacity: 0 !important;
   display: none !important;
-}
-
-/* --- Showcmd readout (Neovim-style key echo), rightmost at the corner. --- */
-.jari-showcmd {
-  order: 2;
-  font-family: var(--jari-cmdl-font-family);
-  font-size: var(--jari-cmdl-font-size);
-  line-height: 1.4;
-  background: var(--jari-cmdl-bg);
-  color: var(--jari-cmdl-fg);
-  border: var(--jari-status-border);
-  border-bottom: 0;
-  padding: 0.125ex 0.75ex;
-  pointer-events: none;
 }

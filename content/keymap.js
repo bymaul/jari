@@ -63,6 +63,7 @@ export const keymapDefaults = {
   ";e": "openOptions",
 
   yy: "copyUrl",
+  yf: "hintYank",
 };
 
 export const prefixes = {

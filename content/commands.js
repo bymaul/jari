@@ -250,6 +250,7 @@ export const commands = {
   hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
   hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
   hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
+  hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
   openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },

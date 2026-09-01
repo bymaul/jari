@@ -1,10 +1,17 @@
-import { Events, canonicalKey, deepActiveElement, modifierKeys, parseRepeatCount, prefixes } from "./keymap.js";
+import {
+  Events,
+  canonicalKey,
+  deepActiveElement,
+  modifierKeys,
+  parseRepeatCount,
+  prefixes,
+} from "./keymap.js";
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { commands, setModeActions } from "./commands.js";
 import { Overlays } from "./overlays.js";
 
-let pendingCount = '';
+let pendingCount = "";
 let pendingPrefix = null;
 let timer = null;
 let ignoreMode = false;
@@ -13,7 +20,7 @@ let passthroughTimer = null;
 const pills = {};
 
 function clearPending() {
-  pendingCount = '';
+  pendingCount = "";
   pendingPrefix = null;
   ui.showcmd(null);
 }
@@ -26,12 +33,12 @@ function restartTimer() {
 function isTypingTarget(el) {
   return (
     !!el &&
-    (el.tagName === 'INPUT' ||
-      el.tagName === 'TEXTAREA' ||
-      el.tagName === 'SELECT' ||
+    (el.tagName === "INPUT" ||
+      el.tagName === "TEXTAREA" ||
+      el.tagName === "SELECT" ||
       el.isContentEditable ||
-      el.getAttribute('role') === 'textbox' ||
-      el.getAttribute('role') === 'searchbox')
+      el.getAttribute("role") === "textbox" ||
+      el.getAttribute("role") === "searchbox")
   );
 }
 
@@ -47,11 +54,10 @@ function setIgnore(on) {
   ignoreMode = on;
   clearPending();
   if (on) {
-
     Overlays.closeAll();
-    showPill('ignore', 'Ignore mode');
+    showPill("ignore", "ignore");
   } else {
-    hidePill('ignore');
+    hidePill("ignore");
   }
 }
 
@@ -67,7 +73,10 @@ function enterPassthrough() {
 
   Overlays.closeAll();
   passthroughMode = true;
-  showPill('passthrough', 'Passthrough (' + settings.getPassthroughMs() + 'ms)');
+  showPill(
+    "passthrough",
+    "passthrough (" + settings.getPassthroughMs() + "ms)",
+  );
   clearTimeout(passthroughTimer);
   passthroughTimer = setTimeout(exitPassthrough, settings.getPassthroughMs());
 }
@@ -76,7 +85,7 @@ function exitPassthrough() {
   if (!passthroughMode) return;
   clearTimeout(passthroughTimer);
   passthroughMode = false;
-  hidePill('passthrough');
+  hidePill("passthrough");
 }
 
 function isFullscreen() {
@@ -103,22 +112,24 @@ function hidePill(name) {
 function handleFullscreenChange() {
   if (!ignoreMode && !passthroughMode) return;
   if (isFullscreen()) {
-    hidePill('ignore');
-    hidePill('passthrough');
+    hidePill("ignore");
+    hidePill("passthrough");
   } else {
-    if (ignoreMode) showPill('ignore', 'Ignore mode');
-    if (passthroughMode) showPill('passthrough', 'Passthrough');
+    if (ignoreMode) showPill("ignore", "Ignore mode");
+    if (passthroughMode) showPill("passthrough", "Passthrough");
   }
 }
 
 function handleKeydown(event) {
-
   if (!event.isTrusted) return;
+
+  const overlay = Overlays.active();
+  if (overlay) return overlay.onKeyDown(event);
 
   if (modifierKeys.has(event.key)) return;
 
   if (passthroughMode) {
-    if (event.key === 'Escape') {
+    if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
       exitPassthrough();
@@ -128,7 +139,10 @@ function handleKeydown(event) {
 
   if (ignoreMode) {
     const key = canonicalKey(event);
-    if (settings.getKeymap()[key] === 'toggleIgnore' || event.key === 'Escape') {
+    if (
+      settings.getKeymap()[key] === "toggleIgnore" ||
+      event.key === "Escape"
+    ) {
       event.preventDefault();
       event.stopImmediatePropagation();
       toggleIgnore();
@@ -138,12 +152,10 @@ function handleKeydown(event) {
 
   if (settings.isDisabled()) {
     const key = canonicalKey(event);
-    if (settings.getKeymap()[key] === 'toggleDisabled') run('toggleDisabled', 1, event);
+    if (settings.getKeymap()[key] === "toggleDisabled")
+      run("toggleDisabled", 1, event);
     return;
   }
-
-  const overlay = Overlays.active();
-  if (overlay) return overlay.onKeyDown(event);
 
   const key = canonicalKey(event);
 
@@ -158,8 +170,8 @@ function handleKeydown(event) {
 
   const activeEl = deepActiveElement();
   if (isTypingTarget(activeEl)) {
-    if (commandName === 'toggleDisabled') run(commandName, 1, event);
-    else if (event.key === 'Escape') {
+    if (commandName === "toggleDisabled") run(commandName, 1, event);
+    else if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
       activeEl.blur();
@@ -174,7 +186,7 @@ function handleKeydown(event) {
     return;
   }
 
-  if (event.key === 'Escape') {
+  if (event.key === "Escape") {
     if (pendingCount) {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -203,17 +215,17 @@ function handleKeydown(event) {
 
   if (!commandName) commandName = settings.getKeymap()[key];
   if (!commandName) {
-
     clearPending();
     return;
   }
 
   const countStr = pendingCount;
   const count = parseRepeatCount(pendingCount);
-  const hadCount = countStr !== '';
-  pendingCount = '';
+  const hadCount = countStr !== "";
+  pendingCount = "";
 
-  if (hadCount || prefixWasPending) ui.flash(countStr + (prefixKey || "") + key);
+  if (hadCount || prefixWasPending)
+    ui.flash(countStr + (prefixKey || "") + key);
   restartTimer();
 
   run(commandName, count, event);
@@ -222,7 +234,7 @@ function handleKeydown(event) {
 async function boot() {
   await settings.load();
 
-  Events.on('settingsChanged', () => {
+  Events.on("settingsChanged", () => {
     if (settings.isDisabled()) {
       setIgnore(false);
       exitPassthrough();
@@ -230,8 +242,8 @@ async function boot() {
     }
   });
 
-  window.addEventListener('keydown', handleKeydown, true);
-  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  window.addEventListener("keydown", handleKeydown, true);
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
 }
 
 setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
@@ -245,10 +257,10 @@ export function __resetState() {
   clearTimeout(passthroughTimer);
   timer = null;
   passthroughTimer = null;
-  pendingCount = '';
+  pendingCount = "";
   pendingPrefix = null;
   ignoreMode = false;
   passthroughMode = false;
-  if (pills.ignore) hidePill('ignore');
-  if (pills.passthrough) hidePill('passthrough');
+  if (pills.ignore) hidePill("ignore");
+  if (pills.passthrough) hidePill("passthrough");
 }

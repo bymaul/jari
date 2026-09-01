@@ -56,6 +56,7 @@ export const COMMAND_CATALOG = {
   hintOpen: { category: "hints", label: "Show hints (open in new foreground tab)" },
   hintOpenBackground: { category: "hints", label: "Show hints (open in background, persistent)" },
   hintInput: { category: "hints", label: "Focus input (hint)" },
+  hintYank: { category: "hints", label: "Copy link URL (hint)" },
 
   showHelp: { category: "help", label: "Show keybindings" },
   openOptions: { category: "help", label: "Open settings" },
