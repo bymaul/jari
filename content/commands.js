@@ -1,7 +1,7 @@
 import { Url } from "../shared/url.js";
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
-import { Scroll } from "./scroll.js";
+import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf } from "./scroll.js";
 import { Prompt } from "./prompt.js";
 import { Help } from "./help.js";
 import { Hints } from "./hints.js";
@@ -21,23 +21,7 @@ function getScrollElement() {
   return Scroll.getTarget();
 }
 
-function scrollHeightOf(el) {
-  return el === window
-    ? (document.scrollingElement || document.documentElement || document.body).scrollHeight
-    : el.scrollHeight;
-}
-
-function clientHeightOf(el) {
-  return el === window ? window.innerHeight : el.clientHeight;
-}
-
 let smoothState = null;
-
-function scrollPosOf(el) {
-  return el === window
-    ? { x: window.scrollX, y: window.scrollY }
-    : { x: el.scrollLeft, y: el.scrollTop };
-}
 
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;

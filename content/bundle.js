@@ -638,6 +638,15 @@
     autoPicked = false;
     showHighlight();
   }
+  function scrollHeightOf(el) {
+    return el === window ? (document.scrollingElement || document.documentElement || document.body).scrollHeight : el.scrollHeight;
+  }
+  function clientHeightOf(el) {
+    return el === window ? window.innerHeight : el.clientHeight;
+  }
+  function scrollPosOf(el) {
+    return el === window ? { x: window.scrollX, y: window.scrollY } : { x: el.scrollLeft, y: el.scrollTop };
+  }
   var highlightEl = null;
   var highlightTimer = null;
   function showHighlight() {
@@ -1267,9 +1276,196 @@
   var Help = { open: open2, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
   register("help", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
 
-  // content/hints.js
+  // content/hints-elements.js
   var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
   var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
+  function isEditable(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (el.isContentEditable) return true;
+    const role = el.getAttribute ? el.getAttribute("role") : null;
+    if (role === "textbox" || role === "searchbox" || role === "combobox")
+      return true;
+    return false;
+  }
+  function isElementDrawn(e, rect) {
+    const min = isEditable(e) ? 1 : 4;
+    rect = rect || e.getBoundingClientRect();
+    return rect.width > min && rect.height > min && (parseFloat(window.getComputedStyle(e).opacity) > 0.1 || e.tagName === "INPUT" && e.type !== "text");
+  }
+  function isElementPartiallyInViewport(el, ignoreSize) {
+    const rect = el.getBoundingClientRect();
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+    return (ignoreSize || isElementDrawn(el, rect)) && rect.top < windowHeight && rect.bottom > 0 && rect.left < windowWidth && rect.right > 0;
+  }
+  function getVisibleElements(filter) {
+    const all = Array.from(document.documentElement.getElementsByTagName("*"));
+    const visibleElements = [];
+    for (let i = 0; i < all.length; i++) {
+      const e = all[i];
+      if (e.shadowRoot) {
+        const cc = e.shadowRoot.querySelectorAll("*");
+        for (let j = 0; j < cc.length; j++) all.push(cc[j]);
+      }
+      const rect = e.getBoundingClientRect();
+      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && window.getComputedStyle(e).visibility !== "hidden") {
+        filter(e, visibleElements);
+      }
+    }
+    return visibleElements;
+  }
+  function filterInvisibleElements(nodes) {
+    return nodes.filter(
+      (n) => n.offsetHeight && n.offsetWidth && !n.getAttribute("disabled") && isElementPartiallyInViewport(n) && window.getComputedStyle(n).visibility !== "hidden"
+    );
+  }
+  function getRealRect(elm) {
+    try {
+      if (elm.childElementCount === 0) {
+        const r = elm.getClientRects();
+        if (r.length === 3) return r[1];
+        if (r.length === 2) return r[0];
+        return elm.getBoundingClientRect();
+      } else if (elm.childElementCount === 1 && elm.firstElementChild && elm.firstElementChild.textContent) {
+        const r = elm.firstElementChild.getBoundingClientRect();
+        if (r.width < 4 || r.height < 4) return elm.getBoundingClientRect();
+        return r;
+      }
+      return elm.getBoundingClientRect();
+    } catch {
+      return elm.getBoundingClientRect();
+    }
+  }
+  function isElementClickable(e) {
+    try {
+      if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
+    } catch {
+    }
+    try {
+      const style = window.getComputedStyle(e);
+      if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
+        return true;
+    } catch {
+    }
+    try {
+      if (e.closest && e.closest(
+        "a, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button"
+      ))
+        return true;
+    } catch {
+    }
+    return false;
+  }
+  function filterAncestors(elements2) {
+    if (elements2.length === 0) return elements2;
+    const result = [];
+    elements2.forEach((e) => {
+      for (let j = 0; j < result.length; j++) {
+        if (result[j].contains(e)) {
+          if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
+          return;
+        } else if (result[j].shadowRoot && result[j].shadowRoot.contains(e)) {
+          return;
+        } else if (e.contains(result[j])) {
+          return;
+        }
+      }
+      result.push(e);
+    });
+    return result;
+  }
+  function filterOverlapElements(elements2) {
+    elements2 = elements2.filter((e) => {
+      const be = getRealRect(e);
+      if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
+      if (e.matches && (e.matches("input, textarea, select, form") || e.contentEditable === "true"))
+        return true;
+      try {
+        if (e.closest && e.closest(overlaySelectors)) return false;
+      } catch {
+      }
+      const el = e.getRootNode().elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
+      return !el || el.shadowRoot && (el.childElementCount === 0 || el.shadowRoot.contains(e)) || el.contains(e) || e.contains(el);
+    });
+    return filterAncestors(elements2);
+  }
+  function getClickableElements() {
+    let elements2 = getVisibleElements((e, v) => {
+      try {
+        if (e.closest && e.closest(overlaySelectors)) return;
+      } catch {
+      }
+      if (isElementClickable(e)) v.push(e);
+    });
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function getHref(el) {
+    try {
+      if (el.href) return el.href;
+    } catch {
+    }
+    const raw = el.getAttribute ? el.getAttribute("href") || el.getAttribute("xlink:href") : null;
+    if (!raw) return null;
+    if (raw.startsWith("#") || raw.trim() === "") return null;
+    try {
+      const url = new URL(raw, location.href);
+      return url.href;
+    } catch {
+      return null;
+    }
+  }
+  function isOpenableLink(el) {
+    const href = getHref(el);
+    if (!href) return false;
+    try {
+      const url = new URL(href);
+      const scheme = url.protocol.replace(":", "").toLowerCase();
+      if (blockedUrlSchemes.has(scheme)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function getLinkElements() {
+    let elements2 = getVisibleElements((e, v) => {
+      if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)
+        v.push(e);
+    });
+    elements2 = elements2.filter((el) => {
+      if (el.closest && el.closest(overlaySelectors)) return false;
+      return isOpenableLink(el);
+    });
+    elements2 = filterInvisibleElements(elements2);
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function getInputElements() {
+    const raw = queryAll(INPUT_SELECTOR);
+    const out = [];
+    for (const el of raw) {
+      if (el.closest && el.closest(overlaySelectors)) continue;
+      const type = el.getAttribute ? (el.getAttribute("type") || "").toLowerCase() : "";
+      if (type === "hidden") continue;
+      if (el.disabled) continue;
+      out.push(el);
+    }
+    let elements2 = filterInvisibleElements(out);
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function collectElements(requestedMode) {
+    let raw = [];
+    if (requestedMode === "click") raw = getClickableElements();
+    else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "yank")
+      raw = getLinkElements();
+    else if (requestedMode === "input") raw = getInputElements();
+    return raw;
+  }
+
+  // content/hints.js
   var active3 = false;
   var container = null;
   var hintsHost = null;
@@ -1376,7 +1572,7 @@
     return active3;
   }
   function normalizeCharset() {
-    const s = settings.getHintChars ? settings.getHintChars() : "asdfgqwertzxcvb";
+    const s = settings.getHintChars();
     if (!s) return "asdfgqwertzxcvb";
     return s.toLowerCase();
   }
@@ -1418,263 +1614,6 @@
       }
     }
     return out;
-  }
-  function isElementDrawn(e, rect) {
-    const min = isEditable(e) ? 1 : 4;
-    rect = rect || e.getBoundingClientRect();
-    return rect.width > min && rect.height > min && (parseFloat(window.getComputedStyle(e).opacity) > 0.1 || e.tagName === "INPUT" && e.type !== "text");
-  }
-  function isElementPartiallyInViewport(el, ignoreSize) {
-    const rect = el.getBoundingClientRect();
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
-    return (ignoreSize || isElementDrawn(el, rect)) && rect.top < windowHeight && rect.bottom > 0 && rect.left < windowWidth && rect.right > 0;
-  }
-  function getVisibleElements(filter) {
-    const all = Array.from(document.documentElement.getElementsByTagName("*"));
-    const visibleElements = [];
-    for (let i = 0; i < all.length; i++) {
-      const e = all[i];
-      if (e.shadowRoot) {
-        const cc = e.shadowRoot.querySelectorAll("*");
-        for (let j = 0; j < cc.length; j++) all.push(cc[j]);
-      }
-      const rect = e.getBoundingClientRect();
-      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && window.getComputedStyle(e).visibility !== "hidden") {
-        filter(e, visibleElements);
-      }
-    }
-    return visibleElements;
-  }
-  function filterInvisibleElements(nodes) {
-    return nodes.filter(
-      (n) => n.offsetHeight && n.offsetWidth && !n.getAttribute("disabled") && isElementPartiallyInViewport(n) && window.getComputedStyle(n).visibility !== "hidden"
-    );
-  }
-  function getRealRect(elm) {
-    try {
-      if (elm.childElementCount === 0) {
-        const r = elm.getClientRects();
-        if (r.length === 3) return r[1];
-        if (r.length === 2) return r[0];
-        return elm.getBoundingClientRect();
-      } else if (elm.childElementCount === 1 && elm.firstElementChild && elm.firstElementChild.textContent) {
-        const r = elm.firstElementChild.getBoundingClientRect();
-        if (r.width < 4 || r.height < 4) return elm.getBoundingClientRect();
-        return r;
-      }
-      return elm.getBoundingClientRect();
-    } catch {
-      return elm.getBoundingClientRect();
-    }
-  }
-  function isElementClickable(e) {
-    try {
-      if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
-    } catch {
-    }
-    try {
-      const style = window.getComputedStyle(e);
-      if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
-        return true;
-    } catch {
-    }
-    try {
-      if (e.closest && e.closest(
-        "a, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button"
-      ))
-        return true;
-    } catch {
-    }
-    return false;
-  }
-  function filterOverlapElements(elements2) {
-    elements2 = elements2.filter((e) => {
-      const be = getRealRect(e);
-      if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
-      if (e.matches && (e.matches("input, textarea, select, form") || e.contentEditable === "true"))
-        return true;
-      try {
-        if (e.closest && e.closest(overlaySelectors)) return false;
-      } catch {
-      }
-      const el = e.getRootNode().elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
-      return !el || el.shadowRoot && (el.childElementCount === 0 || el.shadowRoot.contains(e)) || el.contains(e) || e.contains(el);
-    });
-    return filterAncestors(elements2);
-  }
-  function filterAncestors(elements2) {
-    if (elements2.length === 0) return elements2;
-    const result = [];
-    elements2.forEach((e) => {
-      for (let j = 0; j < result.length; j++) {
-        if (result[j].contains(e)) {
-          if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
-          return;
-        } else if (result[j].shadowRoot && result[j].shadowRoot.contains(e)) {
-          return;
-        } else if (e.contains(result[j])) {
-          return;
-        }
-      }
-      result.push(e);
-    });
-    return result;
-  }
-  function getClickableElements() {
-    let elements2 = getVisibleElements((e, v) => {
-      try {
-        if (e.closest && e.closest(overlaySelectors)) return;
-      } catch {
-      }
-      if (isElementClickable(e)) v.push(e);
-    });
-    elements2 = filterOverlapElements(elements2);
-    return elements2;
-  }
-  function getLinkElements() {
-    let elements2 = getVisibleElements((e, v) => {
-      if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)
-        v.push(e);
-    });
-    elements2 = elements2.filter((el) => {
-      if (el.closest && el.closest(overlaySelectors)) return false;
-      return isOpenableLink(el);
-    });
-    elements2 = filterInvisibleElements(elements2);
-    elements2 = filterOverlapElements(elements2);
-    return elements2;
-  }
-  function getInputElements() {
-    const raw = queryAll(INPUT_SELECTOR);
-    const out = [];
-    for (const el of raw) {
-      if (el.closest && el.closest(overlaySelectors)) continue;
-      const type = el.getAttribute ? (el.getAttribute("type") || "").toLowerCase() : "";
-      if (type === "hidden") continue;
-      if (el.disabled) continue;
-      out.push(el);
-    }
-    let elements2 = filterInvisibleElements(out);
-    elements2 = filterOverlapElements(elements2);
-    return elements2;
-  }
-  function getHref(el) {
-    try {
-      if (el.href) return el.href;
-    } catch {
-    }
-    const raw = el.getAttribute ? el.getAttribute("href") || el.getAttribute("xlink:href") : null;
-    if (!raw) return null;
-    if (raw.startsWith("#") || raw.trim() === "") return null;
-    try {
-      const url = new URL(raw, location.href);
-      return url.href;
-    } catch {
-      return null;
-    }
-  }
-  function isOpenableLink(el) {
-    const href = getHref(el);
-    if (!href) return false;
-    try {
-      const url = new URL(href);
-      const scheme = url.protocol.replace(":", "").toLowerCase();
-      if (blockedUrlSchemes.has(scheme)) return false;
-      if (scheme === "javascript" || scheme === "data" || scheme === "vbscript")
-        return false;
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  function isEditable(el) {
-    if (!el) return false;
-    const tag = el.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    if (el.isContentEditable) return true;
-    const role = el.getAttribute ? el.getAttribute("role") : null;
-    if (role === "textbox" || role === "searchbox" || role === "combobox")
-      return true;
-    return false;
-  }
-  function collectElements(requestedMode) {
-    let raw = [];
-    if (requestedMode === "click") raw = getClickableElements();
-    else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "yank")
-      raw = getLinkElements();
-    else if (requestedMode === "input") raw = getInputElements();
-    return raw;
-  }
-  function updateHintText(hintEl, label, typed) {
-    hintEl.textContent = "";
-    if (!typed) {
-      hintEl.textContent = label;
-      return;
-    }
-    if (label.startsWith(typed)) {
-      const pre = document.createElement("span");
-      pre.className = "jari-hint-matched";
-      pre.textContent = typed;
-      const rest = document.createElement("span");
-      rest.textContent = label.slice(typed.length);
-      hintEl.appendChild(pre);
-      hintEl.appendChild(rest);
-      hintEl.classList.remove("jari-hint-hidden");
-    } else if (typed.startsWith(label)) {
-      hintEl.textContent = label;
-    } else {
-      hintEl.textContent = label;
-    }
-  }
-  function refresh() {
-    if (!active3) return;
-    let visibleCount = 0;
-    for (const h of hints) {
-      if (!prefix) {
-        h.hintEl.style.opacity = "1";
-        h.hintEl.style.display = "";
-        h.hintEl.classList.remove("jari-hint-hidden");
-        updateHintText(h.hintEl, h.label, "");
-        visibleCount++;
-      } else if (h.label === prefix) {
-        h.hintEl.style.opacity = "1";
-      } else if (h.label.startsWith(prefix)) {
-        h.hintEl.style.opacity = "1";
-        h.hintEl.style.display = "";
-        updateHintText(h.hintEl, h.label, prefix);
-        visibleCount++;
-      } else {
-        h.hintEl.style.opacity = "0";
-        h.hintEl.style.display = "none";
-      }
-    }
-    if (prefix && visibleCount === 0) {
-    }
-  }
-  function flip() {
-    if (hints.length === 0) return;
-    const first = hints[0].hintEl;
-    const isFlipped = first.style.zIndex !== String(first.zIndex);
-    hints.forEach((h, i) => {
-      const el = h.hintEl;
-      const z = parseInt(el.zIndex, 10) || parseInt(el.style.zIndex, 10) || 0;
-      if (isFlipped) {
-        el.style.zIndex = String(el.zIndex);
-      } else {
-        el.style.zIndex = String(hints.length - i + 2147483e3 - z);
-      }
-    });
-  }
-  function flashElement(el) {
-    const prevOutline = el.style.outline;
-    const prevOutlineOffset = el.style.outlineOffset;
-    el.style.outline = "2px solid #e0a363";
-    el.style.outlineOffset = "1px";
-    setTimeout(() => {
-      el.style.outline = prevOutline;
-      el.style.outlineOffset = prevOutlineOffset;
-    }, 300);
   }
   function dispatchClick(el) {
     try {
@@ -1760,6 +1699,71 @@
     }
     return ret;
   }
+  function updateHintText(hintEl, label, typed) {
+    hintEl.textContent = "";
+    if (!typed) {
+      hintEl.textContent = label;
+      return;
+    }
+    if (label.startsWith(typed)) {
+      const pre = document.createElement("span");
+      pre.className = "jari-hint-matched";
+      pre.textContent = typed;
+      const rest = document.createElement("span");
+      rest.textContent = label.slice(typed.length);
+      hintEl.appendChild(pre);
+      hintEl.appendChild(rest);
+      hintEl.classList.remove("jari-hint-hidden");
+    } else if (typed.startsWith(label)) {
+      hintEl.textContent = label;
+    } else {
+      hintEl.textContent = label;
+    }
+  }
+  function refresh() {
+    if (!active3) return;
+    for (const h of hints) {
+      if (!prefix) {
+        h.hintEl.style.opacity = "1";
+        h.hintEl.style.display = "";
+        h.hintEl.classList.remove("jari-hint-hidden");
+        updateHintText(h.hintEl, h.label, "");
+      } else if (h.label === prefix) {
+        h.hintEl.style.opacity = "1";
+      } else if (h.label.startsWith(prefix)) {
+        h.hintEl.style.opacity = "1";
+        h.hintEl.style.display = "";
+        updateHintText(h.hintEl, h.label, prefix);
+      } else {
+        h.hintEl.style.opacity = "0";
+        h.hintEl.style.display = "none";
+      }
+    }
+  }
+  function flip() {
+    if (hints.length === 0) return;
+    const first = hints[0].hintEl;
+    const isFlipped = first.style.zIndex !== String(first.zIndex);
+    hints.forEach((h, i) => {
+      const el = h.hintEl;
+      const z = parseInt(el.style.zIndex, 10) || 0;
+      if (isFlipped) {
+        el.style.zIndex = String(el.zIndex);
+      } else {
+        el.style.zIndex = String(hints.length - i + 2147483e3 - z);
+      }
+    });
+  }
+  function flashElement(el) {
+    const prevOutline = el.style.outline;
+    const prevOutlineOffset = el.style.outlineOffset;
+    el.style.outline = "2px solid #e0a363";
+    el.style.outlineOffset = "1px";
+    setTimeout(() => {
+      el.style.outline = prevOutline;
+      el.style.outlineOffset = prevOutlineOffset;
+    }, 300);
+  }
   function render3() {
     if (hintsHost) {
       try {
@@ -1768,12 +1772,6 @@
       }
       hintsHost = null;
       holder = null;
-      container = null;
-    } else if (container) {
-      try {
-        container.remove();
-      } catch {
-      }
       container = null;
     }
     hintsHost = document.createElement("div");
@@ -2025,37 +2023,21 @@
       hintsHost = null;
       holder = null;
       container = null;
-    } else if (container) {
-      try {
-        container.remove();
-      } catch {
-      }
-      container = null;
     }
     stopTracking();
   }
+  var MODE_CONFIG = {
+    click: { mode: "click", multipleHits: false },
+    open: { mode: "open", multipleHits: false },
+    openBackground: { mode: "openBackground", multipleHits: true },
+    input: { mode: "input", multipleHits: false },
+    yank: { mode: "yank", multipleHits: false }
+  };
   function open3(requestedMode) {
     if (active3) close3();
-    let m = requestedMode;
-    if (m === "click") {
-      mode2 = "click";
-      multipleHits = false;
-    } else if (m === "open") {
-      mode2 = "open";
-      multipleHits = false;
-    } else if (m === "openBackground") {
-      mode2 = "openBackground";
-      multipleHits = true;
-    } else if (m === "input") {
-      mode2 = "input";
-      multipleHits = false;
-    } else if (m === "yank") {
-      mode2 = "yank";
-      multipleHits = false;
-    } else {
-      mode2 = "click";
-      multipleHits = false;
-    }
+    const config = MODE_CONFIG[requestedMode] || MODE_CONFIG.click;
+    mode2 = config.mode;
+    multipleHits = config.multipleHits;
     let candidates = collectElements(mode2);
     if (mode2 === "input") {
       if (candidates.length === 0) {
@@ -2233,16 +2215,7 @@
   function getScrollElement() {
     return Scroll.getTarget();
   }
-  function scrollHeightOf(el) {
-    return el === window ? (document.scrollingElement || document.documentElement || document.body).scrollHeight : el.scrollHeight;
-  }
-  function clientHeightOf(el) {
-    return el === window ? window.innerHeight : el.clientHeight;
-  }
   var smoothState = null;
-  function scrollPosOf(el) {
-    return el === window ? { x: window.scrollX, y: window.scrollY } : { x: el.scrollLeft, y: el.scrollTop };
-  }
   function prefersReducedMotion() {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }

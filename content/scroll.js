@@ -206,6 +206,22 @@ function resetToGlobal() {
   showHighlight();
 }
 
+function scrollHeightOf(el) {
+  return el === window
+    ? (document.scrollingElement || document.documentElement || document.body).scrollHeight
+    : el.scrollHeight;
+}
+
+function clientHeightOf(el) {
+  return el === window ? window.innerHeight : el.clientHeight;
+}
+
+function scrollPosOf(el) {
+  return el === window
+    ? { x: window.scrollX, y: window.scrollY }
+    : { x: el.scrollLeft, y: el.scrollTop };
+}
+
 let highlightEl = null;
 let highlightTimer = null;
 
@@ -253,3 +269,5 @@ function showHighlight() {
 }
 
 export const Scroll = { getTarget, cycle, resetToGlobal, showHighlight };
+
+export { scrollHeightOf, clientHeightOf, scrollPosOf };

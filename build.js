@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { copyFileSync, existsSync, readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,18 +22,19 @@ await buildOne(
 );
 await buildOne("background", "main.js", "background.js", buildBanner);
 
-const src = join(root, `manifest.${target}.json`);
-const dest = join(root, "manifest.json");
-if (!existsSync(src)) {
-  console.error(`Missing source manifest: ${src}`);
-  process.exit(1);
+const manifest = JSON.parse(readFileSync(join(root, "manifest.base.json"), "utf8"));
+if (target === "chrome") {
+  manifest.background = { service_worker: "background.js" };
+} else {
+  manifest.background = { scripts: ["background.js"] };
+  manifest.permissions.push("clipboardWrite");
 }
-copyFileSync(src, dest);
+writeFileSync(join(root, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 
 console.log("Wrote content/bundle.js");
 console.log("Wrote options/options.bundle.js");
 console.log("Wrote background.js");
-console.log(`Wrote manifest.json from manifest.${target}.json`);
+console.log(`Wrote manifest.json (${target})`);
 console.log(
   `Load this folder in ${target === "chrome" ? "Chrome" : "Firefox"}.`,
 );

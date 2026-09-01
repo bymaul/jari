@@ -5,7 +5,14 @@
   var suggestionSources = ["tab", "history", "bookmark"];
 
   // shared/url.js
-  var urlSchemes = /* @__PURE__ */ new Set(["http", "https", "file", "about", "chrome"]);
+  var urlSchemes = /* @__PURE__ */ new Set([
+    "http",
+    "https",
+    "file",
+    "about",
+    "chrome",
+    "helium"
+  ]);
   var blockedUrlSchemes = /* @__PURE__ */ new Set([
     "javascript",
     "data",
