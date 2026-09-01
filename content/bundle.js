@@ -1679,7 +1679,6 @@
       } catch {
       }
     }
-    flashElement(el);
   }
   function coordinate(holder2) {
     const link = document.createElement("div");
@@ -1753,16 +1752,6 @@
         el.style.zIndex = String(hints.length - i + 2147483e3 - z);
       }
     });
-  }
-  function flashElement(el) {
-    const prevOutline = el.style.outline;
-    const prevOutlineOffset = el.style.outlineOffset;
-    el.style.outline = "2px solid #e0a363";
-    el.style.outlineOffset = "1px";
-    setTimeout(() => {
-      el.style.outline = prevOutline;
-      el.style.outlineOffset = prevOutlineOffset;
-    }, 300);
   }
   function render3() {
     if (hintsHost) {
@@ -2070,7 +2059,6 @@
         focusInput(el);
       } else {
         dispatchClick(el);
-        flashElement(el);
       }
       if (!multipleHits) close3();
       else {
@@ -2094,7 +2082,6 @@
       if (url) {
         sendMessage("openInBackgroundTab", { url });
       }
-      flashElement(el);
       if (!multipleHits) close3();
       else {
         prefix = "";
@@ -2111,7 +2098,6 @@
       } else {
         ui.toast("No link");
       }
-      flashElement(el);
       close3();
     }
   }
