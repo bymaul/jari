@@ -347,18 +347,18 @@
 
 /* --- Hints (f / F / gf / i): per-element labels over clickable / link / input targets --- */
 .jari-hints {
-  position: absolute !important;
+  position: fixed !important;
   left: 0 !important;
   top: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
   overflow: visible !important;
   pointer-events: none !important;
-  z-index: 2147483646 !important;
+  z-index: 2147483647 !important;
 }
 
 .jari-hint {
-  position: absolute !important;
+  position: fixed !important;
   display: inline-block !important;
   box-sizing: border-box !important;
   font-family: var(--jari-font-family) !important;
@@ -375,7 +375,6 @@
   white-space: nowrap !important;
   pointer-events: none !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35) !important;
-  transform: translate(-4px, -8px) !important;
   text-align: left !important;
 }
 
