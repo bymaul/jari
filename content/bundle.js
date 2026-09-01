@@ -1466,8 +1466,9 @@
   }
 
   // content/hints.js
+  var MAX_HINTS = 800;
+  var REGENERATE_DELAY = 150;
   var active3 = false;
-  var container = null;
   var hintsHost = null;
   var holder = null;
   var elements = [];
@@ -1475,11 +1476,9 @@
   var prefix = "";
   var mode2 = "click";
   var multipleHits = false;
-  var scrollHandler = null;
   var resizeHandler = null;
   var mutationObserver = null;
   var regenerateTimer = null;
-  var scrollEndTimer = null;
   var hintPill = null;
   function getZIndex(node) {
     let z = 0;
@@ -1528,14 +1527,6 @@
     }
     hintPill = null;
   }
-  function hideHints() {
-    if (holder) {
-      holder.style.display = "none";
-    } else if (container) {
-      container.style.display = "none";
-    }
-    prefix = "";
-  }
   function scheduleRegenerate() {
     if (regenerateTimer) return;
     regenerateTimer = setTimeout(() => {
@@ -1548,17 +1539,13 @@
         ui.toast("No hints");
         return;
       }
-      const capped = fresh.length > 800 ? fresh.slice(0, 800) : fresh;
+      const capped = fresh.length > MAX_HINTS ? fresh.slice(0, MAX_HINTS) : fresh;
       if (capped.length !== fresh.length) {
         ui.toast(`Too many hints (${capped.length} shown)`);
       }
       elements = capped;
       render3();
-      if (holder) {
-        holder.style.display = "";
-      } else if (container) {
-        container.style.display = "";
-      }
+      if (holder) holder.style.display = "";
       prefix = savedPrefix;
       refresh();
       const any = hints.some((h) => h.label.startsWith(prefix));
@@ -1566,7 +1553,7 @@
         prefix = "";
         refresh();
       }
-    }, 150);
+    }, REGENERATE_DELAY);
   }
   function isActive3() {
     return active3;
@@ -1576,86 +1563,85 @@
     if (!s) return "asdfgqwertzxcvb";
     return s.toLowerCase();
   }
+  function hasPrefixConflict(labels) {
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = 0; j < labels.length; j++) {
+        if (i !== j && labels[j].startsWith(labels[i])) return true;
+      }
+    }
+    return false;
+  }
+  function buildUniformLabels(count, chars) {
+    let length = 1;
+    while (Math.pow(chars.length, length) < count) length++;
+    const out = [];
+    for (let k = 0; k < count; k++) {
+      let n = k;
+      let s = "";
+      for (let p = 0; p < length; p++) {
+        s = chars[n % chars.length] + s;
+        n = Math.floor(n / chars.length);
+      }
+      out.push(s);
+    }
+    return out;
+  }
   function genLabels(count, charset) {
     const chars = (charset || normalizeCharset()).toUpperCase().split("");
-    if (count <= 0) return [];
-    if (chars.length < 2) return [];
+    if (count <= 0 || chars.length < 2) return [];
     if (count <= chars.length) return chars.slice(0, count);
     const labels = chars.slice();
     let head = 0;
     while (labels.length - head < count) {
       if (head >= labels.length) break;
-      const prefix2 = labels[head++];
+      const p = labels[head++];
       for (const c of chars) {
-        labels.push(prefix2 + c);
+        labels.push(p + c);
         if (labels.length - head >= count) break;
         if (labels.length > 1e4) break;
       }
       if (labels.length > 1e4) break;
     }
     const out = labels.slice(head, head + count);
-    for (let i = 0; i < out.length; i++) {
-      for (let j = 0; j < out.length; j++) {
-        if (i !== j && out[j].startsWith(out[i])) {
-          let L = 1;
-          while (Math.pow(chars.length, L) < count) L++;
-          const uni = [];
-          for (let k = 0; k < count; k++) {
-            let n = k;
-            let s = "";
-            for (let p = 0; p < L; p++) {
-              s = chars[n % chars.length] + s;
-              n = Math.floor(n / chars.length);
-            }
-            uni.push(s);
-          }
-          return uni;
-        }
+    return hasPrefixConflict(out) ? buildUniformLabels(count, chars) : out;
+  }
+  function safeFocus(el, opts) {
+    try {
+      el.focus(opts);
+    } catch {
+      try {
+        el.focus();
+      } catch {
       }
     }
-    return out;
   }
   function dispatchClick(el) {
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
     } catch {
     }
-    const events = ["mouseover", "mousedown", "mouseup", "click"];
-    for (const type of events) {
+    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
       try {
-        const ev = new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          button: 0,
-          buttons: type === "mousedown" ? 1 : 0
-        });
-        el.dispatchEvent(ev);
+        el.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 0,
+            buttons: type === "mousedown" ? 1 : 0
+          })
+        );
       } catch {
       }
     }
-    try {
-      if (typeof el.focus === "function") el.focus({ preventScroll: true });
-    } catch {
-      try {
-        el.focus();
-      } catch {
-      }
-    }
+    safeFocus(el, { preventScroll: true });
   }
   function focusInput(el) {
     try {
       el.scrollIntoView({ block: "center", inline: "center" });
     } catch {
     }
-    try {
-      el.focus({ preventScroll: true });
-    } catch {
-      try {
-        el.focus();
-      } catch {
-      }
-    }
+    safeFocus(el, { preventScroll: true });
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
       try {
         const len = el.value ? el.value.length : 0;
@@ -1680,20 +1666,20 @@
       }
     }
   }
-  function coordinate(holder2) {
-    const link = document.createElement("div");
-    link.style.position = "absolute";
-    link.style.top = "0";
-    link.style.left = "0";
-    link.textContent = "A";
-    holder2.prepend(link);
-    const br = link.getBoundingClientRect();
+  function coordinate(holderEl) {
+    const probe = document.createElement("div");
+    probe.style.position = "absolute";
+    probe.style.top = "0";
+    probe.style.left = "0";
+    probe.textContent = "A";
+    holderEl.prepend(probe);
+    const br = probe.getBoundingClientRect();
     const ret = {
       top: br.top + window.pageYOffset - document.documentElement.clientTop,
       left: br.left + window.pageXOffset - document.documentElement.clientLeft
     };
     try {
-      link.remove();
+      probe.remove();
     } catch {
     }
     return ret;
@@ -1710,11 +1696,8 @@
       pre.textContent = typed;
       const rest = document.createElement("span");
       rest.textContent = label.slice(typed.length);
-      hintEl.appendChild(pre);
-      hintEl.appendChild(rest);
+      hintEl.append(pre, rest);
       hintEl.classList.remove("jari-hint-hidden");
-    } else if (typed.startsWith(label)) {
-      hintEl.textContent = label;
     } else {
       hintEl.textContent = label;
     }
@@ -1746,11 +1729,7 @@
     hints.forEach((h, i) => {
       const el = h.hintEl;
       const z = parseInt(el.style.zIndex, 10) || 0;
-      if (isFlipped) {
-        el.style.zIndex = String(el.zIndex);
-      } else {
-        el.style.zIndex = String(hints.length - i + 2147483e3 - z);
-      }
+      el.style.zIndex = isFlipped ? String(el.zIndex) : String(hints.length - i + 2147483e3 - z);
     });
   }
   function render3() {
@@ -1761,7 +1740,6 @@
       }
       hintsHost = null;
       holder = null;
-      container = null;
     }
     hintsHost = document.createElement("div");
     hintsHost.className = "jari-hints-host";
@@ -1811,7 +1789,6 @@
     holder.style.display = "block";
     holder.style.opacity = "1";
     shadow.appendChild(holder);
-    container = holder;
     placeHintsHost(hintsHost);
     const charset = normalizeCharset();
     const labels = genLabels(elements.length, charset);
@@ -1823,7 +1800,8 @@
         return { top: 0, left: 0 };
       }
     })();
-    let lastTop = -1, lastLeft = -1;
+    let lastTop = -1;
+    let lastLeft = -1;
     const links = elements.map((elm, i) => {
       const r = getRealRect(elm);
       const z = getZIndex(elm);
@@ -1834,14 +1812,14 @@
       link.dataset.label = labels[i];
       let lTop = Math.max(r.top + window.pageYOffset - bof.top, 0);
       if (lTop === lastTop && Math.abs(left - lastLeft) < 20) {
-        link.style.left = left + 20 - Math.abs(left - lastLeft) + "px";
+        link.style.left = `${left + 20 - Math.abs(left - lastLeft)}px`;
       } else if (left === lastLeft && Math.abs(lTop - lastTop) < 20) {
         lTop += 20 - Math.abs(lTop - lastTop);
-        link.style.left = left + "px";
+        link.style.left = `${left}px`;
       } else {
-        link.style.left = left + "px";
+        link.style.left = `${left}px`;
       }
-      link.style.top = lTop + "px";
+      link.style.top = `${lTop}px`;
       link.style.zIndex = String(z + 9999);
       link.zIndex = link.style.zIndex;
       link.label = labels[i];
@@ -1858,7 +1836,7 @@
         const h = links[i];
         const tcr = getRealRect(h);
         if (tcr.top === bcr.top && Math.abs(tcr.left - bcr.left) < bcr.width) {
-          h.style.top = h.offsetTop + h.offsetHeight + "px";
+          h.style.top = `${h.offsetTop + h.offsetHeight}px`;
         }
         bcr = getRealRect(h);
       }
@@ -1878,47 +1856,31 @@
     scrollLockPrevent = (e) => {
       if (!active3) return;
       const t = e.target;
-      if (t && t.closest && t.closest(".jari-hint")) return;
+      if (t?.closest?.(".jari-hint")) return;
       e.preventDefault();
       e.stopPropagation();
     };
-    try {
-      window.addEventListener("wheel", scrollLockPrevent, {
-        passive: false,
-        capture: true
-      });
-    } catch {
-    }
-    try {
-      window.addEventListener("touchmove", scrollLockPrevent, {
-        passive: false,
-        capture: true
-      });
-    } catch {
+    for (const type of ["wheel", "touchmove"]) {
+      try {
+        window.addEventListener(type, scrollLockPrevent, {
+          passive: false,
+          capture: true
+        });
+      } catch {
+      }
     }
   }
   function enableScrollLock() {
     if (!scrollLockPrevent) return;
-    try {
-      window.removeEventListener("wheel", scrollLockPrevent, { capture: true });
-    } catch {
-    }
-    try {
-      window.removeEventListener("touchmove", scrollLockPrevent, {
-        capture: true
-      });
-    } catch {
+    for (const type of ["wheel", "touchmove"]) {
+      try {
+        window.removeEventListener(type, scrollLockPrevent, { capture: true });
+      } catch {
+      }
     }
     scrollLockPrevent = null;
   }
   function stopTracking() {
-    if (scrollHandler) {
-      try {
-        window.removeEventListener("scroll", scrollHandler, true);
-      } catch {
-      }
-      scrollHandler = null;
-    }
     if (resizeHandler) {
       try {
         window.removeEventListener("resize", resizeHandler);
@@ -1936,10 +1898,6 @@
     if (regenerateTimer) {
       clearTimeout(regenerateTimer);
       regenerateTimer = null;
-    }
-    if (scrollEndTimer) {
-      clearTimeout(scrollEndTimer);
-      scrollEndTimer = null;
     }
     if (keyUpHandler) {
       try {
@@ -1977,25 +1935,10 @@
       window.addEventListener("keyup", keyUpHandler, true);
     } catch {
     }
-    scrollHandler = () => {
-      if (!active3) return;
-      hideHints();
-      if (regenerateTimer) {
-        clearTimeout(regenerateTimer);
-        regenerateTimer = null;
-      }
-      if (scrollEndTimer) clearTimeout(scrollEndTimer);
-      scrollEndTimer = setTimeout(() => {
-        scrollEndTimer = null;
-        if (!active3) return;
-        scheduleRegenerate();
-      }, 150);
-    };
     resizeHandler = () => {
       if (!active3) return;
       scheduleRegenerate();
     };
-    window.addEventListener("scroll", scrollHandler, true);
     window.addEventListener("resize", resizeHandler);
   }
   function close3() {
@@ -2011,7 +1954,6 @@
       }
       hintsHost = null;
       holder = null;
-      container = null;
     }
     stopTracking();
   }
@@ -2028,23 +1970,17 @@
     mode2 = config.mode;
     multipleHits = config.multipleHits;
     let candidates = collectElements(mode2);
-    if (mode2 === "input") {
-      if (candidates.length === 0) {
-        ui.toast("No inputs");
-        return;
-      }
-      if (candidates.length === 1) {
-        focusInput(candidates[0]);
-        return;
-      }
-    }
-    if (candidates.length === 0) {
-      if (mode2 === "yank") ui.toast("No links to yank");
-      else ui.toast(mode2 === "input" ? "No inputs" : "No hints");
+    if (mode2 === "input" && candidates.length === 1) {
+      focusInput(candidates[0]);
       return;
     }
-    if (candidates.length > 800) {
-      candidates = candidates.slice(0, 800);
+    if (candidates.length === 0) {
+      const msg = mode2 === "yank" ? "No links to yank" : mode2 === "input" ? "No inputs" : "No hints";
+      ui.toast(msg);
+      return;
+    }
+    if (candidates.length > MAX_HINTS) {
+      candidates = candidates.slice(0, MAX_HINTS);
       ui.toast(`Too many hints (${candidates.length} shown)`);
     }
     elements = candidates;
@@ -2053,40 +1989,27 @@
     render3();
     startTracking();
   }
+  function handleActivationEnd() {
+    if (!multipleHits) close3();
+    else {
+      prefix = "";
+      refresh();
+    }
+  }
   function activate2(el) {
     if (mode2 === "click") {
-      if (isEditable(el)) {
-        focusInput(el);
-      } else {
-        dispatchClick(el);
-      }
-      if (!multipleHits) close3();
-      else {
-        prefix = "";
-        refresh();
-      }
+      if (isEditable(el)) focusInput(el);
+      else dispatchClick(el);
+      handleActivationEnd();
     } else if (mode2 === "open") {
       const url = getHref(el);
-      if (url) {
-        sendMessage("openInForegroundTab", { url });
-      } else {
-        dispatchClick(el);
-      }
-      if (!multipleHits) close3();
-      else {
-        prefix = "";
-        refresh();
-      }
+      if (url) sendMessage("openInForegroundTab", { url });
+      else dispatchClick(el);
+      handleActivationEnd();
     } else if (mode2 === "openBackground") {
       const url = getHref(el);
-      if (url) {
-        sendMessage("openInBackgroundTab", { url });
-      }
-      if (!multipleHits) close3();
-      else {
-        prefix = "";
-        refresh();
-      }
+      if (url) sendMessage("openInBackgroundTab", { url });
+      handleActivationEnd();
     } else if (mode2 === "input") {
       focusInput(el);
       close3();
@@ -2094,20 +2017,23 @@
       const url = getHref(el);
       if (url) {
         ui.copyText(url);
-        ui.toast("Yanked " + url);
+        ui.toast(`Yanked ${url}`);
       } else {
         ui.toast("No link");
       }
       close3();
     }
   }
+  function consume(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
   function onKeyDown3(event) {
     if (!active3) return false;
     const key = event.key;
     if (key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (prefix.length > 0) {
+      consume(event);
+      if (prefix) {
         prefix = "";
         refresh();
       } else {
@@ -2116,22 +2042,18 @@
       return true;
     }
     if (key === "Shift") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      consume(event);
       flip();
       return true;
     }
     if (key === " " || event.code === "Space") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      consume(event);
       if (holder) holder.style.display = "none";
-      else if (container) container.style.display = "none";
       return true;
     }
     if (key === "Backspace") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (prefix.length > 0) {
+      consume(event);
+      if (prefix) {
         prefix = prefix.slice(0, -1);
         refresh();
       } else {
@@ -2140,8 +2062,7 @@
       return true;
     }
     if (key === "Enter") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      consume(event);
       const visible = hints.filter((h) => h.label.startsWith(prefix));
       if (visible.length === 1) activate2(visible[0].el);
       return true;
@@ -2150,36 +2071,23 @@
       const charset = normalizeCharset();
       const lower = key.toLowerCase();
       if (charset.includes(lower)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        consume(event);
         const next = prefix + lower.toUpperCase();
-        const any = hints.some((h) => h.label.startsWith(next));
         const exact = hints.find((h) => h.label === next);
-        if (exact) {
-          prefix = next;
-          refresh();
-          activate2(exact.el);
-        } else if (any) {
-          prefix = next;
-          refresh();
-        } else {
-          prefix = next;
-          refresh();
-        }
+        prefix = next;
+        refresh();
+        if (exact) activate2(exact.el);
         return true;
       }
     }
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    consume(event);
     return true;
   }
   function onKeyUp(event) {
     if (!active3) return false;
     if (event.key === " " || event.code === "Space") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      consume(event);
       if (holder) holder.style.display = "";
-      else if (container) container.style.display = "";
       return true;
     }
     return false;
