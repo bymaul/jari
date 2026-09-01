@@ -302,6 +302,12 @@
       await chrome.tabs.create({ url: target, active: false });
       return { ok: true };
     },
+    openInForegroundTab: async (_, { url } = {}) => {
+      const target = normalizeUrl(url);
+      if (!target) return { ok: false };
+      await chrome.tabs.create({ url: target, active: true });
+      return { ok: true };
+    },
     openOptions: async () => {
       await chrome.runtime.openOptionsPage();
       return { ok: true };

@@ -17,6 +17,7 @@ const state = {
   passthroughMs: settingsDefaults.passthroughMs,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   copyFormat: settingsDefaults.copyFormat,
+  hintChars: settingsDefaults.hintChars,
 };
 
 function merge(data) {
@@ -30,6 +31,7 @@ function merge(data) {
   state.passthroughMs = s.passthroughMs;
   state.suggestionSources = s.suggestionSources;
   state.copyFormat = s.copyFormat;
+  state.hintChars = s.hintChars;
 }
 
 async function load() {
@@ -53,6 +55,7 @@ function persist() {
       passthroughMs: state.passthroughMs,
       suggestionSources: state.suggestionSources,
       copyFormat: state.copyFormat,
+      hintChars: state.hintChars,
     },
   });
 }
@@ -106,6 +109,10 @@ function getCopyFormat() {
   return state.copyFormat;
 }
 
+function getHintChars() {
+  return state.hintChars;
+}
+
 function toggleDisabled() {
   const host = location.hostname;
   const idx = state.disabledSites.indexOf(host);
@@ -134,5 +141,6 @@ export const settings = {
   getPassthroughMs,
   getSuggestionSources,
   getCopyFormat,
+  getHintChars,
   toggleDisabled,
 };

@@ -345,6 +345,50 @@
   padding: 0.25ex 0.5ex;
 }
 
+/* --- Hints (f / F / gf / i): per-element labels over clickable / link / input targets --- */
+.jari-hints {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  z-index: 2147483646 !important;
+}
+
+.jari-hint {
+  position: absolute !important;
+  display: inline-block !important;
+  box-sizing: border-box !important;
+  font-family: var(--jari-font-family) !important;
+  font-size: 10px !important;
+  font-weight: bold !important;
+  line-height: 1 !important;
+  letter-spacing: 0.02em !important;
+  padding: 1px 3px !important;
+  border: 1px solid #c38a22 !important;
+  border-radius: 3px !important;
+  background: linear-gradient(#fff785, #ffc542) !important;
+  color: #1a1a1a !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+  transform: translate(-4px, -8px) !important;
+  text-align: left !important;
+}
+
+.jari-hint-matched {
+  color: #6a6a6a !important;
+  opacity: 0.45 !important;
+}
+
+.jari-hint-hidden {
+  opacity: 0 !important;
+  display: none !important;
+}
+
 /* --- Showcmd readout (Neovim-style key echo), rightmost at the corner. --- */
 .jari-showcmd {
   order: 2;

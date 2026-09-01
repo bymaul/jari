@@ -52,6 +52,11 @@ export const COMMAND_CATALOG = {
   passthrough: { category: "modes", label: "Passthrough keys (timed)" },
   toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
 
+  hintClick: { category: "hints", label: "Show hints (click)" },
+  hintOpen: { category: "hints", label: "Show hints (open in new foreground tab)" },
+  hintOpenBackground: { category: "hints", label: "Show hints (open in background, persistent)" },
+  hintInput: { category: "hints", label: "Focus input (hint)" },
+
   showHelp: { category: "help", label: "Show keybindings" },
   openOptions: { category: "help", label: "Open settings" },
 };

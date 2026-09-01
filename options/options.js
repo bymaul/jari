@@ -28,6 +28,7 @@ const sourceTabEl = document.querySelector("#source-tab");
 const sourceHistoryEl = document.querySelector("#source-history");
 const sourceBookmarkEl = document.querySelector("#source-bookmark");
 const copyFormatEl = document.querySelector("#copy-format");
+const hintCharsEl = document.querySelector("#hint-chars");
 const keymapFilterEl = document.querySelector("#keymap-filter");
 const siteInputEl = document.querySelector("#disabled-site-input");
 const addSiteBtn = document.querySelector("#add-disabled-site");
@@ -46,6 +47,7 @@ async function load() {
   sourceHistoryEl.checked = sources.includes("history");
   sourceBookmarkEl.checked = sources.includes("bookmark");
   copyFormatEl.value = settings.getCopyFormat();
+  hintCharsEl.value = settings.getHintChars();
   renderKeymap();
   renderDisabled();
 }
@@ -222,6 +224,13 @@ function collectBehaviorSettings() {
   if (sourceTabEl.checked) sources.push("tab");
   if (sourceHistoryEl.checked) sources.push("history");
   if (sourceBookmarkEl.checked) sources.push("bookmark");
+  const hintCharsRaw = hintCharsEl.value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const deduped = [...new Set(hintCharsRaw)].join("");
+  if (deduped.length >= 2) {
+    hintCharsEl.value = deduped;
+  } else {
+    hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
+  }
   return {
     scrollStep: parseInt(scrollStepEl.value, 10),
     smoothScroll: smoothScrollEl.checked,
@@ -230,6 +239,7 @@ function collectBehaviorSettings() {
     passthroughMs: parseInt(passthroughEl.value, 10),
     suggestionSources: sources,
     copyFormat: copyFormatEl.value,
+    hintChars: hintCharsEl.value,
   };
 }
 
@@ -256,6 +266,7 @@ function reset() {
       passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
       suggestionSources: SETTINGS_DEFAULTS.suggestionSources.slice(),
       copyFormat: SETTINGS_DEFAULTS.copyFormat,
+      hintChars: SETTINGS_DEFAULTS.hintChars,
     })
     .then(() => status("Reset to defaults"))
     .catch(() => status("Save failed"));
@@ -271,6 +282,7 @@ function reset() {
   sourceBookmarkEl.checked =
     SETTINGS_DEFAULTS.suggestionSources.includes("bookmark");
   copyFormatEl.value = SETTINGS_DEFAULTS.copyFormat;
+  hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
   renderKeymap();
 }
 

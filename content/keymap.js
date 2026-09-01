@@ -11,7 +11,6 @@ export const Events = {
 };
 
 export const keymapDefaults = {
-
   j: "scrollDown",
   k: "scrollUp",
   h: "scrollLeft",
@@ -31,10 +30,13 @@ export const keymapDefaults = {
 
   gw: "splitMerge",
 
+  f: "hintClick",
+  F: "hintOpen",
+  gf: "hintOpenBackground",
+  i: "hintInput",
+
   S: "historyBack",
   D: "historyForward",
-
-
 
   r: "reloadTab",
   R: "hardReload",
@@ -79,9 +81,12 @@ export const categories = [
   { id: "history", label: "History" },
   { id: "page", label: "Page" },
   { id: "clipboard", label: "Clipboard" },
+  { id: "hints", label: "Hints" },
   { id: "modes", label: "Modes" },
   { id: "help", label: "Help" },
 ];
+
+export const HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
 
 export const settingsDefaults = {
   scrollStep: 120,
@@ -95,6 +100,8 @@ export const settingsDefaults = {
   suggestionSources: suggestionSources.slice(),
 
   copyFormat: "plain",
+
+  hintChars: HINT_CHARSET_DEFAULT,
 };
 
 export const prefixKeys = new Set(Object.keys(prefixes));
@@ -127,7 +134,7 @@ export function parseRepeatCount(raw) {
 }
 
 export const overlaySelectors =
-  ".jari-overlay, .jari-scroll-highlight";
+  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints";
 
 export function deepActiveElement() {
   let el = document.activeElement;
@@ -150,6 +157,14 @@ export function queryAll(selector, onShadowRoot) {
   };
   visit(document);
   return out;
+}
+
+export function normalizeHintChars(raw) {
+  if (typeof raw !== "string") return settingsDefaults.hintChars;
+  const chars = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const deduped = [...new Set(chars)].join("");
+  if (deduped.length < 2) return settingsDefaults.hintChars;
+  return deduped;
 }
 
 export function normalizeSettings(data) {
@@ -187,6 +202,7 @@ export function normalizeSettings(data) {
       : settingsDefaults.suggestionSources.slice(),
     copyFormat:
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
+    hintChars: normalizeHintChars(d.hintChars),
   };
 }
 

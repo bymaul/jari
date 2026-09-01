@@ -31,6 +31,10 @@
     "<<": "moveTabLeft",
     ">>": "moveTabRight",
     gw: "splitMerge",
+    f: "hintClick",
+    F: "hintOpen",
+    gf: "hintOpenBackground",
+    i: "hintInput",
     S: "historyBack",
     D: "historyForward",
     r: "reloadTab",
@@ -69,9 +73,11 @@
     { id: "history", label: "History" },
     { id: "page", label: "Page" },
     { id: "clipboard", label: "Clipboard" },
+    { id: "hints", label: "Hints" },
     { id: "modes", label: "Modes" },
     { id: "help", label: "Help" }
   ];
+  var HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
   var settingsDefaults = {
     scrollStep: 120,
     smoothScroll: false,
@@ -79,7 +85,8 @@
     timeoutMs: 1500,
     passthroughMs: 1500,
     suggestionSources: suggestionSources.slice(),
-    copyFormat: "plain"
+    copyFormat: "plain",
+    hintChars: HINT_CHARSET_DEFAULT
   };
   var prefixKeys = new Set(Object.keys(prefixes));
   var modifierKeys = /* @__PURE__ */ new Set([
@@ -102,6 +109,13 @@
     parts.push(event.key);
     return parts.join("+");
   }
+  function normalizeHintChars(raw) {
+    if (typeof raw !== "string") return settingsDefaults.hintChars;
+    const chars = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const deduped = [...new Set(chars)].join("");
+    if (deduped.length < 2) return settingsDefaults.hintChars;
+    return deduped;
+  }
   function normalizeSettings(data) {
     const d = data || {};
     const storedKeymap = {};
@@ -119,7 +133,8 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
-      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat
+      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
+      hintChars: normalizeHintChars(d.hintChars)
     };
   }
   function balanceCategories(byCategory, columnCount = 3) {
@@ -201,6 +216,10 @@
     toggleIgnore: { category: "modes", label: "Ignore mode" },
     passthrough: { category: "modes", label: "Passthrough keys (timed)" },
     toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
+    hintClick: { category: "hints", label: "Show hints (click)" },
+    hintOpen: { category: "hints", label: "Show hints (open in new foreground tab)" },
+    hintOpenBackground: { category: "hints", label: "Show hints (open in background, persistent)" },
+    hintInput: { category: "hints", label: "Focus input (hint)" },
     showHelp: { category: "help", label: "Show keybindings" },
     openOptions: { category: "help", label: "Open settings" }
   };
@@ -216,7 +235,8 @@
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
-    copyFormat: settingsDefaults.copyFormat
+    copyFormat: settingsDefaults.copyFormat,
+    hintChars: settingsDefaults.hintChars
   };
   function merge(data) {
     const s = normalizeSettings(data);
@@ -229,6 +249,7 @@
     state.passthroughMs = s.passthroughMs;
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
+    state.hintChars = s.hintChars;
   }
   async function load() {
     try {
@@ -249,7 +270,8 @@
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
-        copyFormat: state.copyFormat
+        copyFormat: state.copyFormat,
+        hintChars: state.hintChars
       }
     });
   }
@@ -290,6 +312,9 @@
   function getCopyFormat() {
     return state.copyFormat;
   }
+  function getHintChars() {
+    return state.hintChars;
+  }
   function toggleDisabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -317,6 +342,7 @@
     getPassthroughMs,
     getSuggestionSources,
     getCopyFormat,
+    getHintChars,
     toggleDisabled
   };
 
@@ -431,6 +457,7 @@
   var sourceHistoryEl = document.querySelector("#source-history");
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
   var copyFormatEl = document.querySelector("#copy-format");
+  var hintCharsEl = document.querySelector("#hint-chars");
   var keymapFilterEl = document.querySelector("#keymap-filter");
   var siteInputEl = document.querySelector("#disabled-site-input");
   var addSiteBtn = document.querySelector("#add-disabled-site");
@@ -447,6 +474,7 @@
     sourceHistoryEl.checked = sources.includes("history");
     sourceBookmarkEl.checked = sources.includes("bookmark");
     copyFormatEl.value = settings.getCopyFormat();
+    hintCharsEl.value = settings.getHintChars();
     renderKeymap();
     renderDisabled();
   }
@@ -591,6 +619,13 @@
     if (sourceTabEl.checked) sources.push("tab");
     if (sourceHistoryEl.checked) sources.push("history");
     if (sourceBookmarkEl.checked) sources.push("bookmark");
+    const hintCharsRaw = hintCharsEl.value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const deduped = [...new Set(hintCharsRaw)].join("");
+    if (deduped.length >= 2) {
+      hintCharsEl.value = deduped;
+    } else {
+      hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
+    }
     return {
       scrollStep: parseInt(scrollStepEl.value, 10),
       smoothScroll: smoothScrollEl.checked,
@@ -598,7 +633,8 @@
       timeoutMs: parseInt(timeoutEl.value, 10),
       passthroughMs: parseInt(passthroughEl.value, 10),
       suggestionSources: sources,
-      copyFormat: copyFormatEl.value
+      copyFormat: copyFormatEl.value,
+      hintChars: hintCharsEl.value
     };
   }
   function save() {
@@ -616,7 +652,8 @@
       timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
       passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
       suggestionSources: SETTINGS_DEFAULTS.suggestionSources.slice(),
-      copyFormat: SETTINGS_DEFAULTS.copyFormat
+      copyFormat: SETTINGS_DEFAULTS.copyFormat,
+      hintChars: SETTINGS_DEFAULTS.hintChars
     }).then(() => status("Reset to defaults")).catch(() => status("Save failed"));
     scrollStepEl.value = SETTINGS_DEFAULTS.scrollStep;
     smoothScrollEl.checked = SETTINGS_DEFAULTS.smoothScroll;
@@ -627,6 +664,7 @@
     sourceHistoryEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("history");
     sourceBookmarkEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("bookmark");
     copyFormatEl.value = SETTINGS_DEFAULTS.copyFormat;
+    hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
     renderKeymap();
   }
   function renderDisabled() {

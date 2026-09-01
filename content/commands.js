@@ -4,6 +4,7 @@ import { sendMessage, ui } from "./ui.js";
 import { Scroll } from "./scroll.js";
 import { Prompt } from "./prompt.js";
 import { Help } from "./help.js";
+import { Hints } from "./hints.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
 const PAGE_RATIO = 0.9;
@@ -244,6 +245,11 @@ export const commands = {
   toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
   passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
   toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
+
+  hintClick: { ...COMMAND_CATALOG.hintClick, run: () => Hints.open("click") },
+  hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
+  hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
+  hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
   openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
