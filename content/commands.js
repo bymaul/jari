@@ -187,7 +187,10 @@ export const commands = {
     ...COMMAND_CATALOG.splitMerge,
     run: async () => {
       const res = await sendMessage("splitOrMerge");
-      if (res && res.needMerge) Prompt.openMerge(res);
+      if (!res || !res.ok) return;
+      if (res.autoMerged) ui.toast("Merged to window");
+      else if (res.needMerge) Prompt.openMerge(res);
+      else if (res.needMerge === false) ui.toast("No window to merge");
     },
   },
   moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
@@ -238,4 +241,5 @@ export const commands = {
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
   openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
+  openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") },
 };

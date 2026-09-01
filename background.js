@@ -121,6 +121,21 @@
         };
       });
       if (others.length === 0) return { ok: true, needMerge: false };
+      if (others.length === 1) {
+        const targetWindowId = others[0].windowId;
+        await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
+        const tabs = await chrome.tabs.query({ windowId: targetWindowId });
+        const last = tabs[tabs.length - 1];
+        if (last) {
+          try {
+            await focusWindow(targetWindowId);
+          } catch (err) {
+            console.error("[jari] splitOrMerge auto-merge window focus failed", err);
+          }
+          await chrome.tabs.update(last.id, { active: true });
+        }
+        return { ok: true, autoMerged: true };
+      }
       return {
         ok: true,
         needMerge: true,
@@ -318,6 +333,17 @@
     openOptions: async () => {
       await chrome.runtime.openOptionsPage();
       return { ok: true };
+    },
+    openExtensions: async () => {
+      const urls = ["chrome://extensions", "about:addons", "edge://extensions"];
+      for (const url of urls) {
+        try {
+          await chrome.tabs.create({ url });
+          return { ok: true };
+        } catch {
+        }
+      }
+      return { ok: false };
     }
   };
   async function goHistory(tab, delta) {

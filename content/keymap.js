@@ -61,6 +61,7 @@ export const keymapDefaults = {
   g0: "firstTab",
   g$: "lastTab",
   ";e": "openOptions",
+  ";x": "openExtensions",
 
   yy: "copyUrl",
   yf: "hintYank",

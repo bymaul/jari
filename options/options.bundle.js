@@ -56,6 +56,7 @@
     g0: "firstTab",
     g$: "lastTab",
     ";e": "openOptions",
+    ";x": "openExtensions",
     yy: "copyUrl",
     yf: "hintYank"
   };
@@ -223,7 +224,8 @@
     hintInput: { category: "hints", label: "Focus input (hint)" },
     hintYank: { category: "hints", label: "Copy link URL (hint)" },
     showHelp: { category: "help", label: "Show keybindings" },
-    openOptions: { category: "help", label: "Open settings" }
+    openOptions: { category: "help", label: "Open settings" },
+    openExtensions: { category: "help", label: "Open extensions page" }
   };
 
   // content/settings.js

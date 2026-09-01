@@ -60,4 +60,5 @@ export const COMMAND_CATALOG = {
 
   showHelp: { category: "help", label: "Show keybindings" },
   openOptions: { category: "help", label: "Open settings" },
+  openExtensions: { category: "help", label: "Open extensions page" },
 };

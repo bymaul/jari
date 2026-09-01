@@ -57,6 +57,7 @@
     g0: "firstTab",
     g$: "lastTab",
     ";e": "openOptions",
+    ";x": "openExtensions",
     yy: "copyUrl",
     yf: "hintYank"
   };
@@ -1149,7 +1150,8 @@
     hintInput: { category: "hints", label: "Focus input (hint)" },
     hintYank: { category: "hints", label: "Copy link URL (hint)" },
     showHelp: { category: "help", label: "Show keybindings" },
-    openOptions: { category: "help", label: "Open settings" }
+    openOptions: { category: "help", label: "Open settings" },
+    openExtensions: { category: "help", label: "Open extensions page" }
   };
 
   // content/help.js
@@ -1181,15 +1183,29 @@
       if (!byCommand.has(commandName)) byCommand.set(commandName, []);
       byCommand.get(commandName).push(key);
     }
+    const byCategoryAll = /* @__PURE__ */ new Map();
     const byCategory = /* @__PURE__ */ new Map();
-    for (const [commandName, keys] of byCommand) {
-      const meta = COMMAND_CATALOG[commandName];
-      if (!meta) continue;
+    for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
       const id = meta.category || "other";
+      if (!byCategoryAll.has(id)) byCategoryAll.set(id, []);
+      byCategoryAll.get(id).push({ keys: byCommand.get(commandName) || [], label: meta.label });
+      const keys = byCommand.get(commandName);
+      if (!keys) continue;
       if (!byCategory.has(id)) byCategory.set(id, []);
       byCategory.get(id).push({ keys, label: meta.label });
     }
-    const columns = balanceCategories(byCategory, COLUMNS);
+    const columns = balanceCategories(byCategoryAll, COLUMNS);
+    const helpCat = categories.find((c) => c.id === "help");
+    if (helpCat && byCategory.has("help")) {
+      for (const col of columns) {
+        const idx = col.indexOf(helpCat);
+        if (idx !== -1) {
+          col.splice(idx, 1);
+          break;
+        }
+      }
+      columns[columns.length - 1].push(helpCat);
+    }
     listEl2 = document.createElement("div");
     listEl2.className = "jari-help-list";
     const grid = document.createElement("div");
@@ -1198,9 +1214,11 @@
       const colEl = document.createElement("div");
       colEl.className = "jari-help-column";
       for (const cat of col) {
+        const entries = byCategory.get(cat.id);
+        if (!entries || entries.length === 0) continue;
         colEl.appendChild(
           ui.buildCategoryTable(cat, "jari-help-cat-header", (tbody) => {
-            for (const { keys, label } of byCategory.get(cat.id)) {
+            for (const { keys, label } of entries) {
               const tr = document.createElement("tr");
               const keyTd = document.createElement("td");
               keyTd.className = "jari-help-key";
@@ -2255,7 +2273,10 @@ ${location.href}`;
       ...COMMAND_CATALOG.splitMerge,
       run: async () => {
         const res = await sendMessage("splitOrMerge");
-        if (res && res.needMerge) Prompt.openMerge(res);
+        if (!res || !res.ok) return;
+        if (res.autoMerged) ui.toast("Merged to window");
+        else if (res.needMerge) Prompt.openMerge(res);
+        else if (res.needMerge === false) ui.toast("No window to merge");
       }
     },
     moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
@@ -2300,7 +2321,8 @@ ${location.href}`;
     hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
     hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
-    openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") }
+    openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
+    openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") }
   };
 
   // content/content.js
