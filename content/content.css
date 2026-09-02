@@ -367,3 +367,113 @@
   opacity: 0 !important;
   display: none !important;
 }
+
+.jari-find {
+  background: #1c1c24 !important;
+  color: #cdcdcd !important;
+  font-size: var(--jari-cmplt-font-size);
+  font-family: var(--jari-cmplt-font-family);
+  outline: none !important;
+  border-top: 1px solid #333738;
+}
+
+.jari-find-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5ex;
+  padding: 0.25ex 0.5ex;
+  line-height: var(--jari-cmdl-line-height);
+}
+
+.jari-find-label {
+  color: #e0a363;
+  font-weight: bold;
+  flex: 0 0 auto;
+}
+
+.jari-find-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  font-family: var(--jari-cmdl-font-family);
+  font-size: var(--jari-cmdl-font-size);
+  line-height: var(--jari-cmdl-line-height);
+  color: #cdcdcd;
+  background: #1c1c24;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  text-align: left !important;
+  padding: 0;
+}
+
+.jari-find-input:focus,
+.jari-find-input:focus-visible,
+.jari-find-input:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.jari-find-status {
+  flex: 0 0 auto;
+  font-size: var(--jari-cmdl-font-size);
+  color: #878787;
+  white-space: nowrap;
+}
+
+.jari-find-status.jari-find-no-match {
+  color: #e06c75;
+}
+
+::highlight(jari-find) {
+  background: rgba(224, 163, 99, 0.45);
+  color: #1a1a1a;
+}
+
+::highlight(jari-find-current) {
+  background: #e0a363;
+  color: #1a1a1a;
+}
+
+.jari-find-hit {
+  background: rgba(224, 163, 99, 0.35) !important;
+  color: #1a1a1a !important;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.jari-find-current {
+  background: #e0a363 !important;
+  color: #1a1a1a !important;
+  border-radius: 2px;
+  padding: 0 1px;
+  outline: 1px solid #c38a22;
+}
+
+.jari-visual-caret-host {
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+  z-index: 2147483646 !important;
+}
+
+.jari-visual-caret {
+  position: absolute !important;
+  width: 7px !important;
+  height: 1.2em !important;
+  background: #e0a363 !important;
+  opacity: 0.85 !important;
+  border: 1px solid #c38a22 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+  animation: jari-caret-blink 1s steps(1) infinite !important;
+  pointer-events: none !important;
+}
+
+@keyframes jari-caret-blink {
+  0%, 50% { opacity: 0.85; }
+  51%, 100% { opacity: 0; }
+}

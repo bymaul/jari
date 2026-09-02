@@ -10,6 +10,8 @@ import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { commands, setModeActions } from "./commands.js";
 import { Overlays } from "./overlays.js";
+import { Find, __resetFindState } from "./find.js";
+import { __resetVisualState } from "./visual.js";
 
 let pendingCount = "";
 let pendingPrefix = null;
@@ -191,8 +193,19 @@ function handleKeydown(event) {
       event.preventDefault();
       event.stopImmediatePropagation();
       clearPending();
+      return;
+    }
+    if (Find.hasHighlights()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      Find.handleGlobalEsc(event);
+      return;
     }
     return;
+  }
+
+  if (event.key === "Enter" && Find.hasHighlights()) {
+    if (Find.handleGlobalEnter(event)) return;
   }
 
   if (!commandName && /^[0-9]$/.test(key)) {
@@ -263,4 +276,10 @@ export function __resetState() {
   passthroughMode = false;
   if (pills.ignore) hidePill("ignore");
   if (pills.passthrough) hidePill("passthrough");
+  try {
+    __resetFindState();
+  } catch {}
+  try {
+    __resetVisualState();
+  } catch {}
 }

@@ -50,6 +50,11 @@ export const keymapDefaults = {
   "ctrl+alt+v": "toggleDisabled",
 
   "?": "showHelp",
+  "/": "findForward",
+  n: "findNext",
+  N: "findPrev",
+  v: "visualMode",
+  V: "visualLineMode",
 
   gt: "tabSearch",
   gg: "scrollTop",
@@ -84,6 +89,8 @@ export const categories = [
   { id: "page", label: "Page" },
   { id: "clipboard", label: "Clipboard" },
   { id: "hints", label: "Hints" },
+  { id: "find", label: "Find" },
+  { id: "visual", label: "Visual" },
   { id: "modes", label: "Modes" },
   { id: "help", label: "Help" },
 ];
@@ -136,7 +143,7 @@ export function parseRepeatCount(raw) {
 }
 
 export const overlaySelectors =
-  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints";
+  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host";
 
 export function deepActiveElement() {
   let el = document.activeElement;

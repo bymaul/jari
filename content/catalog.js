@@ -58,6 +58,13 @@ export const COMMAND_CATALOG = {
   hintInput: { category: "hints", label: "Focus input (hint)" },
   hintYank: { category: "hints", label: "Copy link URL (hint)" },
 
+  findForward: { category: "find", label: "Find forward" },
+  findNext: { category: "find", label: "Next match", repeatable: true },
+  findPrev: { category: "find", label: "Previous match", repeatable: true },
+
+  visualMode: { category: "visual", label: "Visual mode" },
+  visualLineMode: { category: "visual", label: "Visual line mode" },
+
   showHelp: { category: "help", label: "Show keybindings" },
   openOptions: { category: "help", label: "Open settings" },
   openExtensions: { category: "help", label: "Open extensions page" },

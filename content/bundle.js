@@ -47,6 +47,11 @@
     p: "passthrough",
     "ctrl+alt+v": "toggleDisabled",
     "?": "showHelp",
+    "/": "findForward",
+    n: "findNext",
+    N: "findPrev",
+    v: "visualMode",
+    V: "visualLineMode",
     gt: "tabSearch",
     gg: "scrollTop",
     gu: "goUp",
@@ -77,6 +82,8 @@
     { id: "page", label: "Page" },
     { id: "clipboard", label: "Clipboard" },
     { id: "hints", label: "Hints" },
+    { id: "find", label: "Find" },
+    { id: "visual", label: "Visual" },
     { id: "modes", label: "Modes" },
     { id: "help", label: "Help" }
   ];
@@ -116,7 +123,7 @@
     const n = parseInt(raw, 10);
     return Number.isNaN(n) ? 1 : Math.max(1, n);
   }
-  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints";
+  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host";
   function deepActiveElement() {
     let el = document.activeElement;
     while (el && el.shadowRoot && el.shadowRoot.activeElement) {
@@ -704,16 +711,16 @@
   }
   function scoreAlignment(indices, t, text) {
     let score = 0;
-    let prev = -1;
+    let prev2 = -1;
     for (const i of indices) {
       score += SCORE_BASE;
-      if (prev !== -1) {
-        const gap = i - prev - 1;
+      if (prev2 !== -1) {
+        const gap = i - prev2 - 1;
         score += gap === 0 ? SCORE_RUN : SCORE_GAP * gap;
       }
       if (isBoundaryAt(t, i)) score += SCORE_BOUNDARY;
       else if (text[i] !== text[i].toLowerCase()) score += SCORE_CAMEL;
-      prev = i;
+      prev2 = i;
     }
     score += SCORE_LEADING * indices[0];
     return score;
@@ -812,12 +819,12 @@
   }
   var Overlays = {
     closeAll() {
-      for (const overlay3 of overlays) {
-        if (overlay3.isActive()) overlay3.close();
+      for (const overlay4 of overlays) {
+        if (overlay4.isActive()) overlay4.close();
       }
     },
     active() {
-      return overlays.find((overlay3) => overlay3.isActive()) || null;
+      return overlays.find((overlay4) => overlay4.isActive()) || null;
     }
   };
 
@@ -1149,6 +1156,11 @@
     hintOpenBackground: { category: "hints", label: "Show hints (open in background, persistent)" },
     hintInput: { category: "hints", label: "Focus input (hint)" },
     hintYank: { category: "hints", label: "Copy link URL (hint)" },
+    findForward: { category: "find", label: "Find forward" },
+    findNext: { category: "find", label: "Next match", repeatable: true },
+    findPrev: { category: "find", label: "Previous match", repeatable: true },
+    visualMode: { category: "visual", label: "Visual mode" },
+    visualLineMode: { category: "visual", label: "Visual line mode" },
     showHelp: { category: "help", label: "Show keybindings" },
     openOptions: { category: "help", label: "Open settings" },
     openExtensions: { category: "help", label: "Open extensions page" }
@@ -2090,9 +2102,9 @@
       const lower = key.toLowerCase();
       if (charset.includes(lower)) {
         consume(event);
-        const next = prefix + lower.toUpperCase();
-        const exact = hints.find((h) => h.label === next);
-        prefix = next;
+        const next2 = prefix + lower.toUpperCase();
+        const exact = hints.find((h) => h.label === next2);
+        prefix = next2;
         refresh();
         if (exact) activate2(exact.el);
         return true;
@@ -2112,6 +2124,1609 @@
   }
   var Hints = { open: open3, close: close3, isActive: isActive3, onKeyDown: onKeyDown3, genLabels };
   register("hints", { close: close3, onKeyDown: onKeyDown3, isActive: isActive3 });
+
+  // content/find.js
+  var MAX_MATCHES = 1500;
+  var active4 = false;
+  var overlay3 = null;
+  var inputEl2 = null;
+  var statusEl = null;
+  var restoreFocus2 = null;
+  var matches = [];
+  var currentIdx = 0;
+  var lastQuery = "";
+  var pendingQuery = "";
+  var useHighlights = false;
+  var fallbackSpans = [];
+  function hasHighlights() {
+    return matches.length > 0;
+  }
+  function isActive4() {
+    return active4;
+  }
+  function detectHighlightSupport() {
+    try {
+      return typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
+    } catch {
+      return false;
+    }
+  }
+  function hasUpperCase(s) {
+    return /[A-Z]/.test(s);
+  }
+  function isOverlayElement(el) {
+    try {
+      return el.closest && el.closest(overlaySelectors);
+    } catch {
+      return false;
+    }
+  }
+  function shouldSkipNode(node) {
+    const parent = node.parentElement;
+    if (!parent) return true;
+    const tag = parent.tagName;
+    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return true;
+    if (isOverlayElement(parent)) return true;
+    if (parent.closest && parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host")) return true;
+    try {
+      const style = window.getComputedStyle(parent);
+      if (style.display === "none" || style.visibility === "hidden") return true;
+    } catch {
+    }
+    return false;
+  }
+  function collectTextNodes() {
+    const out = [];
+    const walker = document.createTreeWalker(
+      document.body || document.documentElement,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node2) {
+          if (!node2.nodeValue || !node2.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          if (shouldSkipNode(node2)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+    let node = walker.nextNode();
+    while (node) {
+      out.push(node);
+      node = walker.nextNode();
+    }
+    try {
+      const visit = (root) => {
+        for (const el of root.querySelectorAll("*")) {
+          if (el.shadowRoot) {
+            const sw = document.createTreeWalker(
+              el.shadowRoot,
+              NodeFilter.SHOW_TEXT,
+              {
+                acceptNode(n) {
+                  if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                  const p = n.parentElement;
+                  if (p && p.closest && p.closest(overlaySelectors)) return NodeFilter.FILTER_REJECT;
+                  if (p && p.closest && p.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host")) return NodeFilter.FILTER_REJECT;
+                  return NodeFilter.FILTER_ACCEPT;
+                }
+              }
+            );
+            let sn = sw.nextNode();
+            while (sn) {
+              out.push(sn);
+              sn = sw.nextNode();
+            }
+            visit(el.shadowRoot);
+          }
+        }
+      };
+      visit(document);
+    } catch {
+    }
+    return out;
+  }
+  function buildMatches(query2) {
+    if (!query2) return [];
+    const caseSensitive = hasUpperCase(query2);
+    const needle = caseSensitive ? query2 : query2.toLowerCase();
+    const nodes = collectTextNodes();
+    const out = [];
+    for (const node of nodes) {
+      const text = node.nodeValue;
+      const hay = caseSensitive ? text : text.toLowerCase();
+      let pos = 0;
+      while (true) {
+        const idx = hay.indexOf(needle, pos);
+        if (idx === -1) break;
+        try {
+          const range = document.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, idx + query2.length);
+          out.push(range);
+        } catch {
+        }
+        pos = idx + query2.length;
+        if (out.length >= MAX_MATCHES) break;
+      }
+      if (out.length >= MAX_MATCHES) break;
+    }
+    return out;
+  }
+  function clearHighlightApi() {
+    try {
+      if (CSS.highlights) {
+        CSS.highlights.delete("jari-find");
+        CSS.highlights.delete("jari-find-current");
+      }
+    } catch {
+    }
+  }
+  function clearFallback() {
+    for (const span of fallbackSpans) {
+      try {
+        const parent = span.parentNode;
+        if (!parent) continue;
+        const text = span.textContent;
+        const tn = document.createTextNode(text);
+        parent.replaceChild(tn, span);
+        parent.normalize();
+      } catch {
+      }
+    }
+    fallbackSpans = [];
+  }
+  function clearHighlights() {
+    matches = [];
+    currentIdx = 0;
+    clearHighlightApi();
+    clearFallback();
+    updateStatus();
+  }
+  function getCurrentLinkElement() {
+    if (matches.length === 0) return null;
+    const r = matches[currentIdx];
+    if (!r || !r.startContainer) return null;
+    let el = r.startContainer.parentElement;
+    if (!el) return null;
+    if (el.closest) {
+      const a = el.closest("a");
+      if (a && isOpenableLink(a)) return a;
+      const hrefEl = el.closest("[href]");
+      if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
+    }
+    while (el) {
+      if (el.tagName === "A" && isOpenableLink(el)) return el;
+      if (el.getAttribute && el.getAttribute("href") && isOpenableLink(el)) return el;
+      const parent = el.parentElement;
+      if (parent) {
+        el = parent;
+      } else {
+        const root = el.getRootNode && el.getRootNode();
+        if (root && root.host) el = root.host;
+        else break;
+      }
+    }
+    return null;
+  }
+  function dispatchClick2(el) {
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+    }
+    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
+      try {
+        el.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 0,
+            buttons: type === "mousedown" ? 1 : 0
+          })
+        );
+      } catch {
+      }
+    }
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      try {
+        el.focus();
+      } catch {
+      }
+    }
+  }
+  function activateCurrentLink() {
+    const link = getCurrentLinkElement();
+    if (!link) return false;
+    try {
+      dispatchClick2(link);
+    } catch {
+    }
+    return true;
+  }
+  function applyHighlights() {
+    clearHighlightApi();
+    clearFallback();
+    if (matches.length === 0) return;
+    const cur = matches[currentIdx];
+    if (useHighlights) {
+      try {
+        const others = matches.filter((_, i) => i !== currentIdx);
+        if (others.length > 0) {
+          CSS.highlights.set("jari-find", new Highlight(...others));
+        } else {
+          CSS.highlights.delete("jari-find");
+        }
+        if (cur) {
+          CSS.highlights.set("jari-find-current", new Highlight(cur));
+        }
+        return;
+      } catch {
+        useHighlights = false;
+      }
+    }
+    const byNode = /* @__PURE__ */ new Map();
+    for (let i = 0; i < matches.length; i++) {
+      const r = matches[i];
+      const node = r.startContainer;
+      if (!byNode.has(node)) byNode.set(node, []);
+      byNode.get(node).push({ range: r, idx: i });
+    }
+    for (const list of byNode.values()) {
+      list.sort((a, b) => b.range.startOffset - a.range.startOffset);
+      for (const { range, idx } of list) {
+        try {
+          const span = document.createElement("span");
+          span.className = idx === currentIdx ? "jari-find-current" : "jari-find-hit";
+          range.surroundContents(span);
+          fallbackSpans.push(span);
+        } catch {
+        }
+      }
+    }
+  }
+  function scrollToCurrent() {
+    if (matches.length === 0) return;
+    const r = matches[currentIdx];
+    if (!r) return;
+    try {
+      const el = r.startContainer.parentElement;
+      if (el) {
+        el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+        const rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect();
+        if (rect) {
+          const vh = window.innerHeight;
+          if (rect.top < 0 || rect.bottom > vh) {
+            try {
+              window.scrollBy(0, rect.top - vh / 2);
+            } catch {
+            }
+          }
+        }
+      }
+    } catch {
+    }
+  }
+  function updateStatus() {
+    if (!statusEl) return;
+    if (!pendingQuery && matches.length === 0 && !lastQuery) {
+      statusEl.textContent = "";
+      statusEl.classList.remove("jari-find-no-match");
+      return;
+    }
+    const q = pendingQuery || lastQuery;
+    if (!q) {
+      statusEl.textContent = "";
+      return;
+    }
+    if (matches.length === 0) {
+      statusEl.textContent = `No match for "${q}"`;
+      statusEl.classList.add("jari-find-no-match");
+    } else {
+      statusEl.textContent = `${currentIdx + 1}/${matches.length}`;
+      statusEl.classList.remove("jari-find-no-match");
+    }
+  }
+  function renderBar() {
+    overlay3 = document.createElement("div");
+    overlay3.className = "jari-overlay jari-find";
+    const bar = document.createElement("div");
+    bar.className = "jari-find-bar";
+    const label = document.createElement("span");
+    label.className = "jari-find-label";
+    label.textContent = "/";
+    inputEl2 = document.createElement("input");
+    inputEl2.type = "text";
+    inputEl2.className = "jari-find-input";
+    inputEl2.setAttribute("autocomplete", "off");
+    inputEl2.setAttribute("spellcheck", "false");
+    statusEl = document.createElement("span");
+    statusEl.className = "jari-find-status";
+    bar.appendChild(label);
+    bar.appendChild(inputEl2);
+    bar.appendChild(statusEl);
+    overlay3.appendChild(bar);
+    (document.body || document.documentElement).appendChild(overlay3);
+    restoreFocus2 = document.activeElement;
+    inputEl2.addEventListener("input", () => {
+      pendingQuery = inputEl2.value;
+      const q = pendingQuery.trim();
+      if (!q) {
+        matches = [];
+        currentIdx = 0;
+        clearHighlightApi();
+        clearFallback();
+        updateStatus();
+        return;
+      }
+      matches = buildMatches(q);
+      currentIdx = 0;
+      if (matches.length > 0) {
+        lastQuery = q;
+      }
+      applyHighlights();
+      if (matches.length > 0) scrollToCurrent();
+      updateStatus();
+    });
+    inputEl2.addEventListener("keydown", (e) => e.stopPropagation());
+    inputEl2.focus();
+    updateStatus();
+  }
+  function open4() {
+    if (active4) return;
+    useHighlights = detectHighlightSupport();
+    active4 = true;
+    pendingQuery = "";
+    renderBar();
+  }
+  function closeBar() {
+    if (!active4) return;
+    const wasInput = inputEl2;
+    active4 = false;
+    pendingQuery = "";
+    if (overlay3) {
+      try {
+        overlay3.remove();
+      } catch {
+      }
+      overlay3 = null;
+    }
+    inputEl2 = null;
+    statusEl = null;
+    if (restoreFocus2 && restoreFocus2.isConnected && document.activeElement !== restoreFocus2) {
+      try {
+        restoreFocus2.focus();
+      } catch {
+      }
+    } else if (wasInput && document.activeElement === wasInput) {
+      try {
+        wasInput.blur();
+      } catch {
+      }
+      if (document.activeElement === wasInput) {
+        document.activeElement = document.body || null;
+      }
+    }
+    restoreFocus2 = null;
+  }
+  function closeAndClear() {
+    clearHighlights();
+    closeBar();
+    lastQuery = "";
+  }
+  function next(count = 1, reverse = false) {
+    const c = Math.max(1, Math.floor(count) || 1);
+    if (matches.length === 0) {
+      const q = pendingQuery && pendingQuery.trim() || lastQuery;
+      if (!q) {
+        ui.toast("No search");
+        return;
+      }
+      pendingQuery = q;
+      lastQuery = q;
+      matches = buildMatches(q);
+      currentIdx = 0;
+      if (matches.length === 0) {
+        ui.toast(`No match for "${q}"`);
+        clearHighlightApi();
+        clearFallback();
+        updateStatus();
+        return;
+      }
+      useHighlights = detectHighlightSupport();
+      applyHighlights();
+      updateStatus();
+      if (c > 1) {
+        const delta2 = reverse ? -c : c;
+        const len2 = matches.length;
+        currentIdx = ((currentIdx + (delta2 > 0 ? delta2 - 1 : delta2)) % len2 + len2) % len2;
+        applyHighlights();
+        updateStatus();
+      }
+      scrollToCurrent();
+      ui.toast(`${currentIdx + 1}/${matches.length}`);
+      return;
+    }
+    const len = matches.length;
+    const delta = reverse ? -c : c;
+    currentIdx = ((currentIdx + delta) % len + len) % len;
+    applyHighlights();
+    scrollToCurrent();
+    updateStatus();
+    const wrapped = delta === 1 && currentIdx === 0 || delta === -1 && currentIdx === len - 1;
+    if (wrapped) {
+      ui.toast(`Wrapped \u2014 ${currentIdx + 1}/${len}`);
+    } else {
+      ui.toast(`${currentIdx + 1}/${len}`);
+    }
+  }
+  function prev(count = 1) {
+    next(count, true);
+  }
+  function onKeyDown4(event) {
+    if (!active4) return false;
+    const inInput = document.activeElement === inputEl2;
+    if (inInput) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeAndClear();
+        return true;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const q = inputEl2.value.trim();
+        if (!q) {
+          closeAndClear();
+        } else {
+          lastQuery = q;
+          closeBar();
+        }
+        return true;
+      }
+      return false;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeAndClear();
+      return true;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeBar();
+      return true;
+    }
+    return false;
+  }
+  function hasHighlightsPublic() {
+    return matches.length > 0;
+  }
+  function handleGlobalEsc(event) {
+    if (hasHighlights()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      clearHighlights();
+      lastQuery = "";
+      ui.toast("Cleared");
+      return true;
+    }
+    return false;
+  }
+  function handleGlobalEnter(event) {
+    if (!hasHighlights()) return false;
+    const link = getCurrentLinkElement();
+    if (!link) return false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    activateCurrentLink();
+    clearHighlights();
+    lastQuery = "";
+    return true;
+  }
+  var Find = {
+    open: open4,
+    close: closeBar,
+    clearHighlights,
+    next,
+    prev,
+    isActive: isActive4,
+    hasHighlights: hasHighlightsPublic,
+    handleGlobalEsc,
+    handleGlobalEnter,
+    onKeyDown: onKeyDown4
+  };
+  register("find", { close: closeAndClear, onKeyDown: onKeyDown4, isActive: isActive4 });
+  function __resetFindState() {
+    closeAndClear();
+    lastQuery = "";
+    pendingQuery = "";
+    useHighlights = false;
+  }
+
+  // content/visual.js
+  var active5 = false;
+  var mode3 = "visual";
+  var pillEl = null;
+  var pendingCount = "";
+  var pendingG = false;
+  var pendingF = null;
+  var caretEl = null;
+  var caretHost = null;
+  var hintActive = false;
+  var hintElements = [];
+  var hintLabels = [];
+  var hintPrefix = "";
+  var hintHost = null;
+  var hintHolder = null;
+  var hintMap = /* @__PURE__ */ new Map();
+  var pendingVisualMode = "visual";
+  function isActive5() {
+    return active5 || hintActive;
+  }
+  function showPill() {
+    if (pillEl) return;
+    try {
+      pillEl = document.createElement("div");
+      pillEl.className = "jari-pill";
+      pillEl.textContent = mode3 === "line" ? "visual line" : "visual";
+      ui.statusContainer().appendChild(pillEl);
+    } catch {
+    }
+  }
+  function hidePill() {
+    if (!pillEl) return;
+    try {
+      pillEl.remove();
+    } catch {
+    }
+    pillEl = null;
+  }
+  function getSelection() {
+    return window.getSelection();
+  }
+  function hasModify() {
+    const sel = getSelection();
+    return sel && typeof sel.modify === "function";
+  }
+  function showBlockCaret() {
+    if (caretEl) return;
+    try {
+      caretHost = document.createElement("div");
+      caretHost.className = "jari-visual-caret-host";
+      caretHost.style.position = "fixed";
+      caretHost.style.left = "0";
+      caretHost.style.top = "0";
+      caretHost.style.width = "0";
+      caretHost.style.height = "0";
+      caretHost.style.pointerEvents = "none";
+      caretHost.style.zIndex = "2147483646";
+      try {
+        caretHost.attachShadow({ mode: "open" });
+      } catch {
+        caretHost.shadowRoot = caretHost;
+      }
+      const shadow = caretHost.shadowRoot;
+      const style = document.createElement("style");
+      style.textContent = `
+      .jari-visual-caret {
+        position: absolute;
+        width: 8px;
+        height: 1.2em;
+        background: #e0a363;
+        opacity: 0.85;
+        border: 1px solid #c38a22;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        animation: jari-caret-blink 1s steps(1) infinite;
+        pointer-events: none;
+      }
+      @keyframes jari-caret-blink {
+        0%, 50% { opacity: 0.85; }
+        51%, 100% { opacity: 0; }
+      }
+    `;
+      shadow.appendChild(style);
+      caretEl = document.createElement("div");
+      caretEl.className = "jari-visual-caret";
+      shadow.appendChild(caretEl);
+      (document.documentElement || document.body).appendChild(caretHost);
+    } catch {
+    }
+  }
+  function hideBlockCaret() {
+    if (caretHost) {
+      try {
+        caretHost.remove();
+      } catch {
+      }
+      caretHost = null;
+      caretEl = null;
+    } else if (caretEl) {
+      try {
+        caretEl.remove();
+      } catch {
+      }
+      caretEl = null;
+    }
+  }
+  function updateBlockCaret() {
+    if (!active5 || !caretEl || !caretHost) return;
+    const sel = getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    try {
+      const range = sel.getRangeAt(0);
+      let rect = null;
+      try {
+        const focusNode = sel.focusNode;
+        const focusOffset = sel.focusOffset;
+        if (focusNode) {
+          const r = document.createRange();
+          r.setStart(focusNode, focusOffset);
+          r.collapse(true);
+          rect = r.getBoundingClientRect();
+          if (!rect || rect.width === 0 && rect.height === 0) {
+            rect = range.getBoundingClientRect();
+          }
+        } else {
+          rect = range.getBoundingClientRect();
+        }
+      } catch {
+        rect = range.getBoundingClientRect();
+      }
+      if (!rect) return;
+      if (rect.width === 0 && rect.height === 0) {
+        const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+        if (el) rect = el.getBoundingClientRect();
+      }
+      const hostShadow = caretHost.shadowRoot || caretHost;
+      caretEl.style.left = `${rect.left}px`;
+      caretEl.style.top = `${rect.top}px`;
+      caretEl.style.height = `${Math.max(12, rect.height)}px`;
+      if (mode3 === "line") {
+        caretEl.style.width = `${Math.max(20, rect.width)}px`;
+        caretEl.style.opacity = "0.35";
+      } else {
+        caretEl.style.width = `7px`;
+        caretEl.style.opacity = "0.85";
+      }
+    } catch {
+    }
+  }
+  function ensureVisible() {
+    const sel = getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    try {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (!rect || rect.top === 0 && rect.left === 0 && rect.width === 0 && rect.height === 0) {
+        const node = sel.focusNode;
+        if (node && node.parentElement) {
+          node.parentElement.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+        return;
+      }
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      if (rect.top < 0 || rect.bottom > vh || rect.left < 0 || rect.right > vw) {
+        const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+        if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+        else window.scrollBy(0, rect.top - vh / 2);
+      }
+    } catch {
+    }
+    updateBlockCaret();
+  }
+  function normalizeCharset2() {
+    const s = settings.getHintChars();
+    if (!s) return "asdfgqwertzxcvb";
+    return s.toLowerCase();
+  }
+  function hasPrefixConflict2(labels) {
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = 0; j < labels.length; j++) {
+        if (i !== j && labels[j].startsWith(labels[i])) return true;
+      }
+    }
+    return false;
+  }
+  function buildUniformLabels2(count, chars) {
+    let length = 1;
+    while (Math.pow(chars.length, length) < count) length++;
+    const out = [];
+    for (let k = 0; k < count; k++) {
+      let n = k;
+      let s = "";
+      for (let p = 0; p < length; p++) {
+        s = chars[n % chars.length] + s;
+        n = Math.floor(n / chars.length);
+      }
+      out.push(s);
+    }
+    return out;
+  }
+  function genLabels2(count, charset) {
+    const chars = (charset || normalizeCharset2()).toUpperCase().split("");
+    if (count <= 0 || chars.length < 2) return [];
+    if (count <= chars.length) return chars.slice(0, count);
+    const labels = chars.slice();
+    let head = 0;
+    while (labels.length - head < count) {
+      if (head >= labels.length) break;
+      const p = labels[head++];
+      for (const c of chars) {
+        labels.push(p + c);
+        if (labels.length - head >= count) break;
+        if (labels.length > 1e4) break;
+      }
+      if (labels.length > 1e4) break;
+    }
+    const out = labels.slice(head, head + count);
+    return hasPrefixConflict2(out) ? buildUniformLabels2(count, chars) : out;
+  }
+  function getZIndex2(node) {
+    let z = 0;
+    try {
+      do {
+        const v = parseInt(window.getComputedStyle(node).getPropertyValue("z-index"));
+        if (!isNaN(v) && v >= 0) z += v;
+        node = node.parentNode;
+      } while (node && node !== document.body && node !== document && node.nodeType !== 11);
+    } catch {
+    }
+    return z;
+  }
+  function placeHintsHost2(host) {
+    try {
+      const topLayer = document.querySelector("dialog[open]");
+      if (topLayer) {
+        const r = topLayer.getBoundingClientRect();
+        const style = window.getComputedStyle(topLayer);
+        if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
+          topLayer.appendChild(host);
+          return;
+        }
+      }
+    } catch {
+    }
+    (document.documentElement || document.body).appendChild(host);
+  }
+  function coordinate2(holderEl) {
+    const probe = document.createElement("div");
+    probe.style.position = "absolute";
+    probe.style.top = "0";
+    probe.style.left = "0";
+    probe.textContent = "A";
+    holderEl.prepend(probe);
+    const br = probe.getBoundingClientRect();
+    const ret = {
+      top: br.top + window.pageYOffset - document.documentElement.clientTop,
+      left: br.left + window.pageXOffset - document.documentElement.clientLeft
+    };
+    try {
+      probe.remove();
+    } catch {
+    }
+    return ret;
+  }
+  function collectVisualTextElements() {
+    let elements2 = getVisibleElements((e, v) => {
+      try {
+        if (e.closest && e.closest(overlaySelectors)) return;
+        if (e.closest && e.closest(".jari-visual-caret-host, .jari-visual-caret")) return;
+      } catch {
+      }
+      const text = e.textContent ? e.textContent.trim() : "";
+      if (!text) return;
+      if (text.length < 1) return;
+      if (e.children.length === 0) {
+        v.push(e);
+      } else {
+        let hasDirectText = false;
+        for (const n of e.childNodes) {
+          if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length > 2) {
+            hasDirectText = true;
+            break;
+          }
+        }
+        if (hasDirectText) v.push(e);
+      }
+    });
+    elements2 = filterInvisibleElements(elements2);
+    elements2 = filterOverlapElements(elements2);
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const el of elements2) {
+      if (seen.has(el)) continue;
+      seen.add(el);
+      out.push(el);
+      if (out.length >= 400) break;
+    }
+    if (out.length > 200) {
+      return out.filter((e) => e.textContent.trim().length > 10).slice(0, 300);
+    }
+    return out;
+  }
+  function updateHintText2(hintEl, label, typed) {
+    hintEl.textContent = "";
+    if (!typed) {
+      hintEl.textContent = label;
+      return;
+    }
+    if (label.startsWith(typed)) {
+      const pre = document.createElement("span");
+      pre.className = "jari-hint-matched";
+      pre.textContent = typed;
+      const rest = document.createElement("span");
+      rest.textContent = label.slice(typed.length);
+      hintEl.append(pre, rest);
+      hintEl.classList.remove("jari-hint-hidden");
+    } else {
+      hintEl.textContent = label;
+    }
+  }
+  function renderHints() {
+    if (hintHost) {
+      try {
+        hintHost.remove();
+      } catch {
+      }
+      hintHost = null;
+      hintHolder = null;
+    }
+    hintHost = document.createElement("div");
+    hintHost.className = "jari-hints-host";
+    hintHost.style.position = "fixed";
+    hintHost.style.left = "0";
+    hintHost.style.top = "0";
+    hintHost.style.width = "0";
+    hintHost.style.height = "0";
+    hintHost.style.overflow = "visible";
+    hintHost.style.pointerEvents = "none";
+    hintHost.style.zIndex = "2147483647";
+    try {
+      hintHost.attachShadow({ mode: "open" });
+    } catch {
+      hintHost.shadowRoot = hintHost;
+    }
+    const shadow = hintHost.shadowRoot;
+    const style = document.createElement("style");
+    style.textContent = `
+    .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
+    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 10px; font-weight: bold; line-height: 1; letter-spacing: 0.02em; padding: 1px 3px; border: 1px solid #c38a22; border-radius: 3px; background: linear-gradient(#fff785, #ffc542); color: #1a1a1a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.35); text-align: left; }
+    .jari-hint-matched { color: #6a6a6a; opacity: 0.45; }
+    .jari-hint-hidden { opacity: 0; display: none; }
+  `;
+    shadow.appendChild(style);
+    hintHolder = document.createElement("section");
+    hintHolder.className = "jari-hints";
+    hintHolder.style.display = "block";
+    hintHolder.style.opacity = "1";
+    shadow.appendChild(hintHolder);
+    placeHintsHost2(hintHost);
+    const charset = normalizeCharset2();
+    const labels = genLabels2(hintElements.length, charset);
+    hintLabels = labels;
+    hintMap.clear();
+    const bof = (() => {
+      try {
+        return coordinate2(hintHolder);
+      } catch {
+        return { top: 0, left: 0 };
+      }
+    })();
+    let lastTop = -1;
+    let lastLeft = -1;
+    const hintEls = hintElements.map((elm, i) => {
+      const r = getRealRect(elm);
+      const z = getZIndex2(elm);
+      const left = window.pageXOffset + r.left - bof.left;
+      const link = document.createElement("div");
+      link.className = "jari-hint";
+      link.textContent = labels[i];
+      link.dataset.label = labels[i];
+      let lTop = Math.max(r.top + window.pageYOffset - bof.top, 0);
+      if (lTop === lastTop && Math.abs(left - lastLeft) < 20) {
+        link.style.left = `${left + 20 - Math.abs(left - lastLeft)}px`;
+      } else if (left === lastLeft && Math.abs(lTop - lastTop) < 20) {
+        lTop += 20 - Math.abs(lTop - lastTop);
+        link.style.left = `${left}px`;
+      } else {
+        link.style.left = `${left}px`;
+      }
+      link.style.top = `${lTop}px`;
+      link.style.zIndex = String(z + 9999);
+      link.label = labels[i];
+      link.targetEl = elm;
+      updateHintText2(link, labels[i], "");
+      lastTop = lTop;
+      lastLeft = parseInt(link.style.left, 10);
+      hintMap.set(labels[i], { el: elm, hintEl: link });
+      return link;
+    });
+    hintEls.forEach((link) => hintHolder.appendChild(link));
+    refreshHints();
+  }
+  function refreshHints() {
+    if (!hintActive) return;
+    for (const [label, obj] of hintMap.entries()) {
+      const hintEl = obj.hintEl;
+      if (!hintPrefix) {
+        hintEl.style.opacity = "1";
+        hintEl.style.display = "";
+        hintEl.classList.remove("jari-hint-hidden");
+        updateHintText2(hintEl, label, "");
+      } else if (label === hintPrefix) {
+        hintEl.style.opacity = "1";
+      } else if (label.startsWith(hintPrefix)) {
+        hintEl.style.opacity = "1";
+        hintEl.style.display = "";
+        updateHintText2(hintEl, label, hintPrefix);
+      } else {
+        hintEl.style.opacity = "0";
+        hintEl.style.display = "none";
+      }
+    }
+  }
+  function showVisualHints(requestedMode) {
+    pendingVisualMode = requestedMode || "visual";
+    const elements2 = collectVisualTextElements();
+    if (elements2.length === 0) {
+      ui.toast("No text to select");
+      return;
+    }
+    hintElements = elements2.length > 300 ? elements2.slice(0, 300) : elements2;
+    hintPrefix = "";
+    hintActive = true;
+    renderHints();
+    if (!pillEl) {
+      try {
+        pillEl = document.createElement("div");
+        pillEl.className = "jari-pill";
+        pillEl.textContent = "visual hint";
+        ui.statusContainer().appendChild(pillEl);
+      } catch {
+      }
+    } else {
+      pillEl.textContent = "visual hint";
+    }
+    ui.toast(`Hints: ${hintElements.length} text targets`);
+  }
+  function closeHints() {
+    if (!hintActive) return;
+    hintActive = false;
+    hintPrefix = "";
+    hintElements = [];
+    hintLabels = [];
+    hintMap.clear();
+    if (hintHost) {
+      try {
+        hintHost.remove();
+      } catch {
+      }
+      hintHost = null;
+      hintHolder = null;
+    }
+    if (!active5 && pillEl) {
+      try {
+        pillEl.remove();
+      } catch {
+      }
+      pillEl = null;
+    } else if (active5 && pillEl) {
+      pillEl.textContent = mode3 === "line" ? "visual line" : "visual";
+    }
+  }
+  function activateHintByLabel(label) {
+    const entry = hintMap.get(label);
+    if (!entry) return false;
+    const el = entry.el;
+    closeHints();
+    enterAtElement(el, pendingVisualMode);
+    return true;
+  }
+  function enterAtElement(el, newMode) {
+    if (active5) close4(false);
+    mode3 = newMode || "visual";
+    let range = null;
+    try {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      const first = walker.nextNode();
+      if (first) {
+        range = document.createRange();
+        range.setStart(first, 0);
+        range.collapse(true);
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(true);
+      }
+    } catch {
+      range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(true);
+    }
+    const sel = window.getSelection();
+    if (!sel) return;
+    try {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch {
+    }
+    if (mode3 !== "line" && sel.isCollapsed) {
+      if (hasModify()) {
+        try {
+          sel.modify("extend", "forward", "character");
+        } catch {
+        }
+      }
+    }
+    if (mode3 === "line") {
+      try {
+        if (hasModify()) {
+          sel.modify("extend", "forward", "lineboundary");
+        } else {
+          const r2 = document.createRange();
+          r2.selectNodeContents(el);
+          sel.removeAllRanges();
+          sel.addRange(r2);
+        }
+      } catch {
+        const r2 = document.createRange();
+        r2.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(r2);
+      }
+    }
+    active5 = true;
+    showPill();
+    showBlockCaret();
+    pendingCount = "";
+    pendingG = false;
+    pendingF = null;
+    ui.toast(mode3 === "line" ? "Visual line" : "Visual");
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function extendSelection(direction, granularity) {
+    const sel = getSelection();
+    if (!sel) return false;
+    if (hasModify()) {
+      try {
+        sel.modify("extend", direction, granularity);
+        return true;
+      } catch {
+      }
+    }
+    return false;
+  }
+  function doMoveChar(dir) {
+    const ok = extendSelection(dir < 0 ? "left" : "right", "character");
+    if (!ok) fallbackMoveChar(dir);
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function fallbackMoveChar(dir) {
+    const sel = getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    try {
+      let node = sel.focusNode;
+      let offset = sel.focusOffset;
+      if (!node) return;
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.childNodes[offset]) {
+          node = node.childNodes[offset];
+          offset = 0;
+          if (node.nodeType !== Node.TEXT_NODE) return;
+        } else {
+          return;
+        }
+      }
+      if (node.nodeType !== Node.TEXT_NODE) return;
+      const text = node.nodeValue;
+      let newOffset = offset + dir;
+      let newNode = node;
+      if (newOffset < 0) {
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        walker.currentNode = node;
+        const prev2 = walker.previousNode();
+        if (prev2) {
+          newNode = prev2;
+          newOffset = prev2.nodeValue.length - 1;
+          if (newOffset < 0) newOffset = 0;
+        } else {
+          return;
+        }
+      } else if (newOffset > text.length) {
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        walker.currentNode = node;
+        const next2 = walker.nextNode();
+        if (next2) {
+          newNode = next2;
+          newOffset = 0;
+        } else {
+          return;
+        }
+      }
+      const anchorNode = sel.anchorNode;
+      const anchorOffset = sel.anchorOffset;
+      if (!anchorNode) return;
+      if (typeof sel.extend === "function") {
+        try {
+          sel.extend(newNode, newOffset);
+          return;
+        } catch {
+        }
+      }
+      const r = document.createRange();
+      try {
+        r.setStart(anchorNode, anchorOffset);
+        r.setEnd(newNode, newOffset);
+      } catch {
+        try {
+          r.setStart(newNode, newOffset);
+          r.setEnd(anchorNode, anchorOffset);
+        } catch {
+          return;
+        }
+      }
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } catch {
+    }
+  }
+  function doMoveLine(dir) {
+    const ok = extendSelection(dir < 0 ? "backward" : "forward", "line");
+    if (!ok) ui.toast("No line move");
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function doMoveWord(dir) {
+    const ok = extendSelection(dir < 0 ? "backward" : "forward", "word");
+    if (!ok) ui.toast("No word move");
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function doMoveWordEnd(dir) {
+    const ok = extendSelection("forward", "word");
+    if (ok) {
+      extendSelection("backward", "character");
+    }
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function doLineBoundary(dir) {
+    const gran = "lineboundary";
+    const ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
+    if (!ok) ui.toast("No line boundary");
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function doDocBoundary(dir) {
+    const gran = "documentboundary";
+    extendSelection(dir < 0 ? "backward" : "forward", gran);
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function doFirstNonBlank() {
+    doLineBoundary(-1);
+  }
+  function swapAnchorFocus() {
+    const sel = getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const anchorNode = sel.anchorNode;
+    const anchorOffset = sel.anchorOffset;
+    const focusNode = sel.focusNode;
+    const focusOffset = sel.focusOffset;
+    if (!anchorNode || !focusNode) return;
+    try {
+      const r = document.createRange();
+      r.setStart(focusNode, focusOffset);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      if (typeof sel.extend === "function") {
+        sel.extend(anchorNode, anchorOffset);
+      } else {
+        const r2 = document.createRange();
+        r2.setStart(anchorNode, anchorOffset);
+        r2.setEnd(focusNode, focusOffset);
+        sel.removeAllRanges();
+        sel.addRange(r2);
+      }
+      ensureVisible();
+      updateBlockCaret();
+    } catch {
+    }
+  }
+  function yankSelection() {
+    const sel = getSelection();
+    if (!sel) return;
+    const text = sel.toString();
+    if (!text) {
+      ui.toast("No selection");
+      return;
+    }
+    ui.copyText(text).then(() => ui.toast(`Yanked ${text.length} chars`)).catch(() => ui.toast("Yank failed"));
+  }
+  function handleFChar(ch) {
+    const sel = getSelection();
+    if (!sel) return;
+    const focusNode = sel.focusNode;
+    const focusOffset = sel.focusOffset;
+    if (!focusNode) return;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node2) {
+        if (!node2.nodeValue) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let startFound = false;
+    let node = walker.nextNode();
+    while (node) {
+      if (node === focusNode) {
+        startFound = true;
+        const text = node.nodeValue;
+        let idx = -1;
+        if (pendingF && pendingF.dir === "forward") {
+          idx = text.indexOf(ch, focusOffset + 1);
+        } else if (pendingF && pendingF.dir === "backward") {
+          idx = text.lastIndexOf(ch, focusOffset - 1);
+        }
+        if (idx !== -1) {
+          let finalOffset = idx;
+          if (pendingF && pendingF.till) {
+            finalOffset = pendingF.dir === "forward" ? idx : idx + 1;
+          } else {
+            finalOffset = pendingF.dir === "forward" ? idx + 1 : idx;
+          }
+          moveToPosition(node, finalOffset);
+          ui.toast(`${pendingF.till ? "t" : "f"}${ch}`);
+          pendingF = null;
+          return;
+        }
+      } else if (startFound) {
+        const text = node.nodeValue;
+        let idx = -1;
+        if (pendingF && pendingF.dir === "forward") idx = text.indexOf(ch);
+        else idx = text.lastIndexOf(ch);
+        if (idx !== -1) {
+          let finalOffset = idx;
+          if (pendingF.dir === "forward" && !pendingF.till) finalOffset = idx + 1;
+          if (pendingF.dir === "backward" && pendingF.till) finalOffset = idx + 1;
+          moveToPosition(node, finalOffset);
+          ui.toast(`${pendingF.till ? "t" : "f"}${ch}`);
+          pendingF = null;
+          return;
+        }
+      }
+      node = walker.nextNode();
+    }
+    ui.toast(`Not found: ${ch}`);
+    pendingF = null;
+  }
+  function moveToPosition(node, offset) {
+    const sel = getSelection();
+    if (!sel) return;
+    offset = Math.max(0, Math.min(offset, node.nodeValue ? node.nodeValue.length : 0));
+    const anchorNode = sel.anchorNode;
+    const anchorOffset = sel.anchorOffset;
+    if (!anchorNode) return;
+    if (typeof sel.extend === "function") {
+      try {
+        sel.extend(node, offset);
+        ensureVisible();
+        updateBlockCaret();
+        return;
+      } catch {
+      }
+    }
+    const r = document.createRange();
+    try {
+      r.setStart(anchorNode, anchorOffset);
+      r.setEnd(node, offset);
+    } catch {
+      r.setStart(node, offset);
+      r.setEnd(anchorNode, anchorOffset);
+    }
+    sel.removeAllRanges();
+    sel.addRange(r);
+    ensureVisible();
+    updateBlockCaret();
+  }
+  function consume2(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  function getRepeatCount() {
+    const n = parseInt(pendingCount || "1", 10);
+    const c = Number.isNaN(n) ? 1 : Math.max(1, n);
+    pendingCount = "";
+    return c;
+  }
+  function enter(newMode) {
+    if (hintActive) closeHints();
+    if (active5) close4(false);
+    pendingVisualMode = newMode || "visual";
+    showVisualHints(pendingVisualMode);
+  }
+  function close4(keepSelection = false) {
+    if (hintActive) closeHints();
+    if (!active5) return;
+    active5 = false;
+    hidePill();
+    hideBlockCaret();
+    pendingCount = "";
+    pendingG = false;
+    pendingF = null;
+    if (!keepSelection) {
+      const sel = getSelection();
+      if (sel) {
+        try {
+          sel.removeAllRanges();
+        } catch {
+        }
+      }
+    }
+  }
+  function onKeyDown5(event) {
+    if (hintActive) {
+      const key2 = event.key;
+      if (key2 === "Escape") {
+        consume2(event);
+        if (hintPrefix) {
+          hintPrefix = "";
+          refreshHints();
+        } else {
+          closeHints();
+        }
+        return true;
+      }
+      if (key2 === "Backspace") {
+        consume2(event);
+        if (hintPrefix) {
+          hintPrefix = hintPrefix.slice(0, -1);
+          refreshHints();
+        } else {
+          closeHints();
+        }
+        return true;
+      }
+      if (key2 === "Enter") {
+        consume2(event);
+        const visible = Array.from(hintMap.entries()).filter(([label]) => label.startsWith(hintPrefix));
+        if (visible.length === 1) {
+          activateHintByLabel(visible[0][0]);
+        }
+        return true;
+      }
+      if (key2.length === 1) {
+        const charset = normalizeCharset2();
+        const lower = key2.toLowerCase();
+        if (charset.includes(lower)) {
+          consume2(event);
+          const next2 = hintPrefix + lower.toUpperCase();
+          const exact = hintMap.get(next2);
+          hintPrefix = next2;
+          refreshHints();
+          if (exact) {
+            activateHintByLabel(next2);
+          }
+          return true;
+        }
+      }
+      consume2(event);
+      return true;
+    }
+    if (!active5) return false;
+    if (pendingF) {
+      const ch = event.key;
+      if (ch.length === 1) {
+        consume2(event);
+        handleFChar(ch);
+        return true;
+      }
+      if (ch === "Escape") {
+        consume2(event);
+        pendingF = null;
+        ui.toast("Cancelled");
+        return true;
+      }
+      consume2(event);
+      return true;
+    }
+    const key = event.key;
+    if (key === "Escape") {
+      consume2(event);
+      close4(false);
+      ui.toast("Exited visual");
+      return true;
+    }
+    if (/^[0-9]$/.test(key)) {
+      if (key === "0" && pendingCount === "") {
+      } else {
+        consume2(event);
+        if (pendingCount.length < 9) pendingCount += key;
+        if (pillEl) pillEl.textContent = (mode3 === "line" ? "visual line" : "visual") + " " + pendingCount;
+        return true;
+      }
+    }
+    if (key === "f" || key === "F" || key === "t" || key === "T") {
+      const isUpper = key === "F" || key === "T";
+      const till = key === "t" || key === "T";
+      const dir = isUpper ? "backward" : "forward";
+      pendingF = { dir, till };
+      consume2(event);
+      ui.toast(`/${till ? "t" : "f"}-char\u2026`);
+      return true;
+    }
+    if (key === ";" || key === ",") {
+      consume2(event);
+      ui.toast("No f/t yet");
+      return true;
+    }
+    if (key === "g") {
+      if (pendingG) {
+        consume2(event);
+        getRepeatCount();
+        doDocBoundary(-1);
+        pendingG = false;
+        if (pillEl) pillEl.textContent = mode3 === "line" ? "visual line" : "visual";
+        return true;
+      } else {
+        consume2(event);
+        pendingG = true;
+        if (pillEl) pillEl.textContent = (mode3 === "line" ? "visual line" : "visual") + " g";
+        setTimeout(() => {
+          pendingG = false;
+          if (pillEl && pillEl.textContent.endsWith(" g")) pillEl.textContent = mode3 === "line" ? "visual line" : "visual";
+        }, 1500);
+        return true;
+      }
+    }
+    if (pendingG) {
+      pendingG = false;
+      if (pillEl) pillEl.textContent = mode3 === "line" ? "visual line" : "visual";
+    }
+    let repeat = 1;
+    if (pendingCount) {
+      repeat = getRepeatCount();
+    }
+    switch (key) {
+      case "h":
+      case "ArrowLeft":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doMoveChar(-1);
+        break;
+      case "l":
+      case "ArrowRight":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doMoveChar(1);
+        break;
+      case "j":
+      case "ArrowDown":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doMoveLine(1);
+        break;
+      case "k":
+      case "ArrowUp":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doMoveLine(-1);
+        break;
+      case "w":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doMoveWord(1);
+        break;
+      case "b":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doMoveWord(-1);
+        break;
+      case "e":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doMoveWordEnd(1);
+        break;
+      case "0":
+        consume2(event);
+        doLineBoundary(-1);
+        break;
+      case "^":
+        consume2(event);
+        doFirstNonBlank();
+        break;
+      case "$":
+        consume2(event);
+        for (let i = 0; i < repeat; i++) doLineBoundary(1);
+        break;
+      case "G":
+        consume2(event);
+        doDocBoundary(1);
+        break;
+      case "g":
+        consume2(event);
+        ui.toast("Use gg");
+        break;
+      case "o":
+        consume2(event);
+        swapAnchorFocus();
+        break;
+      case "y":
+        consume2(event);
+        yankSelection();
+        close4(false);
+        break;
+      case "v":
+        consume2(event);
+        if (mode3 === "visual") {
+          close4(false);
+          ui.toast("Exited visual");
+        } else {
+          close4(false);
+          enter("visual");
+        }
+        break;
+      case "V":
+        consume2(event);
+        if (mode3 === "line") {
+          close4(false);
+          ui.toast("Exited visual line");
+        } else {
+          close4(false);
+          enter("line");
+        }
+        break;
+      case "d":
+      case "x":
+        consume2(event);
+        yankSelection();
+        try {
+          document.execCommand("delete");
+        } catch {
+        }
+        close4(false);
+        break;
+      case "Y":
+        consume2(event);
+        yankSelection();
+        close4(false);
+        break;
+      default:
+        if (key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+          consume2(event);
+          ui.toast(`No visual: ${key}`);
+        } else {
+          consume2(event);
+        }
+        break;
+    }
+    pendingCount = "";
+    return true;
+  }
+  var Visual = {
+    enter,
+    close: close4,
+    isActive: isActive5,
+    onKeyDown: onKeyDown5,
+    showBlockCaret,
+    hideBlockCaret,
+    updateBlockCaret
+  };
+  register("visual", { close: () => {
+    closeHints();
+    close4(false);
+  }, onKeyDown: onKeyDown5, isActive: isActive5 });
+  function __resetVisualState() {
+    closeHints();
+    close4(false);
+    pendingCount = "";
+    pendingG = false;
+    pendingF = null;
+  }
 
   // content/commands.js
   var PAGE_RATIO = 0.9;
@@ -2320,13 +3935,18 @@ ${location.href}`;
     hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
     hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
     hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
+    findForward: { ...COMMAND_CATALOG.findForward, run: () => Find.open() },
+    findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
+    findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
+    visualMode: { ...COMMAND_CATALOG.visualMode, run: () => Visual.enter("visual") },
+    visualLineMode: { ...COMMAND_CATALOG.visualLineMode, run: () => Visual.enter("line") },
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
     openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
     openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") }
   };
 
   // content/content.js
-  var pendingCount = "";
+  var pendingCount2 = "";
   var pendingPrefix = null;
   var timer = null;
   var ignoreMode = false;
@@ -2334,7 +3954,7 @@ ${location.href}`;
   var passthroughTimer = null;
   var pills = {};
   function clearPending() {
-    pendingCount = "";
+    pendingCount2 = "";
     pendingPrefix = null;
     ui.showcmd(null);
   }
@@ -2357,9 +3977,9 @@ ${location.href}`;
     clearPending();
     if (on) {
       Overlays.closeAll();
-      showPill("ignore", "ignore");
+      showPill2("ignore", "ignore");
     } else {
-      hidePill("ignore");
+      hidePill2("ignore");
     }
   }
   function toggleIgnore() {
@@ -2372,7 +3992,7 @@ ${location.href}`;
     clearPending();
     Overlays.closeAll();
     passthroughMode = true;
-    showPill(
+    showPill2(
       "passthrough",
       "passthrough (" + settings.getPassthroughMs() + "ms)"
     );
@@ -2383,12 +4003,12 @@ ${location.href}`;
     if (!passthroughMode) return;
     clearTimeout(passthroughTimer);
     passthroughMode = false;
-    hidePill("passthrough");
+    hidePill2("passthrough");
   }
   function isFullscreen() {
     return !!document.fullscreenElement;
   }
-  function showPill(name, text) {
+  function showPill2(name, text) {
     if (pills[name] || isFullscreen()) return;
     const el = document.createElement("div");
     el.className = "jari-pill";
@@ -2396,7 +4016,7 @@ ${location.href}`;
     ui.statusContainer().appendChild(el);
     pills[name] = el;
   }
-  function hidePill(name) {
+  function hidePill2(name) {
     const el = pills[name];
     if (el) {
       el.remove();
@@ -2406,17 +4026,17 @@ ${location.href}`;
   function handleFullscreenChange() {
     if (!ignoreMode && !passthroughMode) return;
     if (isFullscreen()) {
-      hidePill("ignore");
-      hidePill("passthrough");
+      hidePill2("ignore");
+      hidePill2("passthrough");
     } else {
-      if (ignoreMode) showPill("ignore", "Ignore mode");
-      if (passthroughMode) showPill("passthrough", "Passthrough");
+      if (ignoreMode) showPill2("ignore", "Ignore mode");
+      if (passthroughMode) showPill2("passthrough", "Passthrough");
     }
   }
   function handleKeydown(event) {
     if (!event.isTrusted) return;
-    const overlay3 = Overlays.active();
-    if (overlay3) return overlay3.onKeyDown(event);
+    const overlay4 = Overlays.active();
+    if (overlay4) return overlay4.onKeyDown(event);
     if (modifierKeys.has(event.key)) return;
     if (passthroughMode) {
       if (event.key === "Escape") {
@@ -2467,16 +4087,26 @@ ${location.href}`;
       return;
     }
     if (event.key === "Escape") {
-      if (pendingCount) {
+      if (pendingCount2) {
         event.preventDefault();
         event.stopImmediatePropagation();
         clearPending();
+        return;
+      }
+      if (Find.hasHighlights()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        Find.handleGlobalEsc(event);
+        return;
       }
       return;
     }
+    if (event.key === "Enter" && Find.hasHighlights()) {
+      if (Find.handleGlobalEnter(event)) return;
+    }
     if (!commandName && /^[0-9]$/.test(key)) {
-      if (pendingCount.length < 9) pendingCount += key;
-      ui.showcmd(pendingCount);
+      if (pendingCount2.length < 9) pendingCount2 += key;
+      ui.showcmd(pendingCount2);
       event.preventDefault();
       event.stopImmediatePropagation();
       restartTimer();
@@ -2484,7 +4114,7 @@ ${location.href}`;
     }
     if (!commandName && prefixes[key]) {
       pendingPrefix = key;
-      ui.showcmd(pendingCount + key);
+      ui.showcmd(pendingCount2 + key);
       event.preventDefault();
       event.stopImmediatePropagation();
       restartTimer();
@@ -2495,10 +4125,10 @@ ${location.href}`;
       clearPending();
       return;
     }
-    const countStr = pendingCount;
-    const count = parseRepeatCount(pendingCount);
+    const countStr = pendingCount2;
+    const count = parseRepeatCount(pendingCount2);
     const hadCount = countStr !== "";
-    pendingCount = "";
+    pendingCount2 = "";
     if (hadCount || prefixWasPending)
       ui.flash(countStr + (prefixKey || "") + key);
     restartTimer();
@@ -2523,11 +4153,19 @@ ${location.href}`;
     clearTimeout(passthroughTimer);
     timer = null;
     passthroughTimer = null;
-    pendingCount = "";
+    pendingCount2 = "";
     pendingPrefix = null;
     ignoreMode = false;
     passthroughMode = false;
-    if (pills.ignore) hidePill("ignore");
-    if (pills.passthrough) hidePill("passthrough");
+    if (pills.ignore) hidePill2("ignore");
+    if (pills.passthrough) hidePill2("passthrough");
+    try {
+      __resetFindState();
+    } catch {
+    }
+    try {
+      __resetVisualState();
+    } catch {
+    }
   }
 })();

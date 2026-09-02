@@ -5,6 +5,8 @@ import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf } from "./scroll.js
 import { Prompt } from "./prompt.js";
 import { Help } from "./help.js";
 import { Hints } from "./hints.js";
+import { Find } from "./find.js";
+import { Visual } from "./visual.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
 const PAGE_RATIO = 0.9;
@@ -238,6 +240,13 @@ export const commands = {
   hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
   hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
   hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
+
+  findForward: { ...COMMAND_CATALOG.findForward, run: () => Find.open() },
+  findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
+  findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
+
+  visualMode: { ...COMMAND_CATALOG.visualMode, run: () => Visual.enter("visual") },
+  visualLineMode: { ...COMMAND_CATALOG.visualLineMode, run: () => Visual.enter("line") },
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
   openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },

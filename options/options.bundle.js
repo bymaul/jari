@@ -46,6 +46,11 @@
     p: "passthrough",
     "ctrl+alt+v": "toggleDisabled",
     "?": "showHelp",
+    "/": "findForward",
+    n: "findNext",
+    N: "findPrev",
+    v: "visualMode",
+    V: "visualLineMode",
     gt: "tabSearch",
     gg: "scrollTop",
     gu: "goUp",
@@ -76,6 +81,8 @@
     { id: "page", label: "Page" },
     { id: "clipboard", label: "Clipboard" },
     { id: "hints", label: "Hints" },
+    { id: "find", label: "Find" },
+    { id: "visual", label: "Visual" },
     { id: "modes", label: "Modes" },
     { id: "help", label: "Help" }
   ];
@@ -223,6 +230,11 @@
     hintOpenBackground: { category: "hints", label: "Show hints (open in background, persistent)" },
     hintInput: { category: "hints", label: "Focus input (hint)" },
     hintYank: { category: "hints", label: "Copy link URL (hint)" },
+    findForward: { category: "find", label: "Find forward" },
+    findNext: { category: "find", label: "Next match", repeatable: true },
+    findPrev: { category: "find", label: "Previous match", repeatable: true },
+    visualMode: { category: "visual", label: "Visual mode" },
+    visualLineMode: { category: "visual", label: "Visual line mode" },
     showHelp: { category: "help", label: "Show keybindings" },
     openOptions: { category: "help", label: "Open settings" },
     openExtensions: { category: "help", label: "Open extensions page" }
