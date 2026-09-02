@@ -476,7 +476,7 @@
   height: 0 !important;
   pointer-events: none !important;
   z-index: 2147483646 !important;
-  contain: strict !important;
+  overflow: visible !important;
 }
 
 .jari-visual-caret {
@@ -489,8 +489,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
   animation: jari-caret-blink 1s steps(1) infinite !important;
   pointer-events: none !important;
-  will-change: transform, opacity !important;
-  contain: strict !important;
+  will-change: transform !important;
   backface-visibility: hidden !important;
 }
 

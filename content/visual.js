@@ -109,8 +109,7 @@ function showBlockCaret() {
         box-shadow: 0 1px 3px rgba(0,0,0,0.4);
         animation: jari-caret-blink 1s steps(1) infinite;
         pointer-events: none;
-        will-change: transform, opacity;
-        contain: strict;
+        will-change: transform;
         backface-visibility: hidden;
         transform: translate3d(0,0,0);
       }
