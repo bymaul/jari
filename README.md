@@ -9,8 +9,9 @@
 ## Features
 
 Keyboard-driven browsing with everything on the home row: scrolling with repeat
-counts, tab and history management, a fuzzy-search omnibar, and
-ignore/passthrough modes — every key rebindable from the options page.
+counts, tab and history management, a fuzzy-search omnibar, incremental find
+(`/`/`n`/`N`) with highlight, and Vim-like visual/caret text navigation with
+block caret and hints — every key rebindable from the options page.
 
 ## Default keybindings
 
@@ -69,6 +70,48 @@ ignore/passthrough modes — every key rebindable from the options page.
 | `gu` | Go to parent path     |
 | `gU` | Go to site root       |
 | `ge` | Edit current URL      |
+
+### Find
+
+| Key      | Command        |
+| -------- | -------------- |
+| `/`      | Find forward   |
+| `n`      | Next match     |
+| `N`      | Previous match |
+
+Incremental search as you type (smart case: lowercase = case-insensitive, uppercase = case-sensitive). Highlights all matches, current match in solid orange. `Esc` clears highlight, `Enter` on a highlighted link follows it. Debounced, shadow-DOM and iframe aware.
+
+### Visual & Caret
+
+| Key         | Command          |
+| ----------- | ---------------- |
+| `v`         | Visual mode      |
+| `V`         | Visual line mode |
+
+`v`/`V` shows cyan hints for text blocks – type hint label to jump to that element and enter visual selection with block caret. Visual uses Jari blue highlight (`::highlight(jari-visual)`). Caret is the Vim-like `NORMAL` cursor (pill `caret`).
+
+Motions (with repeat count, `3w` etc):
+
+| Key              | Motion |
+| ---------------- | ------ |
+| `h`/`l`/`ArrowLeft`/`ArrowRight` | char left/right |
+| `j`/`k`/`ArrowDown`/`ArrowUp` | line down/up (grid-aware fallback via `caretRangeFromPoint`) |
+| `w`/`b`/`e`      | word start forward/back, word end |
+| `0`/`^`/`$`      | line start, first non-blank, line end |
+| `G`/`gg`         | document end/start (`5G` → 5th block) |
+| `f`/`F`/`t`/`T` + char | find char forward/back (with `3f` count), `;`/`,` repeat/reverse |
+| `o`              | swap anchor/focus |
+
+Operators:
+
+| Key | Action |
+| --- | ------ |
+| `y` | yank selection → caret (visual), `yy`/`Y` yank line in caret |
+| `d`/`x` | yank + delete → caret |
+| `o` | swap |
+| `v`/`V` | toggle visual ↔ caret, `Esc` visual→caret, caret→page |
+
+Works on `select-none` sites (e.g. `maulana.dev` bento) via temporary `user-select:text` override and robust multi-node highlight fallback.
 
 ### Clipboard
 
