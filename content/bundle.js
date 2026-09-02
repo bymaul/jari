@@ -2953,16 +2953,9 @@
     const style = document.createElement("style");
     style.textContent = `
     .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
-    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.2; letter-spacing: 0.02em; padding: 2px 5px; border: 1px solid #1a7f8f; border-radius: 4px; background: linear-gradient(#b0f2ff, #00b4d8); color: #0a2e3a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.35); text-align: left; min-width: 18px; min-height: 18px; }
+    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 10px; font-weight: bold; line-height: 1; letter-spacing: 0.02em; padding: 1px 3px; border: 1px solid #1a7f8f; border-radius: 3px; background: linear-gradient(#b0f2ff, #00b4d8); color: #0a2e3a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.35); text-align: left; }
     .jari-hint-matched { color: #3a6a7a; opacity: 0.45; }
     .jari-hint-hidden { opacity: 0; display: none; }
-    @media (prefers-color-scheme: dark) {
-      .jari-hint { border-color: #0a4a5a; background: linear-gradient(#7ec8e3, #0080a0); color: #e0f6ff; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
-      .jari-hint-matched { color: #a0d8e8; }
-    }
-    @media (forced-colors: active) {
-      .jari-hint { border: 1px solid CanvasText !important; background: Canvas !important; color: CanvasText !important; forced-color-adjust: none; }
-    }
   `;
     shadow.appendChild(style);
     hintHolder = document.createElement("section");
