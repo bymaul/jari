@@ -23,13 +23,20 @@ const fileExtensionDenylist = new Set([
 
 function isValidHostname(host) {
   if (!host) return false;
-  const lower = host.toLowerCase();
+  let lower = host.toLowerCase();
+  if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
   if (lower === "localhost") return true;
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
     return lower.split(".").every(o => {
       const n = parseInt(o, 10);
       return n >= 0 && n <= 255 && String(n) === o;
     });
+  }
+  if (/^[0-9a-f:]+$/i.test(lower) && lower.includes(":")) {
+    try {
+      if (typeof URL !== "undefined") new URL(`http://[${lower}]/`);
+      return true;
+    } catch { return false; }
   }
   const labels = lower.split(".");
   if (labels.length < 2) return false;
@@ -38,6 +45,7 @@ function isValidHostname(host) {
     if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return false;
   }
   const tld = labels[labels.length - 1];
+  if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
   if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
   if (/^\d+$/.test(tld)) return false;
   return true;

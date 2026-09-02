@@ -1888,7 +1888,7 @@ function onKeyDown(event) {
       pendingCount = "";
       return true;
     }
-    if (key === "d" || key === "x" || key === "o") {
+    if (key === "o") {
       consume(event);
       pendingCount = "";
       return true;

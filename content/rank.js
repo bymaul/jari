@@ -196,16 +196,24 @@ function hostBoost(query, item) {
   return m ? 6 + m.score * 0.1 : 0;
 }
 function recencyScore(item) {
-  const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || 0;
+  const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
   if (!ts) return 0;
   const days = (Date.now() - ts) / 86400000;
   if (days < 0 || !Number.isFinite(days)) return 0;
-  return Math.max(0, 7 * Math.exp(-days / 14));
+  const base = Math.max(0, 7 * Math.exp(-days / 14));
+  const typedBonus = item.typedVisits ? 2 : (item.typedCount ? 1 : 0);
+  return base + typedBonus;
 }
 function frequencyScore(item) {
-  const c = item.visitCount || item.typedCount || 0;
+  const visit = item.visitCount || 0;
+  const typed = item.typedCount || item.typedVisits || 0;
+  const c = visit + typed * 1.5;
   if (!c) return 0;
-  return Math.log2(1 + c) * 1.2;
+  return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
+}
+function bookmarkBoost(item) {
+  if (item.source !== "bookmark") return 0;
+  return 0;
 }
 
 const SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
@@ -230,7 +238,8 @@ export function rankMatches(query, list, fuzzy = true) {
       const hBoost = hostBoost(q, item);
       const rScore = recencyScore(item);
       const fScore = frequencyScore(item);
-      const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
+      const bBoost = bookmarkBoost(item);
+      const totalScore = baseScore + tBoost + hBoost + rScore + fScore + bBoost;
       return { item, match: { ...match, score: totalScore, baseScore }, span: last - first + 1, hayLength: hay.length, totalScore };
     })
     .filter(Boolean)

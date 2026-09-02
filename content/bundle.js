@@ -499,13 +499,22 @@
   ]);
   function isValidHostname(host) {
     if (!host) return false;
-    const lower = host.toLowerCase();
+    let lower = host.toLowerCase();
+    if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
       return lower.split(".").every((o) => {
         const n = parseInt(o, 10);
         return n >= 0 && n <= 255 && String(n) === o;
       });
+    }
+    if (/^[0-9a-f:]+$/i.test(lower) && lower.includes(":")) {
+      try {
+        if (typeof URL !== "undefined") new URL(`http://[${lower}]/`);
+        return true;
+      } catch {
+        return false;
+      }
     }
     const labels = lower.split(".");
     if (labels.length < 2) return false;
@@ -514,6 +523,7 @@
       if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return false;
     }
     const tld = labels[labels.length - 1];
+    if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
     if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
     if (/^\d+$/.test(tld)) return false;
     return true;
@@ -1005,16 +1015,30 @@
     return m ? 6 + m.score * 0.1 : 0;
   }
   function recencyScore(item) {
-    const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || 0;
+    const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
     if (!ts) return 0;
     const days = (Date.now() - ts) / 864e5;
     if (days < 0 || !Number.isFinite(days)) return 0;
-    return Math.max(0, 7 * Math.exp(-days / 14));
+    const base = Math.max(0, 7 * Math.exp(-days / 14));
+    const typedBonus = item.typedVisits ? 2 : item.typedCount ? 1 : 0;
+    return base + typedBonus;
   }
   function frequencyScore(item) {
-    const c = item.visitCount || item.typedCount || 0;
+    const visit = item.visitCount || 0;
+    const typed = item.typedCount || item.typedVisits || 0;
+    const c = visit + typed * 1.5;
     if (!c) return 0;
-    return Math.log2(1 + c) * 1.2;
+    return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
+  }
+  function bookmarkBoost(item) {
+    if (item.source !== "bookmark") return 0;
+    let score = 5;
+    if (item.folderBoost) score += item.folderBoost;
+    if (item.dateAdded) {
+      const days = (Date.now() - item.dateAdded) / 864e5;
+      if (days < 7) score += 2;
+    }
+    return score;
   }
   var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
   function rankMatches(query2, list, fuzzy = true) {
@@ -1036,7 +1060,8 @@
       const hBoost = hostBoost(q, item);
       const rScore = recencyScore(item);
       const fScore = frequencyScore(item);
-      const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
+      const bBoost = bookmarkBoost(item);
+      const totalScore = baseScore + tBoost + hBoost + rScore + fScore + bBoost;
       return { item, match: { ...match, score: totalScore, baseScore }, span: last - first + 1, hayLength: hay.length, totalScore };
     }).filter(Boolean).sort((a, b) => {
       if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
@@ -1064,6 +1089,26 @@
   };
 
   // content/prompt.js
+  var SEARCH_ENGINES = {
+    g: "https://www.google.com/search?q=%s",
+    google: "https://www.google.com/search?q=%s",
+    yt: "https://www.youtube.com/results?search_query=%s",
+    youtube: "https://www.youtube.com/results?search_query=%s",
+    gh: "https://github.com/search?q=%s",
+    github: "https://github.com/search?q=%s",
+    w: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
+    wiki: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
+    so: "https://stackoverflow.com/search?q=%s",
+    stack: "https://stackoverflow.com/search?q=%s"
+  };
+  function parseKeyword(query2) {
+    const m = query2.trim().match(/^(\w+)\s+(.*\S)/);
+    if (!m) return null;
+    const kw = m[1].toLowerCase();
+    const tmpl = SEARCH_ENGINES[kw];
+    if (!tmpl) return null;
+    return { keyword: kw, rest: m[2], url: tmpl.replace("%s", encodeURIComponent(m[2])) };
+  }
   var active = false;
   var overlay = null;
   var inputEl = null;
@@ -1076,6 +1121,7 @@
   var suggestSeq = 0;
   var suggestTimer = null;
   var restoreFocus = null;
+  var tabUrlMap = /* @__PURE__ */ new Map();
   function isActive() {
     return active;
   }
@@ -1112,8 +1158,10 @@
   }
   function handleOpenInput(queryText) {
     const q = queryText.trim();
-    const term = Url.suggestionTerm(q);
+    const kw = parseKeyword(q);
+    const term = kw ? kw.rest : Url.suggestionTerm(q);
     query = term;
+    tabUrlMap.clear();
     if (!q) {
       clearTimeout(suggestTimer);
       suggestSeq++;
@@ -1125,14 +1173,20 @@
         if (!active || seq2 !== suggestSeq) return;
         const res = await sendMessage("suggest", { query: "" }) || [];
         if (!active || seq2 !== suggestSeq) return;
-        filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null }));
+        for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
+        filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null, source: item.source }));
         selected = 0;
         renderList();
       }, 130);
       return;
     }
-    const isUrl = Url.looksLikeUrl(q);
-    const row = isUrl ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
+    let row;
+    if (kw) {
+      row = { kind: "search", title: `${kw.keyword} ${kw.rest}`, url: kw.url, keyword: kw.keyword };
+    } else {
+      const isUrl = Url.looksLikeUrl(q);
+      row = isUrl ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
+    }
     filtered = [row];
     selected = 0;
     renderList();
@@ -1142,11 +1196,14 @@
       if (!active || seq !== suggestSeq) return;
       const res = await sendMessage("suggest", { query: term }) || [];
       if (!active || seq !== suggestSeq) return;
+      tabUrlMap.clear();
+      for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
       const suggestions = rank(res, term).map(({ item, match }) => ({
         kind: "suggestion",
         title: item.title,
         url: item.url,
-        match
+        match,
+        source: item.source
       }));
       filtered = [row, ...suggestions];
       selected = 0;
@@ -1242,8 +1299,24 @@
   }
   function renderSuggestionRow(row) {
     const li = document.createElement("li");
-    const titleText = row.kind === "search" ? `Search for "${row.title}"` : row.kind === "url" ? `Open ${row.title}` : row.title || "(untitled)";
-    const urlText = row.kind === "suggestion" ? row.url || "" : "";
+    let titleText;
+    if (row.kind === "search") {
+      if (row.keyword) titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
+      else titleText = `Search for "${row.title}"`;
+    } else if (row.kind === "url") {
+      titleText = `Open ${row.title}`;
+    } else {
+      const isSwitch = row.url && tabUrlMap.has(row.url) && tabUrlMap.get(row.url).source === "tab";
+      titleText = isSwitch ? `Switch to: ${row.title || "(untitled)"}` : row.title || "(untitled)";
+    }
+    let urlText = row.kind === "suggestion" ? row.url || "" : "";
+    if (row.kind === "suggestion" && row.url && tabUrlMap.has(row.url)) {
+      const tabInfo = tabUrlMap.get(row.url);
+      if (tabInfo && tabInfo.source === "tab") urlText = `${urlText}  \u2022  Tab`;
+      else if (row.folderPath) urlText = `${urlText}  \u2022  ${row.folderPath}`;
+    } else if (row.folderPath) {
+      urlText = row.folderPath;
+    }
     return renderTitleUrl(li, titleText, urlText, row.kind === "suggestion" ? query : "");
   }
   function renderTabRow(tab, winLabel) {
@@ -1317,16 +1390,35 @@
   }
   function activate() {
     const item = filtered[selected];
+    const rawInput = inputEl ? inputEl.value.trim() : "";
+    const kwInput = parseKeyword(rawInput);
     if (!item) {
-      if (mode === "open" && !inputEl.value.trim()) sendMessage("createTab");
+      if (mode === "open" && !rawInput) sendMessage("createTab");
+      else if (kwInput) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
+      else if (rawInput && Url.looksLikeUrl(rawInput)) {
+        const target2 = Url.normalizeUrl(rawInput) || rawInput;
+        sendMessage(mode === "open" ? "createTab" : "navigate", { url: target2 });
+      } else if (rawInput) sendMessage("search", { query: rawInput, newTab: mode === "open" });
       close();
       return;
     }
     if (mode === "merge") {
       sendMessage("mergeTab", { targetWindowId: item.windowId });
     } else if (mode === "open" || mode === "edit") {
-      if (item.kind === "search") sendMessage("search", { query: inputEl.value, newTab: mode === "open" });
-      else if (item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+      if (item.kind === "search") {
+        if (item.keyword && item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+        else if (kwInput && kwInput.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
+        else sendMessage("search", { query: rawInput, newTab: mode === "open" });
+      } else if (item.url) {
+        const existing = tabUrlMap.get(item.url);
+        if (existing && existing.source === "tab" && existing.id) {
+          sendMessage("activateTab", { id: existing.id });
+        } else {
+          const tabMatch = tabUrlMap.get(item.url);
+          if (tabMatch && tabMatch.id) sendMessage("activateTab", { id: tabMatch.id });
+          else sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+        }
+      }
     } else {
       sendMessage("activateTab", { id: item.id });
     }
@@ -4284,7 +4376,7 @@
         pendingCount = "";
         return true;
       }
-      if (key === "d" || key === "x" || key === "o") {
+      if (key === "o") {
         consume2(event);
         pendingCount = "";
         return true;

@@ -73,45 +73,43 @@ block caret and hints — every key rebindable from the options page.
 
 ### Find
 
-| Key      | Command        |
-| -------- | -------------- |
-| `/`      | Find forward   |
-| `n`      | Next match     |
-| `N`      | Previous match |
+| Key | Command        |
+| --- | -------------- |
+| `/` | Find forward   |
+| `n` | Next match     |
+| `N` | Previous match |
 
 Incremental search as you type (smart case: lowercase = case-insensitive, uppercase = case-sensitive). Highlights all matches, current match in solid orange. `Esc` clears highlight, `Enter` on a highlighted link follows it. Debounced, shadow-DOM and iframe aware.
 
 ### Visual & Caret
 
-| Key         | Command          |
-| ----------- | ---------------- |
-| `v`         | Visual mode      |
-| `V`         | Visual line mode |
+| Key | Command          |
+| --- | ---------------- |
+| `v` | Visual mode      |
+| `V` | Visual line mode |
 
 `v`/`V` shows cyan hints for text blocks – type hint label to jump to that element and enter visual selection with block caret. Visual uses Jari blue highlight (`::highlight(jari-visual)`). Caret is the Vim-like `NORMAL` cursor (pill `caret`).
 
 Motions (with repeat count, `3w` etc):
 
-| Key              | Motion |
-| ---------------- | ------ |
-| `h`/`l`/`ArrowLeft`/`ArrowRight` | char left/right |
-| `j`/`k`/`ArrowDown`/`ArrowUp` | line down/up (grid-aware fallback via `caretRangeFromPoint`) |
-| `w`/`b`/`e`      | word start forward/back, word end |
-| `0`/`^`/`$`      | line start, first non-blank, line end |
-| `G`/`gg`         | document end/start (`5G` → 5th block) |
-| `f`/`F`/`t`/`T` + char | find char forward/back (with `3f` count), `;`/`,` repeat/reverse |
-| `o`              | swap anchor/focus |
+| Key                              | Motion                                                           |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `h`/`l`/`ArrowLeft`/`ArrowRight` | char left/right                                                  |
+| `j`/`k`/`ArrowDown`/`ArrowUp`    | line down/up (grid-aware fallback via `caretRangeFromPoint`)     |
+| `w`/`b`/`e`                      | word start forward/back, word end                                |
+| `0`/`^`/`$`                      | line start, first non-blank, line end                            |
+| `G`/`gg`                         | document end/start (`5G` → 5th block)                            |
+| `f`/`F`/`t`/`T` + char           | find char forward/back (with `3f` count), `;`/`,` repeat/reverse |
+| `o`                              | swap anchor/focus                                                |
 
 Operators:
 
-| Key | Action |
-| --- | ------ |
-| `y` | yank selection → caret (visual), `yy`/`Y` yank line in caret |
-| `d`/`x` | yank + delete → caret |
-| `o` | swap |
-| `v`/`V` | toggle visual ↔ caret, `Esc` visual→caret, caret→page |
-
-Works on `select-none` sites (e.g. `maulana.dev` bento) via temporary `user-select:text` override and robust multi-node highlight fallback.
+| Key     | Action                                                       |
+| ------- | ------------------------------------------------------------ |
+| `y`     | yank selection → caret (visual), `yy`/`Y` yank line in caret |
+| `d`/`x` | yank + delete → caret                                        |
+| `o`     | swap                                                         |
+| `v`/`V` | toggle visual ↔ caret, `Esc` visual→caret, caret→page        |
 
 ### Clipboard
 

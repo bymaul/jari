@@ -4,6 +4,27 @@ import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
 import { register } from "./overlays.js";
 
+const SEARCH_ENGINES = {
+  g: "https://www.google.com/search?q=%s",
+  google: "https://www.google.com/search?q=%s",
+  yt: "https://www.youtube.com/results?search_query=%s",
+  youtube: "https://www.youtube.com/results?search_query=%s",
+  gh: "https://github.com/search?q=%s",
+  github: "https://github.com/search?q=%s",
+  w: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
+  wiki: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
+  so: "https://stackoverflow.com/search?q=%s",
+  stack: "https://stackoverflow.com/search?q=%s",
+};
+function parseKeyword(query) {
+  const m = query.trim().match(/^(\w+)\s+(.*\S)/);
+  if (!m) return null;
+  const kw = m[1].toLowerCase();
+  const tmpl = SEARCH_ENGINES[kw];
+  if (!tmpl) return null;
+  return { keyword: kw, rest: m[2], url: tmpl.replace("%s", encodeURIComponent(m[2])) };
+}
+
 let active = false;
 let overlay = null;
 let inputEl = null;
@@ -16,6 +37,7 @@ let mode = "tabs";
 let suggestSeq = 0;
 let suggestTimer = null;
 let restoreFocus = null;
+let tabUrlMap = new Map();
 
 function isActive() {
   return active;
@@ -58,8 +80,10 @@ function openMerge(data) {
 
 function handleOpenInput(queryText) {
   const q = queryText.trim();
-  const term = Url.suggestionTerm(q);
+  const kw = parseKeyword(q);
+  const term = kw ? kw.rest : Url.suggestionTerm(q);
   query = term;
+  tabUrlMap.clear();
   if (!q) {
     clearTimeout(suggestTimer);
     suggestSeq++;
@@ -71,16 +95,20 @@ function handleOpenInput(queryText) {
       if (!active || seq !== suggestSeq) return;
       const res = (await sendMessage("suggest", { query: "" })) || [];
       if (!active || seq !== suggestSeq) return;
-      filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null }));
+      for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
+      filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null, source: item.source }));
       selected = 0;
       renderList();
     }, 130);
     return;
   }
-  const isUrl = Url.looksLikeUrl(q);
-  const row = isUrl
-    ? { kind: "url", title: q, url: q }
-    : { kind: "search", title: q, url: null };
+  let row;
+  if (kw) {
+    row = { kind: "search", title: `${kw.keyword} ${kw.rest}`, url: kw.url, keyword: kw.keyword };
+  } else {
+    const isUrl = Url.looksLikeUrl(q);
+    row = isUrl ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
+  }
   filtered = [row];
   selected = 0;
   renderList();
@@ -90,11 +118,14 @@ function handleOpenInput(queryText) {
     if (!active || seq !== suggestSeq) return;
     const res = (await sendMessage("suggest", { query: term })) || [];
     if (!active || seq !== suggestSeq) return;
+    tabUrlMap.clear();
+    for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
     const suggestions = rank(res, term).map(({ item, match }) => ({
       kind: "suggestion",
       title: item.title,
       url: item.url,
       match,
+      source: item.source,
     }));
     filtered = [row, ...suggestions];
     selected = 0;
@@ -204,13 +235,24 @@ function renderTitleUrl(li, titleText, urlText, q) {
 
 function renderSuggestionRow(row) {
   const li = document.createElement("li");
-  const titleText =
-    row.kind === "search"
-      ? `Search for "${row.title}"`
-      : row.kind === "url"
-        ? `Open ${row.title}`
-        : row.title || "(untitled)";
-  const urlText = row.kind === "suggestion" ? row.url || "" : "";
+  let titleText;
+  if (row.kind === "search") {
+    if (row.keyword) titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
+    else titleText = `Search for "${row.title}"`;
+  } else if (row.kind === "url") {
+    titleText = `Open ${row.title}`;
+  } else {
+    const isSwitch = row.url && tabUrlMap.has(row.url) && tabUrlMap.get(row.url).source === "tab";
+    titleText = isSwitch ? `Switch to: ${row.title || "(untitled)"}` : (row.title || "(untitled)");
+  }
+  let urlText = row.kind === "suggestion" ? row.url || "" : "";
+  if (row.kind === "suggestion" && row.url && tabUrlMap.has(row.url)) {
+    const tabInfo = tabUrlMap.get(row.url);
+    if (tabInfo && tabInfo.source === "tab") urlText = `${urlText}  •  Tab`;
+    else if (row.folderPath) urlText = `${urlText}  •  ${row.folderPath}`;
+  } else if (row.folderPath) {
+    urlText = row.folderPath;
+  }
   return renderTitleUrl(li, titleText, urlText, row.kind === "suggestion" ? query : "");
 }
 
@@ -301,19 +343,35 @@ function onKeyDown(event) {
 
 function activate() {
   const item = filtered[selected];
+  const rawInput = inputEl ? inputEl.value.trim() : "";
+  const kwInput = parseKeyword(rawInput);
   if (!item) {
-
-    if (mode === "open" && !inputEl.value.trim()) sendMessage("createTab");
+    if (mode === "open" && !rawInput) sendMessage("createTab");
+    else if (kwInput) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
+    else if (rawInput && Url.looksLikeUrl(rawInput)) {
+      const target = Url.normalizeUrl(rawInput) || rawInput;
+      sendMessage(mode === "open" ? "createTab" : "navigate", { url: target });
+    } else if (rawInput) sendMessage("search", { query: rawInput, newTab: mode === "open" });
     close();
     return;
   }
   if (mode === "merge") {
-
     sendMessage("mergeTab", { targetWindowId: item.windowId });
   } else if (mode === "open" || mode === "edit") {
-
-    if (item.kind === "search") sendMessage("search", { query: inputEl.value, newTab: mode === "open" });
-    else if (item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+    if (item.kind === "search") {
+      if (item.keyword && item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+      else if (kwInput && kwInput.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
+      else sendMessage("search", { query: rawInput, newTab: mode === "open" });
+    } else if (item.url) {
+      const existing = tabUrlMap.get(item.url);
+      if (existing && existing.source === "tab" && existing.id) {
+        sendMessage("activateTab", { id: existing.id });
+      } else {
+        const tabMatch = tabUrlMap.get(item.url);
+        if (tabMatch && tabMatch.id) sendMessage("activateTab", { id: tabMatch.id });
+        else sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+      }
+    }
   } else {
     sendMessage("activateTab", { id: item.id });
   }
