@@ -2024,23 +2024,6 @@ function onKeyDown(event) {
         enter("line");
       }
       break;
-    case "d":
-    case "x":
-      consume(event);
-      yankSelection();
-      try { document.execCommand("delete"); } catch {}
-      try { collapseToFocus(); } catch {}
-      mode = "caret";
-      if (pillEl) pillEl.textContent = pillText(mode);
-      pendingCount = "";
-      pendingG = false;
-      pendingF = null;
-      pendingY = false;
-      showBlockCaret();
-      attachCaretListeners();
-      ensureVisible();
-      updateBlockCaret();
-      break;
     case "Y":
       consume(event);
       yankSelection();

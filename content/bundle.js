@@ -1032,13 +1032,7 @@
   }
   function bookmarkBoost(item) {
     if (item.source !== "bookmark") return 0;
-    let score = 5;
-    if (item.folderBoost) score += item.folderBoost;
-    if (item.dateAdded) {
-      const days = (Date.now() - item.dateAdded) / 864e5;
-      if (days < 7) score += 2;
-    }
-    return score;
+    return 0;
   }
   var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
   function rankMatches(query2, list, fuzzy = true) {
@@ -4523,29 +4517,6 @@
           close4(false);
           enter("line");
         }
-        break;
-      case "d":
-      case "x":
-        consume2(event);
-        yankSelection();
-        try {
-          document.execCommand("delete");
-        } catch {
-        }
-        try {
-          collapseToFocus();
-        } catch {
-        }
-        mode3 = "caret";
-        if (pillEl) pillEl.textContent = pillText(mode3);
-        pendingCount = "";
-        pendingG = false;
-        pendingF = null;
-        pendingY = false;
-        showBlockCaret();
-        attachCaretListeners();
-        ensureVisible();
-        updateBlockCaret();
         break;
       case "Y":
         consume2(event);
