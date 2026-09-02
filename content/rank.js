@@ -7,12 +7,54 @@ const SCORE_LEADING = -1;
 
 const MAX_ALIGNMENT_STARTS = 64;
 
+function normalizeForMatch(s) {
+  try {
+    return String(s).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  } catch {
+    return String(s).toLowerCase();
+  }
+}
+// eslint-disable-next-line no-unused-vars
 function queryTerms(query) {
-  return String(query).trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return normalizeForMatch(query).trim().split(/\s+/).filter(Boolean);
+}
+export function parseQuery(query) {
+  const normalized = normalizeForMatch(query);
+  const phrases = [];
+  const withoutPhrases = normalized.replace(/"([^"]+)"/g, (_, p) => {
+    const t = p.trim();
+    if (t) phrases.push(t);
+    return " ";
+  });
+  const rawTerms = withoutPhrases.trim().split(/\s+/).filter(Boolean);
+  const include = [];
+  const exclude = [];
+  for (const t of rawTerms) {
+    if (t.startsWith("-") && t.length > 1) exclude.push(t.slice(1));
+    else include.push(t);
+  }
+  return { include, exclude, phrases };
 }
 
 function isBoundaryAt(t, i) {
-  return i === 0 || !/[\w]/.test(t[i - 1]);
+  if (i === 0) return true;
+  const prev = t[i - 1];
+  try {
+    if (/[\p{L}\p{N}_]/u.test(prev)) return false;
+    return true;
+  } catch {
+    return !/[\w]/.test(prev);
+  }
+}
+function extractHost(url) {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    return u.hostname || "";
+  } catch {
+    const m = String(url).match(/^(?:https?:\/\/)?([^/]+)/i);
+    return m ? m[1].split(":")[0] : "";
+  }
 }
 
 function scoreAlignment(indices, t, text) {
@@ -68,17 +110,23 @@ function bestAlignment(term, t, text) {
   return best;
 }
 
-function matchTerms(query, text) {
-  const terms = queryTerms(query);
-  const t = String(text).toLowerCase();
-  return { terms, results: terms.map((term) => bestAlignment(term, t, text)) };
-}
-
 export function fuzzyMatch(query, text) {
-  const { terms, results } = matchTerms(query, text);
-  if (terms.length === 0 || results.some((r) => !r)) return null;
-  const indices = [];
+  const { include, exclude, phrases } = parseQuery(query);
+  if (include.length === 0 && phrases.length === 0) return null;
+  const t = normalizeForMatch(text);
+  for (const ex of exclude) if (t.includes(ex)) return null;
+  for (const ph of phrases) if (!t.includes(ph)) return null;
+  const results = include.map((term) => bestAlignment(term, t, text));
+  if (results.some((r) => !r)) return null;
   let total = 0;
+  const indices = [];
+  for (const ph of phrases) {
+    const idx = t.indexOf(ph);
+    if (idx !== -1) {
+      for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+      total += 10 + ph.length * 2;
+    }
+  }
   results.forEach((r) => {
     total += r.score;
     indices.push(...r.indices);
@@ -88,23 +136,60 @@ export function fuzzyMatch(query, text) {
 }
 
 export function fuzzyIndices(query, text) {
-  const { results } = matchTerms(query, text);
+  const { include, exclude, phrases } = parseQuery(query);
+  const t = normalizeForMatch(text);
+  for (const ex of exclude) if (t.includes(ex)) return [];
   const indices = [];
+  for (const ph of phrases) {
+    if (!t.includes(ph)) return [];
+    let idx = t.indexOf(ph);
+    while (idx !== -1) {
+      for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+      idx = t.indexOf(ph, idx + 1);
+    }
+  }
+  const results = include.map((term) => bestAlignment(term, t, text));
   for (const r of results) if (r) indices.push(...r.indices);
   return indices.sort((a, b) => a - b);
 }
 
 export function substringMatch(query, text) {
-  const terms = queryTerms(query);
-  if (terms.length === 0) return false;
-  const t = String(text).toLowerCase();
-  return terms.every((term) => t.includes(term));
+  const { include, exclude, phrases } = parseQuery(query);
+  if (include.length === 0 && phrases.length === 0) return false;
+  const t = normalizeForMatch(text);
+  if (exclude.some((ex) => t.includes(ex))) return false;
+  if (phrases.some((ph) => !t.includes(ph))) return false;
+  return include.every((term) => t.includes(term));
+}
+function titleBoost(query, item) {
+  if (!item.title) return 0;
+  const m = fuzzyMatch(query, item.title);
+  return m ? 8 + m.score * 0.15 : 0;
+}
+function hostBoost(query, item) {
+  const host = extractHost(item.url || "");
+  if (!host) return 0;
+  const m = fuzzyMatch(query, host);
+  return m ? 6 + m.score * 0.1 : 0;
+}
+function recencyScore(item) {
+  const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || 0;
+  if (!ts) return 0;
+  const days = (Date.now() - ts) / 86400000;
+  if (days < 0 || !Number.isFinite(days)) return 0;
+  return Math.max(0, 7 * Math.exp(-days / 14));
+}
+function frequencyScore(item) {
+  const c = item.visitCount || item.typedCount || 0;
+  if (!c) return 0;
+  return Math.log2(1 + c) * 1.2;
 }
 
 const SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
 
 export function rankMatches(query, list, fuzzy = true) {
   const q = String(query).trim();
+  if (!q) return fuzzy ? [] : [...list];
   if (!fuzzy) {
     return list.filter((item) =>
       substringMatch(q, item.title + " " + (item.url || "")),
@@ -117,11 +202,18 @@ export function rankMatches(query, list, fuzzy = true) {
       if (!match) return null;
       const first = match.indices[0];
       const last = match.indices[match.indices.length - 1];
-      return { item, match, span: last - first + 1, hayLength: hay.length };
+      const baseScore = match.score;
+      const tBoost = titleBoost(q, item);
+      const hBoost = hostBoost(q, item);
+      const rScore = recencyScore(item);
+      const fScore = frequencyScore(item);
+      const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
+      return { item, match: { ...match, score: totalScore, baseScore }, span: last - first + 1, hayLength: hay.length, totalScore };
     })
     .filter(Boolean)
     .sort((a, b) => {
-      if (b.match.score !== a.match.score) return b.match.score - a.match.score;
+      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+      if (b.match.baseScore !== a.match.baseScore) return b.match.baseScore - a.match.baseScore;
       if (a.span !== b.span) return a.span - b.span;
       if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
       return (

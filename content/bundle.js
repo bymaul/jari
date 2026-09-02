@@ -418,6 +418,14 @@
   };
 
   // shared/url.js
+  var urlSchemes = /* @__PURE__ */ new Set([
+    "http",
+    "https",
+    "file",
+    "about",
+    "chrome",
+    "helium"
+  ]);
   var blockedUrlSchemes = /* @__PURE__ */ new Set([
     "javascript",
     "data",
@@ -427,6 +435,89 @@
     "moz-extension",
     "view-source"
   ]);
+  var fileExtensionDenylist = /* @__PURE__ */ new Set([
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "mjs",
+    "cjs",
+    "json",
+    "css",
+    "scss",
+    "less",
+    "html",
+    "htm",
+    "md",
+    "markdown",
+    "txt",
+    "csv",
+    "xml",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "conf",
+    "config",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "py",
+    "rb",
+    "php",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "cs",
+    "go",
+    "rs",
+    "swift",
+    "kt",
+    "kts",
+    "dart",
+    "vue",
+    "svelte",
+    "astro",
+    "lua",
+    "pl",
+    "pm",
+    "r",
+    "sql",
+    "db",
+    "sqlite",
+    "log",
+    "lock",
+    "env",
+    "gitignore",
+    "dockerignore",
+    "gradle",
+    "makefile",
+    "cmake"
+  ]);
+  function isValidHostname(host) {
+    if (!host) return false;
+    const lower = host.toLowerCase();
+    if (lower === "localhost") return true;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
+      return lower.split(".").every((o) => {
+        const n = parseInt(o, 10);
+        return n >= 0 && n <= 255 && String(n) === o;
+      });
+    }
+    const labels = lower.split(".");
+    if (labels.length < 2) return false;
+    for (const label of labels) {
+      if (!label || label.length > 63) return false;
+      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return false;
+    }
+    const tld = labels[labels.length - 1];
+    if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
+    if (/^\d+$/.test(tld)) return false;
+    return true;
+  }
   var Url = {
     parentUrlOf(href) {
       try {
@@ -464,9 +555,41 @@
     looksLikeUrl(text) {
       const s = text.trim();
       if (!s || /\s/.test(s)) return false;
-      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || s.startsWith("//")) return true;
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
+        try {
+          const u = new URL(s);
+          const scheme = u.protocol.slice(0, -1).toLowerCase();
+          if (blockedUrlSchemes.has(scheme)) return false;
+          if (urlSchemes.has(scheme)) return true;
+          const host = u.hostname;
+          if (!host) return false;
+          if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return isValidHostname(host);
+          return isValidHostname(host);
+        } catch {
+          return false;
+        }
+      }
+      if (s.startsWith("//")) {
+        try {
+          const u = new URL("https:" + s);
+          return isValidHostname(u.hostname);
+        } catch {
+          return false;
+        }
+      }
       if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
-      return /^[a-z0-9-]+(\.[a-z0-9-]+)+([:/?#].*)?$/i.test(s);
+      if (/^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(s)) return true;
+      const hostPart = s.split(/[:/?#]/)[0];
+      if (!isValidHostname(hostPart)) return false;
+      const tld = hostPart.toLowerCase().split(".").pop();
+      if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
+      try {
+        const u = new URL("https://" + s);
+        return isValidHostname(u.hostname);
+      } catch {
+        return false;
+      }
     },
     suggestionTerm(query2) {
       const idx = query2.search(/\s/);
@@ -703,11 +826,49 @@
   var SCORE_GAP = -3;
   var SCORE_LEADING = -1;
   var MAX_ALIGNMENT_STARTS = 64;
-  function queryTerms(query2) {
-    return String(query2).trim().toLowerCase().split(/\s+/).filter(Boolean);
+  function normalizeForMatch(s) {
+    try {
+      return String(s).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    } catch {
+      return String(s).toLowerCase();
+    }
+  }
+  function parseQuery(query2) {
+    const normalized = normalizeForMatch(query2);
+    const phrases = [];
+    const withoutPhrases = normalized.replace(/"([^"]+)"/g, (_, p) => {
+      const t = p.trim();
+      if (t) phrases.push(t);
+      return " ";
+    });
+    const rawTerms = withoutPhrases.trim().split(/\s+/).filter(Boolean);
+    const include = [];
+    const exclude = [];
+    for (const t of rawTerms) {
+      if (t.startsWith("-") && t.length > 1) exclude.push(t.slice(1));
+      else include.push(t);
+    }
+    return { include, exclude, phrases };
   }
   function isBoundaryAt(t, i) {
-    return i === 0 || !/[\w]/.test(t[i - 1]);
+    if (i === 0) return true;
+    const prev2 = t[i - 1];
+    try {
+      if (/[\p{L}\p{N}_]/u.test(prev2)) return false;
+      return true;
+    } catch {
+      return !/[\w]/.test(prev2);
+    }
+  }
+  function extractHost(url) {
+    if (!url) return "";
+    try {
+      const u = new URL(url);
+      return u.hostname || "";
+    } catch {
+      const m = String(url).match(/^(?:https?:\/\/)?([^/]+)/i);
+      return m ? m[1].split(":")[0] : "";
+    }
   }
   function scoreAlignment(indices, t, text) {
     let score = 0;
@@ -760,16 +921,23 @@
     }
     return best;
   }
-  function matchTerms(query2, text) {
-    const terms = queryTerms(query2);
-    const t = String(text).toLowerCase();
-    return { terms, results: terms.map((term) => bestAlignment(term, t, text)) };
-  }
   function fuzzyMatch(query2, text) {
-    const { terms, results } = matchTerms(query2, text);
-    if (terms.length === 0 || results.some((r) => !r)) return null;
-    const indices = [];
+    const { include, exclude, phrases } = parseQuery(query2);
+    if (include.length === 0 && phrases.length === 0) return null;
+    const t = normalizeForMatch(text);
+    for (const ex of exclude) if (t.includes(ex)) return null;
+    for (const ph of phrases) if (!t.includes(ph)) return null;
+    const results = include.map((term) => bestAlignment(term, t, text));
+    if (results.some((r) => !r)) return null;
     let total = 0;
+    const indices = [];
+    for (const ph of phrases) {
+      const idx = t.indexOf(ph);
+      if (idx !== -1) {
+        for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+        total += 10 + ph.length * 2;
+      }
+    }
     results.forEach((r) => {
       total += r.score;
       indices.push(...r.indices);
@@ -778,20 +946,57 @@
     return { score: total, indices };
   }
   function fuzzyIndices(query2, text) {
-    const { results } = matchTerms(query2, text);
+    const { include, exclude, phrases } = parseQuery(query2);
+    const t = normalizeForMatch(text);
+    for (const ex of exclude) if (t.includes(ex)) return [];
     const indices = [];
+    for (const ph of phrases) {
+      if (!t.includes(ph)) return [];
+      let idx = t.indexOf(ph);
+      while (idx !== -1) {
+        for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+        idx = t.indexOf(ph, idx + 1);
+      }
+    }
+    const results = include.map((term) => bestAlignment(term, t, text));
     for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
   }
   function substringMatch(query2, text) {
-    const terms = queryTerms(query2);
-    if (terms.length === 0) return false;
-    const t = String(text).toLowerCase();
-    return terms.every((term) => t.includes(term));
+    const { include, exclude, phrases } = parseQuery(query2);
+    if (include.length === 0 && phrases.length === 0) return false;
+    const t = normalizeForMatch(text);
+    if (exclude.some((ex) => t.includes(ex))) return false;
+    if (phrases.some((ph) => !t.includes(ph))) return false;
+    return include.every((term) => t.includes(term));
+  }
+  function titleBoost(query2, item) {
+    if (!item.title) return 0;
+    const m = fuzzyMatch(query2, item.title);
+    return m ? 8 + m.score * 0.15 : 0;
+  }
+  function hostBoost(query2, item) {
+    const host = extractHost(item.url || "");
+    if (!host) return 0;
+    const m = fuzzyMatch(query2, host);
+    return m ? 6 + m.score * 0.1 : 0;
+  }
+  function recencyScore(item) {
+    const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || 0;
+    if (!ts) return 0;
+    const days = (Date.now() - ts) / 864e5;
+    if (days < 0 || !Number.isFinite(days)) return 0;
+    return Math.max(0, 7 * Math.exp(-days / 14));
+  }
+  function frequencyScore(item) {
+    const c = item.visitCount || item.typedCount || 0;
+    if (!c) return 0;
+    return Math.log2(1 + c) * 1.2;
   }
   var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
   function rankMatches(query2, list, fuzzy = true) {
     const q = String(query2).trim();
+    if (!q) return fuzzy ? [] : [...list];
     if (!fuzzy) {
       return list.filter(
         (item) => substringMatch(q, item.title + " " + (item.url || ""))
@@ -803,9 +1008,16 @@
       if (!match) return null;
       const first = match.indices[0];
       const last = match.indices[match.indices.length - 1];
-      return { item, match, span: last - first + 1, hayLength: hay.length };
+      const baseScore = match.score;
+      const tBoost = titleBoost(q, item);
+      const hBoost = hostBoost(q, item);
+      const rScore = recencyScore(item);
+      const fScore = frequencyScore(item);
+      const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
+      return { item, match: { ...match, score: totalScore, baseScore }, span: last - first + 1, hayLength: hay.length, totalScore };
     }).filter(Boolean).sort((a, b) => {
-      if (b.match.score !== a.match.score) return b.match.score - a.match.score;
+      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+      if (b.match.baseScore !== a.match.baseScore) return b.match.baseScore - a.match.baseScore;
       if (a.span !== b.span) return a.span - b.span;
       if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
       return (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3);
@@ -885,9 +1097,19 @@
       filtered = [];
       selected = 0;
       renderList();
+      const seq2 = ++suggestSeq;
+      suggestTimer = setTimeout(async () => {
+        if (!active || seq2 !== suggestSeq) return;
+        const res = await sendMessage("suggest", { query: "" }) || [];
+        if (!active || seq2 !== suggestSeq) return;
+        filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null }));
+        selected = 0;
+        renderList();
+      }, 130);
       return;
     }
-    const row = Url.looksLikeUrl(q) ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
+    const isUrl = Url.looksLikeUrl(q);
+    const row = isUrl ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
     filtered = [row];
     selected = 0;
     renderList();

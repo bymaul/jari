@@ -201,7 +201,6 @@ export const handlers = {
   historyForward: async (sender) => goHistory(sender.tab, 1),
 
   listTabs: async () => {
-
     const tabs = await chrome.tabs.query({});
     return tabs.map((tab) => ({
       id: tab.id,
@@ -209,51 +208,64 @@ export const handlers = {
       title: tab.title || "",
       url: tab.url || "",
       active: !!tab.active,
+      lastAccessed: tab.lastAccessed || 0,
+      audible: !!tab.audible,
     }));
   },
 
   suggest: async (_, { query = "" } = {}) => {
     const q = query.trim().toLowerCase();
+    const qRaw = query.trim();
     const items = [];
     const seen = new Set();
-    function push(title, url, source) {
+    function push(title, url, source, extra = {}) {
       if (!url || seen.has(url)) return;
       seen.add(url);
-      items.push({ title: title || url, url, source });
+      items.push({ title: title || url, url, source, ...extra });
     }
     const sources = await getSuggestionSources();
     if (sources.includes("tab")) {
       try {
         const tabs = await chrome.tabs.query({});
-
-        for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
+        tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+        for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
       } catch (err) {
         console.debug("[jari] Tab search failed:", err);
       }
     }
-    if (q) {
+    if (!q) {
+      if (sources.includes("history")) {
+        try {
+          const recents = await chrome.history.search({ text: "", maxResults: 20, startTime: 0 });
+          recents.sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
+          for (const item of recents.slice(0, 8)) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
+        } catch (err) {
+          console.debug("[jari] Recent history failed:", err);
+        }
+      }
+    } else {
       if (sources.includes("history")) {
         try {
           const results = await chrome.history.search({
-            text: q,
-            maxResults: 12,
+            text: qRaw,
+            maxResults: 24,
             startTime: 0,
           });
-          for (const item of results) push(item.title, item.url, "history");
+          for (const item of results) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
         } catch (err) {
           console.debug("[jari] History search failed:", err);
         }
       }
       if (sources.includes("bookmark")) {
         try {
-          const bms = await chrome.bookmarks.search(q);
-          for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark");
+          const bms = await chrome.bookmarks.search(qRaw);
+          for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark", { dateAdded: bm.dateAdded || 0 });
         } catch (err) {
           console.debug("[jari] Bookmark search failed:", err);
         }
       }
     }
-    return items.slice(0, 40);
+    return items.slice(0, 50);
   },
 
   search: async (sender, { query = "", newTab = true } = {}) => {

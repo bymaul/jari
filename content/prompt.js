@@ -66,9 +66,19 @@ function handleOpenInput(queryText) {
     filtered = [];
     selected = 0;
     renderList();
+    const seq = ++suggestSeq;
+    suggestTimer = setTimeout(async () => {
+      if (!active || seq !== suggestSeq) return;
+      const res = (await sendMessage("suggest", { query: "" })) || [];
+      if (!active || seq !== suggestSeq) return;
+      filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null }));
+      selected = 0;
+      renderList();
+    }, 130);
     return;
   }
-  const row = Url.looksLikeUrl(q)
+  const isUrl = Url.looksLikeUrl(q);
+  const row = isUrl
     ? { kind: "url", title: q, url: q }
     : { kind: "search", title: q, url: null };
   filtered = [row];

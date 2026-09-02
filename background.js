@@ -22,17 +22,66 @@
     "moz-extension",
     "view-source"
   ]);
+  function isValidHostname(host) {
+    if (!host) return false;
+    const lower = host.toLowerCase();
+    if (lower === "localhost") return true;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
+      return lower.split(".").every((o) => {
+        const n = parseInt(o, 10);
+        return n >= 0 && n <= 255 && String(n) === o;
+      });
+    }
+    const labels = lower.split(".");
+    if (labels.length < 2) return false;
+    for (const label of labels) {
+      if (!label || label.length > 63) return false;
+      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return false;
+    }
+    const tld = labels[labels.length - 1];
+    if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
+    if (/^\d+$/.test(tld)) return false;
+    return true;
+  }
   function normalizeUrl(raw) {
     if (typeof raw !== "string") return null;
     const url = raw.trim();
     if (!url || /\s/.test(url)) return null;
-    if (/^localhost(:\d+)?(\/.*)?$/i.test(url) || /^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(url))
+    if (/^localhost(:\d+)?(\/.*)?$/i.test(url) || /^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(url) || /^0\.0\.0\.0(:\d+)?(\/.*)?$/i.test(url))
       return "http://" + url;
-    if (url.startsWith("//")) return "https:" + url;
+    if (url.startsWith("//")) {
+      try {
+        const u = new URL("https:" + url);
+        if (!isValidHostname(u.hostname)) return null;
+        return "https:" + url;
+      } catch {
+        return null;
+      }
+    }
     const m = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
-    if (!m) return "https://" + url;
+    if (!m) {
+      const hostPart = url.split(/[:/?#]/)[0];
+      if (!isValidHostname(hostPart)) return null;
+      try {
+        const u = new URL("https://" + url);
+        if (!isValidHostname(u.hostname)) return null;
+      } catch {
+        return null;
+      }
+      return "https://" + url;
+    }
     const scheme = m[1].toLowerCase();
-    if (urlSchemes.has(scheme)) return url;
+    if (urlSchemes.has(scheme)) {
+      if (scheme === "http" || scheme === "https") {
+        try {
+          const u = new URL(url);
+          if (u.hostname && !isValidHostname(u.hostname)) return null;
+        } catch {
+          return null;
+        }
+      }
+      return url;
+    }
     if (blockedUrlSchemes.has(scheme)) return null;
     const rest = url.slice(m[0].length);
     if (/^(\d+)(\/.*)?$/.test(rest)) return "https://" + url;
@@ -221,50 +270,64 @@
         windowId: tab.windowId,
         title: tab.title || "",
         url: tab.url || "",
-        active: !!tab.active
+        active: !!tab.active,
+        lastAccessed: tab.lastAccessed || 0,
+        audible: !!tab.audible
       }));
     },
     suggest: async (_, { query = "" } = {}) => {
       const q = query.trim().toLowerCase();
+      const qRaw = query.trim();
       const items = [];
       const seen = /* @__PURE__ */ new Set();
-      function push(title, url, source) {
+      function push(title, url, source, extra = {}) {
         if (!url || seen.has(url)) return;
         seen.add(url);
-        items.push({ title: title || url, url, source });
+        items.push({ title: title || url, url, source, ...extra });
       }
       const sources = await getSuggestionSources();
       if (sources.includes("tab")) {
         try {
           const tabs = await chrome.tabs.query({});
-          for (const tab of tabs) push(tab.title || "", tab.url || "", "tab");
+          tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+          for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
         } catch (err) {
           console.debug("[jari] Tab search failed:", err);
         }
       }
-      if (q) {
+      if (!q) {
+        if (sources.includes("history")) {
+          try {
+            const recents = await chrome.history.search({ text: "", maxResults: 20, startTime: 0 });
+            recents.sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
+            for (const item of recents.slice(0, 8)) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
+          } catch (err) {
+            console.debug("[jari] Recent history failed:", err);
+          }
+        }
+      } else {
         if (sources.includes("history")) {
           try {
             const results = await chrome.history.search({
-              text: q,
-              maxResults: 12,
+              text: qRaw,
+              maxResults: 24,
               startTime: 0
             });
-            for (const item of results) push(item.title, item.url, "history");
+            for (const item of results) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
           } catch (err) {
             console.debug("[jari] History search failed:", err);
           }
         }
         if (sources.includes("bookmark")) {
           try {
-            const bms = await chrome.bookmarks.search(q);
-            for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark");
+            const bms = await chrome.bookmarks.search(qRaw);
+            for (const bm of bms) if (bm.url) push(bm.title, bm.url, "bookmark", { dateAdded: bm.dateAdded || 0 });
           } catch (err) {
             console.debug("[jari] Bookmark search failed:", err);
           }
         }
       }
-      return items.slice(0, 40);
+      return items.slice(0, 50);
     },
     search: async (sender, { query = "", newTab = true } = {}) => {
       const text = query.trim();
