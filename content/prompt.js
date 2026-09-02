@@ -6,15 +6,10 @@ import { register } from "./overlays.js";
 
 const SEARCH_ENGINES = {
   g: "https://www.google.com/search?q=%s",
-  google: "https://www.google.com/search?q=%s",
   yt: "https://www.youtube.com/results?search_query=%s",
-  youtube: "https://www.youtube.com/results?search_query=%s",
   gh: "https://github.com/search?q=%s",
-  github: "https://github.com/search?q=%s",
-  w: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
   wiki: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
-  so: "https://stackoverflow.com/search?q=%s",
-  stack: "https://stackoverflow.com/search?q=%s",
+  chat: "https://chatgpt.com/?q=%s",
 };
 function parseKeyword(query) {
   const m = query.trim().match(/^(\w+)\s+(.*\S)/);
@@ -22,7 +17,11 @@ function parseKeyword(query) {
   const kw = m[1].toLowerCase();
   const tmpl = SEARCH_ENGINES[kw];
   if (!tmpl) return null;
-  return { keyword: kw, rest: m[2], url: tmpl.replace("%s", encodeURIComponent(m[2])) };
+  return {
+    keyword: kw,
+    rest: m[2],
+    url: tmpl.replace("%s", encodeURIComponent(m[2])),
+  };
 }
 
 let active = false;
@@ -96,7 +95,13 @@ function handleOpenInput(queryText) {
       const res = (await sendMessage("suggest", { query: "" })) || [];
       if (!active || seq !== suggestSeq) return;
       for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-      filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null, source: item.source }));
+      filtered = res.slice(0, 20).map((item) => ({
+        kind: "suggestion",
+        title: item.title,
+        url: item.url,
+        match: null,
+        source: item.source,
+      }));
       selected = 0;
       renderList();
     }, 130);
@@ -104,10 +109,17 @@ function handleOpenInput(queryText) {
   }
   let row;
   if (kw) {
-    row = { kind: "search", title: `${kw.keyword} ${kw.rest}`, url: kw.url, keyword: kw.keyword };
+    row = {
+      kind: "search",
+      title: `${kw.keyword} ${kw.rest}`,
+      url: kw.url,
+      keyword: kw.keyword,
+    };
   } else {
     const isUrl = Url.looksLikeUrl(q);
-    row = isUrl ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
+    row = isUrl
+      ? { kind: "url", title: q, url: q }
+      : { kind: "search", title: q, url: null };
   }
   filtered = [row];
   selected = 0;
@@ -237,13 +249,19 @@ function renderSuggestionRow(row) {
   const li = document.createElement("li");
   let titleText;
   if (row.kind === "search") {
-    if (row.keyword) titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
+    if (row.keyword)
+      titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
     else titleText = `Search for "${row.title}"`;
   } else if (row.kind === "url") {
     titleText = `Open ${row.title}`;
   } else {
-    const isSwitch = row.url && tabUrlMap.has(row.url) && tabUrlMap.get(row.url).source === "tab";
-    titleText = isSwitch ? `Switch to: ${row.title || "(untitled)"}` : (row.title || "(untitled)");
+    const isSwitch =
+      row.url &&
+      tabUrlMap.has(row.url) &&
+      tabUrlMap.get(row.url).source === "tab";
+    titleText = isSwitch
+      ? `Switch to: ${row.title || "(untitled)"}`
+      : row.title || "(untitled)";
   }
   let urlText = row.kind === "suggestion" ? row.url || "" : "";
   if (row.kind === "suggestion" && row.url && tabUrlMap.has(row.url)) {
@@ -253,7 +271,12 @@ function renderSuggestionRow(row) {
   } else if (row.folderPath) {
     urlText = row.folderPath;
   }
-  return renderTitleUrl(li, titleText, urlText, row.kind === "suggestion" ? query : "");
+  return renderTitleUrl(
+    li,
+    titleText,
+    urlText,
+    row.kind === "suggestion" ? query : "",
+  );
 }
 
 function renderTabRow(tab, winLabel) {
@@ -278,12 +301,15 @@ function renderList() {
   for (const tab of rows) {
     if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
   }
-  for (const tab of rows) listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId)));
+  for (const tab of rows)
+    listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId)));
   highlight();
 }
 
 function highlight() {
-  Array.from(listEl.children).forEach((li, i) => li.classList.toggle("selected", i === selected));
+  Array.from(listEl.children).forEach((li, i) =>
+    li.classList.toggle("selected", i === selected),
+  );
   const el = listEl.children[selected];
   if (el) el.scrollIntoView({ block: "nearest" });
 }
@@ -347,11 +373,15 @@ function activate() {
   const kwInput = parseKeyword(rawInput);
   if (!item) {
     if (mode === "open" && !rawInput) sendMessage("createTab");
-    else if (kwInput) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
+    else if (kwInput)
+      sendMessage(mode === "open" ? "createTab" : "navigate", {
+        url: kwInput.url,
+      });
     else if (rawInput && Url.looksLikeUrl(rawInput)) {
       const target = Url.normalizeUrl(rawInput) || rawInput;
       sendMessage(mode === "open" ? "createTab" : "navigate", { url: target });
-    } else if (rawInput) sendMessage("search", { query: rawInput, newTab: mode === "open" });
+    } else if (rawInput)
+      sendMessage("search", { query: rawInput, newTab: mode === "open" });
     close();
     return;
   }
@@ -359,8 +389,14 @@ function activate() {
     sendMessage("mergeTab", { targetWindowId: item.windowId });
   } else if (mode === "open" || mode === "edit") {
     if (item.kind === "search") {
-      if (item.keyword && item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
-      else if (kwInput && kwInput.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
+      if (item.keyword && item.url)
+        sendMessage(mode === "open" ? "createTab" : "navigate", {
+          url: item.url,
+        });
+      else if (kwInput && kwInput.url)
+        sendMessage(mode === "open" ? "createTab" : "navigate", {
+          url: kwInput.url,
+        });
       else sendMessage("search", { query: rawInput, newTab: mode === "open" });
     } else if (item.url) {
       const existing = tabUrlMap.get(item.url);
@@ -368,8 +404,12 @@ function activate() {
         sendMessage("activateTab", { id: existing.id });
       } else {
         const tabMatch = tabUrlMap.get(item.url);
-        if (tabMatch && tabMatch.id) sendMessage("activateTab", { id: tabMatch.id });
-        else sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+        if (tabMatch && tabMatch.id)
+          sendMessage("activateTab", { id: tabMatch.id });
+        else
+          sendMessage(mode === "open" ? "createTab" : "navigate", {
+            url: item.url,
+          });
       }
     }
   } else {
@@ -394,12 +434,24 @@ function close() {
   mode = "tabs";
   active = false;
 
-  if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
+  if (
+    restoreFocus &&
+    restoreFocus.isConnected &&
+    document.activeElement !== restoreFocus
+  ) {
     restoreFocus.focus();
   }
   restoreFocus = null;
 }
 
-export const Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
+export const Prompt = {
+  open,
+  openOmnibar,
+  openEditUrl,
+  openMerge,
+  close,
+  onKeyDown,
+  isActive,
+};
 
 register("prompt", { close, onKeyDown, isActive });

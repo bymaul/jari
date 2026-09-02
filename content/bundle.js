@@ -13,7 +13,7 @@
     },
     emit(event, ...args) {
       for (const fn of this.listeners[event] || []) fn(...args);
-    }
+    },
   };
   var keymapDefaults = {
     j: "scrollDown",
@@ -64,14 +64,14 @@
     ";e": "openOptions",
     ";x": "openExtensions",
     yy: "copyUrl",
-    yf: "hintYank"
+    yf: "hintYank",
   };
   var prefixes = {
     g: {},
     ";": {},
     y: {},
     "<": {},
-    ">": {}
+    ">": {},
   };
   var categories = [
     { id: "scrolling", label: "Scrolling" },
@@ -85,7 +85,7 @@
     { id: "find", label: "Find" },
     { id: "visual", label: "Visual" },
     { id: "modes", label: "Modes" },
-    { id: "help", label: "Help" }
+    { id: "help", label: "Help" },
   ];
   var HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
   var settingsDefaults = {
@@ -96,7 +96,7 @@
     passthroughMs: 1500,
     suggestionSources: suggestionSources.slice(),
     copyFormat: "plain",
-    hintChars: HINT_CHARSET_DEFAULT
+    hintChars: HINT_CHARSET_DEFAULT,
   };
   var prefixKeys = new Set(Object.keys(prefixes));
   var modifierKeys = /* @__PURE__ */ new Set([
@@ -109,7 +109,7 @@
     "NumLock",
     "ScrollLock",
     "Fn",
-    "AltGraph"
+    "AltGraph",
   ]);
   function canonicalKey(event) {
     const parts = [];
@@ -123,7 +123,8 @@
     const n = parseInt(raw, 10);
     return Number.isNaN(n) ? 1 : Math.max(1, n);
   }
-  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host";
+  var overlaySelectors =
+    ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host";
   function deepActiveElement() {
     let el = document.activeElement;
     while (el && el.shadowRoot && el.shadowRoot.activeElement) {
@@ -163,14 +164,31 @@
     return {
       keymap,
       disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
-      scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : settingsDefaults.scrollStep,
-      smoothScroll: typeof d.smoothScroll === "boolean" ? d.smoothScroll : settingsDefaults.smoothScroll,
-      fuzzyMatching: typeof d.fuzzyMatching === "boolean" ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
-      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
-      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
-      suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
-      copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
-      hintChars: normalizeHintChars(d.hintChars)
+      scrollStep: Number.isFinite(d.scrollStep)
+        ? d.scrollStep
+        : settingsDefaults.scrollStep,
+      smoothScroll:
+        typeof d.smoothScroll === "boolean"
+          ? d.smoothScroll
+          : settingsDefaults.smoothScroll,
+      fuzzyMatching:
+        typeof d.fuzzyMatching === "boolean"
+          ? d.fuzzyMatching
+          : settingsDefaults.fuzzyMatching,
+      timeoutMs:
+        Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
+          ? d.timeoutMs
+          : settingsDefaults.timeoutMs,
+      passthroughMs:
+        Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
+          ? d.passthroughMs
+          : settingsDefaults.passthroughMs,
+      suggestionSources: Array.isArray(d.suggestionSources)
+        ? d.suggestionSources.filter((s) => suggestionSources.includes(s))
+        : settingsDefaults.suggestionSources.slice(),
+      copyFormat:
+        d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
+      hintChars: normalizeHintChars(d.hintChars),
     };
   }
   function balanceCategories(byCategory, columnCount = 3) {
@@ -201,7 +219,7 @@
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     copyFormat: settingsDefaults.copyFormat,
-    hintChars: settingsDefaults.hintChars
+    hintChars: settingsDefaults.hintChars,
   };
   function merge(data) {
     const s = normalizeSettings(data);
@@ -236,8 +254,8 @@
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
         copyFormat: state.copyFormat,
-        hintChars: state.hintChars
-      }
+        hintChars: state.hintChars,
+      },
     });
   }
   function set(patch) {
@@ -285,8 +303,7 @@
     const idx = state.disabledSites.indexOf(host);
     if (idx >= 0) state.disabledSites.splice(idx, 1);
     else state.disabledSites.push(host);
-    persist().catch(() => {
-    });
+    persist().catch(() => {});
   }
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync" || !changes[STORAGE_KEY]) return;
@@ -308,7 +325,7 @@
     getSuggestionSources,
     getCopyFormat,
     getHintChars,
-    toggleDisabled
+    toggleDisabled,
   };
 
   // content/ui.js
@@ -414,7 +431,7 @@
     copyText,
     statusContainer,
     buildCategoryTable,
-    withHiddenTextarea
+    withHiddenTextarea,
   };
 
   // shared/url.js
@@ -424,7 +441,7 @@
     "file",
     "about",
     "chrome",
-    "helium"
+    "helium",
   ]);
   var blockedUrlSchemes = /* @__PURE__ */ new Set([
     "javascript",
@@ -433,7 +450,7 @@
     "chrome-extension",
     "edge",
     "moz-extension",
-    "view-source"
+    "view-source",
   ]);
   var fileExtensionDenylist = /* @__PURE__ */ new Set([
     "js",
@@ -495,12 +512,13 @@
     "dockerignore",
     "gradle",
     "makefile",
-    "cmake"
+    "cmake",
   ]);
   function isValidHostname(host) {
     if (!host) return false;
     let lower = host.toLowerCase();
-    if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
+    if (lower.startsWith("[") && lower.endsWith("]"))
+      lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
       return lower.split(".").every((o) => {
@@ -573,8 +591,14 @@
           if (urlSchemes.has(scheme)) return true;
           const host = u.hostname;
           if (!host) return false;
-          if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
-          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return isValidHostname(host);
+          if (
+            host === "localhost" ||
+            /^127\.0\.0\.1$/.test(host) ||
+            /^0\.0\.0\.0$/.test(host)
+          )
+            return true;
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host))
+            return isValidHostname(host);
           return isValidHostname(host);
         } catch {
           return false;
@@ -593,7 +617,14 @@
       const hostPart = s.split(/[:/?#]/)[0];
       if (!isValidHostname(hostPart)) return false;
       const tld = hostPart.toLowerCase().split(".").pop();
-      if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
+      if (
+        !s.includes("/") &&
+        !s.includes(":") &&
+        !s.includes("?") &&
+        !s.includes("#") &&
+        fileExtensionDenylist.has(tld)
+      )
+        return false;
       try {
         const u = new URL("https://" + s);
         return isValidHostname(u.hostname);
@@ -604,8 +635,10 @@
     suggestionTerm(query2) {
       const idx = query2.search(/\s/);
       if (idx === -1) return query2;
-      return Url.looksLikeUrl(query2.slice(0, idx)) ? query2.slice(idx).trim() : query2;
-    }
+      return Url.looksLikeUrl(query2.slice(0, idx))
+        ? query2.slice(idx).trim()
+        : query2;
+    },
   };
 
   // content/scroll.js
@@ -657,7 +690,7 @@
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["class", "style"]
+        attributeFilter: ["class", "style"],
       });
     }
   }
@@ -669,7 +702,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["class", "style"]
+      attributeFilter: ["class", "style"],
     });
   }
   function isScrollVisible(el) {
@@ -690,13 +723,19 @@
     if (cachedEpoch === scanEpoch && cachedAreas) return cachedAreas;
     cachedEpoch = scanEpoch;
     const areas = [];
-    const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
+    const roots = /* @__PURE__ */ new Set([
+      document.documentElement,
+      document.body,
+    ]);
     for (const el of queryAll("*", ensureObserved)) {
       if (roots.has(el)) continue;
       if (el.closest(overlaySelectors)) continue;
       const tag = el.tagName;
       if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
-      if (el.clientHeight < MIN_SCROLL_AREA_SIZE && el.clientWidth < MIN_SCROLL_AREA_SIZE)
+      if (
+        el.clientHeight < MIN_SCROLL_AREA_SIZE &&
+        el.clientWidth < MIN_SCROLL_AREA_SIZE
+      )
         continue;
       if (!isScrollVisible(el)) continue;
       const canY = el.scrollHeight > el.clientHeight + 1;
@@ -705,8 +744,16 @@
       const style = window.getComputedStyle(el);
       const overflowY = style.overflowY;
       const overflowX = style.overflowX;
-      const scrollableY = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && canY;
-      const scrollableX = (overflowX === "auto" || overflowX === "scroll" || overflowX === "overlay") && canX;
+      const scrollableY =
+        (overflowY === "auto" ||
+          overflowY === "scroll" ||
+          overflowY === "overlay") &&
+        canY;
+      const scrollableX =
+        (overflowX === "auto" ||
+          overflowX === "scroll" ||
+          overflowX === "overlay") &&
+        canX;
       if (scrollableY || scrollableX) areas.push(el);
     }
     cachedAreas = areas;
@@ -734,8 +781,9 @@
       const r = el.getBoundingClientRect();
       const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
       const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
-      const coverage = coveredW * coveredH / (vw * vh);
-      const containsCenter = r.left <= cx && cx <= r.right && r.top <= cy && cy <= r.bottom;
+      const coverage = (coveredW * coveredH) / (vw * vh);
+      const containsCenter =
+        r.left <= cx && cx <= r.right && r.top <= cy && cy <= r.bottom;
       const score = coverage + (containsCenter ? 1 : 0);
       if (score > bestScore) {
         bestScore = score;
@@ -780,13 +828,18 @@
     showHighlight();
   }
   function scrollHeightOf(el) {
-    return el === window ? (document.scrollingElement || document.documentElement || document.body).scrollHeight : el.scrollHeight;
+    return el === window
+      ? (document.scrollingElement || document.documentElement || document.body)
+          .scrollHeight
+      : el.scrollHeight;
   }
   function clientHeightOf(el) {
     return el === window ? window.innerHeight : el.clientHeight;
   }
   function scrollPosOf(el) {
-    return el === window ? { x: window.scrollX, y: window.scrollY } : { x: el.scrollLeft, y: el.scrollTop };
+    return el === window
+      ? { x: window.scrollX, y: window.scrollY }
+      : { x: el.scrollLeft, y: el.scrollTop };
   }
   var highlightEl = null;
   var highlightTimer = null;
@@ -799,12 +852,15 @@
       autoPicked = false;
       area = target;
     }
-    const rect = area === window ? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight
-    } : area.getBoundingClientRect();
+    const rect =
+      area === window
+        ? {
+            left: 0,
+            top: 0,
+            width: window.innerWidth,
+            height: window.innerHeight,
+          }
+        : area.getBoundingClientRect();
     clearTimeout(highlightTimer);
     if (highlightEl) highlightEl.remove();
     const el = document.createElement("div");
@@ -815,7 +871,8 @@
     el.style.height = rect.height + "px";
     const label = document.createElement("span");
     label.className = "jari-scroll-highlight-label";
-    label.textContent = area === window ? "global scroll" : "current scroll area";
+    label.textContent =
+      area === window ? "global scroll" : "current scroll area";
     el.appendChild(label);
     document.body.appendChild(el);
     highlightEl = el;
@@ -838,7 +895,10 @@
   var MAX_ALIGNMENT_STARTS = 64;
   function normalizeForMatch(s) {
     try {
-      return String(s).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+      return String(s)
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "");
     } catch {
       return String(s).toLowerCase();
     }
@@ -1015,7 +1075,12 @@
     return m ? 6 + m.score * 0.1 : 0;
   }
   function recencyScore(item) {
-    const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
+    const ts =
+      item.lastVisit ||
+      item.lastAccessed ||
+      item.lastVisitTime ||
+      item.dateAdded ||
+      0;
     if (!ts) return 0;
     const days = (Date.now() - ts) / 864e5;
     if (days < 0 || !Number.isFinite(days)) return 0;
@@ -1039,31 +1104,44 @@
     const q = String(query2).trim();
     if (!q) return fuzzy ? [] : [...list];
     if (!fuzzy) {
-      return list.filter(
-        (item) => substringMatch(q, item.title + " " + (item.url || ""))
+      return list.filter((item) =>
+        substringMatch(q, item.title + " " + (item.url || "")),
       );
     }
-    return list.map((item) => {
-      const hay = item.title + " " + (item.url || "");
-      const match = fuzzyMatch(q, hay);
-      if (!match) return null;
-      const first = match.indices[0];
-      const last = match.indices[match.indices.length - 1];
-      const baseScore = match.score;
-      const tBoost = titleBoost(q, item);
-      const hBoost = hostBoost(q, item);
-      const rScore = recencyScore(item);
-      const fScore = frequencyScore(item);
-      const bBoost = bookmarkBoost(item);
-      const totalScore = baseScore + tBoost + hBoost + rScore + fScore + bBoost;
-      return { item, match: { ...match, score: totalScore, baseScore }, span: last - first + 1, hayLength: hay.length, totalScore };
-    }).filter(Boolean).sort((a, b) => {
-      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-      if (b.match.baseScore !== a.match.baseScore) return b.match.baseScore - a.match.baseScore;
-      if (a.span !== b.span) return a.span - b.span;
-      if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
-      return (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3);
-    });
+    return list
+      .map((item) => {
+        const hay = item.title + " " + (item.url || "");
+        const match = fuzzyMatch(q, hay);
+        if (!match) return null;
+        const first = match.indices[0];
+        const last = match.indices[match.indices.length - 1];
+        const baseScore = match.score;
+        const tBoost = titleBoost(q, item);
+        const hBoost = hostBoost(q, item);
+        const rScore = recencyScore(item);
+        const fScore = frequencyScore(item);
+        const bBoost = bookmarkBoost(item);
+        const totalScore =
+          baseScore + tBoost + hBoost + rScore + fScore + bBoost;
+        return {
+          item,
+          match: { ...match, score: totalScore, baseScore },
+          span: last - first + 1,
+          hayLength: hay.length,
+          totalScore,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+        if (b.match.baseScore !== a.match.baseScore)
+          return b.match.baseScore - a.match.baseScore;
+        if (a.span !== b.span) return a.span - b.span;
+        if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
+        return (
+          (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3)
+        );
+      });
   }
 
   // content/overlays.js
@@ -1079,21 +1157,16 @@
     },
     active() {
       return overlays.find((overlay4) => overlay4.isActive()) || null;
-    }
+    },
   };
 
   // content/prompt.js
   var SEARCH_ENGINES = {
     g: "https://www.google.com/search?q=%s",
-    google: "https://www.google.com/search?q=%s",
     yt: "https://www.youtube.com/results?search_query=%s",
-    youtube: "https://www.youtube.com/results?search_query=%s",
     gh: "https://github.com/search?q=%s",
-    github: "https://github.com/search?q=%s",
-    w: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
     wiki: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
-    so: "https://stackoverflow.com/search?q=%s",
-    stack: "https://stackoverflow.com/search?q=%s"
+    chat: "https://chatgpt.com/?q=%s",
   };
   function parseKeyword(query2) {
     const m = query2.trim().match(/^(\w+)\s+(.*\S)/);
@@ -1101,7 +1174,11 @@
     const kw = m[1].toLowerCase();
     const tmpl = SEARCH_ENGINES[kw];
     if (!tmpl) return null;
-    return { keyword: kw, rest: m[2], url: tmpl.replace("%s", encodeURIComponent(m[2])) };
+    return {
+      keyword: kw,
+      rest: m[2],
+      url: tmpl.replace("%s", encodeURIComponent(m[2])),
+    };
   }
   var active = false;
   var overlay = null;
@@ -1121,7 +1198,7 @@
   }
   async function open() {
     if (active) return;
-    tabs = await sendMessage("listTabs") || [];
+    tabs = (await sendMessage("listTabs")) || [];
     if (tabs.length === 0) return;
     mode = "tabs";
     active = true;
@@ -1145,7 +1222,7 @@
   }
   function openMerge(data) {
     if (active) return;
-    tabs = data && data.tabs || [];
+    tabs = (data && data.tabs) || [];
     mode = "merge";
     active = true;
     render("Merge into", "Choose a window...");
@@ -1165,10 +1242,16 @@
       const seq2 = ++suggestSeq;
       suggestTimer = setTimeout(async () => {
         if (!active || seq2 !== suggestSeq) return;
-        const res = await sendMessage("suggest", { query: "" }) || [];
+        const res = (await sendMessage("suggest", { query: "" })) || [];
         if (!active || seq2 !== suggestSeq) return;
         for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-        filtered = res.slice(0, 20).map((item) => ({ kind: "suggestion", title: item.title, url: item.url, match: null, source: item.source }));
+        filtered = res.slice(0, 20).map((item) => ({
+          kind: "suggestion",
+          title: item.title,
+          url: item.url,
+          match: null,
+          source: item.source,
+        }));
         selected = 0;
         renderList();
       }, 130);
@@ -1176,10 +1259,17 @@
     }
     let row;
     if (kw) {
-      row = { kind: "search", title: `${kw.keyword} ${kw.rest}`, url: kw.url, keyword: kw.keyword };
+      row = {
+        kind: "search",
+        title: `${kw.keyword} ${kw.rest}`,
+        url: kw.url,
+        keyword: kw.keyword,
+      };
     } else {
       const isUrl = Url.looksLikeUrl(q);
-      row = isUrl ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
+      row = isUrl
+        ? { kind: "url", title: q, url: q }
+        : { kind: "search", title: q, url: null };
     }
     filtered = [row];
     selected = 0;
@@ -1188,7 +1278,7 @@
     const seq = ++suggestSeq;
     suggestTimer = setTimeout(async () => {
       if (!active || seq !== suggestSeq) return;
-      const res = await sendMessage("suggest", { query: term }) || [];
+      const res = (await sendMessage("suggest", { query: term })) || [];
       if (!active || seq !== suggestSeq) return;
       tabUrlMap.clear();
       for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
@@ -1197,7 +1287,7 @@
         title: item.title,
         url: item.url,
         match,
-        source: item.source
+        source: item.source,
       }));
       filtered = [row, ...suggestions];
       selected = 0;
@@ -1295,23 +1385,36 @@
     const li = document.createElement("li");
     let titleText;
     if (row.kind === "search") {
-      if (row.keyword) titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
+      if (row.keyword)
+        titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
       else titleText = `Search for "${row.title}"`;
     } else if (row.kind === "url") {
       titleText = `Open ${row.title}`;
     } else {
-      const isSwitch = row.url && tabUrlMap.has(row.url) && tabUrlMap.get(row.url).source === "tab";
-      titleText = isSwitch ? `Switch to: ${row.title || "(untitled)"}` : row.title || "(untitled)";
+      const isSwitch =
+        row.url &&
+        tabUrlMap.has(row.url) &&
+        tabUrlMap.get(row.url).source === "tab";
+      titleText = isSwitch
+        ? `Switch to: ${row.title || "(untitled)"}`
+        : row.title || "(untitled)";
     }
     let urlText = row.kind === "suggestion" ? row.url || "" : "";
     if (row.kind === "suggestion" && row.url && tabUrlMap.has(row.url)) {
       const tabInfo = tabUrlMap.get(row.url);
-      if (tabInfo && tabInfo.source === "tab") urlText = `${urlText}  \u2022  Tab`;
-      else if (row.folderPath) urlText = `${urlText}  \u2022  ${row.folderPath}`;
+      if (tabInfo && tabInfo.source === "tab")
+        urlText = `${urlText}  \u2022  Tab`;
+      else if (row.folderPath)
+        urlText = `${urlText}  \u2022  ${row.folderPath}`;
     } else if (row.folderPath) {
       urlText = row.folderPath;
     }
-    return renderTitleUrl(li, titleText, urlText, row.kind === "suggestion" ? query : "");
+    return renderTitleUrl(
+      li,
+      titleText,
+      urlText,
+      row.kind === "suggestion" ? query : "",
+    );
   }
   function renderTabRow(tab, winLabel) {
     const li = document.createElement("li");
@@ -1333,11 +1436,14 @@
     for (const tab of rows) {
       if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
     }
-    for (const tab of rows) listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId)));
+    for (const tab of rows)
+      listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId)));
     highlight();
   }
   function highlight() {
-    Array.from(listEl.children).forEach((li, i) => li.classList.toggle("selected", i === selected));
+    Array.from(listEl.children).forEach((li, i) =>
+      li.classList.toggle("selected", i === selected),
+    );
     const el = listEl.children[selected];
     if (el) el.scrollIntoView({ block: "nearest" });
   }
@@ -1365,7 +1471,12 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         move(-1);
-      } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      } else if (
+        event.key === "Tab" &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
+      ) {
         event.preventDefault();
         event.stopImmediatePropagation();
         move(event.shiftKey ? -1 : 1);
@@ -1376,7 +1487,12 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       close();
-    } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    } else if (
+      event.key === "Tab" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
       event.preventDefault();
       event.stopImmediatePropagation();
       move(event.shiftKey ? -1 : 1);
@@ -1388,11 +1504,17 @@
     const kwInput = parseKeyword(rawInput);
     if (!item) {
       if (mode === "open" && !rawInput) sendMessage("createTab");
-      else if (kwInput) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
+      else if (kwInput)
+        sendMessage(mode === "open" ? "createTab" : "navigate", {
+          url: kwInput.url,
+        });
       else if (rawInput && Url.looksLikeUrl(rawInput)) {
         const target2 = Url.normalizeUrl(rawInput) || rawInput;
-        sendMessage(mode === "open" ? "createTab" : "navigate", { url: target2 });
-      } else if (rawInput) sendMessage("search", { query: rawInput, newTab: mode === "open" });
+        sendMessage(mode === "open" ? "createTab" : "navigate", {
+          url: target2,
+        });
+      } else if (rawInput)
+        sendMessage("search", { query: rawInput, newTab: mode === "open" });
       close();
       return;
     }
@@ -1400,17 +1522,28 @@
       sendMessage("mergeTab", { targetWindowId: item.windowId });
     } else if (mode === "open" || mode === "edit") {
       if (item.kind === "search") {
-        if (item.keyword && item.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
-        else if (kwInput && kwInput.url) sendMessage(mode === "open" ? "createTab" : "navigate", { url: kwInput.url });
-        else sendMessage("search", { query: rawInput, newTab: mode === "open" });
+        if (item.keyword && item.url)
+          sendMessage(mode === "open" ? "createTab" : "navigate", {
+            url: item.url,
+          });
+        else if (kwInput && kwInput.url)
+          sendMessage(mode === "open" ? "createTab" : "navigate", {
+            url: kwInput.url,
+          });
+        else
+          sendMessage("search", { query: rawInput, newTab: mode === "open" });
       } else if (item.url) {
         const existing = tabUrlMap.get(item.url);
         if (existing && existing.source === "tab" && existing.id) {
           sendMessage("activateTab", { id: existing.id });
         } else {
           const tabMatch = tabUrlMap.get(item.url);
-          if (tabMatch && tabMatch.id) sendMessage("activateTab", { id: tabMatch.id });
-          else sendMessage(mode === "open" ? "createTab" : "navigate", { url: item.url });
+          if (tabMatch && tabMatch.id)
+            sendMessage("activateTab", { id: tabMatch.id });
+          else
+            sendMessage(mode === "open" ? "createTab" : "navigate", {
+              url: item.url,
+            });
         }
       }
     } else {
@@ -1433,36 +1566,86 @@
     query = "";
     mode = "tabs";
     active = false;
-    if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
+    if (
+      restoreFocus &&
+      restoreFocus.isConnected &&
+      document.activeElement !== restoreFocus
+    ) {
       restoreFocus.focus();
     }
     restoreFocus = null;
   }
-  var Prompt = { open, openOmnibar, openEditUrl, openMerge, close, onKeyDown, isActive };
+  var Prompt = {
+    open,
+    openOmnibar,
+    openEditUrl,
+    openMerge,
+    close,
+    onKeyDown,
+    isActive,
+  };
   register("prompt", { close, onKeyDown, isActive });
 
   // content/catalog.js
   var COMMAND_CATALOG = {
-    scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
+    scrollDown: {
+      category: "scrolling",
+      label: "Scroll down",
+      repeatable: true,
+    },
     scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
-    scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
-    scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
+    scrollLeft: {
+      category: "scrolling",
+      label: "Scroll left",
+      repeatable: true,
+    },
+    scrollRight: {
+      category: "scrolling",
+      label: "Scroll right",
+      repeatable: true,
+    },
     scrollTop: { category: "scrolling", label: "Scroll to top" },
     scrollBottom: { category: "scrolling", label: "Scroll to bottom" },
-    scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
-    scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
-    scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
-    scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-    cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas" },
+    scrollPageDown: {
+      category: "scrolling",
+      label: "Scroll page down",
+      repeatable: true,
+    },
+    scrollPageUp: {
+      category: "scrolling",
+      label: "Scroll page up",
+      repeatable: true,
+    },
+    scrollHalfPageDown: {
+      category: "scrolling",
+      label: "Scroll half page down",
+      repeatable: true,
+    },
+    scrollHalfPageUp: {
+      category: "scrolling",
+      label: "Scroll half page up",
+      repeatable: true,
+    },
+    cycleScrollArea: {
+      category: "scrolling",
+      label: "Cycle nested scroll areas",
+    },
     resetScrollArea: { category: "scrolling", label: "Reset to page scroll" },
     showScrollArea: { category: "scrolling", label: "Show scroll area" },
     zoomIn: { category: "view", label: "Zoom in" },
     zoomOut: { category: "view", label: "Zoom out" },
     newTab: { category: "tabs", label: "New tab" },
     closeTab: { category: "tabs", label: "Close tab", repeatable: true },
-    restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
+    restoreTab: {
+      category: "tabs",
+      label: "Reopen closed tab",
+      repeatable: true,
+    },
     pasteOpen: { category: "tabs", label: "Open clipboard URL in current tab" },
-    pasteOpenBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
+    pasteOpenBackground: {
+      category: "tabs",
+      label: "Open clipboard URL in background tab",
+    },
     previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
     nextTab: { category: "tabs", label: "Next tab", repeatable: true },
     firstTab: { category: "tabs", label: "Jump to first tab" },
@@ -1488,8 +1671,14 @@
     passthrough: { category: "modes", label: "Passthrough keys (timed)" },
     toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
     hintClick: { category: "hints", label: "Show hints (click)" },
-    hintOpen: { category: "hints", label: "Show hints (open in new foreground tab)" },
-    hintOpenBackground: { category: "hints", label: "Show hints (open in background, persistent)" },
+    hintOpen: {
+      category: "hints",
+      label: "Show hints (open in new foreground tab)",
+    },
+    hintOpenBackground: {
+      category: "hints",
+      label: "Show hints (open in background, persistent)",
+    },
     hintInput: { category: "hints", label: "Focus input (hint)" },
     hintYank: { category: "hints", label: "Copy link URL (hint)" },
     findForward: { category: "find", label: "Find forward" },
@@ -1499,7 +1688,7 @@
     visualLineMode: { category: "visual", label: "Visual line mode" },
     showHelp: { category: "help", label: "Show keybindings" },
     openOptions: { category: "help", label: "Open settings" },
-    openExtensions: { category: "help", label: "Open extensions page" }
+    openExtensions: { category: "help", label: "Open extensions page" },
   };
 
   // content/help.js
@@ -1536,7 +1725,9 @@
     for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
       const id = meta.category || "other";
       if (!byCategoryAll.has(id)) byCategoryAll.set(id, []);
-      byCategoryAll.get(id).push({ keys: byCommand.get(commandName) || [], label: meta.label });
+      byCategoryAll
+        .get(id)
+        .push({ keys: byCommand.get(commandName) || [], label: meta.label });
       const keys = byCommand.get(commandName);
       if (!keys) continue;
       if (!byCategory.has(id)) byCategory.set(id, []);
@@ -1578,7 +1769,7 @@
               tr.appendChild(labelTd);
               tbody.appendChild(tr);
             }
-          })
+          }),
         );
       }
       grid.appendChild(colEl);
@@ -1611,9 +1802,12 @@
     }
     if (event.ctrlKey) {
       if (event.key === "d") listEl2.scrollBy(0, listEl2.clientHeight * 0.5);
-      else if (event.key === "u") listEl2.scrollBy(0, -listEl2.clientHeight * 0.5);
-      else if (event.key === "f") listEl2.scrollBy(0, listEl2.clientHeight * 0.9);
-      else if (event.key === "b") listEl2.scrollBy(0, -listEl2.clientHeight * 0.9);
+      else if (event.key === "u")
+        listEl2.scrollBy(0, -listEl2.clientHeight * 0.5);
+      else if (event.key === "f")
+        listEl2.scrollBy(0, listEl2.clientHeight * 0.9);
+      else if (event.key === "b")
+        listEl2.scrollBy(0, -listEl2.clientHeight * 0.9);
       return;
     }
     switch (event.key) {
@@ -1639,12 +1833,23 @@
     gPending = false;
     active2 = false;
   }
-  var Help = { open: open2, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
-  register("help", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
+  var Help = {
+    open: open2,
+    close: close2,
+    onKeyDown: onKeyDown2,
+    isActive: isActive2,
+  };
+  register("help", {
+    close: close2,
+    onKeyDown: onKeyDown2,
+    isActive: isActive2,
+  });
 
   // content/hints-elements.js
-  var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
-  var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
+  var CLICKABLE_SELECTOR =
+    "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
+  var INPUT_SELECTOR =
+    'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
   function isEditable(el) {
     if (!el) return false;
     const tag = el.tagName;
@@ -1658,13 +1863,26 @@
   function isElementDrawn(e, rect) {
     const min = isEditable(e) ? 1 : 4;
     rect = rect || e.getBoundingClientRect();
-    return rect.width > min && rect.height > min && (parseFloat(window.getComputedStyle(e).opacity) > 0.1 || e.tagName === "INPUT" && e.type !== "text");
+    return (
+      rect.width > min &&
+      rect.height > min &&
+      (parseFloat(window.getComputedStyle(e).opacity) > 0.1 ||
+        (e.tagName === "INPUT" && e.type !== "text"))
+    );
   }
   function isElementPartiallyInViewport(el, ignoreSize) {
     const rect = el.getBoundingClientRect();
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
-    return (ignoreSize || isElementDrawn(el, rect)) && rect.top < windowHeight && rect.bottom > 0 && rect.left < windowWidth && rect.right > 0;
+    const windowHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+    const windowWidth =
+      window.innerWidth || document.documentElement.clientWidth;
+    return (
+      (ignoreSize || isElementDrawn(el, rect)) &&
+      rect.top < windowHeight &&
+      rect.bottom > 0 &&
+      rect.left < windowWidth &&
+      rect.right > 0
+    );
   }
   function getVisibleElements(filter) {
     const all = Array.from(document.documentElement.getElementsByTagName("*"));
@@ -1676,7 +1894,14 @@
         for (let j = 0; j < cc.length; j++) all.push(cc[j]);
       }
       const rect = e.getBoundingClientRect();
-      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && window.getComputedStyle(e).visibility !== "hidden") {
+      if (
+        rect.top <= window.innerHeight &&
+        rect.bottom >= 0 &&
+        rect.left <= window.innerWidth &&
+        rect.right >= 0 &&
+        rect.height > 0 &&
+        window.getComputedStyle(e).visibility !== "hidden"
+      ) {
         filter(e, visibleElements);
       }
     }
@@ -1684,7 +1909,12 @@
   }
   function filterInvisibleElements(nodes) {
     return nodes.filter(
-      (n) => n.offsetHeight && n.offsetWidth && !n.getAttribute("disabled") && isElementPartiallyInViewport(n) && window.getComputedStyle(n).visibility !== "hidden"
+      (n) =>
+        n.offsetHeight &&
+        n.offsetWidth &&
+        !n.getAttribute("disabled") &&
+        isElementPartiallyInViewport(n) &&
+        window.getComputedStyle(n).visibility !== "hidden",
     );
   }
   function getRealRect(elm) {
@@ -1694,7 +1924,11 @@
         if (r.length === 3) return r[1];
         if (r.length === 2) return r[0];
         return elm.getBoundingClientRect();
-      } else if (elm.childElementCount === 1 && elm.firstElementChild && elm.firstElementChild.textContent) {
+      } else if (
+        elm.childElementCount === 1 &&
+        elm.firstElementChild &&
+        elm.firstElementChild.textContent
+      ) {
         const r = elm.firstElementChild.getBoundingClientRect();
         if (r.width < 4 || r.height < 4) return elm.getBoundingClientRect();
         return r;
@@ -1707,21 +1941,21 @@
   function isElementClickable(e) {
     try {
       if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
-    } catch {
-    }
+    } catch {}
     try {
       const style = window.getComputedStyle(e);
       if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
         return true;
-    } catch {
-    }
+    } catch {}
     try {
-      if (e.closest && e.closest(
-        "a, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button"
-      ))
+      if (
+        e.closest &&
+        e.closest(
+          "a, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button",
+        )
+      )
         return true;
-    } catch {
-    }
+    } catch {}
     return false;
   }
   function filterAncestors(elements2) {
@@ -1746,14 +1980,25 @@
     elements2 = elements2.filter((e) => {
       const be = getRealRect(e);
       if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
-      if (e.matches && (e.matches("input, textarea, select, form") || e.contentEditable === "true"))
+      if (
+        e.matches &&
+        (e.matches("input, textarea, select, form") ||
+          e.contentEditable === "true")
+      )
         return true;
       try {
         if (e.closest && e.closest(overlaySelectors)) return false;
-      } catch {
-      }
-      const el = e.getRootNode().elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
-      return !el || el.shadowRoot && (el.childElementCount === 0 || el.shadowRoot.contains(e)) || el.contains(e) || e.contains(el);
+      } catch {}
+      const el = e
+        .getRootNode()
+        .elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
+      return (
+        !el ||
+        (el.shadowRoot &&
+          (el.childElementCount === 0 || el.shadowRoot.contains(e))) ||
+        el.contains(e) ||
+        e.contains(el)
+      );
     });
     return filterAncestors(elements2);
   }
@@ -1761,8 +2006,7 @@
     let elements2 = getVisibleElements((e, v) => {
       try {
         if (e.closest && e.closest(overlaySelectors)) return;
-      } catch {
-      }
+      } catch {}
       if (isElementClickable(e)) v.push(e);
     });
     elements2 = filterOverlapElements(elements2);
@@ -1771,9 +2015,10 @@
   function getHref(el) {
     try {
       if (el.href) return el.href;
-    } catch {
-    }
-    const raw = el.getAttribute ? el.getAttribute("href") || el.getAttribute("xlink:href") : null;
+    } catch {}
+    const raw = el.getAttribute
+      ? el.getAttribute("href") || el.getAttribute("xlink:href")
+      : null;
     if (!raw) return null;
     if (raw.startsWith("#") || raw.trim() === "") return null;
     try {
@@ -1813,7 +2058,9 @@
     const out = [];
     for (const el of raw) {
       if (el.closest && el.closest(overlaySelectors)) continue;
-      const type = el.getAttribute ? (el.getAttribute("type") || "").toLowerCase() : "";
+      const type = el.getAttribute
+        ? (el.getAttribute("type") || "").toLowerCase()
+        : "";
       if (type === "hidden") continue;
       if (el.disabled) continue;
       out.push(el);
@@ -1825,7 +2072,11 @@
   function collectElements(requestedMode) {
     let raw = [];
     if (requestedMode === "click") raw = getClickableElements();
-    else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "yank")
+    else if (
+      requestedMode === "open" ||
+      requestedMode === "openBackground" ||
+      requestedMode === "yank"
+    )
       raw = getLinkElements();
     else if (requestedMode === "input") raw = getInputElements();
     return raw;
@@ -1851,13 +2102,17 @@
     try {
       do {
         const v = parseInt(
-          window.getComputedStyle(node).getPropertyValue("z-index")
+          window.getComputedStyle(node).getPropertyValue("z-index"),
         );
         if (!isNaN(v) && v >= 0) z += v;
         node = node.parentNode;
-      } while (node && node !== document.body && node !== document && node.nodeType !== 11);
-    } catch {
-    }
+      } while (
+        node &&
+        node !== document.body &&
+        node !== document &&
+        node.nodeType !== 11
+      );
+    } catch {}
     return z;
   }
   function placeHintsHost(host) {
@@ -1866,13 +2121,17 @@
       if (topLayer) {
         const r = topLayer.getBoundingClientRect();
         const style = window.getComputedStyle(topLayer);
-        if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
+        if (
+          r.width > 0 &&
+          r.height > 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden"
+        ) {
           topLayer.appendChild(host);
           return;
         }
       }
-    } catch {
-    }
+    } catch {}
     (document.documentElement || document.body).appendChild(host);
   }
   function showHintPill() {
@@ -1882,15 +2141,13 @@
       hintPill.className = "jari-pill";
       hintPill.textContent = "hint";
       ui.statusContainer().appendChild(hintPill);
-    } catch {
-    }
+    } catch {}
   }
   function hideHintPill() {
     if (!hintPill) return;
     try {
       hintPill.remove();
-    } catch {
-    }
+    } catch {}
     hintPill = null;
   }
   function scheduleRegenerate() {
@@ -1905,7 +2162,8 @@
         ui.toast("No hints");
         return;
       }
-      const capped = fresh.length > MAX_HINTS ? fresh.slice(0, MAX_HINTS) : fresh;
+      const capped =
+        fresh.length > MAX_HINTS ? fresh.slice(0, MAX_HINTS) : fresh;
       if (capped.length !== fresh.length) {
         ui.toast(`Too many hints (${capped.length} shown)`);
       }
@@ -1977,15 +2235,13 @@
     } catch {
       try {
         el.focus();
-      } catch {
-      }
+      } catch {}
     }
   }
   function dispatchClick(el) {
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch {
-    }
+    } catch {}
     for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
       try {
         el.dispatchEvent(
@@ -1994,30 +2250,31 @@
             cancelable: true,
             view: window,
             button: 0,
-            buttons: type === "mousedown" ? 1 : 0
-          })
+            buttons: type === "mousedown" ? 1 : 0,
+          }),
         );
-      } catch {
-      }
+      } catch {}
     }
     safeFocus(el, { preventScroll: true });
   }
   function focusInput(el) {
     try {
       el.scrollIntoView({ block: "center", inline: "center" });
-    } catch {
-    }
+    } catch {}
     safeFocus(el, { preventScroll: true });
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
       try {
         const len = el.value ? el.value.length : 0;
-        if (typeof el.select === "function" && el.type !== "checkbox" && el.type !== "radio") {
+        if (
+          typeof el.select === "function" &&
+          el.type !== "checkbox" &&
+          el.type !== "radio"
+        ) {
           el.select();
         } else if (typeof el.setSelectionRange === "function") {
           el.setSelectionRange(len, len);
         }
-      } catch {
-      }
+      } catch {}
     } else if (el.isContentEditable) {
       try {
         const sel = window.getSelection();
@@ -2028,8 +2285,7 @@
           sel.removeAllRanges();
           sel.addRange(range);
         }
-      } catch {
-      }
+      } catch {}
     }
   }
   function coordinate(holderEl) {
@@ -2042,12 +2298,11 @@
     const br = probe.getBoundingClientRect();
     const ret = {
       top: br.top + window.pageYOffset - document.documentElement.clientTop,
-      left: br.left + window.pageXOffset - document.documentElement.clientLeft
+      left: br.left + window.pageXOffset - document.documentElement.clientLeft,
     };
     try {
       probe.remove();
-    } catch {
-    }
+    } catch {}
     return ret;
   }
   function updateHintText(hintEl, label, typed) {
@@ -2095,15 +2350,16 @@
     hints.forEach((h, i) => {
       const el = h.hintEl;
       const z = parseInt(el.style.zIndex, 10) || 0;
-      el.style.zIndex = isFlipped ? String(el.zIndex) : String(hints.length - i + 2147483e3 - z);
+      el.style.zIndex = isFlipped
+        ? String(el.zIndex)
+        : String(hints.length - i + 2147483e3 - z);
     });
   }
   function render3() {
     if (hintsHost) {
       try {
         hintsHost.remove();
-      } catch {
-      }
+      } catch {}
       hintsHost = null;
       holder = null;
     }
@@ -2211,7 +2467,7 @@
       el: link.link,
       label: link.label,
       hintEl: link,
-      rect: getRealRect(link.link)
+      rect: getRealRect(link.link),
     }));
     refresh();
   }
@@ -2230,10 +2486,9 @@
       try {
         window.addEventListener(type, scrollLockPrevent, {
           passive: false,
-          capture: true
+          capture: true,
         });
-      } catch {
-      }
+      } catch {}
     }
   }
   function enableScrollLock() {
@@ -2241,8 +2496,7 @@
     for (const type of ["wheel", "touchmove"]) {
       try {
         window.removeEventListener(type, scrollLockPrevent, { capture: true });
-      } catch {
-      }
+      } catch {}
     }
     scrollLockPrevent = null;
   }
@@ -2250,15 +2504,13 @@
     if (resizeHandler) {
       try {
         window.removeEventListener("resize", resizeHandler);
-      } catch {
-      }
+      } catch {}
       resizeHandler = null;
     }
     if (mutationObserver) {
       try {
         mutationObserver.disconnect();
-      } catch {
-      }
+      } catch {}
       mutationObserver = null;
     }
     if (regenerateTimer) {
@@ -2268,8 +2520,7 @@
     if (keyUpHandler) {
       try {
         window.removeEventListener("keyup", keyUpHandler, true);
-      } catch {
-      }
+      } catch {}
       keyUpHandler = null;
     }
     enableScrollLock();
@@ -2281,8 +2532,7 @@
     showHintPill();
     try {
       ui.toast(`Hints: ${elements.length} targets (${mode2})`);
-    } catch {
-    }
+    } catch {}
     try {
       mutationObserver = new MutationObserver(scheduleRegenerate);
       const target2 = document.body || document.documentElement;
@@ -2290,17 +2540,15 @@
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["style", "class", "hidden", "aria-hidden", "inert"]
+        attributeFilter: ["style", "class", "hidden", "aria-hidden", "inert"],
       });
-    } catch {
-    }
+    } catch {}
     keyUpHandler = (e) => {
       if (active3) onKeyUp(e);
     };
     try {
       window.addEventListener("keyup", keyUpHandler, true);
-    } catch {
-    }
+    } catch {}
     resizeHandler = () => {
       if (!active3) return;
       scheduleRegenerate();
@@ -2316,8 +2564,7 @@
     if (hintsHost) {
       try {
         hintsHost.remove();
-      } catch {
-      }
+      } catch {}
       hintsHost = null;
       holder = null;
     }
@@ -2328,7 +2575,7 @@
     open: { mode: "open", multipleHits: false },
     openBackground: { mode: "openBackground", multipleHits: true },
     input: { mode: "input", multipleHits: false },
-    yank: { mode: "yank", multipleHits: false }
+    yank: { mode: "yank", multipleHits: false },
   };
   function open3(requestedMode) {
     if (active3) close3();
@@ -2341,7 +2588,12 @@
       return;
     }
     if (candidates.length === 0) {
-      const msg = mode2 === "yank" ? "No links to yank" : mode2 === "input" ? "No inputs" : "No hints";
+      const msg =
+        mode2 === "yank"
+          ? "No links to yank"
+          : mode2 === "input"
+            ? "No inputs"
+            : "No hints";
       ui.toast(msg);
       return;
     }
@@ -2458,8 +2710,18 @@
     }
     return false;
   }
-  var Hints = { open: open3, close: close3, isActive: isActive3, onKeyDown: onKeyDown3, genLabels };
-  register("hints", { close: close3, onKeyDown: onKeyDown3, isActive: isActive3 });
+  var Hints = {
+    open: open3,
+    close: close3,
+    isActive: isActive3,
+    onKeyDown: onKeyDown3,
+    genLabels,
+  };
+  register("hints", {
+    close: close3,
+    onKeyDown: onKeyDown3,
+    isActive: isActive3,
+  });
 
   // content/visual.js
   var active4 = false;
@@ -2502,15 +2764,13 @@
       pillEl.className = "jari-pill";
       pillEl.textContent = pillText(mode3);
       ui.statusContainer().appendChild(pillEl);
-    } catch {
-    }
+    } catch {}
   }
   function hidePill() {
     if (!pillEl) return;
     try {
       pillEl.remove();
-    } catch {
-    }
+    } catch {}
     pillEl = null;
   }
   function getSelection() {
@@ -2570,22 +2830,19 @@
       caretEl.className = "jari-visual-caret";
       shadow.appendChild(caretEl);
       (document.documentElement || document.body).appendChild(caretHost);
-    } catch {
-    }
+    } catch {}
   }
   function hideBlockCaret() {
     if (caretHost) {
       try {
         caretHost.remove();
-      } catch {
-      }
+      } catch {}
       caretHost = null;
       caretEl = null;
     } else if (caretEl) {
       try {
         caretEl.remove();
-      } catch {
-      }
+      } catch {}
       caretEl = null;
     }
   }
@@ -2604,7 +2861,7 @@
           r.setStart(focusNode, focusOffset);
           r.collapse(true);
           rect = r.getBoundingClientRect();
-          if (!rect || rect.width === 0 && rect.height === 0) {
+          if (!rect || (rect.width === 0 && rect.height === 0)) {
             const cr = range.getClientRects();
             if (cr && cr.length) rect = cr[0];
             else rect = range.getBoundingClientRect();
@@ -2621,7 +2878,10 @@
       }
       if (!rect) return;
       if (rect.width === 0 && rect.height === 0) {
-        const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+        const el =
+          sel.focusNode && sel.focusNode.parentElement
+            ? sel.focusNode.parentElement
+            : null;
         if (el) {
           const cr = el.getClientRects();
           if (cr && cr.length) rect = cr[0];
@@ -2639,13 +2899,14 @@
         caretEl.style.opacity = "0.85";
       }
       try {
-        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        if (
+          window.matchMedia &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
           caretEl.style.animation = "none";
         }
-      } catch {
-      }
-    } catch {
-    }
+      } catch {}
+    } catch {}
   }
   function updateBlockCaret() {
     if (caretRaf) return;
@@ -2660,37 +2921,58 @@
     try {
       const range = sel.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      if (!rect || rect.top === 0 && rect.left === 0 && rect.width === 0 && rect.height === 0) {
+      if (
+        !rect ||
+        (rect.top === 0 &&
+          rect.left === 0 &&
+          rect.width === 0 &&
+          rect.height === 0)
+      ) {
         const node = sel.focusNode;
         if (node && node.parentElement) {
-          node.parentElement.scrollIntoView({ block: "nearest", inline: "nearest" });
+          node.parentElement.scrollIntoView({
+            block: "nearest",
+            inline: "nearest",
+          });
         }
         return;
       }
       const vh = window.innerHeight;
       const vw = window.innerWidth;
-      if (rect.top < 0 || rect.bottom > vh || rect.left < 0 || rect.right > vw) {
-        const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+      if (
+        rect.top < 0 ||
+        rect.bottom > vh ||
+        rect.left < 0 ||
+        rect.right > vw
+      ) {
+        const el =
+          sel.focusNode && sel.focusNode.parentElement
+            ? sel.focusNode.parentElement
+            : null;
         if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
         else window.scrollBy(0, rect.top - vh / 2);
       }
-    } catch {
-    }
+    } catch {}
     updateBlockCaret();
     applyVisualHighlight();
   }
   function attachCaretListeners() {
     try {
-      window.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
+      window.addEventListener("scroll", updateBlockCaret, {
+        passive: true,
+        capture: true,
+      });
       window.addEventListener("resize", updateBlockCaret, { passive: true });
-      document.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
+      document.addEventListener("scroll", updateBlockCaret, {
+        passive: true,
+        capture: true,
+      });
     } catch {
       try {
         window.addEventListener("scroll", updateBlockCaret, true);
         window.addEventListener("resize", updateBlockCaret);
         document.addEventListener("scroll", updateBlockCaret, true);
-      } catch {
-      }
+      } catch {}
     }
     enableSelectOverride();
   }
@@ -2698,20 +2980,20 @@
     try {
       window.removeEventListener("scroll", updateBlockCaret, { capture: true });
       window.removeEventListener("resize", updateBlockCaret);
-      document.removeEventListener("scroll", updateBlockCaret, { capture: true });
+      document.removeEventListener("scroll", updateBlockCaret, {
+        capture: true,
+      });
     } catch {
       try {
         window.removeEventListener("scroll", updateBlockCaret, true);
         window.removeEventListener("resize", updateBlockCaret);
         document.removeEventListener("scroll", updateBlockCaret, true);
-      } catch {
-      }
+      } catch {}
     }
     if (caretRaf) {
       try {
         cancelAnimationFrame(caretRaf);
-      } catch {
-      }
+      } catch {}
       caretRaf = null;
     }
     if (!active4 && !hintActive) disableSelectOverride();
@@ -2724,22 +3006,19 @@
       selectOverrideEl.id = "jari-select-override";
       selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; }`;
       (document.head || document.documentElement).appendChild(selectOverrideEl);
-    } catch {
-    }
+    } catch {}
   }
   function disableSelectOverride() {
     if (!selectOverrideEl) return;
     try {
       selectOverrideEl.remove();
-    } catch {
-    }
+    } catch {}
     selectOverrideEl = null;
   }
   function clearVisualHighlight() {
     try {
       if (CSS.highlights) CSS.highlights.delete("jari-visual");
-    } catch {
-    }
+    } catch {}
     for (const span of visualFallbackSpans) {
       try {
         const parent = span.parentNode;
@@ -2748,8 +3027,7 @@
         const tn = document.createTextNode(text);
         parent.replaceChild(tn, span);
         parent.normalize();
-      } catch {
-      }
+      } catch {}
     }
     visualFallbackSpans = [];
   }
@@ -2761,7 +3039,11 @@
     try {
       const range = sel.getRangeAt(0).cloneRange();
       try {
-        if (typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined") {
+        if (
+          typeof CSS !== "undefined" &&
+          CSS.highlights &&
+          typeof Highlight !== "undefined"
+        ) {
           CSS.highlights.set("jari-visual", new Highlight(range));
           visualUseHighlights = true;
           return;
@@ -2776,7 +3058,10 @@
         visualFallbackSpans.push(span);
       } catch {
         try {
-          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+          );
           let n = walker.nextNode();
           while (n) {
             try {
@@ -2786,20 +3071,41 @@
               }
               const nodeRange = document.createRange();
               nodeRange.selectNodeContents(n);
-              if (range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <= 0 || range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0) {
+              if (
+                range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <=
+                  0 ||
+                range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0
+              ) {
                 n = walker.nextNode();
                 continue;
               }
-              const startNode = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? n : range.startContainer;
-              const startOffset = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? 0 : range.startOffset;
-              const endNode = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n : range.endContainer;
-              const endOffset = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n.nodeValue.length : range.endOffset;
+              const startNode =
+                range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <=
+                0
+                  ? n
+                  : range.startContainer;
+              const startOffset =
+                range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <=
+                0
+                  ? 0
+                  : range.startOffset;
+              const endNode =
+                range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0
+                  ? n
+                  : range.endContainer;
+              const endOffset =
+                range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0
+                  ? n.nodeValue.length
+                  : range.endOffset;
               if (startNode !== n || endNode !== n) {
                 n = walker.nextNode();
                 continue;
               }
               const r = document.createRange();
-              r.setStart(n, Math.max(0, Math.min(startOffset, n.nodeValue.length)));
+              r.setStart(
+                n,
+                Math.max(0, Math.min(startOffset, n.nodeValue.length)),
+              );
               r.setEnd(n, Math.max(0, Math.min(endOffset, n.nodeValue.length)));
               if (r.collapsed) {
                 n = walker.nextNode();
@@ -2809,23 +3115,22 @@
               s.className = "jari-visual-highlight";
               r.surroundContents(s);
               visualFallbackSpans.push(s);
-            } catch {
-            }
+            } catch {}
             n = walker.nextNode();
           }
-        } catch {
-        }
+        } catch {}
         try {
-          const walker2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          const walker2 = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+          );
           let nn = walker2.nextNode();
           while (nn && visualFallbackSpans.length === 0) {
             nn = walker2.nextNode();
           }
-        } catch {
-        }
+        } catch {}
       }
-    } catch {
-    }
+    } catch {}
   }
   function normalizeCharset2() {
     const s = settings.getHintChars();
@@ -2878,12 +3183,18 @@
     let z = 0;
     try {
       do {
-        const v = parseInt(window.getComputedStyle(node).getPropertyValue("z-index"));
+        const v = parseInt(
+          window.getComputedStyle(node).getPropertyValue("z-index"),
+        );
         if (!isNaN(v) && v >= 0) z += v;
         node = node.parentNode;
-      } while (node && node !== document.body && node !== document && node.nodeType !== 11);
-    } catch {
-    }
+      } while (
+        node &&
+        node !== document.body &&
+        node !== document &&
+        node.nodeType !== 11
+      );
+    } catch {}
     return z;
   }
   function placeHintsHost2(host) {
@@ -2892,13 +3203,17 @@
       if (topLayer) {
         const r = topLayer.getBoundingClientRect();
         const style = window.getComputedStyle(topLayer);
-        if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
+        if (
+          r.width > 0 &&
+          r.height > 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden"
+        ) {
           topLayer.appendChild(host);
           return;
         }
       }
-    } catch {
-    }
+    } catch {}
     (document.documentElement || document.body).appendChild(host);
   }
   function coordinate2(holderEl) {
@@ -2911,33 +3226,53 @@
     const br = probe.getBoundingClientRect();
     const ret = {
       top: br.top + window.pageYOffset - document.documentElement.clientTop,
-      left: br.left + window.pageXOffset - document.documentElement.clientLeft
+      left: br.left + window.pageXOffset - document.documentElement.clientLeft,
     };
     try {
       probe.remove();
-    } catch {
-    }
+    } catch {}
     return ret;
   }
   function collectVisualTextElements() {
     let elements2 = getVisibleElements((e, v) => {
       try {
         if (e.closest && e.closest(overlaySelectors)) return;
-        if (e.closest && e.closest(".jari-visual-caret-host, .jari-visual-caret, .jari-hints-host, .jari-hint")) return;
-        if (e.closest && e.closest("script, style, noscript, template, head, meta, link, svg, canvas, video, audio, iframe")) return;
-      } catch {
-      }
+        if (
+          e.closest &&
+          e.closest(
+            ".jari-visual-caret-host, .jari-visual-caret, .jari-hints-host, .jari-hint",
+          )
+        )
+          return;
+        if (
+          e.closest &&
+          e.closest(
+            "script, style, noscript, template, head, meta, link, svg, canvas, video, audio, iframe",
+          )
+        )
+          return;
+      } catch {}
       const raw = e.textContent;
       if (!raw) return;
       const text = raw.trim();
       if (!text || text.length < 3 || text.length > 500) return;
       const tag = e.tagName;
-      if (tag === "HTML" || tag === "BODY" || tag === "MAIN" || tag === "ARTICLE" || tag === "SECTION") {
+      if (
+        tag === "HTML" ||
+        tag === "BODY" ||
+        tag === "MAIN" ||
+        tag === "ARTICLE" ||
+        tag === "SECTION"
+      ) {
         if (text.length > 200) return;
       }
       let hasDirectText = false;
       for (const n of e.childNodes) {
-        if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 2) {
+        if (
+          n.nodeType === Node.TEXT_NODE &&
+          n.nodeValue &&
+          n.nodeValue.trim().length >= 2
+        ) {
           hasDirectText = true;
           break;
         }
@@ -2946,10 +3281,14 @@
       let isBlock = false;
       try {
         const style = window.getComputedStyle(e);
-        isBlock = style.display === "block" || style.display === "flex" || style.display === "grid" || style.display === "list-item" || style.display === "table-cell";
+        isBlock =
+          style.display === "block" ||
+          style.display === "flex" ||
+          style.display === "grid" ||
+          style.display === "list-item" ||
+          style.display === "table-cell";
         if (style.visibility === "hidden" || style.opacity === "0") return;
-      } catch {
-      }
+      } catch {}
       if (!isLeaf && !hasDirectText && !isBlock) return;
       if (!hasDirectText && text.length < 8 && !isLeaf) return;
       v.push(e);
@@ -2961,24 +3300,36 @@
     });
     elements2 = filterOverlapElements(elements2);
     elements2 = filterAncestors(elements2);
-    const scored = elements2.map((el) => {
-      const text = el.textContent.trim();
-      const rect = el.getBoundingClientRect();
-      const area = rect.width * rect.height;
-      let score = 0;
-      if (text.length >= 10 && text.length <= 140) score += 12;
-      else if (text.length > 200) score -= 8;
-      if (text.split(/\s+/).length >= 2) score += 4;
-      if (area > 0 && area < 4e4) score += 6;
-      else if (area >= 1e5) score -= 6;
-      try {
-        if (el.closest && el.closest("p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd")) score += 5;
-      } catch {
-      }
-      const hasDirect = Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 3);
-      if (hasDirect) score += 4;
-      return { el, score, area };
-    }).sort((a, b) => b.score - a.score || a.area - b.area);
+    const scored = elements2
+      .map((el) => {
+        const text = el.textContent.trim();
+        const rect = el.getBoundingClientRect();
+        const area = rect.width * rect.height;
+        let score = 0;
+        if (text.length >= 10 && text.length <= 140) score += 12;
+        else if (text.length > 200) score -= 8;
+        if (text.split(/\s+/).length >= 2) score += 4;
+        if (area > 0 && area < 4e4) score += 6;
+        else if (area >= 1e5) score -= 6;
+        try {
+          if (
+            el.closest &&
+            el.closest(
+              "p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd",
+            )
+          )
+            score += 5;
+        } catch {}
+        const hasDirect = Array.from(el.childNodes).some(
+          (n) =>
+            n.nodeType === Node.TEXT_NODE &&
+            n.nodeValue &&
+            n.nodeValue.trim().length >= 3,
+        );
+        if (hasDirect) score += 4;
+        return { el, score, area };
+      })
+      .sort((a, b) => b.score - a.score || a.area - b.area);
     const seen = /* @__PURE__ */ new Set();
     const out = [];
     for (const { el } of scored) {
@@ -3014,8 +3365,7 @@
     if (hintHost) {
       try {
         hintHost.remove();
-      } catch {
-      }
+      } catch {}
       hintHost = null;
       hintHolder = null;
     }
@@ -3131,8 +3481,7 @@
         pillEl.className = "jari-pill";
         pillEl.textContent = "visual hint";
         ui.statusContainer().appendChild(pillEl);
-      } catch {
-      }
+      } catch {}
     } else {
       pillEl.textContent = "visual hint";
     }
@@ -3148,8 +3497,7 @@
     if (hintHost) {
       try {
         hintHost.remove();
-      } catch {
-      }
+      } catch {}
       hintHost = null;
       hintHolder = null;
     }
@@ -3157,8 +3505,7 @@
     if (!active4 && pillEl) {
       try {
         pillEl.remove();
-      } catch {
-      }
+      } catch {}
       pillEl = null;
     } else if (active4 && pillEl) {
       pillEl.textContent = pillText(mode3);
@@ -3179,9 +3526,10 @@
     try {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
-          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          if (!node.nodeValue || !node.nodeValue.trim())
+            return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
-        }
+        },
       });
       const first = walker.nextNode();
       if (first) {
@@ -3203,14 +3551,12 @@
     try {
       sel.removeAllRanges();
       sel.addRange(range);
-    } catch {
-    }
+    } catch {}
     if (mode3 !== "line" && sel.isCollapsed) {
       if (hasModify()) {
         try {
           sel.modify("extend", "forward", "character");
-        } catch {
-        }
+        } catch {}
       }
     }
     if (mode3 === "line") {
@@ -3249,8 +3595,7 @@
       try {
         sel.modify("extend", direction, granularity);
         return true;
-      } catch {
-      }
+      } catch {}
     }
     return false;
   }
@@ -3261,8 +3606,7 @@
       try {
         sel.modify("move", direction, granularity);
         return true;
-      } catch {
-      }
+      } catch {}
     }
     return false;
   }
@@ -3279,7 +3623,10 @@
     const off = sel.focusOffset;
     if (node.nodeType === Node.TEXT_NODE) {
       if (off < node.nodeValue.length) return node.nodeValue[off];
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+      );
       walker.currentNode = node;
       const nxt = walker.nextNode();
       if (nxt && nxt.nodeValue.length > 0) return nxt.nodeValue[0];
@@ -3294,10 +3641,14 @@
     const off = sel.focusOffset;
     if (node.nodeType === Node.TEXT_NODE) {
       if (off > 0) return node.nodeValue[off - 1];
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+      );
       walker.currentNode = node;
       const prev2 = walker.previousNode();
-      if (prev2 && prev2.nodeValue.length > 0) return prev2.nodeValue[prev2.nodeValue.length - 1];
+      if (prev2 && prev2.nodeValue.length > 0)
+        return prev2.nodeValue[prev2.nodeValue.length - 1];
       return null;
     }
     return null;
@@ -3307,9 +3658,20 @@
     while (el) {
       try {
         const display = window.getComputedStyle(el).display;
-        if (display === "block" || display === "flex" || display === "grid" || display === "list-item" || el.tagName === "P" || el.tagName === "DIV" || el.tagName === "LI" || el.tagName === "H1" || el.tagName === "H2" || el.tagName === "H3") return el;
-      } catch {
-      }
+        if (
+          display === "block" ||
+          display === "flex" ||
+          display === "grid" ||
+          display === "list-item" ||
+          el.tagName === "P" ||
+          el.tagName === "DIV" ||
+          el.tagName === "LI" ||
+          el.tagName === "H1" ||
+          el.tagName === "H2" ||
+          el.tagName === "H3"
+        )
+          return el;
+      } catch {}
       el = el.parentElement;
     }
     return node && node.parentElement ? node.parentElement : document.body;
@@ -3348,7 +3710,10 @@
       let newOffset = offset + dir;
       let newNode = node;
       if (newOffset < 0) {
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
         walker.currentNode = node;
         const prev2 = walker.previousNode();
         if (prev2) {
@@ -3359,7 +3724,10 @@
           return;
         }
       } else if (newOffset > text.length) {
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
         walker.currentNode = node;
         const next2 = walker.nextNode();
         if (next2) {
@@ -3376,8 +3744,7 @@
         try {
           sel.extend(newNode, newOffset);
           return;
-        } catch {
-        }
+        } catch {}
       }
       const r = document.createRange();
       try {
@@ -3393,8 +3760,7 @@
       }
       sel.removeAllRanges();
       sel.addRange(r);
-    } catch {
-    }
+    } catch {}
   }
   function fallbackMoveCaret(dir) {
     const sel = getSelection();
@@ -3417,7 +3783,10 @@
       let newOffset = offset + dir;
       let newNode = node;
       if (newOffset < 0) {
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
         walker.currentNode = node;
         const prev2 = walker.previousNode();
         if (prev2) {
@@ -3428,7 +3797,10 @@
           return;
         }
       } else if (newOffset > text.length) {
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
         walker.currentNode = node;
         const next2 = walker.nextNode();
         if (next2) {
@@ -3443,8 +3815,7 @@
       r.collapse(true);
       sel.removeAllRanges();
       sel.addRange(r);
-    } catch {
-    }
+    } catch {}
   }
   function fallbackMoveWord(dir) {
     const sel = getSelection();
@@ -3469,7 +3840,8 @@
       const prevNode = sel.focusNode;
       const prevOff = sel.focusOffset;
       fallbackMoveCaret(dir);
-      if (sel.focusNode === prevNode && sel.focusOffset === prevOff) return false;
+      if (sel.focusNode === prevNode && sel.focusOffset === prevOff)
+        return false;
     }
     return false;
   }
@@ -3494,7 +3866,8 @@
       const prevOff = getSelection().focusOffset;
       fallbackMoveChar(dir);
       const sel = getSelection();
-      if (sel.focusNode === prevNode && sel.focusOffset === prevOff) return false;
+      if (sel.focusNode === prevNode && sel.focusOffset === prevOff)
+        return false;
     }
     return false;
   }
@@ -3505,12 +3878,15 @@
     if (!block) return false;
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
       acceptNode(n) {
-        if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        if (!n.nodeValue || !n.nodeValue.trim())
+          return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
-      }
+      },
     });
-    let first = null, last = null, node;
-    while (node = walker.nextNode()) {
+    let first = null,
+      last = null,
+      node;
+    while ((node = walker.nextNode())) {
       if (!first) first = node;
       last = node;
     }
@@ -3539,7 +3915,7 @@
     if (!block) return false;
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
     let node;
-    while (node = walker.nextNode()) {
+    while ((node = walker.nextNode())) {
       const txt = node.nodeValue;
       for (let i = 0; i < txt.length; i++) {
         if (!/\s/.test(txt[i])) {
@@ -3555,7 +3931,10 @@
     if (!sel || !sel.focusNode) return null;
     const startNode = sel.focusNode;
     const startOffset = sel.focusOffset;
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
     let nodes = [];
     let n = walker.nextNode();
     while (n) {
@@ -3571,13 +3950,18 @@
       let from = 0;
       if (i === startIdx) from = startOffset;
       let pos = from;
+      let inWord = false;
       while (pos < txt.length) {
-        while (pos < txt.length && !isWordChar(txt[pos])) pos++;
-        if (pos >= txt.length) break;
-        let wordStart = pos;
-        while (pos < txt.length && isWordChar(txt[pos])) pos++;
-        let wordEnd = pos - 1;
-        if (wordEnd >= from) {
+        if (!inWord) {
+          while (pos < txt.length && !isWordChar(txt[pos])) pos++;
+          if (pos >= txt.length) break;
+          inWord = true;
+        } else {
+          while (pos < txt.length && isWordChar(txt[pos])) pos++;
+          if (pos >= txt.length) break;
+          inWord = false;
+          const wordEnd = pos - 1;
+          if (i === startIdx && wordEnd <= from) continue;
           found++;
           if (found === count) {
             return { node, offset: wordEnd };
@@ -3600,9 +3984,14 @@
     return true;
   }
   function fallbackDocBoundary(dir, forCaret) {
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    let first = null, last = null, n;
-    while (n = walker.nextNode()) {
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
+    let first = null,
+      last = null,
+      n;
+    while ((n = walker.nextNode())) {
       if (!n.nodeValue.trim()) continue;
       if (!first) first = n;
       last = n;
@@ -3635,7 +4024,13 @@
       }
       const origNode = sel.focusNode;
       const origOff = sel.focusOffset;
-      if (newRange && !(newRange.startContainer === origNode && newRange.startOffset === origOff)) {
+      if (
+        newRange &&
+        !(
+          newRange.startContainer === origNode &&
+          newRange.startOffset === origOff
+        )
+      ) {
         if (forCaret) {
           newRange.collapse(true);
           sel.removeAllRanges();
@@ -3647,8 +4042,7 @@
             try {
               sel.extend(newRange.startContainer, newRange.startOffset);
               return true;
-            } catch {
-            }
+            } catch {}
           }
           const r = document.createRange();
           try {
@@ -3663,8 +4057,7 @@
         }
         return true;
       }
-    } catch {
-    }
+    } catch {}
     try {
       const curRect = getSelection().getRangeAt(0).getBoundingClientRect();
       const candidates = collectVisualTextElements();
@@ -3676,7 +4069,9 @@
         if (dir < 0) {
           if (r.bottom >= curRect.top - 2) continue;
           const vDist = curRect.top - r.bottom;
-          const hDist = Math.abs(r.left + r.width / 2 - (curRect.left + curRect.width / 2));
+          const hDist = Math.abs(
+            r.left + r.width / 2 - (curRect.left + curRect.width / 2),
+          );
           const dist = vDist * 1.2 + hDist * 0.3;
           if (dist < bestDist) {
             bestDist = dist;
@@ -3685,7 +4080,9 @@
         } else {
           if (r.top <= curRect.bottom + 2) continue;
           const vDist = r.top - curRect.bottom;
-          const hDist = Math.abs(r.left + r.width / 2 - (curRect.left + curRect.width / 2));
+          const hDist = Math.abs(
+            r.left + r.width / 2 - (curRect.left + curRect.width / 2),
+          );
           const dist = vDist * 1.2 + hDist * 0.3;
           if (dist < bestDist) {
             bestDist = dist;
@@ -3696,24 +4093,27 @@
       if (best) {
         const walker = document.createTreeWalker(best, NodeFilter.SHOW_TEXT, {
           acceptNode(n) {
-            if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            if (!n.nodeValue || !n.nodeValue.trim())
+              return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
-          }
+          },
         });
         let first = walker.nextNode();
         if (!first) return false;
-        const targetNode = dir < 0 ? (() => {
-          let last = first;
-          let n2;
-          while (n2 = walker.nextNode()) last = n2;
-          return last;
-        })() : first;
+        const targetNode =
+          dir < 0
+            ? (() => {
+                let last = first;
+                let n2;
+                while ((n2 = walker.nextNode())) last = n2;
+                return last;
+              })()
+            : first;
         const targetOffset = dir < 0 ? targetNode.nodeValue.length : 0;
         moveToPosition(targetNode, targetOffset);
         return true;
       }
-    } catch {
-    }
+    } catch {}
     return false;
   }
   function doMoveLine(dir) {
@@ -3803,19 +4203,24 @@
   }
   function doGoToLine(n) {
     const line = Math.max(1, Math.floor(n) || 1);
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode(node2) {
-        if (!node2.nodeValue || !node2.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-        const parent = node2.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === "none" || style.visibility === "hidden") return NodeFilter.FILTER_REJECT;
-        } catch {
-        }
-        return NodeFilter.FILTER_ACCEPT;
-      }
-    });
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node2) {
+          if (!node2.nodeValue || !node2.nodeValue.trim())
+            return NodeFilter.FILTER_REJECT;
+          const parent = node2.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          try {
+            const style = window.getComputedStyle(parent);
+            if (style.display === "none" || style.visibility === "hidden")
+              return NodeFilter.FILTER_REJECT;
+          } catch {}
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      },
+    );
     let idx = 0;
     let target2 = null;
     let node = walker.nextNode();
@@ -3878,8 +4283,7 @@
       }
       ensureVisible();
       updateBlockCaret();
-    } catch {
-    }
+    } catch {}
   }
   function yankSelection() {
     const sel = getSelection();
@@ -3889,7 +4293,9 @@
       ui.toast("No selection");
       return;
     }
-    ui.copyText(text).then(() => ui.toast(`Yanked ${text.length} chars`)).catch(() => ui.toast("Yank failed"));
+    ui.copyText(text)
+      .then(() => ui.toast(`Yanked ${text.length} chars`))
+      .catch(() => ui.toast("Yank failed"));
   }
   function yankLineFromCaret() {
     const sel = getSelection();
@@ -3911,13 +4317,19 @@
       if (wasCollapsed) {
         const ok = extendSelection("forward", "lineboundary");
         if (!ok) {
-          const cur = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+          const cur =
+            sel.focusNode && sel.focusNode.parentElement
+              ? sel.focusNode.parentElement
+              : null;
           if (cur) lineText = cur.textContent || "";
           else lineText = sel.toString();
         } else {
           lineText = sel.toString();
           if (!lineText) {
-            const cur = atStartNode && atStartNode.parentElement ? atStartNode.parentElement : null;
+            const cur =
+              atStartNode && atStartNode.parentElement
+                ? atStartNode.parentElement
+                : null;
             lineText = cur ? cur.textContent || "" : "";
           }
         }
@@ -3925,8 +4337,7 @@
         lineText = sel.toString();
       }
       if (lineText) lineText = lineText.trim();
-    } catch {
-    }
+    } catch {}
     try {
       const r = document.createRange();
       r.setStart(savedNode, savedOffset);
@@ -3935,13 +4346,14 @@
       sel.addRange(r);
       updateBlockCaret();
       ensureVisible();
-    } catch {
-    }
+    } catch {}
     if (!lineText) {
       ui.toast("No line");
       return;
     }
-    ui.copyText(lineText).then(() => ui.toast(`Yanked line ${lineText.length} chars`)).catch(() => ui.toast("Yank failed"));
+    ui.copyText(lineText)
+      .then(() => ui.toast(`Yanked line ${lineText.length} chars`))
+      .catch(() => ui.toast("Yank failed"));
   }
   function getCaretLinkElement() {
     const sel = getSelection();
@@ -3959,7 +4371,8 @@
       let cur = el;
       while (cur) {
         if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
-        if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur)) return cur;
+        if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
+          return cur;
         const parent = cur.parentElement;
         if (parent) cur = parent;
         else {
@@ -3968,8 +4381,7 @@
           else break;
         }
       }
-    } catch {
-    }
+    } catch {}
     return null;
   }
   function activateCaretLink() {
@@ -3980,21 +4392,26 @@
     }
     try {
       link.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch {
-    }
+    } catch {}
     for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
       try {
-        link.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, button: 0, buttons: type === "mousedown" ? 1 : 0 }));
-      } catch {
-      }
+        link.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 0,
+            buttons: type === "mousedown" ? 1 : 0,
+          }),
+        );
+      } catch {}
     }
     try {
       link.focus({ preventScroll: true });
     } catch {
       try {
         link.focus();
-      } catch {
-      }
+      } catch {}
     }
     return true;
   }
@@ -4007,12 +4424,16 @@
     const dir = pendingF.dir;
     const till = pendingF.till;
     const count = pendingF.count || 1;
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode(node) {
-        if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      }
-    });
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      },
+    );
     let nodes = [];
     let n = walker.nextNode();
     while (n) {
@@ -4077,7 +4498,10 @@
   function moveToPosition(node, offset) {
     const sel = getSelection();
     if (!sel) return;
-    offset = Math.max(0, Math.min(offset, node.nodeValue ? node.nodeValue.length : 0));
+    offset = Math.max(
+      0,
+      Math.min(offset, node.nodeValue ? node.nodeValue.length : 0),
+    );
     if (isCaret()) {
       try {
         const r2 = document.createRange();
@@ -4085,8 +4509,7 @@
         r2.collapse(true);
         sel.removeAllRanges();
         sel.addRange(r2);
-      } catch {
-      }
+      } catch {}
       ensureVisible();
       updateBlockCaret();
       return;
@@ -4100,8 +4523,7 @@
         ensureVisible();
         updateBlockCaret();
         return;
-      } catch {
-      }
+      } catch {}
     }
     const r = document.createRange();
     try {
@@ -4139,8 +4561,7 @@
         sel.removeAllRanges();
         sel.addRange(r);
       }
-    } catch {
-    }
+    } catch {}
   }
   function enterCaretAtFocus() {
     if (!active4) return;
@@ -4180,8 +4601,7 @@
       if (sel) {
         try {
           sel.removeAllRanges();
-        } catch {
-        }
+        } catch {}
       }
     }
   }
@@ -4210,7 +4630,9 @@
       }
       if (key2 === "Enter") {
         consume2(event);
-        const visible = Array.from(hintMap.entries()).filter(([label]) => label.startsWith(hintPrefix));
+        const visible = Array.from(hintMap.entries()).filter(([label]) =>
+          label.startsWith(hintPrefix),
+        );
         if (visible.length === 1) {
           activateHintByLabel(visible[0][0]);
         }
@@ -4316,7 +4738,8 @@
         if (pillEl) pillEl.textContent = pillText(mode3) + " g";
         setTimeout(() => {
           pendingG = false;
-          if (pillEl && pillEl.textContent.endsWith(" g")) pillEl.textContent = pillText(mode3);
+          if (pillEl && pillEl.textContent.endsWith(" g"))
+            pillEl.textContent = pillText(mode3);
         }, 1500);
         return true;
       }
@@ -4332,7 +4755,8 @@
     if (isCaret()) {
       if (pendingY) {
         pendingY = false;
-        if (pillEl && pillEl.textContent.endsWith(" y")) pillEl.textContent = pillText(mode3);
+        if (pillEl && pillEl.textContent.endsWith(" y"))
+          pillEl.textContent = pillText(mode3);
         if (key === "y") {
           consume2(event);
           for (let i = 0; i < repeat; i++) yankLineFromCaret();
@@ -4347,7 +4771,8 @@
         setTimeout(() => {
           if (pendingY) {
             pendingY = false;
-            if (pillEl && pillEl.textContent.endsWith(" y")) pillEl.textContent = pillText(mode3);
+            if (pillEl && pillEl.textContent.endsWith(" y"))
+              pillEl.textContent = pillText(mode3);
           }
         }, 1500);
         return true;
@@ -4384,8 +4809,7 @@
           if (sel && sel.isCollapsed && hasModify()) {
             try {
               sel.modify("extend", "forward", "character");
-            } catch {
-            }
+            } catch {}
           }
           ensureVisible();
           updateBlockCaret();
@@ -4396,13 +4820,11 @@
             try {
               sel.modify("extend", "forward", "lineboundary");
               sel.modify("extend", "backward", "lineboundary");
-            } catch {
-            }
+            } catch {}
             if (sel && sel.isCollapsed) {
               try {
                 sel.modify("extend", "forward", "line");
-              } catch {
-              }
+              } catch {}
             }
           }
           ensureVisible();
@@ -4485,8 +4907,7 @@
         yankSelection();
         try {
           collapseToFocus();
-        } catch {
-        }
+        } catch {}
         mode3 = "caret";
         if (pillEl) pillEl.textContent = pillText(mode3);
         pendingCount = "";
@@ -4523,8 +4944,7 @@
         yankSelection();
         try {
           collapseToFocus();
-        } catch {
-        }
+        } catch {}
         mode3 = "caret";
         if (pillEl) pillEl.textContent = pillText(mode3);
         pendingCount = "";
@@ -4548,7 +4968,12 @@
           }
           break;
         }
-        if (key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        if (
+          key.length === 1 &&
+          !event.ctrlKey &&
+          !event.altKey &&
+          !event.metaKey
+        ) {
           consume2(event);
           ui.toast(`${isCaret() ? "No caret" : "No visual"}: ${key}`);
         } else {
@@ -4558,7 +4983,12 @@
       default:
         if (isCaret()) {
           consume2(event);
-        } else if (key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        } else if (
+          key.length === 1 &&
+          !event.ctrlKey &&
+          !event.altKey &&
+          !event.metaKey
+        ) {
           consume2(event);
           ui.toast(`No visual: ${key}`);
         } else {
@@ -4580,12 +5010,16 @@
     onKeyDown: onKeyDown4,
     showBlockCaret,
     hideBlockCaret,
-    updateBlockCaret
+    updateBlockCaret,
   };
-  register("visual", { close: () => {
-    closeHints();
-    close4(false);
-  }, onKeyDown: onKeyDown4, isActive: isActive4 });
+  register("visual", {
+    close: () => {
+      closeHints();
+      close4(false);
+    },
+    onKeyDown: onKeyDown4,
+    isActive: isActive4,
+  });
   function __resetVisualState() {
     closeHints();
     close4(false);
@@ -4620,7 +5054,11 @@
   }
   function detectHighlightSupport() {
     try {
-      return typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
+      return (
+        typeof CSS !== "undefined" &&
+        CSS.highlights &&
+        typeof Highlight !== "undefined"
+      );
     } catch {
       return false;
     }
@@ -4639,23 +5077,40 @@
     const parent = node.parentElement;
     if (!parent) return true;
     const tag = parent.tagName;
-    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
+    if (
+      tag === "SCRIPT" ||
+      tag === "STYLE" ||
+      tag === "NOSCRIPT" ||
+      tag === "TEMPLATE" ||
+      tag === "IFRAME" ||
+      tag === "CANVAS" ||
+      tag === "SVG"
+    )
+      return true;
     if (isOverlayElement(parent)) return true;
     if (parent.closest) {
       try {
-        if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-find-hit, .jari-find-current, .jari-hints-host")) return true;
+        if (
+          parent.closest(
+            ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-find-hit, .jari-find-current, .jari-hints-host",
+          )
+        )
+          return true;
         if (parent.closest('[aria-hidden="true"]')) return true;
         if (parent.closest("[hidden]")) return true;
-      } catch {
-      }
+      } catch {}
     }
     try {
       if (!isElementDrawn(parent)) return true;
       const style = window.getComputedStyle(parent);
-      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.opacity === "0"
+      )
+        return true;
       if (parseFloat(style.opacity) < 0.05) return true;
-    } catch {
-    }
+    } catch {}
     return false;
   }
   function scheduleFindRebuild() {
@@ -4666,24 +5121,33 @@
       if (!q) return;
       try {
         const rebuilt = buildMatches(q);
-        if (rebuilt.length !== matches.length || rebuilt.some((r, i) => r.startContainer !== matches[i]?.startContainer)) {
+        if (
+          rebuilt.length !== matches.length ||
+          rebuilt.some(
+            (r, i) => r.startContainer !== matches[i]?.startContainer,
+          )
+        ) {
           matches = rebuilt;
           currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
           applyHighlights();
           updateStatus();
           if (matches.length > 0) scrollToCurrent();
         }
-      } catch {
-      }
+      } catch {}
     }, 150);
   }
   function startFindObserver() {
     stopFindObserver();
     try {
       findObserver = new MutationObserver(scheduleFindRebuild);
-      findObserver.observe(document.body || document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style", "class", "hidden", "aria-hidden"] });
-    } catch {
-    }
+      findObserver.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["style", "class", "hidden", "aria-hidden"],
+      });
+    } catch {}
   }
   function stopFindObserver() {
     clearTimeout(findObserverTimer);
@@ -4691,8 +5155,7 @@
     if (findObserver) {
       try {
         findObserver.disconnect();
-      } catch {
-      }
+      } catch {}
       findObserver = null;
     }
   }
@@ -4701,25 +5164,21 @@
     const rootEl = document.body || document.documentElement;
     if (!rootEl) return out;
     try {
-      const walker = document.createTreeWalker(
-        rootEl,
-        NodeFilter.SHOW_TEXT,
-        {
-          acceptNode(node2) {
-            if (!node2.nodeValue || !node2.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-            if (shouldSkipNode(node2)) return NodeFilter.FILTER_REJECT;
-            return NodeFilter.FILTER_ACCEPT;
-          }
-        }
-      );
+      const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+        acceptNode(node2) {
+          if (!node2.nodeValue || !node2.nodeValue.trim())
+            return NodeFilter.FILTER_REJECT;
+          if (shouldSkipNode(node2)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      });
       let node = walker.nextNode();
       while (node) {
         out.push(node);
         if (out.length > 5e3) break;
         node = walker.nextNode();
       }
-    } catch {
-    }
+    } catch {}
     try {
       const visit = (root) => {
         let els;
@@ -4736,11 +5195,12 @@
                 NodeFilter.SHOW_TEXT,
                 {
                   acceptNode(n) {
-                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    if (!n.nodeValue || !n.nodeValue.trim())
+                      return NodeFilter.FILTER_REJECT;
                     if (shouldSkipNode(n)) return NodeFilter.FILTER_REJECT;
                     return NodeFilter.FILTER_ACCEPT;
-                  }
-                }
+                  },
+                },
               );
               let sn = sw.nextNode();
               while (sn) {
@@ -4749,8 +5209,7 @@
                 sn = sw.nextNode();
               }
               visit(el.shadowRoot);
-            } catch {
-            }
+            } catch {}
           }
           if (el.tagName === "IFRAME") {
             try {
@@ -4758,13 +5217,19 @@
               if (doc && doc.body) {
                 const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
                   acceptNode(n) {
-                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    if (!n.nodeValue || !n.nodeValue.trim())
+                      return NodeFilter.FILTER_REJECT;
                     const p = n.parentElement;
                     if (!p) return NodeFilter.FILTER_REJECT;
                     const tag = p.tagName;
-                    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
+                    if (
+                      tag === "SCRIPT" ||
+                      tag === "STYLE" ||
+                      tag === "NOSCRIPT"
+                    )
+                      return NodeFilter.FILTER_REJECT;
                     return NodeFilter.FILTER_ACCEPT;
-                  }
+                  },
                 });
                 let nn = w.nextNode();
                 while (nn) {
@@ -4773,14 +5238,12 @@
                   nn = w.nextNode();
                 }
               }
-            } catch {
-            }
+            } catch {}
           }
         }
       };
       visit(document);
-    } catch {
-    }
+    } catch {}
     return out;
   }
   function buildMatches(query2) {
@@ -4801,8 +5264,7 @@
           range.setStart(node, idx);
           range.setEnd(node, idx + query2.length);
           out.push(range);
-        } catch {
-        }
+        } catch {}
         pos = idx + query2.length;
         if (out.length >= MAX_MATCHES) break;
       }
@@ -4816,8 +5278,7 @@
         CSS.highlights.delete("jari-find");
         CSS.highlights.delete("jari-find-current");
       }
-    } catch {
-    }
+    } catch {}
   }
   function clearFallback() {
     for (const span of fallbackSpans) {
@@ -4828,8 +5289,7 @@
         const tn = document.createTextNode(text);
         parent.replaceChild(tn, span);
         parent.normalize();
-      } catch {
-      }
+      } catch {}
     }
     fallbackSpans = [];
   }
@@ -4854,7 +5314,8 @@
     }
     while (el) {
       if (el.tagName === "A" && isOpenableLink(el)) return el;
-      if (el.getAttribute && el.getAttribute("href") && isOpenableLink(el)) return el;
+      if (el.getAttribute && el.getAttribute("href") && isOpenableLink(el))
+        return el;
       const parent = el.parentElement;
       if (parent) {
         el = parent;
@@ -4869,8 +5330,7 @@
   function dispatchClick2(el) {
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch {
-    }
+    } catch {}
     for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
       try {
         el.dispatchEvent(
@@ -4879,19 +5339,17 @@
             cancelable: true,
             view: window,
             button: 0,
-            buttons: type === "mousedown" ? 1 : 0
-          })
+            buttons: type === "mousedown" ? 1 : 0,
+          }),
         );
-      } catch {
-      }
+      } catch {}
     }
     try {
       el.focus({ preventScroll: true });
     } catch {
       try {
         el.focus();
-      } catch {
-      }
+      } catch {}
     }
   }
   function activateCurrentLink() {
@@ -4899,8 +5357,7 @@
     if (!link) return false;
     try {
       dispatchClick2(link);
-    } catch {
-    }
+    } catch {}
     return true;
   }
   function applyHighlights() {
@@ -4909,14 +5366,20 @@
     if (matches.length === 0) return;
     const valid = matches.filter((r) => {
       try {
-        return r.startContainer && r.startContainer.isConnected !== false && r.endContainer && r.endContainer.isConnected !== false;
+        return (
+          r.startContainer &&
+          r.startContainer.isConnected !== false &&
+          r.endContainer &&
+          r.endContainer.isConnected !== false
+        );
       } catch {
         return false;
       }
     });
     if (valid.length !== matches.length) {
       matches = valid;
-      if (currentIdx >= matches.length) currentIdx = Math.max(0, matches.length - 1);
+      if (currentIdx >= matches.length)
+        currentIdx = Math.max(0, matches.length - 1);
       if (matches.length === 0) {
         updateStatus();
         return;
@@ -4931,16 +5394,14 @@
         } else {
           try {
             CSS.highlights.delete("jari-find");
-          } catch {
-          }
+          } catch {}
         }
         if (cur) {
           CSS.highlights.set("jari-find-current", new Highlight(cur));
         } else {
           try {
             CSS.highlights.delete("jari-find-current");
-          } catch {
-          }
+          } catch {}
         }
         return;
       } catch {
@@ -4961,11 +5422,11 @@
         try {
           if (!range.startContainer.isConnected) continue;
           const span = document.createElement("span");
-          span.className = idx === currentIdx ? "jari-find-current" : "jari-find-hit";
+          span.className =
+            idx === currentIdx ? "jari-find-current" : "jari-find-hit";
           range.surroundContents(span);
           fallbackSpans.push(span);
-        } catch {
-        }
+        } catch {}
       }
     }
   }
@@ -4975,30 +5436,35 @@
     if (!r) return;
     try {
       if (r.startContainer && r.startContainer.isConnected === false) return;
-      const el = r.startContainer && r.startContainer.parentElement ? r.startContainer.parentElement : null;
+      const el =
+        r.startContainer && r.startContainer.parentElement
+          ? r.startContainer.parentElement
+          : null;
       if (!el || !el.isConnected) return;
       try {
         const style = window.getComputedStyle(el);
         if (style.display === "none" || style.visibility === "hidden") return;
-      } catch {
-      }
-      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+      } catch {}
+      el.scrollIntoView({
+        block: "center",
+        inline: "nearest",
+        behavior: "instant",
+      });
       let rect = null;
       try {
-        rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect();
-      } catch {
-      }
+        rect = r.getBoundingClientRect
+          ? r.getBoundingClientRect()
+          : el.getBoundingClientRect();
+      } catch {}
       if (rect) {
         const vh = window.innerHeight || document.documentElement.clientHeight;
         if (rect.top < 0 || rect.bottom > vh) {
           try {
             window.scrollBy(0, rect.top - vh / 2);
-          } catch {
-          }
+          } catch {}
         }
       }
-    } catch {
-    }
+    } catch {}
   }
   function updateStatus() {
     if (!statusEl) return;
@@ -5055,7 +5521,7 @@
       }
       inputDebounce = setTimeout(() => {
         try {
-          const latest = inputEl2 && inputEl2.value.trim() || q;
+          const latest = (inputEl2 && inputEl2.value.trim()) || q;
           if (latest !== q) return;
           matches = buildMatches(latest);
           currentIdx = 0;
@@ -5063,8 +5529,7 @@
           applyHighlights();
           if (matches.length > 0) scrollToCurrent();
           updateStatus();
-        } catch {
-        }
+        } catch {}
       }, 80);
     });
     inputEl2.addEventListener("keydown", (e) => e.stopPropagation());
@@ -5090,22 +5555,23 @@
     if (overlay3) {
       try {
         overlay3.remove();
-      } catch {
-      }
+      } catch {}
       overlay3 = null;
     }
     inputEl2 = null;
     statusEl = null;
-    if (restoreFocus2 && restoreFocus2.isConnected && document.activeElement !== restoreFocus2) {
+    if (
+      restoreFocus2 &&
+      restoreFocus2.isConnected &&
+      document.activeElement !== restoreFocus2
+    ) {
       try {
         restoreFocus2.focus();
-      } catch {
-      }
+      } catch {}
     } else if (wasInput && document.activeElement === wasInput) {
       try {
         wasInput.blur();
-      } catch {
-      }
+      } catch {}
       if (document.activeElement === wasInput) {
         document.activeElement = document.body || null;
       }
@@ -5121,7 +5587,9 @@
     const c = Math.max(1, Math.floor(count) || 1);
     if (matches.length > 0) {
       try {
-        const stale = matches.some((r) => !r.startContainer || r.startContainer.isConnected === false);
+        const stale = matches.some(
+          (r) => !r.startContainer || r.startContainer.isConnected === false,
+        );
         if (stale) {
           const q = (lastQuery || pendingQuery || "").trim();
           if (q) {
@@ -5142,11 +5610,10 @@
             updateStatus();
           }
         }
-      } catch {
-      }
+      } catch {}
     }
     if (matches.length === 0) {
-      const q = pendingQuery && pendingQuery.trim() || lastQuery;
+      const q = (pendingQuery && pendingQuery.trim()) || lastQuery;
       if (!q) {
         ui.toast("No search");
         return;
@@ -5168,7 +5635,9 @@
       if (c > 1) {
         const delta2 = reverse ? -c : c;
         const len2 = matches.length;
-        currentIdx = ((currentIdx + (delta2 > 0 ? delta2 - 1 : delta2)) % len2 + len2) % len2;
+        currentIdx =
+          (((currentIdx + (delta2 > 0 ? delta2 - 1 : delta2)) % len2) + len2) %
+          len2;
         applyHighlights();
         updateStatus();
       }
@@ -5178,7 +5647,7 @@
     }
     const len = matches.length;
     const delta = reverse ? -c : c;
-    currentIdx = ((currentIdx + delta) % len + len) % len;
+    currentIdx = (((currentIdx + delta) % len) + len) % len;
     applyHighlights();
     scrollToCurrent();
     updateStatus();
@@ -5260,13 +5729,16 @@
     hasHighlights: hasHighlightsPublic,
     handleGlobalEsc,
     handleGlobalEnter,
-    onKeyDown: onKeyDown5
+    onKeyDown: onKeyDown5,
   };
-  register("find", { close: closeAndClear, onKeyDown: onKeyDown5, isActive: isActive5 });
+  register("find", {
+    close: closeAndClear,
+    onKeyDown: onKeyDown5,
+    isActive: isActive5,
+  });
   try {
     Visual.setFindOpen(() => open4());
-  } catch {
-  }
+  } catch {}
   function __resetFindState() {
     closeAndClear();
     lastQuery = "";
@@ -5277,10 +5749,8 @@
   // content/commands.js
   var PAGE_RATIO = 0.9;
   var HALF_RATIO = 0.5;
-  var ignoreToggle = () => {
-  };
-  var passthroughEnter = () => {
-  };
+  var ignoreToggle = () => {};
+  var passthroughEnter = () => {};
   function setModeActions({ ignore, passthrough } = {}) {
     if (ignore) ignoreToggle = ignore;
     if (passthrough) passthroughEnter = passthrough;
@@ -5318,8 +5788,16 @@
       return;
     }
     const CAP = 80;
-    const moveX = pendingX !== 0 ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4))) : 0;
-    const moveY = pendingY2 !== 0 ? Math.sign(pendingY2) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY2) * 0.4))) : 0;
+    const moveX =
+      pendingX !== 0
+        ? Math.sign(pendingX) *
+          Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4)))
+        : 0;
+    const moveY =
+      pendingY2 !== 0
+        ? Math.sign(pendingY2) *
+          Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY2) * 0.4)))
+        : 0;
     const before = scrollPosOf(el);
     el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
     const after = scrollPosOf(el);
@@ -5344,7 +5822,9 @@
     ui.toast(message);
   }
   function copyTitleUrlText() {
-    return settings.getCopyFormat() === "markdown" ? `[${document.title}](${location.href})` : `${document.title}
+    return settings.getCopyFormat() === "markdown"
+      ? `[${document.title}](${location.href})`
+      : `${document.title}
 ${location.href}`;
   }
   function pasteClipboard() {
@@ -5353,61 +5833,114 @@ ${location.href}`;
       ui.withHiddenTextarea((ta) => {
         if (document.execCommand("paste")) text = ta.value.trim();
       });
-    } catch {
-    }
+    } catch {}
     if (text) return Promise.resolve(text);
     try {
-      return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
+      return navigator.clipboard
+        .readText()
+        .then((t) => t.trim())
+        .catch(() => "");
     } catch {
       return Promise.resolve("");
     }
   }
   var commands = {
-    scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
-    scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
-    scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
-    scrollRight: { ...COMMAND_CATALOG.scrollRight, run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }) },
+    scrollDown: {
+      ...COMMAND_CATALOG.scrollDown,
+      run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }),
+    },
+    scrollUp: {
+      ...COMMAND_CATALOG.scrollUp,
+      run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }),
+    },
+    scrollLeft: {
+      ...COMMAND_CATALOG.scrollLeft,
+      run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }),
+    },
+    scrollRight: {
+      ...COMMAND_CATALOG.scrollRight,
+      run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }),
+    },
     scrollTop: {
       ...COMMAND_CATALOG.scrollTop,
       run: () => {
         const el = getScrollElement();
-        if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
+        if (settings.isSmoothScroll() && !prefersReducedMotion())
+          smoothScrollBy(el, 0, -scrollPosOf(el).y);
         else el.scrollTo({ top: 0, behavior: "instant" });
-      }
+      },
     },
     scrollBottom: {
       ...COMMAND_CATALOG.scrollBottom,
       run: () => {
         const el = getScrollElement();
         const target2 = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
-        if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target2 - scrollPosOf(el).y);
+        if (settings.isSmoothScroll() && !prefersReducedMotion())
+          smoothScrollBy(el, 0, target2 - scrollPosOf(el).y);
         else el.scrollTo({ top: target2, behavior: "instant" });
-      }
+      },
     },
     scrollPageDown: {
       ...COMMAND_CATALOG.scrollPageDown,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count })
+      run: (c) =>
+        scrollBy({
+          y: clientHeightOf(getScrollElement()) * PAGE_RATIO,
+          count: c.count,
+        }),
     },
     scrollPageUp: {
       ...COMMAND_CATALOG.scrollPageUp,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count })
+      run: (c) =>
+        scrollBy({
+          y: -clientHeightOf(getScrollElement()) * PAGE_RATIO,
+          count: c.count,
+        }),
     },
     scrollHalfPageDown: {
       ...COMMAND_CATALOG.scrollHalfPageDown,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count })
+      run: (c) =>
+        scrollBy({
+          y: clientHeightOf(getScrollElement()) * HALF_RATIO,
+          count: c.count,
+        }),
     },
     scrollHalfPageUp: {
       ...COMMAND_CATALOG.scrollHalfPageUp,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count })
+      run: (c) =>
+        scrollBy({
+          y: -clientHeightOf(getScrollElement()) * HALF_RATIO,
+          count: c.count,
+        }),
     },
-    cycleScrollArea: { ...COMMAND_CATALOG.cycleScrollArea, run: () => Scroll.cycle() },
-    resetScrollArea: { ...COMMAND_CATALOG.resetScrollArea, run: () => Scroll.resetToGlobal() },
-    showScrollArea: { ...COMMAND_CATALOG.showScrollArea, run: () => Scroll.showHighlight() },
-    zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
-    zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
+    cycleScrollArea: {
+      ...COMMAND_CATALOG.cycleScrollArea,
+      run: () => Scroll.cycle(),
+    },
+    resetScrollArea: {
+      ...COMMAND_CATALOG.resetScrollArea,
+      run: () => Scroll.resetToGlobal(),
+    },
+    showScrollArea: {
+      ...COMMAND_CATALOG.showScrollArea,
+      run: () => Scroll.showHighlight(),
+    },
+    zoomIn: {
+      ...COMMAND_CATALOG.zoomIn,
+      run: () => sendMessage("zoomBy", { delta: 0.1 }),
+    },
+    zoomOut: {
+      ...COMMAND_CATALOG.zoomOut,
+      run: () => sendMessage("zoomBy", { delta: -0.1 }),
+    },
     newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
-    closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
-    restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
+    closeTab: {
+      ...COMMAND_CATALOG.closeTab,
+      run: (c) => sendMessage("closeTab", { count: c.count }),
+    },
+    restoreTab: {
+      ...COMMAND_CATALOG.restoreTab,
+      run: (c) => sendMessage("restoreTab", { count: c.count }),
+    },
     pasteOpen: {
       ...COMMAND_CATALOG.pasteOpen,
       run: async () => {
@@ -5415,7 +5948,7 @@ ${location.href}`;
         if (!text) return ui.toast("Clipboard empty");
         const res = await sendMessage("navigate", { url: text });
         if (res && !res.ok) ui.toast("Not a URL");
-      }
+      },
     },
     pasteOpenBackground: {
       ...COMMAND_CATALOG.pasteOpenBackground,
@@ -5424,11 +5957,20 @@ ${location.href}`;
         if (!text) return ui.toast("Clipboard empty");
         const res = await sendMessage("openInBackgroundTab", { url: text });
         if (res && !res.ok) ui.toast("Not a URL");
-      }
+      },
     },
-    previousTab: { ...COMMAND_CATALOG.previousTab, run: (c) => sendMessage("previousTab", { count: c.count }) },
-    nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
-    firstTab: { ...COMMAND_CATALOG.firstTab, run: () => sendMessage("firstTab") },
+    previousTab: {
+      ...COMMAND_CATALOG.previousTab,
+      run: (c) => sendMessage("previousTab", { count: c.count }),
+    },
+    nextTab: {
+      ...COMMAND_CATALOG.nextTab,
+      run: (c) => sendMessage("nextTab", { count: c.count }),
+    },
+    firstTab: {
+      ...COMMAND_CATALOG.firstTab,
+      run: () => sendMessage("firstTab"),
+    },
     lastTab: { ...COMMAND_CATALOG.lastTab, run: () => sendMessage("lastTab") },
     splitMerge: {
       ...COMMAND_CATALOG.splitMerge,
@@ -5443,57 +5985,122 @@ ${location.href}`;
         else if (res.needMerge) Prompt.openMerge(res);
         else if (res.needMerge === false) ui.toast("No window to merge");
         else ui.toast("No window to split");
-      }
+      },
     },
-    moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
-    moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
-    duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
-    togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
-    toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
+    moveTabLeft: {
+      ...COMMAND_CATALOG.moveTabLeft,
+      run: () => sendMessage("moveTabLeft"),
+    },
+    moveTabRight: {
+      ...COMMAND_CATALOG.moveTabRight,
+      run: () => sendMessage("moveTabRight"),
+    },
+    duplicateTab: {
+      ...COMMAND_CATALOG.duplicateTab,
+      run: () => sendMessage("duplicateTab"),
+    },
+    togglePin: {
+      ...COMMAND_CATALOG.togglePin,
+      run: () => sendMessage("togglePin"),
+    },
+    toggleMute: {
+      ...COMMAND_CATALOG.toggleMute,
+      run: () => sendMessage("toggleMute"),
+    },
     tabSearch: { ...COMMAND_CATALOG.tabSearch, run: () => Prompt.open() },
     omnibar: { ...COMMAND_CATALOG.omnibar, run: () => Prompt.openOmnibar() },
-    reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
-    hardReload: { ...COMMAND_CATALOG.hardReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
+    reloadTab: {
+      ...COMMAND_CATALOG.reloadTab,
+      run: () => sendMessage("reloadTab", { bypassCache: false }),
+    },
+    hardReload: {
+      ...COMMAND_CATALOG.hardReload,
+      run: () => sendMessage("reloadTab", { bypassCache: true }),
+    },
     goUp: {
       ...COMMAND_CATALOG.goUp,
       run: () => {
         const target2 = Url.parentUrlOf(location.href);
-        if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
+        if (Url.isSamePath(target2, location.href))
+          return ui.toast("Already at root");
         sendMessage("navigate", { url: target2 });
-      }
+      },
     },
     goToRoot: {
       ...COMMAND_CATALOG.goToRoot,
       run: () => {
         const target2 = Url.rootUrlOf(location.href);
-        if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
+        if (Url.isSamePath(target2, location.href))
+          return ui.toast("Already at root");
         sendMessage("navigate", { url: target2 });
-      }
+      },
     },
     editUrl: {
       ...COMMAND_CATALOG.editUrl,
-      run: () => Prompt.openEditUrl()
+      run: () => Prompt.openEditUrl(),
     },
-    historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
-    historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
-    copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
-    copyTitleUrl: { ...COMMAND_CATALOG.copyTitleUrl, run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
-    toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
-    passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
-    toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
+    historyBack: {
+      ...COMMAND_CATALOG.historyBack,
+      run: () => sendMessage("historyBack"),
+    },
+    historyForward: {
+      ...COMMAND_CATALOG.historyForward,
+      run: () => sendMessage("historyForward"),
+    },
+    copyUrl: {
+      ...COMMAND_CATALOG.copyUrl,
+      run: () => copyToClipboard(location.href, "Copied"),
+    },
+    copyTitleUrl: {
+      ...COMMAND_CATALOG.copyTitleUrl,
+      run: () => copyToClipboard(copyTitleUrlText(), "Copied"),
+    },
+    toggleIgnore: {
+      ...COMMAND_CATALOG.toggleIgnore,
+      run: () => ignoreToggle(),
+    },
+    passthrough: {
+      ...COMMAND_CATALOG.passthrough,
+      run: () => passthroughEnter(),
+    },
+    toggleDisabled: {
+      ...COMMAND_CATALOG.toggleDisabled,
+      run: () => settings.toggleDisabled(),
+    },
     hintClick: { ...COMMAND_CATALOG.hintClick, run: () => Hints.open("click") },
     hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
-    hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
+    hintOpenBackground: {
+      ...COMMAND_CATALOG.hintOpenBackground,
+      run: () => Hints.open("openBackground"),
+    },
     hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
     hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
     findForward: { ...COMMAND_CATALOG.findForward, run: () => Find.open() },
-    findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
-    findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
-    visualMode: { ...COMMAND_CATALOG.visualMode, run: () => Visual.enter("visual") },
-    visualLineMode: { ...COMMAND_CATALOG.visualLineMode, run: () => Visual.enter("line") },
+    findNext: {
+      ...COMMAND_CATALOG.findNext,
+      run: (c) => Find.next(c.count, false),
+    },
+    findPrev: {
+      ...COMMAND_CATALOG.findPrev,
+      run: (c) => Find.next(c.count, true),
+    },
+    visualMode: {
+      ...COMMAND_CATALOG.visualMode,
+      run: () => Visual.enter("visual"),
+    },
+    visualLineMode: {
+      ...COMMAND_CATALOG.visualLineMode,
+      run: () => Visual.enter("line"),
+    },
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
-    openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
-    openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") }
+    openOptions: {
+      ...COMMAND_CATALOG.openOptions,
+      run: () => sendMessage("openOptions"),
+    },
+    openExtensions: {
+      ...COMMAND_CATALOG.openExtensions,
+      run: () => sendMessage("openExtensions"),
+    },
   };
 
   // content/content.js
@@ -5514,7 +6121,15 @@ ${location.href}`;
     timer = setTimeout(clearPending, settings.getTimeoutMs());
   }
   function isTypingTarget(el) {
-    return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.getAttribute("role") === "textbox" || el.getAttribute("role") === "searchbox");
+    return (
+      !!el &&
+      (el.tagName === "INPUT" ||
+        el.tagName === "TEXTAREA" ||
+        el.tagName === "SELECT" ||
+        el.isContentEditable ||
+        el.getAttribute("role") === "textbox" ||
+        el.getAttribute("role") === "searchbox")
+    );
   }
   function run(commandName, count, event) {
     const cmd = commands[commandName];
@@ -5545,7 +6160,7 @@ ${location.href}`;
     passthroughMode = true;
     showPill2(
       "passthrough",
-      "passthrough (" + settings.getPassthroughMs() + "ms)"
+      "passthrough (" + settings.getPassthroughMs() + "ms)",
     );
     clearTimeout(passthroughTimer);
     passthroughTimer = setTimeout(exitPassthrough, settings.getPassthroughMs());
@@ -5599,7 +6214,10 @@ ${location.href}`;
     }
     if (ignoreMode) {
       const key2 = canonicalKey(event);
-      if (settings.getKeymap()[key2] === "toggleIgnore" || event.key === "Escape") {
+      if (
+        settings.getKeymap()[key2] === "toggleIgnore" ||
+        event.key === "Escape"
+      ) {
         event.preventDefault();
         event.stopImmediatePropagation();
         toggleIgnore();
@@ -5712,11 +6330,9 @@ ${location.href}`;
     if (pills.passthrough) hidePill2("passthrough");
     try {
       __resetFindState();
-    } catch {
-    }
+    } catch {}
     try {
       __resetVisualState();
-    } catch {
-    }
+    } catch {}
   }
 })();

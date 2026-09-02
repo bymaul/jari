@@ -171,11 +171,18 @@ function updateBlockCaretImmediate() {
         rect = range.getBoundingClientRect();
       }
     } catch {
-      try { rect = range.getBoundingClientRect(); } catch { rect = null; }
+      try {
+        rect = range.getBoundingClientRect();
+      } catch {
+        rect = null;
+      }
     }
     if (!rect) return;
     if (rect.width === 0 && rect.height === 0) {
-      const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+      const el =
+        sel.focusNode && sel.focusNode.parentElement
+          ? sel.focusNode.parentElement
+          : null;
       if (el) {
         const cr = el.getClientRects();
         if (cr && cr.length) rect = cr[0];
@@ -193,7 +200,10 @@ function updateBlockCaretImmediate() {
       caretEl.style.opacity = "0.85";
     }
     try {
-      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      if (
+        window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
         caretEl.style.animation = "none";
       }
     } catch {}
@@ -213,30 +223,48 @@ function ensureVisible() {
   try {
     const range = sel.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    if (!rect || (rect.top === 0 && rect.left === 0 && rect.width === 0 && rect.height === 0)) {
+    if (
+      !rect ||
+      (rect.top === 0 &&
+        rect.left === 0 &&
+        rect.width === 0 &&
+        rect.height === 0)
+    ) {
       const node = sel.focusNode;
       if (node && node.parentElement) {
-        node.parentElement.scrollIntoView({ block: "nearest", inline: "nearest" });
+        node.parentElement.scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+        });
       }
       return;
     }
     const vh = window.innerHeight;
     const vw = window.innerWidth;
     if (rect.top < 0 || rect.bottom > vh || rect.left < 0 || rect.right > vw) {
-      const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+      const el =
+        sel.focusNode && sel.focusNode.parentElement
+          ? sel.focusNode.parentElement
+          : null;
       if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
       else window.scrollBy(0, rect.top - vh / 2);
     }
-    } catch {}
+  } catch {}
   updateBlockCaret();
   applyVisualHighlight();
 }
 
 function attachCaretListeners() {
   try {
-    window.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
+    window.addEventListener("scroll", updateBlockCaret, {
+      passive: true,
+      capture: true,
+    });
     window.addEventListener("resize", updateBlockCaret, { passive: true });
-    document.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
+    document.addEventListener("scroll", updateBlockCaret, {
+      passive: true,
+      capture: true,
+    });
   } catch {
     try {
       window.addEventListener("scroll", updateBlockCaret, true);
@@ -258,7 +286,12 @@ function detachCaretListeners() {
       document.removeEventListener("scroll", updateBlockCaret, true);
     } catch {}
   }
-  if (caretRaf) { try { cancelAnimationFrame(caretRaf); } catch {} caretRaf = null; }
+  if (caretRaf) {
+    try {
+      cancelAnimationFrame(caretRaf);
+    } catch {}
+    caretRaf = null;
+  }
   if (!active && !hintActive) disableSelectOverride();
 }
 let selectOverrideEl = null;
@@ -273,7 +306,9 @@ function enableSelectOverride() {
 }
 function disableSelectOverride() {
   if (!selectOverrideEl) return;
-  try { selectOverrideEl.remove(); } catch {}
+  try {
+    selectOverrideEl.remove();
+  } catch {}
   selectOverrideEl = null;
 }
 
@@ -301,7 +336,11 @@ function applyVisualHighlight() {
   try {
     const range = sel.getRangeAt(0).cloneRange();
     try {
-      if (typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined") {
+      if (
+        typeof CSS !== "undefined" &&
+        CSS.highlights &&
+        typeof Highlight !== "undefined"
+      ) {
         CSS.highlights.set("jari-visual", new Highlight(range));
         visualUseHighlights = true;
         return;
@@ -316,23 +355,56 @@ function applyVisualHighlight() {
       visualFallbackSpans.push(span);
     } catch {
       try {
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
         let n = walker.nextNode();
         while (n) {
           try {
-            if (!range.intersectsNode || !range.intersectsNode(n)) { n = walker.nextNode(); continue; }
+            if (!range.intersectsNode || !range.intersectsNode(n)) {
+              n = walker.nextNode();
+              continue;
+            }
             const nodeRange = document.createRange();
             nodeRange.selectNodeContents(n);
-            if (range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <= 0 || range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0) { n = walker.nextNode(); continue; }
-            const startNode = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? n : range.startContainer;
-            const startOffset = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? 0 : range.startOffset;
-            const endNode = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n : range.endContainer;
-            const endOffset = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n.nodeValue.length : range.endOffset;
-            if (startNode !== n || endNode !== n) { n = walker.nextNode(); continue; }
+            if (
+              range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <= 0 ||
+              range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0
+            ) {
+              n = walker.nextNode();
+              continue;
+            }
+            const startNode =
+              range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0
+                ? n
+                : range.startContainer;
+            const startOffset =
+              range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0
+                ? 0
+                : range.startOffset;
+            const endNode =
+              range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0
+                ? n
+                : range.endContainer;
+            const endOffset =
+              range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0
+                ? n.nodeValue.length
+                : range.endOffset;
+            if (startNode !== n || endNode !== n) {
+              n = walker.nextNode();
+              continue;
+            }
             const r = document.createRange();
-            r.setStart(n, Math.max(0, Math.min(startOffset, n.nodeValue.length)));
+            r.setStart(
+              n,
+              Math.max(0, Math.min(startOffset, n.nodeValue.length)),
+            );
             r.setEnd(n, Math.max(0, Math.min(endOffset, n.nodeValue.length)));
-            if (r.collapsed) { n = walker.nextNode(); continue; }
+            if (r.collapsed) {
+              n = walker.nextNode();
+              continue;
+            }
             const s = document.createElement("span");
             s.className = "jari-visual-highlight";
             r.surroundContents(s);
@@ -342,7 +414,10 @@ function applyVisualHighlight() {
         }
       } catch {}
       try {
-        const walker2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const walker2 = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
         let nn = walker2.nextNode();
         while (nn && visualFallbackSpans.length === 0) {
           nn = walker2.nextNode();
@@ -407,10 +482,17 @@ function getZIndex(node) {
   let z = 0;
   try {
     do {
-      const v = parseInt(window.getComputedStyle(node).getPropertyValue("z-index"));
+      const v = parseInt(
+        window.getComputedStyle(node).getPropertyValue("z-index"),
+      );
       if (!isNaN(v) && v >= 0) z += v;
       node = node.parentNode;
-    } while (node && node !== document.body && node !== document && node.nodeType !== 11);
+    } while (
+      node &&
+      node !== document.body &&
+      node !== document &&
+      node.nodeType !== 11
+    );
   } catch {}
   return z;
 }
@@ -421,7 +503,12 @@ function placeHintsHost(host) {
     if (topLayer) {
       const r = topLayer.getBoundingClientRect();
       const style = window.getComputedStyle(topLayer);
-      if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
+      if (
+        r.width > 0 &&
+        r.height > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden"
+      ) {
         topLayer.appendChild(host);
         return;
       }
@@ -442,7 +529,9 @@ function coordinate(holderEl) {
     top: br.top + window.pageYOffset - document.documentElement.clientTop,
     left: br.left + window.pageXOffset - document.documentElement.clientLeft,
   };
-  try { probe.remove(); } catch {}
+  try {
+    probe.remove();
+  } catch {}
   return ret;
 }
 
@@ -450,20 +539,42 @@ function collectVisualTextElements() {
   let elements = getVisibleElements((e, v) => {
     try {
       if (e.closest && e.closest(overlaySelectors)) return;
-      if (e.closest && e.closest(".jari-visual-caret-host, .jari-visual-caret, .jari-hints-host, .jari-hint")) return;
-      if (e.closest && e.closest("script, style, noscript, template, head, meta, link, svg, canvas, video, audio, iframe")) return;
+      if (
+        e.closest &&
+        e.closest(
+          ".jari-visual-caret-host, .jari-visual-caret, .jari-hints-host, .jari-hint",
+        )
+      )
+        return;
+      if (
+        e.closest &&
+        e.closest(
+          "script, style, noscript, template, head, meta, link, svg, canvas, video, audio, iframe",
+        )
+      )
+        return;
     } catch {}
     const raw = e.textContent;
     if (!raw) return;
     const text = raw.trim();
     if (!text || text.length < 3 || text.length > 500) return;
     const tag = e.tagName;
-    if (tag === "HTML" || tag === "BODY" || tag === "MAIN" || tag === "ARTICLE" || tag === "SECTION") {
+    if (
+      tag === "HTML" ||
+      tag === "BODY" ||
+      tag === "MAIN" ||
+      tag === "ARTICLE" ||
+      tag === "SECTION"
+    ) {
       if (text.length > 200) return;
     }
     let hasDirectText = false;
     for (const n of e.childNodes) {
-      if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 2) {
+      if (
+        n.nodeType === Node.TEXT_NODE &&
+        n.nodeValue &&
+        n.nodeValue.trim().length >= 2
+      ) {
         hasDirectText = true;
         break;
       }
@@ -472,7 +583,12 @@ function collectVisualTextElements() {
     let isBlock = false;
     try {
       const style = window.getComputedStyle(e);
-      isBlock = style.display === "block" || style.display === "flex" || style.display === "grid" || style.display === "list-item" || style.display === "table-cell";
+      isBlock =
+        style.display === "block" ||
+        style.display === "flex" ||
+        style.display === "grid" ||
+        style.display === "list-item" ||
+        style.display === "table-cell";
       if (style.visibility === "hidden" || style.opacity === "0") return;
     } catch {}
     if (!isLeaf && !hasDirectText && !isBlock) return;
@@ -480,29 +596,42 @@ function collectVisualTextElements() {
     v.push(e);
   });
   elements = filterInvisibleElements(elements);
-  elements = elements.filter(e => {
+  elements = elements.filter((e) => {
     const r = e.getBoundingClientRect();
     return r.width >= 16 && r.height >= 8 && r.width * r.height >= 80;
   });
   elements = filterOverlapElements(elements);
   elements = filterAncestors(elements);
-  const scored = elements.map(el => {
-    const text = el.textContent.trim();
-    const rect = el.getBoundingClientRect();
-    const area = rect.width * rect.height;
-    let score = 0;
-    if (text.length >= 10 && text.length <= 140) score += 12;
-    else if (text.length > 200) score -= 8;
-    if (text.split(/\s+/).length >= 2) score += 4;
-    if (area > 0 && area < 40000) score += 6;
-    else if (area >= 100000) score -= 6;
-    try {
-      if (el.closest && el.closest("p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd")) score += 5;
-    } catch {}
-    const hasDirect = Array.from(el.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 3);
-    if (hasDirect) score += 4;
-    return { el, score, area };
-  }).sort((a, b) => b.score - a.score || a.area - b.area);
+  const scored = elements
+    .map((el) => {
+      const text = el.textContent.trim();
+      const rect = el.getBoundingClientRect();
+      const area = rect.width * rect.height;
+      let score = 0;
+      if (text.length >= 10 && text.length <= 140) score += 12;
+      else if (text.length > 200) score -= 8;
+      if (text.split(/\s+/).length >= 2) score += 4;
+      if (area > 0 && area < 40000) score += 6;
+      else if (area >= 100000) score -= 6;
+      try {
+        if (
+          el.closest &&
+          el.closest(
+            "p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd",
+          )
+        )
+          score += 5;
+      } catch {}
+      const hasDirect = Array.from(el.childNodes).some(
+        (n) =>
+          n.nodeType === Node.TEXT_NODE &&
+          n.nodeValue &&
+          n.nodeValue.trim().length >= 3,
+      );
+      if (hasDirect) score += 4;
+      return { el, score, area };
+    })
+    .sort((a, b) => b.score - a.score || a.area - b.area);
   const seen = new Set();
   const out = [];
   for (const { el } of scored) {
@@ -512,7 +641,7 @@ function collectVisualTextElements() {
     if (out.length >= 350) break;
   }
   if (out.length > 250) {
-    return out.filter(e => e.textContent.trim().length >= 10).slice(0, 250);
+    return out.filter((e) => e.textContent.trim().length >= 10).slice(0, 250);
   }
   return out;
 }
@@ -538,7 +667,9 @@ function updateHintText(hintEl, label, typed) {
 
 function renderHints() {
   if (hintHost) {
-    try { hintHost.remove(); } catch {}
+    try {
+      hintHost.remove();
+    } catch {}
     hintHost = null;
     hintHolder = null;
   }
@@ -579,7 +710,11 @@ function renderHints() {
   hintMap.clear();
 
   const bof = (() => {
-    try { return coordinate(hintHolder); } catch { return { top: 0, left: 0 }; }
+    try {
+      return coordinate(hintHolder);
+    } catch {
+      return { top: 0, left: 0 };
+    }
   })();
 
   let lastTop = -1;
@@ -612,7 +747,7 @@ function renderHints() {
     return link;
   });
 
-  hintEls.forEach(link => hintHolder.appendChild(link));
+  hintEls.forEach((link) => hintHolder.appendChild(link));
   refreshHints();
 }
 
@@ -672,14 +807,18 @@ function closeHints() {
   hintLabels = [];
   hintMap.clear();
   if (hintHost) {
-    try { hintHost.remove(); } catch {}
+    try {
+      hintHost.remove();
+    } catch {}
     hintHost = null;
     hintHolder = null;
   }
   if (!active && !hintActive) disableSelectOverride();
   // restore pill if visual active, else hide
   if (!active && pillEl) {
-    try { pillEl.remove(); } catch {}
+    try {
+      pillEl.remove();
+    } catch {}
     pillEl = null;
   } else if (active && pillEl) {
     pillEl.textContent = pillText(mode);
@@ -704,7 +843,8 @@ function enterAtElement(el, newMode) {
     // Find first text node in element
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
-        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        if (!node.nodeValue || !node.nodeValue.trim())
+          return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       },
     });
@@ -733,7 +873,9 @@ function enterAtElement(el, newMode) {
   // For visual, extend by one char to show selection
   if (mode !== "line" && sel.isCollapsed) {
     if (hasModify()) {
-      try { sel.modify("extend", "forward", "character"); } catch {}
+      try {
+        sel.modify("extend", "forward", "character");
+      } catch {}
     }
   }
   if (mode === "line") {
@@ -810,7 +952,10 @@ function charAtFocus() {
   const off = sel.focusOffset;
   if (node.nodeType === Node.TEXT_NODE) {
     if (off < node.nodeValue.length) return node.nodeValue[off];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
     walker.currentNode = node;
     const nxt = walker.nextNode();
     if (nxt && nxt.nodeValue.length > 0) return nxt.nodeValue[0];
@@ -825,10 +970,14 @@ function charBeforeFocus() {
   const off = sel.focusOffset;
   if (node.nodeType === Node.TEXT_NODE) {
     if (off > 0) return node.nodeValue[off - 1];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
     walker.currentNode = node;
     const prev = walker.previousNode();
-    if (prev && prev.nodeValue.length > 0) return prev.nodeValue[prev.nodeValue.length - 1];
+    if (prev && prev.nodeValue.length > 0)
+      return prev.nodeValue[prev.nodeValue.length - 1];
     return null;
   }
   return null;
@@ -838,7 +987,19 @@ function getBlockAncestor(node) {
   while (el) {
     try {
       const display = window.getComputedStyle(el).display;
-      if (display === "block" || display === "flex" || display === "grid" || display === "list-item" || el.tagName === "P" || el.tagName === "DIV" || el.tagName === "LI" || el.tagName === "H1" || el.tagName === "H2" || el.tagName === "H3") return el;
+      if (
+        display === "block" ||
+        display === "flex" ||
+        display === "grid" ||
+        display === "list-item" ||
+        el.tagName === "P" ||
+        el.tagName === "DIV" ||
+        el.tagName === "LI" ||
+        el.tagName === "H1" ||
+        el.tagName === "H2" ||
+        el.tagName === "H3"
+      )
+        return el;
     } catch {}
     el = el.parentElement;
   }
@@ -880,7 +1041,10 @@ function fallbackMoveChar(dir) {
     let newOffset = offset + dir;
     let newNode = node;
     if (newOffset < 0) {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+      );
       walker.currentNode = node;
       const prev = walker.previousNode();
       if (prev) {
@@ -891,7 +1055,10 @@ function fallbackMoveChar(dir) {
         return;
       }
     } else if (newOffset > text.length) {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+      );
       walker.currentNode = node;
       const next = walker.nextNode();
       if (next) {
@@ -918,7 +1085,9 @@ function fallbackMoveChar(dir) {
       try {
         r.setStart(newNode, newOffset);
         r.setEnd(anchorNode, anchorOffset);
-      } catch { return; }
+      } catch {
+        return;
+      }
     }
     sel.removeAllRanges();
     sel.addRange(r);
@@ -946,7 +1115,10 @@ function fallbackMoveCaret(dir) {
     let newOffset = offset + dir;
     let newNode = node;
     if (newOffset < 0) {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+      );
       walker.currentNode = node;
       const prev = walker.previousNode();
       if (prev) {
@@ -957,7 +1129,10 @@ function fallbackMoveCaret(dir) {
         return;
       }
     } else if (newOffset > text.length) {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+      );
       walker.currentNode = node;
       const next = walker.nextNode();
       if (next) {
@@ -1032,9 +1207,14 @@ function fallbackLineBoundary(dir, forCaret) {
   const block = getBlockAncestor(sel.focusNode);
   if (!block) return false;
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) { if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT; return NodeFilter.FILTER_ACCEPT; }
+    acceptNode(n) {
+      if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
   });
-  let first = null, last = null, node;
+  let first = null,
+    last = null,
+    node;
   while ((node = walker.nextNode())) {
     if (!first) first = node;
     last = node;
@@ -1083,7 +1263,10 @@ function findNextWordEnd(count) {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let nodes = [];
   let n = walker.nextNode();
-  while (n) { nodes.push(n); n = walker.nextNode(); }
+  while (n) {
+    nodes.push(n);
+    n = walker.nextNode();
+  }
   let startIdx = nodes.indexOf(startNode);
   if (startIdx === -1) return null;
   let found = 0;
@@ -1092,32 +1275,24 @@ function findNextWordEnd(count) {
     const txt = node.nodeValue;
     let from = 0;
     if (i === startIdx) from = startOffset;
-    // If caret is inside word, we want end of that word first
-    // So scan from 'from' to find word end
     let pos = from;
+    let inWord = false;
     while (pos < txt.length) {
-      while (pos < txt.length && !isWordChar(txt[pos])) pos++;
-      if (pos >= txt.length) break;
-      let wordStart = pos;
-      while (pos < txt.length && isWordChar(txt[pos])) pos++;
-      let wordEnd = pos - 1;
-      // word is from wordStart to wordEnd inclusive
-      // caret at from, if from <= wordEnd, then this word's end is candidate
-      // But need to handle caret already at word end: should go to next word's end
-      // For caret at offset inside word, wordEnd >= from ? then this word qualifies if wordEnd >= from
-      // For caret at 0 in hello, wordEnd=4, from=0, qualifies, found 1
-      // For caret at 2 in hello, wordEnd=4, qualifies
-      // For caret at 5 (after hello, before space), wordStart of next word is 6, wordEnd maybe 10, from=5, so next word qualifies
-      // To avoid counting same word when caret is after it, we need to ensure wordEnd >= from and (wordStart < from ? still counts as current word)
-      // Simpler: if wordEnd >= from, count it, but if from is inside word, first word counted
-      // If caret is at 5 (space), word hello's wordEnd=4 < from=5, so not counted, next word will be counted
-      if (wordEnd >= from) {
+      if (!inWord) {
+        while (pos < txt.length && !isWordChar(txt[pos])) pos++;
+        if (pos >= txt.length) break;
+        inWord = true;
+      } else {
+        while (pos < txt.length && isWordChar(txt[pos])) pos++;
+        if (pos >= txt.length) break;
+        inWord = false;
+        const wordEnd = pos - 1;
+        if (i === startIdx && wordEnd <= from) continue;
         found++;
         if (found === count) {
           return { node, offset: wordEnd };
         }
       }
-      // continue to next word in same node
     }
   }
   return null;
@@ -1131,17 +1306,14 @@ function fallbackMoveWordEnd(count) {
 function fallbackExtendWordEnd(count) {
   const pos = findNextWordEnd(count);
   if (!pos) return false;
-  // For visual, extend to include word end char: need offset after last char
-  // Our moveToPosition for visual extends to offset, so we want offset after word end (wordEnd+1) to include char
-  // But caret position for visual should be after word end to show selection covering word
-  // For visual, selection should cover from anchor to after word end
-  // So adjust offset to wordEnd+1
   moveToPosition(pos.node, pos.offset + 1);
   return true;
 }
 function fallbackDocBoundary(dir, forCaret) {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  let first = null, last = null, n;
+  let first = null,
+    last = null,
+    n;
   while ((n = walker.nextNode())) {
     if (!n.nodeValue.trim()) continue;
     if (!first) first = n;
@@ -1175,7 +1347,12 @@ function fallbackMoveLine(dir, forCaret) {
     }
     const origNode = sel.focusNode;
     const origOff = sel.focusOffset;
-    if (newRange && !(newRange.startContainer === origNode && newRange.startOffset === origOff)) {
+    if (
+      newRange &&
+      !(
+        newRange.startContainer === origNode && newRange.startOffset === origOff
+      )
+    ) {
       if (forCaret) {
         newRange.collapse(true);
         sel.removeAllRanges();
@@ -1214,24 +1391,46 @@ function fallbackMoveLine(dir, forCaret) {
       if (dir < 0) {
         if (r.bottom >= curRect.top - 2) continue;
         const vDist = curRect.top - r.bottom;
-        const hDist = Math.abs((r.left + r.width / 2) - (curRect.left + curRect.width / 2));
+        const hDist = Math.abs(
+          r.left + r.width / 2 - (curRect.left + curRect.width / 2),
+        );
         const dist = vDist * 1.2 + hDist * 0.3;
-        if (dist < bestDist) { bestDist = dist; best = el; }
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = el;
+        }
       } else {
         if (r.top <= curRect.bottom + 2) continue;
         const vDist = r.top - curRect.bottom;
-        const hDist = Math.abs((r.left + r.width / 2) - (curRect.left + curRect.width / 2));
+        const hDist = Math.abs(
+          r.left + r.width / 2 - (curRect.left + curRect.width / 2),
+        );
         const dist = vDist * 1.2 + hDist * 0.3;
-        if (dist < bestDist) { bestDist = dist; best = el; }
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = el;
+        }
       }
     }
     if (best) {
       const walker = document.createTreeWalker(best, NodeFilter.SHOW_TEXT, {
-        acceptNode(n) { if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT; return NodeFilter.FILTER_ACCEPT; }
+        acceptNode(n) {
+          if (!n.nodeValue || !n.nodeValue.trim())
+            return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        },
       });
       let first = walker.nextNode();
       if (!first) return false;
-      const targetNode = dir < 0 ? (() => { let last = first; let n2; while ((n2 = walker.nextNode())) last = n2; return last; })() : first;
+      const targetNode =
+        dir < 0
+          ? (() => {
+              let last = first;
+              let n2;
+              while ((n2 = walker.nextNode())) last = n2;
+              return last;
+            })()
+          : first;
       const targetOffset = dir < 0 ? targetNode.nodeValue.length : 0;
       moveToPosition(targetNode, targetOffset);
       return true;
@@ -1331,24 +1530,33 @@ function doDocBoundary(dir) {
 }
 function doGoToLine(n) {
   const line = Math.max(1, Math.floor(n) || 1);
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-      const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
-      try {
-        const style = window.getComputedStyle(parent);
-        if (style.display === "none" || style.visibility === "hidden") return NodeFilter.FILTER_REJECT;
-      } catch {}
-      return NodeFilter.FILTER_ACCEPT;
-    }
-  });
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue || !node.nodeValue.trim())
+          return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === "none" || style.visibility === "hidden")
+            return NodeFilter.FILTER_REJECT;
+        } catch {}
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    },
+  );
   let idx = 0;
   let target = null;
   let node = walker.nextNode();
   while (node) {
     idx++;
-    if (idx === line) { target = node; break; }
+    if (idx === line) {
+      target = node;
+      break;
+    }
     node = walker.nextNode();
   }
   if (!target) {
@@ -1415,7 +1623,9 @@ function yankSelection() {
     ui.toast("No selection");
     return;
   }
-  ui.copyText(text).then(() => ui.toast(`Yanked ${text.length} chars`)).catch(() => ui.toast("Yank failed"));
+  ui.copyText(text)
+    .then(() => ui.toast(`Yanked ${text.length} chars`))
+    .catch(() => ui.toast("Yank failed"));
 }
 
 function yankLineFromCaret() {
@@ -1438,13 +1648,19 @@ function yankLineFromCaret() {
     if (wasCollapsed) {
       const ok = extendSelection("forward", "lineboundary");
       if (!ok) {
-        const cur = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+        const cur =
+          sel.focusNode && sel.focusNode.parentElement
+            ? sel.focusNode.parentElement
+            : null;
         if (cur) lineText = cur.textContent || "";
         else lineText = sel.toString();
       } else {
         lineText = sel.toString();
         if (!lineText) {
-          const cur = atStartNode && atStartNode.parentElement ? atStartNode.parentElement : null;
+          const cur =
+            atStartNode && atStartNode.parentElement
+              ? atStartNode.parentElement
+              : null;
           lineText = cur ? cur.textContent || "" : "";
         }
       }
@@ -1466,7 +1682,9 @@ function yankLineFromCaret() {
     ui.toast("No line");
     return;
   }
-  ui.copyText(lineText).then(() => ui.toast(`Yanked line ${lineText.length} chars`)).catch(() => ui.toast("Yank failed"));
+  ui.copyText(lineText)
+    .then(() => ui.toast(`Yanked line ${lineText.length} chars`))
+    .catch(() => ui.toast("Yank failed"));
 }
 
 function getCaretLinkElement() {
@@ -1485,7 +1703,8 @@ function getCaretLinkElement() {
     let cur = el;
     while (cur) {
       if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
-      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur)) return cur;
+      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
+        return cur;
       const parent = cur.parentElement;
       if (parent) cur = parent;
       else {
@@ -1509,10 +1728,24 @@ function activateCaretLink() {
   } catch {}
   for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
     try {
-      link.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, button: 0, buttons: type === "mousedown" ? 1 : 0 }));
+      link.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          button: 0,
+          buttons: type === "mousedown" ? 1 : 0,
+        }),
+      );
     } catch {}
   }
-  try { link.focus({ preventScroll: true }); } catch { try { link.focus(); } catch {} }
+  try {
+    link.focus({ preventScroll: true });
+  } catch {
+    try {
+      link.focus();
+    } catch {}
+  }
   return true;
 }
 
@@ -1525,15 +1758,22 @@ function handleFChar(ch) {
   const dir = pendingF.dir;
   const till = pendingF.till;
   const count = pendingF.count || 1;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
     },
-  });
+  );
   let nodes = [];
   let n = walker.nextNode();
-  while (n) { nodes.push(n); n = walker.nextNode(); }
+  while (n) {
+    nodes.push(n);
+    n = walker.nextNode();
+  }
   let startIdx = nodes.indexOf(focusNode);
   if (startIdx === -1) {
     ui.toast(`Not found: ${ch}`);
@@ -1593,7 +1833,10 @@ function handleFChar(ch) {
 function moveToPosition(node, offset) {
   const sel = getSelection();
   if (!sel) return;
-  offset = Math.max(0, Math.min(offset, node.nodeValue ? node.nodeValue.length : 0));
+  offset = Math.max(
+    0,
+    Math.min(offset, node.nodeValue ? node.nodeValue.length : 0),
+  );
   if (isCaret()) {
     try {
       const r = document.createRange();
@@ -1697,7 +1940,9 @@ function close(keepSelection = false) {
   if (!keepSelection) {
     const sel = getSelection();
     if (sel) {
-      try { sel.removeAllRanges(); } catch {}
+      try {
+        sel.removeAllRanges();
+      } catch {}
     }
   }
 }
@@ -1727,7 +1972,9 @@ function onKeyDown(event) {
     }
     if (key === "Enter") {
       consume(event);
-      const visible = Array.from(hintMap.entries()).filter(([label]) => label.startsWith(hintPrefix));
+      const visible = Array.from(hintMap.entries()).filter(([label]) =>
+        label.startsWith(hintPrefix),
+      );
       if (visible.length === 1) {
         activateHintByLabel(visible[0][0]);
       }
@@ -1838,7 +2085,11 @@ function onKeyDown(event) {
       consume(event);
       pendingG = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " g";
-      setTimeout(() => { pendingG = false; if (pillEl && pillEl.textContent.endsWith(" g")) pillEl.textContent = pillText(mode); }, 1500);
+      setTimeout(() => {
+        pendingG = false;
+        if (pillEl && pillEl.textContent.endsWith(" g"))
+          pillEl.textContent = pillText(mode);
+      }, 1500);
       return true;
     }
   }
@@ -1855,7 +2106,8 @@ function onKeyDown(event) {
   if (isCaret()) {
     if (pendingY) {
       pendingY = false;
-      if (pillEl && pillEl.textContent.endsWith(" y")) pillEl.textContent = pillText(mode);
+      if (pillEl && pillEl.textContent.endsWith(" y"))
+        pillEl.textContent = pillText(mode);
       if (key === "y") {
         consume(event);
         for (let i = 0; i < repeat; i++) yankLineFromCaret();
@@ -1867,7 +2119,13 @@ function onKeyDown(event) {
       consume(event);
       pendingY = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " y";
-      setTimeout(() => { if (pendingY) { pendingY = false; if (pillEl && pillEl.textContent.endsWith(" y")) pillEl.textContent = pillText(mode); } }, 1500);
+      setTimeout(() => {
+        if (pendingY) {
+          pendingY = false;
+          if (pillEl && pillEl.textContent.endsWith(" y"))
+            pillEl.textContent = pillText(mode);
+        }
+      }, 1500);
       return true;
     }
     if (key === "Y") {
@@ -1900,7 +2158,9 @@ function onKeyDown(event) {
         mode = "visual";
         if (pillEl) pillEl.textContent = pillText(mode);
         if (sel && sel.isCollapsed && hasModify()) {
-          try { sel.modify("extend", "forward", "character"); } catch {}
+          try {
+            sel.modify("extend", "forward", "character");
+          } catch {}
         }
         ensureVisible();
         updateBlockCaret();
@@ -1908,9 +2168,14 @@ function onKeyDown(event) {
         mode = "line";
         if (pillEl) pillEl.textContent = pillText(mode);
         if (sel && sel.isCollapsed) {
-          try { sel.modify("extend", "forward", "lineboundary"); sel.modify("extend", "backward", "lineboundary"); } catch {}
+          try {
+            sel.modify("extend", "forward", "lineboundary");
+            sel.modify("extend", "backward", "lineboundary");
+          } catch {}
           if (sel && sel.isCollapsed) {
-            try { sel.modify("extend", "forward", "line"); } catch {}
+            try {
+              sel.modify("extend", "forward", "line");
+            } catch {}
           }
         }
         ensureVisible();
@@ -1992,7 +2257,9 @@ function onKeyDown(event) {
     case "y":
       consume(event);
       yankSelection();
-      try { collapseToFocus(); } catch {}
+      try {
+        collapseToFocus();
+      } catch {}
       mode = "caret";
       if (pillEl) pillEl.textContent = pillText(mode);
       pendingCount = "";
@@ -2027,7 +2294,9 @@ function onKeyDown(event) {
     case "Y":
       consume(event);
       yankSelection();
-      try { collapseToFocus(); } catch {}
+      try {
+        collapseToFocus();
+      } catch {}
       mode = "caret";
       if (pillEl) pillEl.textContent = pillText(mode);
       pendingCount = "";
@@ -2052,7 +2321,12 @@ function onKeyDown(event) {
         break;
       }
       // fall through for visual mode: show disabled
-      if (key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      if (
+        key.length === 1 &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
         consume(event);
         ui.toast(`${isCaret() ? "No caret" : "No visual"}: ${key}`);
       } else {
@@ -2062,7 +2336,12 @@ function onKeyDown(event) {
     default:
       if (isCaret()) {
         consume(event);
-      } else if (key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      } else if (
+        key.length === 1 &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
         consume(event);
         ui.toast(`No visual: ${key}`);
       } else {
@@ -2089,7 +2368,14 @@ export const Visual = {
   updateBlockCaret,
 };
 
-register("visual", { close: ( ) => { closeHints(); close(false); }, onKeyDown, isActive });
+register("visual", {
+  close: () => {
+    closeHints();
+    close(false);
+  },
+  onKeyDown,
+  isActive,
+});
 
 export function __resetVisualState() {
   closeHints();
