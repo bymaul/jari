@@ -3,6 +3,7 @@ import { register } from "./overlays.js";
 import { ui } from "./ui.js";
 import { overlaySelectors } from "./keymap.js";
 import { isOpenableLink } from "./hints-elements.js";
+import { Visual } from "./visual.js";
 
 const MAX_MATCHES = 1500;
 
@@ -19,6 +20,7 @@ let pendingQuery = "";
 
 let useHighlights = false;
 let fallbackSpans = [];
+let inputDebounce = null;
 
 function hasHighlights() {
   return matches.length > 0;
@@ -56,64 +58,102 @@ function shouldSkipNode(node) {
   const parent = node.parentElement;
   if (!parent) return true;
   const tag = parent.tagName;
-  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return true;
+  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS") return true;
   if (isOverlayElement(parent)) return true;
-  if (parent.closest && parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host")) return true;
+  if (parent.closest) {
+    try {
+      if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-find-hit, .jari-find-current, .jari-hints-host")) return true;
+      if (parent.closest('[aria-hidden="true"]')) return true;
+      if (parent.closest('[hidden]')) return true;
+    } catch {}
+  }
   try {
     const style = window.getComputedStyle(parent);
-    if (style.display === "none" || style.visibility === "hidden") return true;
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
+    if (parseFloat(style.opacity) < 0.05) return true;
   } catch {}
   return false;
 }
 
 function collectTextNodes() {
   const out = [];
-  const walker = document.createTreeWalker(
-    document.body || document.documentElement,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-        if (shouldSkipNode(node)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
+  const rootEl = document.body || document.documentElement;
+  if (!rootEl) return out;
+  try {
+    const walker = document.createTreeWalker(
+      rootEl,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          if (shouldSkipNode(node)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        },
       },
-    },
-  );
-  let node = walker.nextNode();
-  while (node) {
-    out.push(node);
-    node = walker.nextNode();
-  }
-
+    );
+    let node = walker.nextNode();
+    while (node) {
+      out.push(node);
+      if (out.length > 5000) break;
+      node = walker.nextNode();
+    }
+  } catch {}
   try {
     const visit = (root) => {
-      for (const el of root.querySelectorAll("*")) {
+      let els;
+      try {
+        els = root.querySelectorAll("*");
+      } catch { return; }
+      for (const el of els) {
         if (el.shadowRoot) {
-          const sw = document.createTreeWalker(
-            el.shadowRoot,
-            NodeFilter.SHOW_TEXT,
-            {
-              acceptNode(n) {
-                if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                const p = n.parentElement;
-                if (p && p.closest && p.closest(overlaySelectors)) return NodeFilter.FILTER_REJECT;
-                if (p && p.closest && p.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host")) return NodeFilter.FILTER_REJECT;
-                return NodeFilter.FILTER_ACCEPT;
+          try {
+            const sw = document.createTreeWalker(
+              el.shadowRoot,
+              NodeFilter.SHOW_TEXT,
+              {
+                acceptNode(n) {
+                  if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                  if (shouldSkipNode(n)) return NodeFilter.FILTER_REJECT;
+                  return NodeFilter.FILTER_ACCEPT;
+                },
               },
-            },
-          );
-          let sn = sw.nextNode();
-          while (sn) {
-            out.push(sn);
-            sn = sw.nextNode();
-          }
-          visit(el.shadowRoot);
+            );
+            let sn = sw.nextNode();
+            while (sn) {
+              out.push(sn);
+              if (out.length > 5000) return;
+              sn = sw.nextNode();
+            }
+            visit(el.shadowRoot);
+          } catch {}
+        }
+        if (el.tagName === "IFRAME") {
+          try {
+            const doc = el.contentDocument;
+            if (doc && doc.body) {
+              const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+                acceptNode(n) {
+                  if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                  const p = n.parentElement;
+                  if (!p) return NodeFilter.FILTER_REJECT;
+                  const tag = p.tagName;
+                  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
+                  return NodeFilter.FILTER_ACCEPT;
+                },
+              });
+              let nn = w.nextNode();
+              while (nn) {
+                out.push(nn);
+                if (out.length > 5000) return;
+                nn = w.nextNode();
+              }
+            }
+          } catch {}
         }
       }
     };
     visit(document);
   } catch {}
-
   return out;
 }
 
@@ -241,17 +281,29 @@ function applyHighlights() {
   clearHighlightApi();
   clearFallback();
   if (matches.length === 0) return;
+  const valid = matches.filter(r => {
+    try {
+      return r.startContainer && r.startContainer.isConnected !== false && r.endContainer && r.endContainer.isConnected !== false;
+    } catch { return false; }
+  });
+  if (valid.length !== matches.length) {
+    matches = valid;
+    if (currentIdx >= matches.length) currentIdx = Math.max(0, matches.length - 1);
+    if (matches.length === 0) { updateStatus(); return; }
+  }
   const cur = matches[currentIdx];
   if (useHighlights) {
     try {
-      const others = matches.filter((_, i) => i !== currentIdx);
+      const others = valid.filter((_, i) => i !== currentIdx);
       if (others.length > 0) {
         CSS.highlights.set("jari-find", new Highlight(...others));
       } else {
-        CSS.highlights.delete("jari-find");
+        try { CSS.highlights.delete("jari-find"); } catch {}
       }
       if (cur) {
         CSS.highlights.set("jari-find-current", new Highlight(cur));
+      } else {
+        try { CSS.highlights.delete("jari-find-current"); } catch {}
       }
       return;
     } catch {
@@ -259,9 +311,10 @@ function applyHighlights() {
     }
   }
   const byNode = new Map();
-  for (let i = 0; i < matches.length; i++) {
-    const r = matches[i];
+  for (let i = 0; i < valid.length; i++) {
+    const r = valid[i];
     const node = r.startContainer;
+    if (!node || !node.isConnected) continue;
     if (!byNode.has(node)) byNode.set(node, []);
     byNode.get(node).push({ range: r, idx: i });
   }
@@ -269,6 +322,7 @@ function applyHighlights() {
     list.sort((a, b) => b.range.startOffset - a.range.startOffset);
     for (const { range, idx } of list) {
       try {
+        if (!range.startContainer.isConnected) continue;
         const span = document.createElement("span");
         span.className = idx === currentIdx ? "jari-find-current" : "jari-find-hit";
         range.surroundContents(span);
@@ -283,17 +337,20 @@ function scrollToCurrent() {
   const r = matches[currentIdx];
   if (!r) return;
   try {
-    const el = r.startContainer.parentElement;
-    if (el) {
-      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
-      const rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect();
-      if (rect) {
-        const vh = window.innerHeight;
-        if (rect.top < 0 || rect.bottom > vh) {
-          try {
-            window.scrollBy(0, rect.top - vh / 2);
-          } catch {}
-        }
+    if (r.startContainer && r.startContainer.isConnected === false) return;
+    const el = r.startContainer && r.startContainer.parentElement ? r.startContainer.parentElement : null;
+    if (!el || !el.isConnected) return;
+    try {
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden") return;
+    } catch {}
+    el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+    let rect = null;
+    try { rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect(); } catch {}
+    if (rect) {
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      if (rect.top < 0 || rect.bottom > vh) {
+        try { window.scrollBy(0, rect.top - vh / 2); } catch {}
       }
     }
   } catch {}
@@ -346,6 +403,7 @@ function renderBar() {
   inputEl.addEventListener("input", () => {
     pendingQuery = inputEl.value;
     const q = pendingQuery.trim();
+    clearTimeout(inputDebounce);
     if (!q) {
       matches = [];
       currentIdx = 0;
@@ -354,14 +412,18 @@ function renderBar() {
       updateStatus();
       return;
     }
-    matches = buildMatches(q);
-    currentIdx = 0;
-    if (matches.length > 0) {
-      lastQuery = q;
-    }
-    applyHighlights();
-    if (matches.length > 0) scrollToCurrent();
-    updateStatus();
+    inputDebounce = setTimeout(() => {
+      try {
+        const latest = (inputEl && inputEl.value.trim()) || q;
+        if (latest !== q) return;
+        matches = buildMatches(latest);
+        currentIdx = 0;
+        if (matches.length > 0) lastQuery = latest;
+        applyHighlights();
+        if (matches.length > 0) scrollToCurrent();
+        updateStatus();
+      } catch {}
+    }, 80);
   });
 
   inputEl.addEventListener("keydown", (e) => e.stopPropagation());
@@ -380,6 +442,8 @@ function open() {
 
 function closeBar() {
   if (!active) return;
+  clearTimeout(inputDebounce);
+  inputDebounce = null;
   const wasInput = inputEl;
   active = false;
   pendingQuery = "";
@@ -414,6 +478,31 @@ function closeAndClear() {
 
 function next(count = 1, reverse = false) {
   const c = Math.max(1, Math.floor(count) || 1);
+  if (matches.length > 0) {
+    try {
+      const stale = matches.some(r => !r.startContainer || r.startContainer.isConnected === false);
+      if (stale) {
+        const q = (lastQuery || pendingQuery || "").trim();
+        if (q) {
+          const rebuilt = buildMatches(q);
+          if (rebuilt.length === 0) {
+            clearHighlights();
+            updateStatus();
+            ui.toast(`No match for "${q}"`);
+            return;
+          }
+          matches = rebuilt;
+          if (currentIdx >= matches.length) currentIdx = 0;
+          useHighlights = detectHighlightSupport();
+          applyHighlights();
+          updateStatus();
+        } else {
+          clearHighlights();
+          updateStatus();
+        }
+      }
+    } catch {}
+  }
   if (matches.length === 0) {
     const q = (pendingQuery && pendingQuery.trim()) || lastQuery;
     if (!q) {
@@ -451,12 +540,7 @@ function next(count = 1, reverse = false) {
   applyHighlights();
   scrollToCurrent();
   updateStatus();
-  const wrapped = (delta === 1 && currentIdx === 0) || (delta === -1 && currentIdx === len - 1);
-  if (wrapped) {
-    ui.toast(`Wrapped — ${currentIdx + 1}/${len}`);
-  } else {
-    ui.toast(`${currentIdx + 1}/${len}`);
-  }
+  ui.toast(`${currentIdx + 1}/${len}`);
 }
 
 function prev(count = 1) {
@@ -482,7 +566,6 @@ function onKeyDown(event) {
       } else {
         lastQuery = q;
         closeBar();
-        // TODO: enter visual mode on find highlight (select current match with block caret)
       }
       return true;
     }
@@ -498,7 +581,6 @@ function onKeyDown(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     closeBar();
-    // TODO: enter visual mode on find highlight (select current match with block caret)
     return true;
   }
   return false;
@@ -546,6 +628,10 @@ export const Find = {
 };
 
 register("find", { close: closeAndClear, onKeyDown, isActive });
+
+try {
+  Visual.setFindOpen(() => open());
+} catch {}
 
 export const __testHelpers = {
   buildMatches,

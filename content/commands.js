@@ -189,10 +189,15 @@ export const commands = {
     ...COMMAND_CATALOG.splitMerge,
     run: async () => {
       const res = await sendMessage("splitOrMerge");
-      if (!res || !res.ok) return;
+      if (!res || !res.ok) {
+        ui.toast("No window to split");
+        return;
+      }
       if (res.autoMerged) ui.toast("Merged to window");
+      else if (res.split) ui.toast("Split to window");
       else if (res.needMerge) Prompt.openMerge(res);
       else if (res.needMerge === false) ui.toast("No window to merge");
+      else ui.toast("No window to split");
     },
   },
   moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },

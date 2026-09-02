@@ -451,6 +451,19 @@
   outline: 1px solid #c38a22;
 }
 
+::highlight(jari-visual) {
+  background: rgba(0, 180, 216, 0.45);
+  color: #0a1a22;
+}
+
+.jari-visual-highlight {
+  background: rgba(0, 180, 216, 0.35) !important;
+  color: #0a1a22 !important;
+  border-radius: 2px;
+  padding: 0 1px;
+  outline: 1px solid rgba(0, 180, 216, 0.6);
+}
+
 .jari-visual-caret-host {
   position: fixed !important;
   left: 0 !important;
