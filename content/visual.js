@@ -22,6 +22,7 @@ let pendingG = false;
 let pendingF = null;
 let lastF = null;
 let pendingY = false;
+let caretRaf = null;
 
 let caretEl = null;
 let caretHost = null;
@@ -108,10 +109,20 @@ function showBlockCaret() {
         box-shadow: 0 1px 3px rgba(0,0,0,0.4);
         animation: jari-caret-blink 1s steps(1) infinite;
         pointer-events: none;
+        will-change: transform, opacity;
+        contain: strict;
+        backface-visibility: hidden;
+        transform: translate3d(0,0,0);
       }
       @keyframes jari-caret-blink {
         0%, 50% { opacity: 0.85; }
         51%, 100% { opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .jari-visual-caret { animation: none !important; opacity: 0.9 !important; }
+      }
+      @media (forced-colors: active) {
+        .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
       }
     `;
     shadow.appendChild(style);
@@ -137,7 +148,7 @@ function hideBlockCaret() {
   }
 }
 
-function updateBlockCaret() {
+function updateBlockCaretImmediate() {
   if (!active || !caretEl || !caretHost) return;
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
@@ -145,7 +156,6 @@ function updateBlockCaret() {
     const range = sel.getRangeAt(0);
     let rect = null;
     try {
-      // Use focus position for caret
       const focusNode = sel.focusNode;
       const focusOffset = sel.focusOffset;
       if (focusNode) {
@@ -153,28 +163,29 @@ function updateBlockCaret() {
         r.setStart(focusNode, focusOffset);
         r.collapse(true);
         rect = r.getBoundingClientRect();
-        // If rect is empty (e.g., at line end), try focusNode parent
         if (!rect || (rect.width === 0 && rect.height === 0)) {
-          rect = range.getBoundingClientRect();
+          const cr = range.getClientRects();
+          if (cr && cr.length) rect = cr[0];
+          else rect = range.getBoundingClientRect();
         }
       } else {
         rect = range.getBoundingClientRect();
       }
     } catch {
-      rect = range.getBoundingClientRect();
+      try { rect = range.getBoundingClientRect(); } catch { rect = null; }
     }
     if (!rect) return;
-    // If rect is zero, hide
     if (rect.width === 0 && rect.height === 0) {
       const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
-      if (el) rect = el.getBoundingClientRect();
+      if (el) {
+        const cr = el.getClientRects();
+        if (cr && cr.length) rect = cr[0];
+        else rect = el.getBoundingClientRect();
+      }
     }
-    const hostShadow = caretHost.shadowRoot || caretHost;
-    // caretHost is fixed at 0,0, so caret position is viewport coords
-    caretEl.style.left = `${rect.left}px`;
-    caretEl.style.top = `${rect.top}px`;
+    if (!rect) return;
+    caretEl.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
     caretEl.style.height = `${Math.max(12, rect.height)}px`;
-    // Adjust for line mode: block across line?
     if (mode === "line") {
       caretEl.style.width = `${Math.max(20, rect.width)}px`;
       caretEl.style.opacity = "0.35";
@@ -182,7 +193,19 @@ function updateBlockCaret() {
       caretEl.style.width = `7px`;
       caretEl.style.opacity = "0.85";
     }
+    try {
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        caretEl.style.animation = "none";
+      }
+    } catch {}
   } catch {}
+}
+function updateBlockCaret() {
+  if (caretRaf) return;
+  caretRaf = requestAnimationFrame(() => {
+    caretRaf = null;
+    updateBlockCaretImmediate();
+  });
 }
 
 function ensureVisible() {
@@ -212,18 +235,31 @@ function ensureVisible() {
 
 function attachCaretListeners() {
   try {
-    window.addEventListener("scroll", updateBlockCaret, true);
-    window.addEventListener("resize", updateBlockCaret);
-    document.addEventListener("scroll", updateBlockCaret, true);
-  } catch {}
+    window.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
+    window.addEventListener("resize", updateBlockCaret, { passive: true });
+    document.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
+  } catch {
+    try {
+      window.addEventListener("scroll", updateBlockCaret, true);
+      window.addEventListener("resize", updateBlockCaret);
+      document.addEventListener("scroll", updateBlockCaret, true);
+    } catch {}
+  }
   enableSelectOverride();
 }
 function detachCaretListeners() {
   try {
-    window.removeEventListener("scroll", updateBlockCaret, true);
+    window.removeEventListener("scroll", updateBlockCaret, { capture: true });
     window.removeEventListener("resize", updateBlockCaret);
-    document.removeEventListener("scroll", updateBlockCaret, true);
-  } catch {}
+    document.removeEventListener("scroll", updateBlockCaret, { capture: true });
+  } catch {
+    try {
+      window.removeEventListener("scroll", updateBlockCaret, true);
+      window.removeEventListener("resize", updateBlockCaret);
+      document.removeEventListener("scroll", updateBlockCaret, true);
+    } catch {}
+  }
+  if (caretRaf) { try { cancelAnimationFrame(caretRaf); } catch {} caretRaf = null; }
   if (!active && !hintActive) disableSelectOverride();
 }
 let selectOverrideEl = null;
@@ -526,9 +562,16 @@ function renderHints() {
   const style = document.createElement("style");
   style.textContent = `
     .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
-    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 10px; font-weight: bold; line-height: 1; letter-spacing: 0.02em; padding: 1px 3px; border: 1px solid #1a7f8f; border-radius: 3px; background: linear-gradient(#b0f2ff, #00b4d8); color: #0a2e3a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.35); text-align: left; }
+    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.2; letter-spacing: 0.02em; padding: 2px 5px; border: 1px solid #1a7f8f; border-radius: 4px; background: linear-gradient(#b0f2ff, #00b4d8); color: #0a2e3a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.35); text-align: left; min-width: 18px; min-height: 18px; }
     .jari-hint-matched { color: #3a6a7a; opacity: 0.45; }
     .jari-hint-hidden { opacity: 0; display: none; }
+    @media (prefers-color-scheme: dark) {
+      .jari-hint { border-color: #0a4a5a; background: linear-gradient(#7ec8e3, #0080a0); color: #e0f6ff; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+      .jari-hint-matched { color: #a0d8e8; }
+    }
+    @media (forced-colors: active) {
+      .jari-hint { border: 1px solid CanvasText !important; background: Canvas !important; color: CanvasText !important; forced-color-adjust: none; }
+    }
   `;
   shadow.appendChild(style);
   hintHolder = document.createElement("section");
@@ -997,7 +1040,7 @@ function fallbackLineBoundary(dir, forCaret) {
   const block = getBlockAncestor(sel.focusNode);
   if (!block) return false;
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) { if (!n.nodeValue || !n.nodeValue.trim() === "") return NodeFilter.FILTER_REJECT; return NodeFilter.FILTER_ACCEPT; }
+    acceptNode(n) { if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT; return NodeFilter.FILTER_ACCEPT; }
   });
   let first = null, last = null, node;
   while ((node = walker.nextNode())) {

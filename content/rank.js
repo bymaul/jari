@@ -161,6 +161,29 @@ export function substringMatch(query, text) {
   if (phrases.some((ph) => !t.includes(ph))) return false;
   return include.every((term) => t.includes(term));
 }
+export function substringIndices(query, text) {
+  const { include, exclude, phrases } = parseQuery(query);
+  if (include.length === 0 && phrases.length === 0) return [];
+  const t = normalizeForMatch(text);
+  if (exclude.some((ex) => t.includes(ex))) return [];
+  if (phrases.some((ph) => !t.includes(ph))) return [];
+  const indices = [];
+  for (const ph of phrases) {
+    let idx = t.indexOf(ph);
+    while (idx !== -1) {
+      for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+      idx = t.indexOf(ph, idx + 1);
+    }
+  }
+  for (const term of include) {
+    let idx = t.indexOf(term);
+    while (idx !== -1) {
+      for (let i = idx; i < idx + term.length; i++) indices.push(i);
+      idx = t.indexOf(term, idx + 1);
+    }
+  }
+  return [...new Set(indices)].sort((a, b) => a - b);
+}
 function titleBoost(query, item) {
   if (!item.title) return 0;
   const m = fuzzyMatch(query, item.title);

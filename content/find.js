@@ -2,7 +2,7 @@
 import { register } from "./overlays.js";
 import { ui } from "./ui.js";
 import { overlaySelectors } from "./keymap.js";
-import { isOpenableLink } from "./hints-elements.js";
+import { isOpenableLink, isElementDrawn } from "./hints-elements.js";
 import { Visual } from "./visual.js";
 
 const MAX_MATCHES = 1500;
@@ -21,6 +21,8 @@ let pendingQuery = "";
 let useHighlights = false;
 let fallbackSpans = [];
 let inputDebounce = null;
+let findObserver = null;
+let findObserverTimer = null;
 
 function hasHighlights() {
   return matches.length > 0;
@@ -58,7 +60,7 @@ function shouldSkipNode(node) {
   const parent = node.parentElement;
   if (!parent) return true;
   const tag = parent.tagName;
-  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS") return true;
+  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
   if (isOverlayElement(parent)) return true;
   if (parent.closest) {
     try {
@@ -68,11 +70,45 @@ function shouldSkipNode(node) {
     } catch {}
   }
   try {
+    if (!isElementDrawn(parent)) return true;
     const style = window.getComputedStyle(parent);
     if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
     if (parseFloat(style.opacity) < 0.05) return true;
   } catch {}
   return false;
+}
+function scheduleFindRebuild() {
+  clearTimeout(findObserverTimer);
+  findObserverTimer = setTimeout(() => {
+    if (!active || !pendingQuery) return;
+    const q = pendingQuery.trim();
+    if (!q) return;
+    try {
+      const rebuilt = buildMatches(q);
+      if (rebuilt.length !== matches.length || rebuilt.some((r, i) => r.startContainer !== matches[i]?.startContainer)) {
+        matches = rebuilt;
+        currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
+        applyHighlights();
+        updateStatus();
+        if (matches.length > 0) scrollToCurrent();
+      }
+    } catch {}
+  }, 150);
+}
+function startFindObserver() {
+  stopFindObserver();
+  try {
+    findObserver = new MutationObserver(scheduleFindRebuild);
+    findObserver.observe(document.body || document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style", "class", "hidden", "aria-hidden"] });
+  } catch {}
+}
+function stopFindObserver() {
+  clearTimeout(findObserverTimer);
+  findObserverTimer = null;
+  if (findObserver) {
+    try { findObserver.disconnect(); } catch {}
+    findObserver = null;
+  }
 }
 
 function collectTextNodes() {
@@ -436,6 +472,7 @@ function open() {
   if (active) return;
   useHighlights = detectHighlightSupport();
   active = true;
+  startFindObserver();
   pendingQuery = "";
   renderBar();
 }
@@ -444,6 +481,7 @@ function closeBar() {
   if (!active) return;
   clearTimeout(inputDebounce);
   inputDebounce = null;
+  stopFindObserver();
   const wasInput = inputEl;
   active = false;
   pendingQuery = "";

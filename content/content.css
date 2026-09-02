@@ -19,7 +19,7 @@
   --jari-cmdl-font-family: monospace;
   --jari-cmdl-font-size: calc(var(--jari-font-size) * 0.75);
 
-  --jari-cmplt-option-height: 1.4em;
+  --jari-cmplt-option-height: 1.6em;
   --jari-cmplt-fg: var(--jari-fg);
   --jari-cmplt-bg: var(--jari-bg);
   --jari-cmplt-font-size: calc(var(--jari-font-size) * 9 / 12);
@@ -341,21 +341,23 @@
   display: inline-block !important;
   box-sizing: border-box !important;
   font-family: var(--jari-font-family) !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: bold !important;
-  line-height: 1 !important;
+  line-height: 1.2 !important;
   letter-spacing: 0.02em !important;
-  padding: 1px 3px !important;
+  padding: 2px 5px !important;
   border: 1px solid #c38a22 !important;
-  border-radius: 3px !important;
+  border-radius: 4px !important;
   background: linear-gradient(#fff785, #ffc542) !important;
   color: #1a1a1a !important;
   text-transform: uppercase !important;
   white-space: nowrap !important;
   pointer-events: none !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35) !important;
   text-align: left !important;
   isolation: isolate !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
 }
 
 .jari-hint-matched {
@@ -366,6 +368,13 @@
 .jari-hint-hidden {
   opacity: 0 !important;
   display: none !important;
+}
+@media (prefers-color-scheme: dark) {
+  .jari-hint { border-color: #8a6a00 !important; background: linear-gradient(#ffe680, #e0a800) !important; color: #1a1200 !important; }
+  .jari-hint-matched { color: #6a5a00 !important; }
+}
+@media (forced-colors: active) {
+  .jari-hint { border: 1px solid CanvasText !important; background: Canvas !important; color: CanvasText !important; forced-color-adjust: none !important; }
 }
 
 .jari-find {
@@ -463,6 +472,10 @@
   padding: 0 1px;
   outline: 1px solid rgba(0, 180, 216, 0.6);
 }
+@media (forced-colors: active) {
+  ::highlight(jari-find), ::highlight(jari-find-current), ::highlight(jari-visual) { background: Highlight !important; color: HighlightText !important; }
+  .jari-find-hit, .jari-find-current, .jari-visual-highlight { background: Highlight !important; color: HighlightText !important; outline: 1px solid HighlightText !important; forced-color-adjust: none !important; }
+}
 
 .jari-visual-caret-host {
   position: fixed !important;
@@ -472,6 +485,7 @@
   height: 0 !important;
   pointer-events: none !important;
   z-index: 2147483646 !important;
+  contain: strict !important;
 }
 
 .jari-visual-caret {
@@ -484,9 +498,19 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
   animation: jari-caret-blink 1s steps(1) infinite !important;
   pointer-events: none !important;
+  will-change: transform, opacity !important;
+  contain: strict !important;
+  backface-visibility: hidden !important;
+  transform: translate3d(0,0,0) !important;
 }
 
 @keyframes jari-caret-blink {
   0%, 50% { opacity: 0.85; }
   51%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jari-visual-caret { animation: none !important; opacity: 0.9 !important; }
+}
+@media (forced-colors: active) {
+  .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none !important; }
 }

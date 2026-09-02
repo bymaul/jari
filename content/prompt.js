@@ -1,5 +1,5 @@
 import { Url } from "../shared/url.js";
-import { fuzzyIndices, rankMatches } from "./rank.js";
+import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
 import { register } from "./overlays.js";
@@ -185,9 +185,14 @@ function makeSpan(className) {
 function renderTitleUrl(li, titleText, urlText, q) {
   const title = makeSpan("title");
   const url = makeSpan("url");
-  if (q && settings.isFuzzyMatching()) {
-    renderText(title, titleText, fuzzyIndices(q, titleText));
-    renderText(url, urlText, fuzzyIndices(q, urlText));
+  if (q) {
+    if (settings.isFuzzyMatching()) {
+      renderText(title, titleText, fuzzyIndices(q, titleText));
+      renderText(url, urlText, fuzzyIndices(q, urlText));
+    } else {
+      renderText(title, titleText, substringIndices(q, titleText));
+      renderText(url, urlText, substringIndices(q, urlText));
+    }
   } else {
     title.textContent = titleText;
     url.textContent = urlText;

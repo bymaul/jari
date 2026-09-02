@@ -970,6 +970,29 @@
     if (phrases.some((ph) => !t.includes(ph))) return false;
     return include.every((term) => t.includes(term));
   }
+  function substringIndices(query2, text) {
+    const { include, exclude, phrases } = parseQuery(query2);
+    if (include.length === 0 && phrases.length === 0) return [];
+    const t = normalizeForMatch(text);
+    if (exclude.some((ex) => t.includes(ex))) return [];
+    if (phrases.some((ph) => !t.includes(ph))) return [];
+    const indices = [];
+    for (const ph of phrases) {
+      let idx = t.indexOf(ph);
+      while (idx !== -1) {
+        for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+        idx = t.indexOf(ph, idx + 1);
+      }
+    }
+    for (const term of include) {
+      let idx = t.indexOf(term);
+      while (idx !== -1) {
+        for (let i = idx; i < idx + term.length; i++) indices.push(i);
+        idx = t.indexOf(term, idx + 1);
+      }
+    }
+    return [...new Set(indices)].sort((a, b) => a - b);
+  }
   function titleBoost(query2, item) {
     if (!item.title) return 0;
     const m = fuzzyMatch(query2, item.title);
@@ -1201,9 +1224,14 @@
   function renderTitleUrl(li, titleText, urlText, q) {
     const title = makeSpan("title");
     const url = makeSpan("url");
-    if (q && settings.isFuzzyMatching()) {
-      renderText(title, titleText, fuzzyIndices(q, titleText));
-      renderText(url, urlText, fuzzyIndices(q, urlText));
+    if (q) {
+      if (settings.isFuzzyMatching()) {
+        renderText(title, titleText, fuzzyIndices(q, titleText));
+        renderText(url, urlText, fuzzyIndices(q, urlText));
+      } else {
+        renderText(title, titleText, substringIndices(q, titleText));
+        renderText(url, urlText, substringIndices(q, urlText));
+      }
     } else {
       title.textContent = titleText;
       url.textContent = urlText;
@@ -2356,6 +2384,7 @@
   var pendingF = null;
   var lastF = null;
   var pendingY = false;
+  var caretRaf = null;
   var caretEl = null;
   var caretHost = null;
   var hintActive = false;
@@ -2435,10 +2464,20 @@
         box-shadow: 0 1px 3px rgba(0,0,0,0.4);
         animation: jari-caret-blink 1s steps(1) infinite;
         pointer-events: none;
+        will-change: transform, opacity;
+        contain: strict;
+        backface-visibility: hidden;
+        transform: translate3d(0,0,0);
       }
       @keyframes jari-caret-blink {
         0%, 50% { opacity: 0.85; }
         51%, 100% { opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .jari-visual-caret { animation: none !important; opacity: 0.9 !important; }
+      }
+      @media (forced-colors: active) {
+        .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
       }
     `;
       shadow.appendChild(style);
@@ -2465,7 +2504,7 @@
       caretEl = null;
     }
   }
-  function updateBlockCaret() {
+  function updateBlockCaretImmediate() {
     if (!active4 || !caretEl || !caretHost) return;
     const sel = getSelection();
     if (!sel || sel.rangeCount === 0) return;
@@ -2481,22 +2520,31 @@
           r.collapse(true);
           rect = r.getBoundingClientRect();
           if (!rect || rect.width === 0 && rect.height === 0) {
-            rect = range.getBoundingClientRect();
+            const cr = range.getClientRects();
+            if (cr && cr.length) rect = cr[0];
+            else rect = range.getBoundingClientRect();
           }
         } else {
           rect = range.getBoundingClientRect();
         }
       } catch {
-        rect = range.getBoundingClientRect();
+        try {
+          rect = range.getBoundingClientRect();
+        } catch {
+          rect = null;
+        }
       }
       if (!rect) return;
       if (rect.width === 0 && rect.height === 0) {
         const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
-        if (el) rect = el.getBoundingClientRect();
+        if (el) {
+          const cr = el.getClientRects();
+          if (cr && cr.length) rect = cr[0];
+          else rect = el.getBoundingClientRect();
+        }
       }
-      const hostShadow = caretHost.shadowRoot || caretHost;
-      caretEl.style.left = `${rect.left}px`;
-      caretEl.style.top = `${rect.top}px`;
+      if (!rect) return;
+      caretEl.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
       caretEl.style.height = `${Math.max(12, rect.height)}px`;
       if (mode3 === "line") {
         caretEl.style.width = `${Math.max(20, rect.width)}px`;
@@ -2505,8 +2553,21 @@
         caretEl.style.width = `7px`;
         caretEl.style.opacity = "0.85";
       }
+      try {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          caretEl.style.animation = "none";
+        }
+      } catch {
+      }
     } catch {
     }
+  }
+  function updateBlockCaret() {
+    if (caretRaf) return;
+    caretRaf = requestAnimationFrame(() => {
+      caretRaf = null;
+      updateBlockCaretImmediate();
+    });
   }
   function ensureVisible() {
     const sel = getSelection();
@@ -2535,19 +2596,38 @@
   }
   function attachCaretListeners() {
     try {
-      window.addEventListener("scroll", updateBlockCaret, true);
-      window.addEventListener("resize", updateBlockCaret);
-      document.addEventListener("scroll", updateBlockCaret, true);
+      window.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
+      window.addEventListener("resize", updateBlockCaret, { passive: true });
+      document.addEventListener("scroll", updateBlockCaret, { passive: true, capture: true });
     } catch {
+      try {
+        window.addEventListener("scroll", updateBlockCaret, true);
+        window.addEventListener("resize", updateBlockCaret);
+        document.addEventListener("scroll", updateBlockCaret, true);
+      } catch {
+      }
     }
     enableSelectOverride();
   }
   function detachCaretListeners() {
     try {
-      window.removeEventListener("scroll", updateBlockCaret, true);
+      window.removeEventListener("scroll", updateBlockCaret, { capture: true });
       window.removeEventListener("resize", updateBlockCaret);
-      document.removeEventListener("scroll", updateBlockCaret, true);
+      document.removeEventListener("scroll", updateBlockCaret, { capture: true });
     } catch {
+      try {
+        window.removeEventListener("scroll", updateBlockCaret, true);
+        window.removeEventListener("resize", updateBlockCaret);
+        document.removeEventListener("scroll", updateBlockCaret, true);
+      } catch {
+      }
+    }
+    if (caretRaf) {
+      try {
+        cancelAnimationFrame(caretRaf);
+      } catch {
+      }
+      caretRaf = null;
     }
     if (!active4 && !hintActive) disableSelectOverride();
   }
@@ -2873,9 +2953,16 @@
     const style = document.createElement("style");
     style.textContent = `
     .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
-    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 10px; font-weight: bold; line-height: 1; letter-spacing: 0.02em; padding: 1px 3px; border: 1px solid #1a7f8f; border-radius: 3px; background: linear-gradient(#b0f2ff, #00b4d8); color: #0a2e3a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.35); text-align: left; }
+    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.2; letter-spacing: 0.02em; padding: 2px 5px; border: 1px solid #1a7f8f; border-radius: 4px; background: linear-gradient(#b0f2ff, #00b4d8); color: #0a2e3a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.35); text-align: left; min-width: 18px; min-height: 18px; }
     .jari-hint-matched { color: #3a6a7a; opacity: 0.45; }
     .jari-hint-hidden { opacity: 0; display: none; }
+    @media (prefers-color-scheme: dark) {
+      .jari-hint { border-color: #0a4a5a; background: linear-gradient(#7ec8e3, #0080a0); color: #e0f6ff; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+      .jari-hint-matched { color: #a0d8e8; }
+    }
+    @media (forced-colors: active) {
+      .jari-hint { border: 1px solid CanvasText !important; background: Canvas !important; color: CanvasText !important; forced-color-adjust: none; }
+    }
   `;
     shadow.appendChild(style);
     hintHolder = document.createElement("section");
@@ -3340,7 +3427,7 @@
     if (!block) return false;
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
       acceptNode(n) {
-        if (!n.nodeValue || !n.nodeValue.trim() === "") return NodeFilter.FILTER_REJECT;
+        if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
@@ -4468,6 +4555,8 @@
   var useHighlights = false;
   var fallbackSpans = [];
   var inputDebounce = null;
+  var findObserver = null;
+  var findObserverTimer = null;
   function hasHighlights() {
     return matches.length > 0;
   }
@@ -4495,7 +4584,7 @@
     const parent = node.parentElement;
     if (!parent) return true;
     const tag = parent.tagName;
-    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS") return true;
+    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
     if (isOverlayElement(parent)) return true;
     if (parent.closest) {
       try {
@@ -4506,12 +4595,51 @@
       }
     }
     try {
+      if (!isElementDrawn(parent)) return true;
       const style = window.getComputedStyle(parent);
       if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
       if (parseFloat(style.opacity) < 0.05) return true;
     } catch {
     }
     return false;
+  }
+  function scheduleFindRebuild() {
+    clearTimeout(findObserverTimer);
+    findObserverTimer = setTimeout(() => {
+      if (!active5 || !pendingQuery) return;
+      const q = pendingQuery.trim();
+      if (!q) return;
+      try {
+        const rebuilt = buildMatches(q);
+        if (rebuilt.length !== matches.length || rebuilt.some((r, i) => r.startContainer !== matches[i]?.startContainer)) {
+          matches = rebuilt;
+          currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
+          applyHighlights();
+          updateStatus();
+          if (matches.length > 0) scrollToCurrent();
+        }
+      } catch {
+      }
+    }, 150);
+  }
+  function startFindObserver() {
+    stopFindObserver();
+    try {
+      findObserver = new MutationObserver(scheduleFindRebuild);
+      findObserver.observe(document.body || document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style", "class", "hidden", "aria-hidden"] });
+    } catch {
+    }
+  }
+  function stopFindObserver() {
+    clearTimeout(findObserverTimer);
+    findObserverTimer = null;
+    if (findObserver) {
+      try {
+        findObserver.disconnect();
+      } catch {
+      }
+      findObserver = null;
+    }
   }
   function collectTextNodes() {
     const out = [];
@@ -4892,6 +5020,7 @@
     if (active5) return;
     useHighlights = detectHighlightSupport();
     active5 = true;
+    startFindObserver();
     pendingQuery = "";
     renderBar();
   }
@@ -4899,6 +5028,7 @@
     if (!active5) return;
     clearTimeout(inputDebounce);
     inputDebounce = null;
+    stopFindObserver();
     const wasInput = inputEl2;
     active5 = false;
     pendingQuery = "";
