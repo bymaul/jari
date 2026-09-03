@@ -57,7 +57,7 @@
         <div class="setting">
           <div class="setting-text">
             <label>Suggestions</label>
-            <p class="helper">Sources shown under the typed query in <code data-key="omnibar"></code>.</p>
+            <p class="helper">Sources shown under the typed query in <code data-key="openOmnibar"></code>.</p>
           </div>
           <div class="setting-control setting-sources">
             <label class="check"><input id="source-tab" type="checkbox" /> Tabs</label>
@@ -72,7 +72,7 @@
         <div class="setting">
           <div class="setting-text">
             <label for="copy-format">Copy title + URL as</label>
-            <p class="helper">Format for the <code data-key="copyTitleUrl"></code> command.</p>
+            <p class="helper">Format for the <code data-key="copyTitleAndUrl"></code> command.</p>
           </div>
           <div class="setting-control">
             <select id="copy-format">
@@ -98,7 +98,7 @@
         <div class="setting">
           <div class="setting-text">
             <label for="passthrough-timeout">Passthrough duration</label>
-            <p class="helper">How long <code data-key="passthrough"></code> lets the page have the keys.</p>
+            <p class="helper">How long <code data-key="passthroughKeys"></code> lets the page have the keys.</p>
           </div>
           <div class="setting-control">
             <input id="passthrough-timeout" type="number" min="100" max="30000" step="100" />
@@ -142,7 +142,7 @@
         <h2>Disabled sites</h2>
         <p class="helper">
           Jari is turned off on these sites. Press
-          <code data-key="toggleDisabled"></code> on a page to toggle it there, or add a host here.
+          <code data-key="toggleSiteEnabled"></code> on a page to toggle it there, or add a host here.
         </p>
         <div class="add-site">
           <input id="disabled-site-input" type="text" placeholder="example.com" />
@@ -154,7 +154,7 @@
 
     <footer>
       <div class="wrap">
-        To open these settings anytime, press <code data-key="openOptions"></code> on any page (or find Jari under
+        To open these settings anytime, press <code data-key="openSettings"></code> on any page (or find Jari under
         <code>chrome://extensions</code>).
       </div>
     </footer>

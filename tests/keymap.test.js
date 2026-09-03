@@ -17,10 +17,10 @@ test("parseRepeatCount clamps counts to at least 1", () => {
 });
 
 test("normalizeSettings treats a stored keymap as authoritative and drops invalid values", () => {
-  const s = Jari.normalizeSettings({ scrollStep: 100, smoothScroll: true, keymap: { j: "scrollTop" } });
+  const s = Jari.normalizeSettings({ scrollStep: 100, smoothScroll: true, keymap: { j: "scrollToTop" } });
   assert.equal(s.scrollStep, 100);
   assert.equal(s.smoothScroll, true);
-  assert.equal(s.keymap.j, "scrollTop");
+  assert.equal(s.keymap.j, "scrollToTop");
   assert.equal(s.keymap.t, undefined);
   assert.equal(s.timeoutMs, 1500);
   assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
@@ -37,13 +37,13 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
 
 test("normalizeSettings fills defaults only when no keymap is stored", () => {
   const s = Jari.normalizeSettings({});
-  assert.equal(s.keymap.t, "omnibar");
-  assert.equal(s.keymap.p, "passthrough");
+  assert.equal(s.keymap.t, "openOmnibar");
+  assert.equal(s.keymap.p, "passthroughKeys");
 });
 
 test("rebinding away a default key removes the default binding", () => {
-  const s = Jari.normalizeSettings({ keymap: { z: "passthrough" } });
-  assert.equal(s.keymap.z, "passthrough");
+  const s = Jari.normalizeSettings({ keymap: { z: "passthroughKeys" } });
+  assert.equal(s.keymap.z, "passthroughKeys");
   assert.equal(s.keymap.p, undefined);
 });
 
@@ -66,7 +66,7 @@ test("normalizeSettings validates suggestionSources and copyFormat", () => {
 test("balanceCategories spreads categories across the columns", () => {
   const byCategory = new Map([
     ["scrolling", ["scrollDown", "scrollUp"]],
-    ["tabs", ["tabSearch"]],
+    ["tabs", ["searchTabs"]],
   ]);
   const columns = Jari.balanceCategories(byCategory, 3);
   const total = columns.reduce((n, col) => n + col.length, 0);

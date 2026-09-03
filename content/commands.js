@@ -136,13 +136,13 @@ async function copyToClipboard(text, message) {
   ui.toast(message);
 }
 
-function copyTitleUrlText() {
+function copyTitleAndUrlText() {
   return settings.getCopyFormat() === "markdown"
     ? `[${document.title}](${location.href})`
     : `${document.title}\n${location.href}`;
 }
 
-function pasteClipboard() {
+function readClipboardText() {
   let text = "";
   try {
     ui.withHiddenTextarea((ta) => {
@@ -163,8 +163,8 @@ export const commands = {
   scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
   scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
   scrollRight: { ...COMMAND_CATALOG.scrollRight, run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }) },
-  scrollTop: {
-    ...COMMAND_CATALOG.scrollTop,
+  scrollToTop: {
+    ...COMMAND_CATALOG.scrollToTop,
     run: () => {
       const el = getScrollElement();
       if (isFrame(el)) {
@@ -175,8 +175,8 @@ export const commands = {
       else el.scrollTo({ top: 0, behavior: "instant" });
     },
   },
-  scrollBottom: {
-    ...COMMAND_CATALOG.scrollBottom,
+  scrollToBottom: {
+    ...COMMAND_CATALOG.scrollToBottom,
     run: () => {
       const el = getScrollElement();
       if (isFrame(el)) {
@@ -239,19 +239,19 @@ export const commands = {
   newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
   closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
   restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
-  pasteOpen: {
-    ...COMMAND_CATALOG.pasteOpen,
+  openClipboard: {
+    ...COMMAND_CATALOG.openClipboard,
     run: async () => {
-      const text = await pasteClipboard();
+      const text = await readClipboardText();
       if (!text) return ui.toast("Clipboard empty");
       const res = await sendMessage("navigate", { url: text });
       if (res && !res.ok) ui.toast("Not a URL");
     },
   },
-  pasteOpenBackground: {
-    ...COMMAND_CATALOG.pasteOpenBackground,
+  openClipboardBackground: {
+    ...COMMAND_CATALOG.openClipboardBackground,
     run: async () => {
-      const text = await pasteClipboard();
+      const text = await readClipboardText();
       if (!text) return ui.toast("Clipboard empty");
       const res = await sendMessage("openInBackgroundTab", { url: text });
       if (res && !res.ok) ui.toast("Not a URL");
@@ -259,21 +259,21 @@ export const commands = {
   },
   previousTab: { ...COMMAND_CATALOG.previousTab, run: (c) => sendMessage("previousTab", { count: c.count }) },
   nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
-  firstTab: { ...COMMAND_CATALOG.firstTab, run: () => sendMessage("firstTab") },
-  lastTab: { ...COMMAND_CATALOG.lastTab, run: () => sendMessage("lastTab") },
-  splitMerge: {
-    ...COMMAND_CATALOG.splitMerge,
+  goToFirstTab: { ...COMMAND_CATALOG.goToFirstTab, run: () => sendMessage("goToFirstTab") },
+  goToLastTab: { ...COMMAND_CATALOG.goToLastTab, run: () => sendMessage("goToLastTab") },
+  moveTabToWindow: {
+    ...COMMAND_CATALOG.moveTabToWindow,
     run: async () => {
-      const res = await sendMessage("splitOrMerge");
+      const res = await sendMessage("moveTabToWindow");
       if (!res || !res.ok) {
-        ui.toast("No window to split");
+        ui.toast("No window available");
         return;
       }
-      if (res.autoMerged) ui.toast("Merged to window");
-      else if (res.split) ui.toast("Split to window");
-      else if (res.needMerge) Prompt.openMerge(res);
-      else if (res.needMerge === false) ui.toast("No window to merge");
-      else ui.toast("No window to split");
+      if (res.movedToWindow) ui.toast("Moved to window");
+      else if (res.movedToNewWindow) ui.toast("Moved to new window");
+      else if (res.needWindowChoice) Prompt.chooseWindow(res);
+      else if (res.needWindowChoice === false) ui.toast("No other window");
+      else ui.toast("No window available");
     },
   },
   moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
@@ -281,12 +281,12 @@ export const commands = {
   duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
   togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
   toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
-  tabSearch: { ...COMMAND_CATALOG.tabSearch, run: () => Prompt.open() },
-  omnibar: { ...COMMAND_CATALOG.omnibar, run: () => Prompt.openOmnibar() },
+  searchTabs: { ...COMMAND_CATALOG.searchTabs, run: () => Prompt.open() },
+  openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
   reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
-  hardReload: { ...COMMAND_CATALOG.hardReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
-  goUp: {
-    ...COMMAND_CATALOG.goUp,
+  forceReload: { ...COMMAND_CATALOG.forceReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
+  goToParent: {
+    ...COMMAND_CATALOG.goToParent,
     run: () => {
       const target = Url.parentUrlOf(location.href);
       if (Url.isSamePath(target, location.href)) return ui.toast("Already at root");
@@ -306,15 +306,15 @@ export const commands = {
     run: () => Prompt.openEditUrl(),
   },
 
-  historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
-  historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
+  goBack: { ...COMMAND_CATALOG.goBack, run: () => sendMessage("goBack") },
+  goForward: { ...COMMAND_CATALOG.goForward, run: () => sendMessage("goForward") },
 
   copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
-  copyTitleUrl: { ...COMMAND_CATALOG.copyTitleUrl, run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
+  copyTitleAndUrl: { ...COMMAND_CATALOG.copyTitleAndUrl, run: () => copyToClipboard(copyTitleAndUrlText(), "Copied") },
 
   toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
-  passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
-  toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
+  passthroughKeys: { ...COMMAND_CATALOG.passthroughKeys, run: () => passthroughEnter() },
+  toggleSiteEnabled: { ...COMMAND_CATALOG.toggleSiteEnabled, run: () => settings.toggleSiteEnabled() },
 
   hintClick: { ...COMMAND_CATALOG.hintClick, run: () => Hints.open("click") },
   hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
@@ -322,14 +322,14 @@ export const commands = {
   hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
   hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
 
-  findForward: { ...COMMAND_CATALOG.findForward, run: () => Find.open() },
+  findText: { ...COMMAND_CATALOG.findText, run: () => Find.open() },
   findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
   findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
 
-  visualMode: { ...COMMAND_CATALOG.visualMode, run: () => Visual.enter("visual") },
-  visualLineMode: { ...COMMAND_CATALOG.visualLineMode, run: () => Visual.enter("line") },
+  enterVisual: { ...COMMAND_CATALOG.enterVisual, run: () => Visual.enter("visual") },
+  enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
-  openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
+  openSettings: { ...COMMAND_CATALOG.openSettings, run: () => sendMessage("openSettings") },
   openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") },
 };

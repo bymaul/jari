@@ -113,7 +113,7 @@ function getHintChars() {
   return state.hintChars;
 }
 
-function toggleDisabled() {
+function toggleSiteEnabled() {
   const host = location.hostname;
   const idx = state.disabledSites.indexOf(host);
   if (idx >= 0) state.disabledSites.splice(idx, 1);
@@ -142,5 +142,5 @@ export const settings = {
   getSuggestionSources,
   getCopyFormat,
   getHintChars,
-  toggleDisabled,
+  toggleSiteEnabled,
 };

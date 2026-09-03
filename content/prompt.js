@@ -69,12 +69,12 @@ function openEditUrl() {
   handleOpenInput(inputEl.value);
 }
 
-function openMerge(data) {
+function chooseWindow(data) {
   if (active) return;
   tabs = (data && data.tabs) || [];
-  mode = "merge";
+  mode = "moveWindow";
   active = true;
-  render("Merge into", "Choose a window...");
+  render("Move tab to", "Choose a window...");
 }
 
 function handleOpenInput(queryText) {
@@ -385,8 +385,8 @@ function activate() {
     close();
     return;
   }
-  if (mode === "merge") {
-    sendMessage("mergeTab", { targetWindowId: item.windowId });
+  if (mode === "moveWindow") {
+    sendMessage("moveTabIntoWindow", { targetWindowId: item.windowId });
   } else if (mode === "open" || mode === "edit") {
     if (item.kind === "search") {
       if (item.keyword && item.url)
@@ -448,7 +448,7 @@ export const Prompt = {
   open,
   openOmnibar,
   openEditUrl,
-  openMerge,
+  chooseWindow,
   close,
   onKeyDown,
   isActive,

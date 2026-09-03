@@ -72,13 +72,13 @@ export const handlers = {
     return switchTab(sender.tab, clampCount(count));
   },
 
-  splitOrMerge: async (sender) => {
+  moveTabToWindow: async (sender) => {
     const tab = sender.tab;
     if (!tab || !tab.id) return { ok: false };
     const myTabs = await chrome.tabs.query({ windowId: tab.windowId });
     if (myTabs.length > 1) {
       await chrome.windows.create({ tabId: tab.id });
-      return { ok: true, split: true };
+      return { ok: true, movedToNewWindow: true };
     }
     const windows = await chrome.windows.getAll({ populate: true });
     const others = windows
@@ -94,7 +94,7 @@ export const handlers = {
           url: `${win.tabs ? win.tabs.length : 0} tabs`,
         };
       });
-    if (others.length === 0) return { ok: true, needMerge: false };
+    if (others.length === 0) return { ok: true, needWindowChoice: false };
     if (others.length === 1) {
       const targetWindowId = others[0].windowId;
       await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
@@ -104,22 +104,22 @@ export const handlers = {
         try {
           await focusWindow(targetWindowId);
         } catch (err) {
-          console.error("[jari] splitOrMerge auto-merge window focus failed", err);
+          console.error("[jari] moveTabToWindow auto-merge window focus failed", err);
         }
         await chrome.tabs.update(last.id, { active: true });
       }
-      return { ok: true, autoMerged: true };
+      return { ok: true, movedToWindow: true };
     }
     return {
       ok: true,
-      needMerge: true,
+      needWindowChoice: true,
       ownTabId: tab.id,
       ownWindowId: tab.windowId,
       tabs: others,
     };
   },
 
-  mergeTab: async (sender, { targetWindowId } = {}) => {
+  moveTabIntoWindow: async (sender, { targetWindowId } = {}) => {
     const tab = sender.tab;
     if (!tab || !tab.id || !targetWindowId) return { ok: false };
     await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
@@ -130,7 +130,7 @@ export const handlers = {
       try {
         await focusWindow(targetWindowId);
       } catch (err) {
-        console.error("[jari] mergeTab window focus failed", err);
+        console.error("[jari] moveTabIntoWindow window focus failed", err);
       }
       await chrome.tabs.update(last.id, { active: true });
     }
@@ -145,13 +145,13 @@ export const handlers = {
     return { ok: true };
   },
 
-  firstTab: async () => {
+  goToFirstTab: async () => {
     const tabs = await chrome.tabs.query({ currentWindow: true });
     if (tabs.length) await chrome.tabs.update(tabs[0].id, { active: true });
     return { ok: true };
   },
 
-  lastTab: async () => {
+  goToLastTab: async () => {
     const tabs = await chrome.tabs.query({ currentWindow: true });
     if (tabs.length)
       await chrome.tabs.update(tabs[tabs.length - 1].id, { active: true });
@@ -197,8 +197,8 @@ export const handlers = {
     return { ok: true };
   },
 
-  historyBack: async (sender) => goHistory(sender.tab, -1),
-  historyForward: async (sender) => goHistory(sender.tab, 1),
+  goBack: async (sender) => goHistory(sender.tab, -1),
+  goForward: async (sender) => goHistory(sender.tab, 1),
 
   listTabs: async () => {
     const tabs = await chrome.tabs.query({});
@@ -396,7 +396,7 @@ export const handlers = {
     return { ok: true };
   },
 
-  openOptions: async () => {
+  openSettings: async () => {
     await chrome.runtime.openOptionsPage();
     return { ok: true };
   },

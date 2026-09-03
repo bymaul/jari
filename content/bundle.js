@@ -20,46 +20,46 @@
     k: "scrollUp",
     h: "scrollLeft",
     l: "scrollRight",
-    G: "scrollBottom",
+    G: "scrollToBottom",
     w: "cycleScrollFrame",
     "+": "zoomIn",
     "-": "zoomOut",
-    t: "omnibar",
+    t: "openOmnibar",
     x: "closeTab",
     X: "restoreTab",
     J: "previousTab",
     K: "nextTab",
     "<<": "moveTabLeft",
     ">>": "moveTabRight",
-    gw: "splitMerge",
+    gw: "moveTabToWindow",
     f: "hintClick",
     F: "hintOpen",
     gf: "hintOpenBackground",
     i: "hintInput",
-    H: "historyBack",
-    L: "historyForward",
+    H: "goBack",
+    L: "goForward",
     r: "reloadTab",
-    R: "hardReload",
-    Y: "copyTitleUrl",
-    gp: "pasteOpen",
-    gP: "pasteOpenBackground",
+    R: "forceReload",
+    Y: "copyTitleAndUrl",
+    gp: "openClipboard",
+    gP: "openClipboardBackground",
     I: "toggleIgnore",
-    p: "passthrough",
-    "ctrl+alt+v": "toggleDisabled",
+    p: "passthroughKeys",
+    "ctrl+alt+v": "toggleSiteEnabled",
     "?": "showHelp",
-    "/": "findForward",
+    "/": "findText",
     n: "findNext",
     N: "findPrev",
-    v: "visualMode",
-    V: "visualLineMode",
-    gt: "tabSearch",
-    gg: "scrollTop",
-    gu: "goUp",
+    v: "enterVisual",
+    V: "enterVisualLine",
+    gt: "searchTabs",
+    gg: "scrollToTop",
+    gu: "goToParent",
     gU: "goToRoot",
     ge: "editUrl",
-    g0: "firstTab",
-    g$: "lastTab",
-    ";e": "openOptions",
+    g0: "goToFirstTab",
+    g$: "goToLastTab",
+    ";e": "openSettings",
     ";x": "openExtensions",
     yy: "copyUrl",
     yf: "hintYank"
@@ -73,12 +73,10 @@
   };
   var categories = [
     { id: "scrolling", label: "Scrolling" },
-    { id: "view", label: "View & zoom" },
+    { id: "zoom", label: "Zoom" },
     { id: "tabs", label: "Tabs" },
-    { id: "tabActions", label: "Tab actions" },
     { id: "history", label: "History" },
     { id: "page", label: "Page" },
-    { id: "clipboard", label: "Clipboard" },
     { id: "hints", label: "Hints" },
     { id: "find", label: "Find" },
     { id: "visual", label: "Visual" },
@@ -154,17 +152,8 @@
     const d = data || {};
     const storedKeymap = {};
     for (const [key, command] of Object.entries(d.keymap || {})) {
-      if (command === "cycleScrollArea") {
-        storedKeymap[key] = "cycleScrollFrame";
-      } else if (command === "showScrollArea" || command === "resetScrollArea") {
-        if (key === "w") storedKeymap[key] = "cycleScrollFrame";
-        continue;
-      } else {
-        storedKeymap[key] = command;
-      }
+      storedKeymap[key] = command;
     }
-    if (storedKeymap[";s"] === "cycleScrollFrame") delete storedKeymap[";s"];
-    if (storedKeymap[";S"] === "cycleScrollFrame") delete storedKeymap[";S"];
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
     for (const key of prefixKeys) delete keymap[key];
     return {
@@ -183,7 +172,14 @@
   function balanceCategories(byCategory, columnCount = 3) {
     const columns = Array.from({ length: columnCount }, () => []);
     const columnRows = columns.map(() => 0);
-    for (const cat of categories || []) {
+    const ordered = [...categories || []].sort((a, b) => {
+      const rowsA = byCategory.get(a.id);
+      const rowsB = byCategory.get(b.id);
+      const weightA = rowsA ? 1 + rowsA.length : -1;
+      const weightB = rowsB ? 1 + rowsB.length : -1;
+      return weightB - weightA;
+    });
+    for (const cat of ordered) {
       const rows = byCategory.get(cat.id);
       if (!rows) continue;
       let best = 0;
@@ -287,7 +283,7 @@
   function getHintChars() {
     return state.hintChars;
   }
-  function toggleDisabled() {
+  function toggleSiteEnabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
     if (idx >= 0) state.disabledSites.splice(idx, 1);
@@ -315,7 +311,7 @@
     getSuggestionSources,
     getCopyFormat,
     getHintChars,
-    toggleDisabled
+    toggleSiteEnabled
   };
 
   // content/ui.js
@@ -1201,12 +1197,12 @@
     inputEl.value = location.href;
     handleOpenInput(inputEl.value);
   }
-  function openMerge(data) {
+  function chooseWindow(data) {
     if (active) return;
     tabs = data && data.tabs || [];
-    mode = "merge";
+    mode = "moveWindow";
     active = true;
-    render("Merge into", "Choose a window...");
+    render("Move tab to", "Choose a window...");
   }
   function handleOpenInput(queryText) {
     const q = queryText.trim();
@@ -1478,8 +1474,8 @@
       close();
       return;
     }
-    if (mode === "merge") {
-      sendMessage("mergeTab", { targetWindowId: item.windowId });
+    if (mode === "moveWindow") {
+      sendMessage("moveTabIntoWindow", { targetWindowId: item.windowId });
     } else if (mode === "open" || mode === "edit") {
       if (item.kind === "search") {
         if (item.keyword && item.url)
@@ -1534,7 +1530,7 @@
     open,
     openOmnibar,
     openEditUrl,
-    openMerge,
+    chooseWindow,
     close,
     onKeyDown,
     isActive
@@ -1547,56 +1543,56 @@
     scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
     scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
     scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
-    scrollTop: { category: "scrolling", label: "Scroll to top" },
-    scrollBottom: { category: "scrolling", label: "Scroll to bottom" },
+    scrollToTop: { category: "scrolling", label: "Scroll to top" },
+    scrollToBottom: { category: "scrolling", label: "Scroll to bottom" },
     scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
     scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
     cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
-    zoomIn: { category: "view", label: "Zoom in" },
-    zoomOut: { category: "view", label: "Zoom out" },
+    zoomIn: { category: "zoom", label: "Zoom in" },
+    zoomOut: { category: "zoom", label: "Zoom out" },
     newTab: { category: "tabs", label: "New tab" },
     closeTab: { category: "tabs", label: "Close tab", repeatable: true },
     restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
-    pasteOpen: { category: "tabs", label: "Open clipboard URL in current tab" },
-    pasteOpenBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
     previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
     nextTab: { category: "tabs", label: "Next tab", repeatable: true },
-    firstTab: { category: "tabs", label: "Jump to first tab" },
-    lastTab: { category: "tabs", label: "Jump to last tab" },
-    tabSearch: { category: "tabs", label: "Tab search" },
-    omnibar: { category: "tabs", label: "Open URL or search" },
-    splitMerge: { category: "tabActions", label: "Split / merge" },
-    moveTabLeft: { category: "tabActions", label: "Move tab left" },
-    moveTabRight: { category: "tabActions", label: "Move tab right" },
-    duplicateTab: { category: "tabActions", label: "Duplicate tab" },
-    togglePin: { category: "tabActions", label: "Pin/unpin tab" },
-    toggleMute: { category: "tabActions", label: "Mute/unmute tab" },
-    historyBack: { category: "history", label: "Go back in history" },
-    historyForward: { category: "history", label: "Go forward in history" },
-    reloadTab: { category: "page", label: "Reload" },
-    hardReload: { category: "page", label: "Reload (bypass cache)" },
-    goUp: { category: "page", label: "Go to parent path" },
+    goToFirstTab: { category: "tabs", label: "Go to first tab" },
+    goToLastTab: { category: "tabs", label: "Go to last tab" },
+    searchTabs: { category: "tabs", label: "Search tabs" },
+    openOmnibar: { category: "tabs", label: "Open URL or search" },
+    openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
+    openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
+    duplicateTab: { category: "tabs", label: "Duplicate tab" },
+    moveTabLeft: { category: "tabs", label: "Move tab left" },
+    moveTabRight: { category: "tabs", label: "Move tab right" },
+    togglePin: { category: "tabs", label: "Pin / unpin tab" },
+    toggleMute: { category: "tabs", label: "Mute / unmute tab" },
+    moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
+    goBack: { category: "history", label: "Go back in history" },
+    goForward: { category: "history", label: "Go forward in history" },
+    reloadTab: { category: "page", label: "Reload tab" },
+    forceReload: { category: "page", label: "Reload without cache" },
+    goToParent: { category: "page", label: "Go to parent page" },
     goToRoot: { category: "page", label: "Go to site root" },
     editUrl: { category: "page", label: "Edit current URL" },
-    copyUrl: { category: "clipboard", label: "Copy URL" },
-    copyTitleUrl: { category: "clipboard", label: "Copy title + URL" },
+    copyUrl: { category: "page", label: "Copy page URL" },
+    copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
     toggleIgnore: { category: "modes", label: "Ignore mode" },
-    passthrough: { category: "modes", label: "Passthrough keys (timed)" },
-    toggleDisabled: { category: "modes", label: "Enable/disable on this site" },
-    hintClick: { category: "hints", label: "Show hints (click)" },
-    hintOpen: { category: "hints", label: "Show hints (open in new foreground tab)" },
-    hintOpenBackground: { category: "hints", label: "Show hints (open in background, persistent)" },
-    hintInput: { category: "hints", label: "Focus input (hint)" },
-    hintYank: { category: "hints", label: "Copy link URL (hint)" },
-    findForward: { category: "find", label: "Find forward" },
+    passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },
+    toggleSiteEnabled: { category: "modes", label: "Enable / disable on this site" },
+    hintClick: { category: "hints", label: "Click link" },
+    hintOpen: { category: "hints", label: "Open link in new tab" },
+    hintOpenBackground: { category: "hints", label: "Open link in background tab" },
+    hintInput: { category: "hints", label: "Focus input" },
+    hintYank: { category: "hints", label: "Copy link URL" },
+    findText: { category: "find", label: "Find in page" },
     findNext: { category: "find", label: "Next match", repeatable: true },
     findPrev: { category: "find", label: "Previous match", repeatable: true },
-    visualMode: { category: "visual", label: "Visual mode" },
-    visualLineMode: { category: "visual", label: "Visual line mode" },
-    showHelp: { category: "help", label: "Show keybindings" },
-    openOptions: { category: "help", label: "Open settings" },
+    enterVisual: { category: "visual", label: "Visual mode" },
+    enterVisualLine: { category: "visual", label: "Visual line mode" },
+    showHelp: { category: "help", label: "Show this help" },
+    openSettings: { category: "help", label: "Open settings" },
     openExtensions: { category: "help", label: "Open extensions page" }
   };
 
@@ -1629,29 +1625,15 @@
       if (!byCommand.has(commandName)) byCommand.set(commandName, []);
       byCommand.get(commandName).push(key);
     }
-    const byCategoryAll = /* @__PURE__ */ new Map();
     const byCategory = /* @__PURE__ */ new Map();
     for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
-      const id = meta.category || "other";
-      if (!byCategoryAll.has(id)) byCategoryAll.set(id, []);
-      byCategoryAll.get(id).push({ keys: byCommand.get(commandName) || [], label: meta.label });
       const keys = byCommand.get(commandName);
       if (!keys) continue;
+      const id = meta.category || "other";
       if (!byCategory.has(id)) byCategory.set(id, []);
       byCategory.get(id).push({ keys, label: meta.label });
     }
-    const columns = balanceCategories(byCategoryAll, COLUMNS);
-    const helpCat = categories.find((c) => c.id === "help");
-    if (helpCat && byCategory.has("help")) {
-      for (const col of columns) {
-        const idx = col.indexOf(helpCat);
-        if (idx !== -1) {
-          col.splice(idx, 1);
-          break;
-        }
-      }
-      columns[columns.length - 1].push(helpCat);
-    }
+    const columns = balanceCategories(byCategory, COLUMNS);
     listEl2 = document.createElement("div");
     listEl2.className = "jari-help-list";
     const grid = document.createElement("div");
@@ -5589,11 +5571,11 @@
     await ui.copyText(text);
     ui.toast(message);
   }
-  function copyTitleUrlText() {
+  function copyTitleAndUrlText() {
     return settings.getCopyFormat() === "markdown" ? `[${document.title}](${location.href})` : `${document.title}
 ${location.href}`;
   }
-  function pasteClipboard() {
+  function readClipboardText() {
     let text = "";
     try {
       ui.withHiddenTextarea((ta) => {
@@ -5613,8 +5595,8 @@ ${location.href}`;
     scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
     scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
     scrollRight: { ...COMMAND_CATALOG.scrollRight, run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }) },
-    scrollTop: {
-      ...COMMAND_CATALOG.scrollTop,
+    scrollToTop: {
+      ...COMMAND_CATALOG.scrollToTop,
       run: () => {
         const el = getScrollElement();
         if (isFrame(el)) {
@@ -5625,8 +5607,8 @@ ${location.href}`;
         else el.scrollTo({ top: 0, behavior: "instant" });
       }
     },
-    scrollBottom: {
-      ...COMMAND_CATALOG.scrollBottom,
+    scrollToBottom: {
+      ...COMMAND_CATALOG.scrollToBottom,
       run: () => {
         const el = getScrollElement();
         if (isFrame(el)) {
@@ -5688,19 +5670,19 @@ ${location.href}`;
     newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
     closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
     restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
-    pasteOpen: {
-      ...COMMAND_CATALOG.pasteOpen,
+    openClipboard: {
+      ...COMMAND_CATALOG.openClipboard,
       run: async () => {
-        const text = await pasteClipboard();
+        const text = await readClipboardText();
         if (!text) return ui.toast("Clipboard empty");
         const res = await sendMessage("navigate", { url: text });
         if (res && !res.ok) ui.toast("Not a URL");
       }
     },
-    pasteOpenBackground: {
-      ...COMMAND_CATALOG.pasteOpenBackground,
+    openClipboardBackground: {
+      ...COMMAND_CATALOG.openClipboardBackground,
       run: async () => {
-        const text = await pasteClipboard();
+        const text = await readClipboardText();
         if (!text) return ui.toast("Clipboard empty");
         const res = await sendMessage("openInBackgroundTab", { url: text });
         if (res && !res.ok) ui.toast("Not a URL");
@@ -5708,21 +5690,21 @@ ${location.href}`;
     },
     previousTab: { ...COMMAND_CATALOG.previousTab, run: (c) => sendMessage("previousTab", { count: c.count }) },
     nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
-    firstTab: { ...COMMAND_CATALOG.firstTab, run: () => sendMessage("firstTab") },
-    lastTab: { ...COMMAND_CATALOG.lastTab, run: () => sendMessage("lastTab") },
-    splitMerge: {
-      ...COMMAND_CATALOG.splitMerge,
+    goToFirstTab: { ...COMMAND_CATALOG.goToFirstTab, run: () => sendMessage("goToFirstTab") },
+    goToLastTab: { ...COMMAND_CATALOG.goToLastTab, run: () => sendMessage("goToLastTab") },
+    moveTabToWindow: {
+      ...COMMAND_CATALOG.moveTabToWindow,
       run: async () => {
-        const res = await sendMessage("splitOrMerge");
+        const res = await sendMessage("moveTabToWindow");
         if (!res || !res.ok) {
-          ui.toast("No window to split");
+          ui.toast("No window available");
           return;
         }
-        if (res.autoMerged) ui.toast("Merged to window");
-        else if (res.split) ui.toast("Split to window");
-        else if (res.needMerge) Prompt.openMerge(res);
-        else if (res.needMerge === false) ui.toast("No window to merge");
-        else ui.toast("No window to split");
+        if (res.movedToWindow) ui.toast("Moved to window");
+        else if (res.movedToNewWindow) ui.toast("Moved to new window");
+        else if (res.needWindowChoice) Prompt.chooseWindow(res);
+        else if (res.needWindowChoice === false) ui.toast("No other window");
+        else ui.toast("No window available");
       }
     },
     moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
@@ -5730,12 +5712,12 @@ ${location.href}`;
     duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
     togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
     toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
-    tabSearch: { ...COMMAND_CATALOG.tabSearch, run: () => Prompt.open() },
-    omnibar: { ...COMMAND_CATALOG.omnibar, run: () => Prompt.openOmnibar() },
+    searchTabs: { ...COMMAND_CATALOG.searchTabs, run: () => Prompt.open() },
+    openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
     reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
-    hardReload: { ...COMMAND_CATALOG.hardReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
-    goUp: {
-      ...COMMAND_CATALOG.goUp,
+    forceReload: { ...COMMAND_CATALOG.forceReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
+    goToParent: {
+      ...COMMAND_CATALOG.goToParent,
       run: () => {
         const target2 = Url.parentUrlOf(location.href);
         if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
@@ -5754,25 +5736,25 @@ ${location.href}`;
       ...COMMAND_CATALOG.editUrl,
       run: () => Prompt.openEditUrl()
     },
-    historyBack: { ...COMMAND_CATALOG.historyBack, run: () => sendMessage("historyBack") },
-    historyForward: { ...COMMAND_CATALOG.historyForward, run: () => sendMessage("historyForward") },
+    goBack: { ...COMMAND_CATALOG.goBack, run: () => sendMessage("goBack") },
+    goForward: { ...COMMAND_CATALOG.goForward, run: () => sendMessage("goForward") },
     copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
-    copyTitleUrl: { ...COMMAND_CATALOG.copyTitleUrl, run: () => copyToClipboard(copyTitleUrlText(), "Copied") },
+    copyTitleAndUrl: { ...COMMAND_CATALOG.copyTitleAndUrl, run: () => copyToClipboard(copyTitleAndUrlText(), "Copied") },
     toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
-    passthrough: { ...COMMAND_CATALOG.passthrough, run: () => passthroughEnter() },
-    toggleDisabled: { ...COMMAND_CATALOG.toggleDisabled, run: () => settings.toggleDisabled() },
+    passthroughKeys: { ...COMMAND_CATALOG.passthroughKeys, run: () => passthroughEnter() },
+    toggleSiteEnabled: { ...COMMAND_CATALOG.toggleSiteEnabled, run: () => settings.toggleSiteEnabled() },
     hintClick: { ...COMMAND_CATALOG.hintClick, run: () => Hints.open("click") },
     hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
     hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
     hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
     hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
-    findForward: { ...COMMAND_CATALOG.findForward, run: () => Find.open() },
+    findText: { ...COMMAND_CATALOG.findText, run: () => Find.open() },
     findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
     findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
-    visualMode: { ...COMMAND_CATALOG.visualMode, run: () => Visual.enter("visual") },
-    visualLineMode: { ...COMMAND_CATALOG.visualLineMode, run: () => Visual.enter("line") },
+    enterVisual: { ...COMMAND_CATALOG.enterVisual, run: () => Visual.enter("visual") },
+    enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
-    openOptions: { ...COMMAND_CATALOG.openOptions, run: () => sendMessage("openOptions") },
+    openSettings: { ...COMMAND_CATALOG.openSettings, run: () => sendMessage("openSettings") },
     openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") }
   };
 
@@ -5888,8 +5870,8 @@ ${location.href}`;
     }
     if (settings.isDisabled()) {
       const key2 = canonicalKey(event);
-      if (settings.getKeymap()[key2] === "toggleDisabled")
-        run("toggleDisabled", 1, event);
+      if (settings.getKeymap()[key2] === "toggleSiteEnabled")
+        run("toggleSiteEnabled", 1, event);
       return;
     }
     const key = canonicalKey(event);
@@ -5903,7 +5885,7 @@ ${location.href}`;
     }
     const activeEl = deepActiveElement();
     if (isTypingTarget(activeEl)) {
-      if (commandName === "toggleDisabled") run(commandName, 1, event);
+      if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
       else if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();

@@ -23,47 +23,57 @@ block caret and hints - every key rebindable from the options page.
 - `G` - scroll to bottom
 - `w` - cycle scroll area / frame (focuses frames, so `j`/`k` and `f` then work inside)
 
-### View & Zoom
+### Zoom
 
 - `+` - zoom in
 - `-` - zoom out
 
 ### Tabs
 
-- `t` - open URL or search (omnibar)
-- `gt` - tab search
+- `t` - open URL or search
+- `gt` - search tabs
 - `x` - close tab
 - `X` - reopen closed tab
-- `H` / `L` - previous / next tab
-- `g0` - jump to first tab
-- `g$` - jump to last tab
+- `J` / `K` - previous / next tab
+- `g0` - go to first tab
+- `g$` - go to last tab
 - `<<` / `>>` - move tab left / right
-- `gw` - split / merge tab/window
-- `gp` - open clipboard URL in current tab
+- `gw` - move tab to another window
+- `gp` - open clipboard URL in this tab
 - `gP` - open clipboard URL in background tab
 
 ### History
 
-- `S` - go back in history
-- `D` - go forward in history
+- `H` - go back in history
+- `L` - go forward in history
 
 ### Page
 
-- `r` - reload
-- `R` - reload (bypass cache)
-- `gu` - go to parent path
+- `r` - reload tab
+- `R` - reload without cache
+- `gu` - go to parent page
 - `gU` - go to site root
 - `ge` - edit current URL
+- `yy` - copy page URL
+- `Y` - copy title + URL
+
+### Hints
+
+- `f` - click link
+- `F` - open link in new tab
+- `gf` - open link in background tab
+- `i` - focus input
+- `yf` - copy link URL
 
 ### Find
 
-- `/` - find forward
+- `/` - find in page
 - `n` - next match
 - `N` - previous match
 
 Incremental search as you type (smart case: lowercase = case-insensitive, uppercase = case-sensitive). Highlights all matches, current match in solid orange. `Esc` clears highlight, `Enter` on a highlighted link follows it. Debounced, shadow-DOM and iframe aware.
 
-### Visual & Caret
+### Visual
 
 - `v` - visual mode
 - `V` - visual line mode
@@ -88,21 +98,17 @@ Incremental search as you type (smart case: lowercase = case-insensitive, upperc
 
 In caret mode the operators are limited: `y`/`yy` yank the current line and `o` swaps anchor/focus in both modes.
 
-### Clipboard
-
-- `yy` - copy URL
-- `Y` - copy title + URL
-
 ### Modes
 
 - `I` - ignore mode
 - `p` - passthrough keys
-- `ctrl+alt+v` - enable/disable on this site
+- `ctrl+alt+v` - enable / disable on this site
 
 ### Help
 
-- `?` - show keybindings
+- `?` - show this help
 - `;e` - open settings
+- `;x` - open extensions page
 
 **Commands without default bindings** - bind one from the options page:
 

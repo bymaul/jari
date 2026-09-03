@@ -1,4 +1,4 @@
-import { balanceCategories, categories } from "./keymap.js";
+import { balanceCategories } from "./keymap.js";
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { COMMAND_CATALOG } from "./catalog.js";
@@ -40,27 +40,16 @@ function render() {
     byCommand.get(commandName).push(key);
   }
 
-  const byCategoryAll = new Map();
   const byCategory = new Map();
   for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
-    const id = meta.category || "other";
-    if (!byCategoryAll.has(id)) byCategoryAll.set(id, []);
-    byCategoryAll.get(id).push({ keys: byCommand.get(commandName) || [], label: meta.label });
     const keys = byCommand.get(commandName);
     if (!keys) continue;
+    const id = meta.category || "other";
     if (!byCategory.has(id)) byCategory.set(id, []);
     byCategory.get(id).push({ keys, label: meta.label });
   }
 
-  const columns = balanceCategories(byCategoryAll, COLUMNS);
-  const helpCat = categories.find((c) => c.id === "help");
-  if (helpCat && byCategory.has("help")) {
-    for (const col of columns) {
-      const idx = col.indexOf(helpCat);
-      if (idx !== -1) { col.splice(idx, 1); break; }
-    }
-    columns[columns.length - 1].push(helpCat);
-  }
+  const columns = balanceCategories(byCategory, COLUMNS);
 
   listEl = document.createElement('div');
   listEl.className = 'jari-help-list';

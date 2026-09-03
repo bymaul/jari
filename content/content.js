@@ -154,8 +154,8 @@ function handleKeydown(event) {
 
   if (settings.isDisabled()) {
     const key = canonicalKey(event);
-    if (settings.getKeymap()[key] === "toggleDisabled")
-      run("toggleDisabled", 1, event);
+    if (settings.getKeymap()[key] === "toggleSiteEnabled")
+      run("toggleSiteEnabled", 1, event);
     return;
   }
 
@@ -172,7 +172,7 @@ function handleKeydown(event) {
 
   const activeEl = deepActiveElement();
   if (isTypingTarget(activeEl)) {
-    if (commandName === "toggleDisabled") run(commandName, 1, event);
+    if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
     else if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();

@@ -15,12 +15,12 @@ export const keymapDefaults = {
   k: "scrollUp",
   h: "scrollLeft",
   l: "scrollRight",
-  G: "scrollBottom",
+  G: "scrollToBottom",
   w: "cycleScrollFrame",
   "+": "zoomIn",
   "-": "zoomOut",
 
-  t: "omnibar",
+  t: "openOmnibar",
   x: "closeTab",
   X: "restoreTab",
   J: "previousTab",
@@ -28,42 +28,42 @@ export const keymapDefaults = {
   "<<": "moveTabLeft",
   ">>": "moveTabRight",
 
-  gw: "splitMerge",
+  gw: "moveTabToWindow",
 
   f: "hintClick",
   F: "hintOpen",
   gf: "hintOpenBackground",
   i: "hintInput",
 
-  H: "historyBack",
-  L: "historyForward",
+  H: "goBack",
+  L: "goForward",
 
   r: "reloadTab",
-  R: "hardReload",
+  R: "forceReload",
 
-  Y: "copyTitleUrl",
-  gp: "pasteOpen",
-  gP: "pasteOpenBackground",
+  Y: "copyTitleAndUrl",
+  gp: "openClipboard",
+  gP: "openClipboardBackground",
 
   I: "toggleIgnore",
-  p: "passthrough",
-  "ctrl+alt+v": "toggleDisabled",
+  p: "passthroughKeys",
+  "ctrl+alt+v": "toggleSiteEnabled",
 
   "?": "showHelp",
-  "/": "findForward",
+  "/": "findText",
   n: "findNext",
   N: "findPrev",
-  v: "visualMode",
-  V: "visualLineMode",
+  v: "enterVisual",
+  V: "enterVisualLine",
 
-  gt: "tabSearch",
-  gg: "scrollTop",
-  gu: "goUp",
+  gt: "searchTabs",
+  gg: "scrollToTop",
+  gu: "goToParent",
   gU: "goToRoot",
   ge: "editUrl",
-  g0: "firstTab",
-  g$: "lastTab",
-  ";e": "openOptions",
+  g0: "goToFirstTab",
+  g$: "goToLastTab",
+  ";e": "openSettings",
   ";x": "openExtensions",
 
   yy: "copyUrl",
@@ -80,12 +80,10 @@ export const prefixes = {
 
 export const categories = [
   { id: "scrolling", label: "Scrolling" },
-  { id: "view", label: "View & zoom" },
+  { id: "zoom", label: "Zoom" },
   { id: "tabs", label: "Tabs" },
-  { id: "tabActions", label: "Tab actions" },
   { id: "history", label: "History" },
   { id: "page", label: "Page" },
-  { id: "clipboard", label: "Clipboard" },
   { id: "hints", label: "Hints" },
   { id: "find", label: "Find" },
   { id: "visual", label: "Visual" },
@@ -178,17 +176,8 @@ export function normalizeSettings(data) {
   const d = data || {};
   const storedKeymap = {};
   for (const [key, command] of Object.entries(d.keymap || {})) {
-    if (command === "cycleScrollArea") {
-      storedKeymap[key] = "cycleScrollFrame";
-    } else if (command === "showScrollArea" || command === "resetScrollArea") {
-      if (key === "w") storedKeymap[key] = "cycleScrollFrame";
-      continue;
-    } else {
-      storedKeymap[key] = command;
-    }
+    storedKeymap[key] = command;
   }
-  if (storedKeymap[";s"] === "cycleScrollFrame") delete storedKeymap[";s"];
-  if (storedKeymap[";S"] === "cycleScrollFrame") delete storedKeymap[";S"];
   const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
   for (const key of prefixKeys) delete keymap[key];
   return {
@@ -225,7 +214,14 @@ export function normalizeSettings(data) {
 export function balanceCategories(byCategory, columnCount = 3) {
   const columns = Array.from({ length: columnCount }, () => []);
   const columnRows = columns.map(() => 0);
-  for (const cat of categories || []) {
+  const ordered = [...(categories || [])].sort((a, b) => {
+    const rowsA = byCategory.get(a.id);
+    const rowsB = byCategory.get(b.id);
+    const weightA = rowsA ? 1 + rowsA.length : -1;
+    const weightB = rowsB ? 1 + rowsB.length : -1;
+    return weightB - weightA;
+  });
+  for (const cat of ordered) {
     const rows = byCategory.get(cat.id);
     if (!rows) continue;
     let best = 0;

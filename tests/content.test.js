@@ -144,19 +144,19 @@ test("a bare zero count clamps to one repeat", () => {
 });
 
 test("a two-key prefix composes a binding", () => {
-  spyOn("goUp");
+  spyOn("goToParent");
   handleKeydown(key({ key: "g" }));
   handleKeydown(key({ key: "u" }));
-  assert.equal(spiedCalls.goUp.length, 1);
-  assert.equal(spiedCalls.goUp[0].count, 1);
+  assert.equal(spiedCalls.goToParent.length, 1);
+  assert.equal(spiedCalls.goToParent[0].count, 1);
 });
 
 test("a modifier press does not cancel a pending prefix", () => {
-  spyOn("goUp");
+  spyOn("goToParent");
   handleKeydown(key({ key: "g" }));
   handleKeydown(key({ key: "Shift" }));
   handleKeydown(key({ key: "u" }));
-  assert.equal(spiedCalls.goUp.length, 1);
+  assert.equal(spiedCalls.goToParent.length, 1);
 });
 
 test("an unbound prefix completion is a dead key", () => {
@@ -189,14 +189,14 @@ test("Escape with nothing pending reaches the page", () => {
 test("the showcmd readout echoes counts and prefixes", () => {
   const showcmdCalls = spyUi("showcmd");
   const flashCalls = spyUi("flash");
-  spyOn("goUp");
+  spyOn("goToParent");
   handleKeydown(key({ key: "2" }));
   assert.deepEqual(showcmdCalls, [["2"]]);
   handleKeydown(key({ key: "g" }));
   assert.deepEqual(showcmdCalls, [["2"], ["2g"]]);
   handleKeydown(key({ key: "u" }));
   assert.deepEqual(flashCalls, [["2gu"]]);
-  assert.equal(spiedCalls.goUp[0].count, 2);
+  assert.equal(spiedCalls.goToParent[0].count, 2);
 });
 
 test("ignore mode passes every key through except its toggle and Escape", () => {
@@ -273,7 +273,7 @@ test("passthrough exits when the timeout expires", async () => {
 test("disabled sites pass every key through except the toggle", () => {
   settings.set({ disabledSites: ["test.example"] });
   spyOn("scrollDown");
-  spyOn("toggleDisabled");
+  spyOn("toggleSiteEnabled");
 
   const pass = key({ key: "j" });
   handleKeydown(pass);
@@ -282,7 +282,7 @@ test("disabled sites pass every key through except the toggle", () => {
 
   const toggle = key({ key: "v", ctrlKey: true, altKey: true });
   handleKeydown(toggle);
-  assert.equal(spiedCalls.toggleDisabled.length, 1);
+  assert.equal(spiedCalls.toggleSiteEnabled.length, 1);
   assertClaimed(toggle);
 });
 
