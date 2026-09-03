@@ -1,5 +1,6 @@
 import { overlaySelectors, queryAll } from "./keymap.js";
 import { ui } from "./ui.js";
+import { FRAME_SELECTOR, isFrameElement } from "./hints-elements.js";
 import { MIN_SCROLL_AREA_SIZE } from "../shared/constants.js";
 
 let target = null;
@@ -34,11 +35,18 @@ function getTarget() {
 }
 
 let scanEpoch = 0;
-let cachedEpoch = -1;
-let cachedAreas = null;
-let cachedFrames = null;
-let cachedFramesEpoch = -1;
 let mutationTimeout = null;
+
+function epochCache(compute) {
+  let epoch = -1;
+  let value = null;
+  return () => {
+    if (epoch === scanEpoch && value) return value;
+    epoch = scanEpoch;
+    value = compute();
+    return value;
+  };
+}
 
 function invalidateScrollCache() {
   if (mutationTimeout) {
@@ -95,9 +103,7 @@ function isScrollVisible(el) {
   return true;
 }
 
-function findScrollableElements() {
-  if (cachedEpoch === scanEpoch && cachedAreas) return cachedAreas;
-  cachedEpoch = scanEpoch;
+const findScrollableElements = epochCache(() => {
   const areas = [];
   const roots = new Set([document.documentElement, document.body]);
 
@@ -130,15 +136,12 @@ function findScrollableElements() {
       canX;
     if (scrollableY || scrollableX) areas.push(el);
   }
-  cachedAreas = areas;
   return areas;
-}
+});
 
-function findFrameElements() {
-  if (cachedFramesEpoch === scanEpoch && cachedFrames) return cachedFrames;
-  cachedFramesEpoch = scanEpoch;
+const findFrameElements = epochCache(() => {
   const frames = [];
-  for (const el of queryAll("iframe,frame", ensureObserved)) {
+  for (const el of queryAll(FRAME_SELECTOR, ensureObserved)) {
     try {
       if (el.closest && el.closest(overlaySelectors)) continue;
     } catch {}
@@ -161,14 +164,12 @@ function findFrameElements() {
       continue;
     frames.push(el);
   }
-  cachedFrames = frames;
   return frames;
-}
+});
 
 export function isFrame(el) {
   if (!el || el === window) return false;
-  const tag = el.tagName;
-  return tag === "IFRAME" || tag === "FRAME";
+  return isFrameElement(el);
 }
 
 export function focusTarget(el) {

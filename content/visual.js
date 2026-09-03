@@ -9,6 +9,11 @@ import {
   layoutHints,
 } from "./hint-layer.js";
 import {
+  detectHighlightSupport,
+  clearHighlightNames,
+  unwrapSpans,
+} from "./highlight.js";
+import {
   isElementDrawn,
   isElementPartiallyInViewport,
   getVisibleElements,
@@ -45,7 +50,6 @@ let pendingVisualMode = "visual";
 let findOpenHandler = null;
 let findNavHandler = null;
 
-let visualUseHighlights = false;
 let visualFallbackSpans = [];
 
 function isActive() {
@@ -323,20 +327,8 @@ function disableSelectOverride() {
 }
 
 function clearVisualHighlight() {
-  try {
-    if (CSS.highlights) CSS.highlights.delete("jari-visual");
-  } catch {}
-  for (const span of visualFallbackSpans) {
-    try {
-      const parent = span.parentNode;
-      if (!parent) continue;
-      const text = span.textContent;
-      const tn = document.createTextNode(text);
-      parent.replaceChild(tn, span);
-      parent.normalize();
-    } catch {}
-  }
-  visualFallbackSpans = [];
+  clearHighlightNames("jari-visual");
+  unwrapSpans(visualFallbackSpans);
 }
 function applyVisualHighlight() {
   clearVisualHighlight();
@@ -346,18 +338,11 @@ function applyVisualHighlight() {
   try {
     const range = sel.getRangeAt(0).cloneRange();
     try {
-      if (
-        typeof CSS !== "undefined" &&
-        CSS.highlights &&
-        typeof Highlight !== "undefined"
-      ) {
+      if (detectHighlightSupport()) {
         CSS.highlights.set("jari-visual", new Highlight(range));
-        visualUseHighlights = true;
         return;
       }
-    } catch {
-      visualUseHighlights = false;
-    }
+    } catch {}
     try {
       const span = document.createElement("span");
       span.className = "jari-visual-highlight";

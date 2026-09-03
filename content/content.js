@@ -10,6 +10,7 @@ import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { commands, setModeActions } from "./commands.js";
 import { Overlays } from "./overlays.js";
+import { isEditable } from "./hints-elements.js";
 import { Find, __resetFindState } from "./find.js";
 import { __resetVisualState } from "./visual.js";
 
@@ -35,18 +36,6 @@ function clearPending() {
 function restartTimer() {
   clearTimeout(timer);
   timer = setTimeout(clearPending, settings.getTimeoutMs());
-}
-
-function isTypingTarget(el) {
-  return (
-    !!el &&
-    (el.tagName === "INPUT" ||
-      el.tagName === "TEXTAREA" ||
-      el.tagName === "SELECT" ||
-      el.isContentEditable ||
-      el.getAttribute("role") === "textbox" ||
-      el.getAttribute("role") === "searchbox")
-  );
 }
 
 function run(commandName, count, event) {
@@ -173,7 +162,7 @@ function handleKeydown(event) {
   }
 
   const activeEl = deepActiveElement();
-  if (isTypingTarget(activeEl)) {
+  if (isEditable(activeEl)) {
     if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
     else if (event.key === "Escape") {
       event.preventDefault();

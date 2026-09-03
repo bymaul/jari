@@ -3,6 +3,11 @@ import { register } from "./overlays.js";
 import { ui } from "./ui.js";
 import { overlaySelectors } from "./keymap.js";
 import { isElementDrawn, getLinkAncestor } from "./hints-elements.js";
+import {
+  detectHighlightSupport,
+  clearHighlightNames,
+  unwrapSpans,
+} from "./highlight.js";
 import { Visual } from "./visual.js";
 
 const MAX_MATCHES = 1500;
@@ -30,18 +35,6 @@ function hasHighlights() {
 
 function isActive() {
   return active;
-}
-
-function detectHighlightSupport() {
-  try {
-    return (
-      typeof CSS !== "undefined" &&
-      CSS.highlights &&
-      typeof Highlight !== "undefined"
-    );
-  } catch {
-    return false;
-  }
 }
 
 function hasUpperCase(s) {
@@ -221,26 +214,11 @@ function buildMatches(query) {
 }
 
 function clearHighlightApi() {
-  try {
-    if (CSS.highlights) {
-      CSS.highlights.delete("jari-find");
-      CSS.highlights.delete("jari-find-current");
-    }
-  } catch {}
+  clearHighlightNames("jari-find", "jari-find-current");
 }
 
 function clearFallback() {
-  for (const span of fallbackSpans) {
-    try {
-      const parent = span.parentNode;
-      if (!parent) continue;
-      const text = span.textContent;
-      const tn = document.createTextNode(text);
-      parent.replaceChild(tn, span);
-      parent.normalize();
-    } catch {}
-  }
-  fallbackSpans = [];
+  unwrapSpans(fallbackSpans);
 }
 
 function clearHighlights() {

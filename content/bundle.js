@@ -662,6 +662,245 @@
     }
   };
 
+  // content/hints-elements.js
+  var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
+  var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
+  var FRAME_SELECTOR = "iframe,frame";
+  function isFrameElement(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "IFRAME" || tag === "FRAME";
+  }
+  function isEditable(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (el.isContentEditable) return true;
+    const role = el.getAttribute ? el.getAttribute("role") : null;
+    if (role === "textbox" || role === "searchbox" || role === "combobox")
+      return true;
+    return false;
+  }
+  function isElementDrawn(e, rect) {
+    const min = isEditable(e) ? 1 : 4;
+    rect = rect || e.getBoundingClientRect();
+    return rect.width > min && rect.height > min && (parseFloat(window.getComputedStyle(e).opacity) > 0.1 || e.tagName === "INPUT" && e.type !== "text");
+  }
+  function isElementPartiallyInViewport(el, ignoreSize) {
+    const rect = el.getBoundingClientRect();
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+    return (ignoreSize || isElementDrawn(el, rect)) && rect.top < windowHeight && rect.bottom > 0 && rect.left < windowWidth && rect.right > 0;
+  }
+  function getVisibleElements(filter) {
+    const all = Array.from(document.documentElement.getElementsByTagName("*"));
+    const visibleElements = [];
+    for (let i = 0; i < all.length; i++) {
+      const e = all[i];
+      if (e.shadowRoot) {
+        const cc = e.shadowRoot.querySelectorAll("*");
+        for (let j = 0; j < cc.length; j++) all.push(cc[j]);
+      }
+      const rect = e.getBoundingClientRect();
+      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && window.getComputedStyle(e).visibility !== "hidden") {
+        filter(e, visibleElements);
+      }
+    }
+    return visibleElements;
+  }
+  function filterInvisibleElements(nodes) {
+    return nodes.filter(
+      (n) => n.offsetHeight && n.offsetWidth && !n.getAttribute("disabled") && isElementPartiallyInViewport(n) && window.getComputedStyle(n).visibility !== "hidden"
+    );
+  }
+  function getRealRect(elm) {
+    try {
+      if (elm.childElementCount === 0) {
+        const r = elm.getClientRects();
+        if (r.length === 3) return r[1];
+        if (r.length === 2) return r[0];
+        return elm.getBoundingClientRect();
+      } else if (elm.childElementCount === 1 && elm.firstElementChild && elm.firstElementChild.textContent) {
+        const r = elm.firstElementChild.getBoundingClientRect();
+        if (r.width < 4 || r.height < 4) return elm.getBoundingClientRect();
+        return r;
+      }
+      return elm.getBoundingClientRect();
+    } catch {
+      return elm.getBoundingClientRect();
+    }
+  }
+  function isElementClickable(e) {
+    try {
+      if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
+    } catch {
+    }
+    try {
+      const style = window.getComputedStyle(e);
+      if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
+        return true;
+    } catch {
+    }
+    try {
+      if (e.closest && e.closest(
+        "a, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button"
+      ))
+        return true;
+    } catch {
+    }
+    return false;
+  }
+  function filterAncestors(elements2) {
+    if (elements2.length === 0) return elements2;
+    const result = [];
+    elements2.forEach((e) => {
+      for (let j = 0; j < result.length; j++) {
+        if (result[j].contains(e)) {
+          if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
+          return;
+        } else if (result[j].shadowRoot && result[j].shadowRoot.contains(e)) {
+          return;
+        } else if (e.contains(result[j])) {
+          return;
+        }
+      }
+      result.push(e);
+    });
+    return result;
+  }
+  function filterOverlapElements(elements2) {
+    elements2 = elements2.filter((e) => {
+      const be = getRealRect(e);
+      if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
+      if (e.matches && (e.matches("input, textarea, select, form") || e.contentEditable === "true"))
+        return true;
+      try {
+        if (e.closest && e.closest(overlaySelectors)) return false;
+      } catch {
+      }
+      const el = e.getRootNode().elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
+      return !el || el.shadowRoot && (el.childElementCount === 0 || el.shadowRoot.contains(e)) || el.contains(e) || e.contains(el);
+    });
+    return filterAncestors(elements2);
+  }
+  function getClickableElements() {
+    let elements2 = getVisibleElements((e, v) => {
+      try {
+        if (e.closest && e.closest(overlaySelectors)) return;
+      } catch {
+      }
+      if (isElementClickable(e)) v.push(e);
+    });
+    for (const frame of getFrameElements()) {
+      if (!elements2.includes(frame)) elements2.push(frame);
+    }
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function getFrameElements() {
+    const raw = queryAll(FRAME_SELECTOR);
+    const out = [];
+    for (const el of raw) {
+      try {
+        if (el.closest && el.closest(overlaySelectors)) continue;
+      } catch {
+      }
+      out.push(el);
+    }
+    let elements2 = filterInvisibleElements(out);
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function getHref(el) {
+    try {
+      if (el.href) return el.href;
+    } catch {
+    }
+    const raw = el.getAttribute ? el.getAttribute("href") || el.getAttribute("xlink:href") : null;
+    if (!raw) return null;
+    if (raw.startsWith("#") || raw.trim() === "") return null;
+    try {
+      const url = new URL(raw, location.href);
+      return url.href;
+    } catch {
+      return null;
+    }
+  }
+  function isOpenableLink(el) {
+    const href = getHref(el);
+    if (!href) return false;
+    try {
+      const url = new URL(href);
+      const scheme = url.protocol.replace(":", "").toLowerCase();
+      if (blockedUrlSchemes.has(scheme)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function getLinkAncestor(el) {
+    if (!el) return null;
+    if (el.closest) {
+      try {
+        const a = el.closest("a");
+        if (a && isOpenableLink(a)) return a;
+        const hrefEl = el.closest("[href]");
+        if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
+      } catch {
+      }
+    }
+    let cur = el;
+    while (cur) {
+      if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
+      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
+        return cur;
+      const parent = cur.parentElement;
+      if (parent) {
+        cur = parent;
+      } else {
+        const root = cur.getRootNode && cur.getRootNode();
+        if (root && root.host) cur = root.host;
+        else break;
+      }
+    }
+    return null;
+  }
+  function getLinkElements() {
+    let elements2 = getVisibleElements((e, v) => {
+      if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)
+        v.push(e);
+    });
+    elements2 = elements2.filter((el) => {
+      if (el.closest && el.closest(overlaySelectors)) return false;
+      return isOpenableLink(el);
+    });
+    elements2 = filterInvisibleElements(elements2);
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function getInputElements() {
+    const raw = queryAll(INPUT_SELECTOR);
+    const out = [];
+    for (const el of raw) {
+      if (el.closest && el.closest(overlaySelectors)) continue;
+      const type = el.getAttribute ? (el.getAttribute("type") || "").toLowerCase() : "";
+      if (type === "hidden") continue;
+      if (el.disabled) continue;
+      out.push(el);
+    }
+    let elements2 = filterInvisibleElements(out);
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function collectElements(requestedMode) {
+    let raw = [];
+    if (requestedMode === "click") raw = getClickableElements();
+    else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "yank")
+      raw = getLinkElements();
+    else if (requestedMode === "input") raw = getInputElements();
+    return raw;
+  }
+
   // content/scroll.js
   var target = null;
   var HIGHLIGHT_MS = 300;
@@ -689,11 +928,17 @@
     return target === null ? window : target;
   }
   var scanEpoch = 0;
-  var cachedEpoch = -1;
-  var cachedAreas = null;
-  var cachedFrames = null;
-  var cachedFramesEpoch = -1;
   var mutationTimeout = null;
+  function epochCache(compute) {
+    let epoch = -1;
+    let value = null;
+    return () => {
+      if (epoch === scanEpoch && value) return value;
+      epoch = scanEpoch;
+      value = compute();
+      return value;
+    };
+  }
   function invalidateScrollCache() {
     if (mutationTimeout) {
       clearTimeout(mutationTimeout);
@@ -742,9 +987,7 @@
     }
     return true;
   }
-  function findScrollableElements() {
-    if (cachedEpoch === scanEpoch && cachedAreas) return cachedAreas;
-    cachedEpoch = scanEpoch;
+  var findScrollableElements = epochCache(() => {
     const areas = [];
     const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
     for (const el of queryAll("*", ensureObserved)) {
@@ -765,14 +1008,11 @@
       const scrollableX = (overflowX === "auto" || overflowX === "scroll" || overflowX === "overlay") && canX;
       if (scrollableY || scrollableX) areas.push(el);
     }
-    cachedAreas = areas;
     return areas;
-  }
-  function findFrameElements() {
-    if (cachedFramesEpoch === scanEpoch && cachedFrames) return cachedFrames;
-    cachedFramesEpoch = scanEpoch;
+  });
+  var findFrameElements = epochCache(() => {
     const frames = [];
-    for (const el of queryAll("iframe,frame", ensureObserved)) {
+    for (const el of queryAll(FRAME_SELECTOR, ensureObserved)) {
       try {
         if (el.closest && el.closest(overlaySelectors)) continue;
       } catch {
@@ -793,13 +1033,11 @@
         continue;
       frames.push(el);
     }
-    cachedFrames = frames;
     return frames;
-  }
+  });
   function isFrame(el) {
     if (!el || el === window) return false;
-    const tag = el.tagName;
-    return tag === "IFRAME" || tag === "FRAME";
+    return isFrameElement(el);
   }
   function focusTarget(el) {
     if (!el || el === window) return;
@@ -1761,245 +1999,6 @@
   var Help = { open: open2, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
   register("help", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
 
-  // content/hints-elements.js
-  var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
-  var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
-  var FRAME_SELECTOR = "iframe,frame";
-  function isFrameElement(el) {
-    if (!el) return false;
-    const tag = el.tagName;
-    return tag === "IFRAME" || tag === "FRAME";
-  }
-  function isEditable(el) {
-    if (!el) return false;
-    const tag = el.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    if (el.isContentEditable) return true;
-    const role = el.getAttribute ? el.getAttribute("role") : null;
-    if (role === "textbox" || role === "searchbox" || role === "combobox")
-      return true;
-    return false;
-  }
-  function isElementDrawn(e, rect) {
-    const min = isEditable(e) ? 1 : 4;
-    rect = rect || e.getBoundingClientRect();
-    return rect.width > min && rect.height > min && (parseFloat(window.getComputedStyle(e).opacity) > 0.1 || e.tagName === "INPUT" && e.type !== "text");
-  }
-  function isElementPartiallyInViewport(el, ignoreSize) {
-    const rect = el.getBoundingClientRect();
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
-    return (ignoreSize || isElementDrawn(el, rect)) && rect.top < windowHeight && rect.bottom > 0 && rect.left < windowWidth && rect.right > 0;
-  }
-  function getVisibleElements(filter) {
-    const all = Array.from(document.documentElement.getElementsByTagName("*"));
-    const visibleElements = [];
-    for (let i = 0; i < all.length; i++) {
-      const e = all[i];
-      if (e.shadowRoot) {
-        const cc = e.shadowRoot.querySelectorAll("*");
-        for (let j = 0; j < cc.length; j++) all.push(cc[j]);
-      }
-      const rect = e.getBoundingClientRect();
-      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && window.getComputedStyle(e).visibility !== "hidden") {
-        filter(e, visibleElements);
-      }
-    }
-    return visibleElements;
-  }
-  function filterInvisibleElements(nodes) {
-    return nodes.filter(
-      (n) => n.offsetHeight && n.offsetWidth && !n.getAttribute("disabled") && isElementPartiallyInViewport(n) && window.getComputedStyle(n).visibility !== "hidden"
-    );
-  }
-  function getRealRect(elm) {
-    try {
-      if (elm.childElementCount === 0) {
-        const r = elm.getClientRects();
-        if (r.length === 3) return r[1];
-        if (r.length === 2) return r[0];
-        return elm.getBoundingClientRect();
-      } else if (elm.childElementCount === 1 && elm.firstElementChild && elm.firstElementChild.textContent) {
-        const r = elm.firstElementChild.getBoundingClientRect();
-        if (r.width < 4 || r.height < 4) return elm.getBoundingClientRect();
-        return r;
-      }
-      return elm.getBoundingClientRect();
-    } catch {
-      return elm.getBoundingClientRect();
-    }
-  }
-  function isElementClickable(e) {
-    try {
-      if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
-    } catch {
-    }
-    try {
-      const style = window.getComputedStyle(e);
-      if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
-        return true;
-    } catch {
-    }
-    try {
-      if (e.closest && e.closest(
-        "a, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button"
-      ))
-        return true;
-    } catch {
-    }
-    return false;
-  }
-  function filterAncestors(elements2) {
-    if (elements2.length === 0) return elements2;
-    const result = [];
-    elements2.forEach((e) => {
-      for (let j = 0; j < result.length; j++) {
-        if (result[j].contains(e)) {
-          if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
-          return;
-        } else if (result[j].shadowRoot && result[j].shadowRoot.contains(e)) {
-          return;
-        } else if (e.contains(result[j])) {
-          return;
-        }
-      }
-      result.push(e);
-    });
-    return result;
-  }
-  function filterOverlapElements(elements2) {
-    elements2 = elements2.filter((e) => {
-      const be = getRealRect(e);
-      if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
-      if (e.matches && (e.matches("input, textarea, select, form") || e.contentEditable === "true"))
-        return true;
-      try {
-        if (e.closest && e.closest(overlaySelectors)) return false;
-      } catch {
-      }
-      const el = e.getRootNode().elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
-      return !el || el.shadowRoot && (el.childElementCount === 0 || el.shadowRoot.contains(e)) || el.contains(e) || e.contains(el);
-    });
-    return filterAncestors(elements2);
-  }
-  function getClickableElements() {
-    let elements2 = getVisibleElements((e, v) => {
-      try {
-        if (e.closest && e.closest(overlaySelectors)) return;
-      } catch {
-      }
-      if (isElementClickable(e)) v.push(e);
-    });
-    for (const frame of getFrameElements()) {
-      if (!elements2.includes(frame)) elements2.push(frame);
-    }
-    elements2 = filterOverlapElements(elements2);
-    return elements2;
-  }
-  function getFrameElements() {
-    const raw = queryAll(FRAME_SELECTOR);
-    const out = [];
-    for (const el of raw) {
-      try {
-        if (el.closest && el.closest(overlaySelectors)) continue;
-      } catch {
-      }
-      out.push(el);
-    }
-    let elements2 = filterInvisibleElements(out);
-    elements2 = filterOverlapElements(elements2);
-    return elements2;
-  }
-  function getHref(el) {
-    try {
-      if (el.href) return el.href;
-    } catch {
-    }
-    const raw = el.getAttribute ? el.getAttribute("href") || el.getAttribute("xlink:href") : null;
-    if (!raw) return null;
-    if (raw.startsWith("#") || raw.trim() === "") return null;
-    try {
-      const url = new URL(raw, location.href);
-      return url.href;
-    } catch {
-      return null;
-    }
-  }
-  function isOpenableLink(el) {
-    const href = getHref(el);
-    if (!href) return false;
-    try {
-      const url = new URL(href);
-      const scheme = url.protocol.replace(":", "").toLowerCase();
-      if (blockedUrlSchemes.has(scheme)) return false;
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  function getLinkAncestor(el) {
-    if (!el) return null;
-    if (el.closest) {
-      try {
-        const a = el.closest("a");
-        if (a && isOpenableLink(a)) return a;
-        const hrefEl = el.closest("[href]");
-        if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
-      } catch {
-      }
-    }
-    let cur = el;
-    while (cur) {
-      if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
-      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
-        return cur;
-      const parent = cur.parentElement;
-      if (parent) {
-        cur = parent;
-      } else {
-        const root = cur.getRootNode && cur.getRootNode();
-        if (root && root.host) cur = root.host;
-        else break;
-      }
-    }
-    return null;
-  }
-  function getLinkElements() {
-    let elements2 = getVisibleElements((e, v) => {
-      if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)
-        v.push(e);
-    });
-    elements2 = elements2.filter((el) => {
-      if (el.closest && el.closest(overlaySelectors)) return false;
-      return isOpenableLink(el);
-    });
-    elements2 = filterInvisibleElements(elements2);
-    elements2 = filterOverlapElements(elements2);
-    return elements2;
-  }
-  function getInputElements() {
-    const raw = queryAll(INPUT_SELECTOR);
-    const out = [];
-    for (const el of raw) {
-      if (el.closest && el.closest(overlaySelectors)) continue;
-      const type = el.getAttribute ? (el.getAttribute("type") || "").toLowerCase() : "";
-      if (type === "hidden") continue;
-      if (el.disabled) continue;
-      out.push(el);
-    }
-    let elements2 = filterInvisibleElements(out);
-    elements2 = filterOverlapElements(elements2);
-    return elements2;
-  }
-  function collectElements(requestedMode) {
-    let raw = [];
-    if (requestedMode === "click") raw = getClickableElements();
-    else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "yank")
-      raw = getLinkElements();
-    else if (requestedMode === "input") raw = getInputElements();
-    return raw;
-  }
-
   // content/hint-layer.js
   function normalizeCharset() {
     const s = settings.getHintChars();
@@ -2604,6 +2603,37 @@
   var Hints = { open: open3, close: close3, isActive: isActive3, onKeyDown: onKeyDown3, genLabels };
   register("hints", { close: close3, onKeyDown: onKeyDown3, isActive: isActive3 });
 
+  // content/highlight.js
+  function detectHighlightSupport() {
+    try {
+      return typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
+    } catch {
+      return false;
+    }
+  }
+  function clearHighlightNames(...names) {
+    try {
+      if (CSS.highlights) {
+        for (const name of names) CSS.highlights.delete(name);
+      }
+    } catch {
+    }
+  }
+  function unwrapSpans(spans) {
+    for (const span of spans) {
+      try {
+        const parent = span.parentNode;
+        if (!parent) continue;
+        const text = span.textContent;
+        const tn = document.createTextNode(text);
+        parent.replaceChild(tn, span);
+        parent.normalize();
+      } catch {
+      }
+    }
+    spans.length = 0;
+  }
+
   // content/visual.js
   var active4 = false;
   var mode3 = "visual";
@@ -2626,7 +2656,6 @@
   var pendingVisualMode = "visual";
   var findOpenHandler = null;
   var findNavHandler = null;
-  var visualUseHighlights = false;
   var visualFallbackSpans = [];
   function isActive4() {
     return active4 || hintActive;
@@ -2892,22 +2921,8 @@
     selectOverrideEl = null;
   }
   function clearVisualHighlight() {
-    try {
-      if (CSS.highlights) CSS.highlights.delete("jari-visual");
-    } catch {
-    }
-    for (const span of visualFallbackSpans) {
-      try {
-        const parent = span.parentNode;
-        if (!parent) continue;
-        const text = span.textContent;
-        const tn = document.createTextNode(text);
-        parent.replaceChild(tn, span);
-        parent.normalize();
-      } catch {
-      }
-    }
-    visualFallbackSpans = [];
+    clearHighlightNames("jari-visual");
+    unwrapSpans(visualFallbackSpans);
   }
   function applyVisualHighlight() {
     clearVisualHighlight();
@@ -2917,13 +2932,11 @@
     try {
       const range = sel.getRangeAt(0).cloneRange();
       try {
-        if (typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined") {
+        if (detectHighlightSupport()) {
           CSS.highlights.set("jari-visual", new Highlight(range));
-          visualUseHighlights = true;
           return;
         }
       } catch {
-        visualUseHighlights = false;
       }
       try {
         const span = document.createElement("span");
@@ -4610,13 +4623,6 @@
   function isActive5() {
     return active5;
   }
-  function detectHighlightSupport() {
-    try {
-      return typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
-    } catch {
-      return false;
-    }
-  }
   function hasUpperCase(s) {
     return /[A-Z]/.test(s);
   }
@@ -4803,27 +4809,10 @@
     return out;
   }
   function clearHighlightApi() {
-    try {
-      if (CSS.highlights) {
-        CSS.highlights.delete("jari-find");
-        CSS.highlights.delete("jari-find-current");
-      }
-    } catch {
-    }
+    clearHighlightNames("jari-find", "jari-find-current");
   }
   function clearFallback() {
-    for (const span of fallbackSpans) {
-      try {
-        const parent = span.parentNode;
-        if (!parent) continue;
-        const text = span.textContent;
-        const tn = document.createTextNode(text);
-        parent.replaceChild(tn, span);
-        parent.normalize();
-      } catch {
-      }
-    }
-    fallbackSpans = [];
+    unwrapSpans(fallbackSpans);
   }
   function clearHighlights() {
     matches = [];
@@ -5533,9 +5522,6 @@ ${location.href}`;
     clearTimeout(timer);
     timer = setTimeout(clearPending, settings.getTimeoutMs());
   }
-  function isTypingTarget(el) {
-    return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.getAttribute("role") === "textbox" || el.getAttribute("role") === "searchbox");
-  }
   function run(commandName, count, event) {
     const cmd = commands[commandName];
     if (!cmd) return;
@@ -5639,7 +5625,7 @@ ${location.href}`;
       ui.showcmd(null);
     }
     const activeEl = deepActiveElement();
-    if (isTypingTarget(activeEl)) {
+    if (isEditable(activeEl)) {
       if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
       else if (event.key === "Escape") {
         event.preventDefault();
