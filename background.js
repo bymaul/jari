@@ -125,19 +125,7 @@
     openIncognitoTab: async (_, { url } = {}) => {
       const target = url === void 0 ? void 0 : normalizeUrl(url);
       if (url !== void 0 && !target) return { ok: false };
-      const windows = await chrome.windows.getAll({});
-      const incognito = (windows || []).find((win2) => win2 && win2.incognito);
-      if (incognito) {
-        const tab = await chrome.tabs.create(
-          target ? { windowId: incognito.id, url: target, active: true } : { windowId: incognito.id, active: true }
-        );
-        await focusWindow(incognito.id, "openIncognitoTab");
-        return tab ? { ok: true, id: tab.id } : { ok: false };
-      }
-      const win = await chrome.windows.create(
-        target ? { url: target, incognito: true } : { incognito: true }
-      );
-      return win ? { ok: true, id: win.id } : { ok: false };
+      return openInIncognito(target);
     },
     navigate: async (sender, { url } = {}) => {
       const target = normalizeUrl(url);
@@ -366,9 +354,14 @@
       const items = Array.from(map.values());
       return items.slice(0, 50);
     },
-    search: async (sender, { query = "", newTab = true } = {}) => {
+    search: async (sender, { query = "", newTab = true, incognito = false } = {}) => {
       const text = query.trim();
       if (!text) return { ok: false };
+      if (incognito) {
+        return openInIncognito(
+          "https://www.google.com/search?q=" + encodeURIComponent(text)
+        );
+      }
       if (typeof chrome.search?.query === "function") {
         await chrome.search.query({
           text,
@@ -458,6 +451,22 @@
     await chrome.tabs.create({ url: target, active });
     return { ok: true };
   }
+  async function openInIncognito(url) {
+    const windows = await chrome.windows.getAll({});
+    const incognito = (windows || []).find((win2) => win2 && win2.incognito);
+    if (incognito) {
+      const tab = await chrome.tabs.create(
+        url ? { windowId: incognito.id, url, active: true } : { windowId: incognito.id, active: true }
+      );
+      await focusWindow(incognito.id, "openInIncognito");
+      await maximizeWindow(incognito.id);
+      return tab ? { ok: true, id: tab.id } : { ok: false };
+    }
+    const win = await chrome.windows.create(
+      url ? { url, incognito: true, state: "maximized" } : { incognito: true, state: "maximized" }
+    );
+    return win ? { ok: true, id: win.id } : { ok: false };
+  }
   async function moveTab(sender, delta) {
     const tab = sender.tab;
     if (tab && tab.id) {
@@ -490,6 +499,13 @@
       }
     } catch (err) {
       console.error(`[jari] ${context} window focus failed`, err);
+    }
+  }
+  async function maximizeWindow(windowId) {
+    try {
+      await chrome.windows.update(windowId, { state: "maximized" });
+    } catch (err) {
+      console.error("[jari] openInIncognito window maximize failed", err);
     }
   }
 

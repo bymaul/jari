@@ -25,6 +25,7 @@ export const COMMAND_CATALOG = {
   goToLastTab: { category: "tabs", label: "Go to last tab" },
   searchTabs: { category: "tabs", label: "Search tabs" },
   openOmnibar: { category: "tabs", label: "Open URL or search" },
+  openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
   openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
   openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
   duplicateTab: { category: "tabs", label: "Duplicate tab" },

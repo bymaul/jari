@@ -21,7 +21,7 @@ export const keymapDefaults = {
   "-": "zoomOut",
 
   t: "openOmnibar",
-  T: "newIncognitoTab",
+  T: "openOmnibarIncognito",
   x: "closeTab",
   X: "restoreTab",
   J: "previousTab",

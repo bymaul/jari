@@ -212,3 +212,53 @@ test("Ctrl+Tab is left to the browser and does not move the selection", async ()
     Prompt.close();
   });
 });
+
+async function openIncognitoPrompt(document, input) {
+  const sent = [];
+  const original = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = (message, callback) => {
+    sent.push(message);
+    callback([]);
+  };
+  try {
+    Prompt.openIncognito();
+    const inputEl = document.created.find((el) => el.tagName === "input");
+    inputEl.value = input;
+    inputEl.dispatch("input", {});
+    Prompt.onKeyDown(keyEvent("Enter"));
+  } finally {
+    chrome.runtime.sendMessage = original;
+    Prompt.close();
+  }
+  return sent;
+}
+
+test("incognito omnibar submits a URL to the incognito handler", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = await openIncognitoPrompt(document, "example.com");
+    const open = sent.find((m) => m.action === "openIncognitoTab");
+    assert.ok(open, "expected an incognito open");
+    assert.equal(open.url, "example.com");
+    assert.ok(
+      !sent.some((m) => m.action === "createTab" || m.action === "navigate"),
+      "expected no normal-tab navigation",
+    );
+  });
+});
+
+test("incognito omnibar submits a search with the incognito flag", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = await openIncognitoPrompt(document, "some random query");
+    assert.deepEqual(
+      sent.find((m) => m.action === "search"),
+      {
+        action: "search",
+        query: "some random query",
+        newTab: true,
+        incognito: true,
+      },
+    );
+  });
+});

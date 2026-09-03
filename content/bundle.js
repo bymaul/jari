@@ -25,7 +25,7 @@
     "+": "zoomIn",
     "-": "zoomOut",
     t: "openOmnibar",
-    T: "newIncognitoTab",
+    T: "openOmnibarIncognito",
     x: "closeTab",
     X: "restoreTab",
     J: "previousTab",
@@ -1557,6 +1557,13 @@
     active = true;
     render("Open", "Search or type URL");
   }
+  function openIncognito() {
+    if (active) return;
+    tabs = [];
+    mode = "incognito";
+    active = true;
+    render("Incognito", "Search or type URL");
+  }
   function openEditUrl() {
     if (active) return;
     tabs = [];
@@ -1651,7 +1658,7 @@
     inputEl.addEventListener("input", () => {
       const q = inputEl.value.trim();
       query = q;
-      if (mode === "open" || mode === "edit") {
+      if (mode === "open" || mode === "edit" || mode === "incognito") {
         handleOpenInput(q);
       } else {
         filtered = q ? rankTabs(q, tabs) : tabs;
@@ -1761,7 +1768,7 @@
   function renderList() {
     const rows = filtered.slice(0, 50);
     listEl.textContent = "";
-    if (mode === "open" || mode === "edit") {
+    if (mode === "open" || mode === "edit" || mode === "incognito") {
       for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
       highlight();
       return;
@@ -1824,7 +1831,17 @@
     }
   }
   function openUrl(url) {
-    sendMessage(mode === "open" ? "createTab" : "navigate", { url });
+    sendMessage(
+      mode === "incognito" ? "openIncognitoTab" : mode === "open" ? "createTab" : "navigate",
+      { url }
+    );
+  }
+  function searchQuery(text) {
+    sendMessage("search", {
+      query: text,
+      newTab: mode !== "edit",
+      incognito: mode === "incognito"
+    });
   }
   function activate() {
     const item = filtered[selected];
@@ -1832,21 +1849,21 @@
     const kwInput = parseKeyword(rawInput);
     if (!item) {
       if (mode === "open" && !rawInput) sendMessage("createTab");
+      else if (mode === "incognito" && !rawInput) sendMessage("openIncognitoTab");
       else if (kwInput) openUrl(kwInput.url);
       else if (rawInput && Url.looksLikeUrl(rawInput)) {
         openUrl(Url.normalizeUrl(rawInput) || rawInput);
-      } else if (rawInput)
-        sendMessage("search", { query: rawInput, newTab: mode === "open" });
+      } else if (rawInput) searchQuery(rawInput);
       close();
       return;
     }
     if (mode === "moveWindow") {
       sendMessage("moveTabIntoWindow", { targetWindowId: item.windowId });
-    } else if (mode === "open" || mode === "edit") {
+    } else if (mode === "open" || mode === "edit" || mode === "incognito") {
       if (item.kind === "search") {
         if (item.keyword && item.url) openUrl(item.url);
         else if (kwInput && kwInput.url) openUrl(kwInput.url);
-        else sendMessage("search", { query: rawInput, newTab: mode === "open" });
+        else searchQuery(rawInput);
       } else if (item.url) {
         const match = tabUrlMap.get(item.url);
         if (match && match.id) sendMessage("activateTab", { id: match.id });
@@ -1880,6 +1897,7 @@
   var Prompt = {
     open,
     openOmnibar,
+    openIncognito,
     openEditUrl,
     chooseWindow,
     close,
@@ -1913,6 +1931,7 @@
     goToLastTab: { category: "tabs", label: "Go to last tab" },
     searchTabs: { category: "tabs", label: "Search tabs" },
     openOmnibar: { category: "tabs", label: "Open URL or search" },
+    openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
     openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
     openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
     duplicateTab: { category: "tabs", label: "Duplicate tab" },
@@ -5491,6 +5510,7 @@ ${location.href}`;
     toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
     searchTabs: { ...COMMAND_CATALOG.searchTabs, run: () => Prompt.open() },
     openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
+    openOmnibarIncognito: { ...COMMAND_CATALOG.openOmnibarIncognito, run: () => Prompt.openIncognito() },
     reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
     forceReload: { ...COMMAND_CATALOG.forceReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
     goToParent: { ...COMMAND_CATALOG.goToParent, run: () => goTo(Url.parentUrlOf) },

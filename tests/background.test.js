@@ -61,7 +61,10 @@ test("openIncognitoTab reuses an existing incognito window", async () => {
   const res = await handlers.openIncognitoTab({}, {});
   assert.deepEqual(res, { ok: true, id: 9 });
   assert.deepEqual(created, [{ windowId: 2, active: true }]);
-  assert.deepEqual(updated, [[2, { focused: true }]]);
+  assert.deepEqual(updated, [
+    [2, { focused: true }],
+    [2, { state: "maximized" }],
+  ]);
 });
 
 test("openIncognitoTab creates an incognito window when none exists", async () => {
@@ -75,7 +78,7 @@ test("openIncognitoTab creates an incognito window when none exists", async () =
   const res = await handlers.openIncognitoTab({}, {});
   assert.deepEqual(res, { ok: true, id: 30 });
   assert.deepEqual(createdTabs, []);
-  assert.deepEqual(createdWindows, [{ incognito: true }]);
+  assert.deepEqual(createdWindows, [{ incognito: true, state: "maximized" }]);
 });
 
 test("openIncognitoTab rejects an invalid URL", async () => {
@@ -88,4 +91,24 @@ test("openIncognitoTab rejects an invalid URL", async () => {
   const res = await handlers.openIncognitoTab({}, { url: "http://" });
   assert.deepEqual(res, { ok: false });
   assert.equal(calls, 0);
+});
+
+test("search with incognito opens the search URL in an incognito window", async () => {
+  const createdWindows = [];
+  stubChrome({
+    windows: [{ id: 1, incognito: false }],
+    onCreateWindow: (opts) => createdWindows.push(opts),
+  });
+  const res = await handlers.search(
+    {},
+    { query: "hello world", newTab: true, incognito: true },
+  );
+  assert.deepEqual(res, { ok: true, id: 30 });
+  assert.deepEqual(createdWindows, [
+    {
+      url: "https://www.google.com/search?q=hello%20world",
+      incognito: true,
+      state: "maximized",
+    },
+  ]);
 });

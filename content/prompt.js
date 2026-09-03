@@ -59,6 +59,14 @@ function openOmnibar() {
   render("Open", "Search or type URL");
 }
 
+function openIncognito() {
+  if (active) return;
+  tabs = [];
+  mode = "incognito";
+  active = true;
+  render("Incognito", "Search or type URL");
+}
+
 function openEditUrl() {
   if (active) return;
   tabs = [];
@@ -163,7 +171,7 @@ function render(title, placeholder) {
   inputEl.addEventListener("input", () => {
     const q = inputEl.value.trim();
     query = q;
-    if (mode === "open" || mode === "edit") {
+    if (mode === "open" || mode === "edit" || mode === "incognito") {
       handleOpenInput(q);
     } else {
       filtered = q ? rankTabs(q, tabs) : tabs;
@@ -290,7 +298,7 @@ function renderTabRow(tab, winLabel) {
 function renderList() {
   const rows = filtered.slice(0, 50);
   listEl.textContent = "";
-  if (mode === "open" || mode === "edit") {
+  if (mode === "open" || mode === "edit" || mode === "incognito") {
     for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
     highlight();
     return;
@@ -368,7 +376,22 @@ function onKeyDown(event) {
 }
 
 function openUrl(url) {
-  sendMessage(mode === "open" ? "createTab" : "navigate", { url });
+  sendMessage(
+    mode === "incognito"
+      ? "openIncognitoTab"
+      : mode === "open"
+        ? "createTab"
+        : "navigate",
+    { url },
+  );
+}
+
+function searchQuery(text) {
+  sendMessage("search", {
+    query: text,
+    newTab: mode !== "edit",
+    incognito: mode === "incognito",
+  });
 }
 
 function activate() {
@@ -377,21 +400,21 @@ function activate() {
   const kwInput = parseKeyword(rawInput);
   if (!item) {
     if (mode === "open" && !rawInput) sendMessage("createTab");
+    else if (mode === "incognito" && !rawInput) sendMessage("openIncognitoTab");
     else if (kwInput) openUrl(kwInput.url);
     else if (rawInput && Url.looksLikeUrl(rawInput)) {
       openUrl(Url.normalizeUrl(rawInput) || rawInput);
-    } else if (rawInput)
-      sendMessage("search", { query: rawInput, newTab: mode === "open" });
+    } else if (rawInput) searchQuery(rawInput);
     close();
     return;
   }
   if (mode === "moveWindow") {
     sendMessage("moveTabIntoWindow", { targetWindowId: item.windowId });
-  } else if (mode === "open" || mode === "edit") {
+  } else if (mode === "open" || mode === "edit" || mode === "incognito") {
     if (item.kind === "search") {
       if (item.keyword && item.url) openUrl(item.url);
       else if (kwInput && kwInput.url) openUrl(kwInput.url);
-      else sendMessage("search", { query: rawInput, newTab: mode === "open" });
+      else searchQuery(rawInput);
     } else if (item.url) {
       const match = tabUrlMap.get(item.url);
       if (match && match.id) sendMessage("activateTab", { id: match.id });
@@ -432,6 +455,7 @@ function close() {
 export const Prompt = {
   open,
   openOmnibar,
+  openIncognito,
   openEditUrl,
   chooseWindow,
   close,

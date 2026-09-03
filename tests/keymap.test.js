@@ -38,6 +38,7 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
 test("normalizeSettings fills defaults only when no keymap is stored", () => {
   const s = Jari.normalizeSettings({});
   assert.equal(s.keymap.t, "openOmnibar");
+  assert.equal(s.keymap.T, "openOmnibarIncognito");
   assert.equal(s.keymap.p, "passthroughKeys");
 });
 
