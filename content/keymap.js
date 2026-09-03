@@ -29,7 +29,7 @@ export const keymapDefaults = {
   "<<": "moveTabLeft",
   ">>": "moveTabRight",
 
-  gw: "moveTabToWindow",
+  W: "moveTabToWindow",
 
   f: "hintClick",
   F: "hintOpen",
@@ -99,9 +99,12 @@ export const settingsDefaults = {
   smoothScroll: false,
 
   fuzzyMatching: true,
-  timeoutMs: 1500,
+  timeoutMs: 0,
 
   passthroughMs: 1500,
+
+  clueEnabled: true,
+  clueDelayMs: 300,
 
   suggestionSources: suggestionSources.slice(),
 
@@ -143,6 +146,48 @@ export function keysForCommand(keymap, commandName) {
     .map(([key]) => key);
 }
 
+export function isPrefixKey(keymap, key) {
+  if (!key || typeof key !== "string") return false;
+  if (key.includes("+")) return false;
+  if (/^[0-9]$/.test(key)) return false;
+  for (const combo of Object.keys(keymap || {})) {
+    if (combo.includes("+")) continue;
+    if (combo.length > key.length && combo.startsWith(key)) return true;
+  }
+  return false;
+}
+
+export function getDynamicPrefixes(keymap) {
+  const out = new Set();
+  for (const combo of Object.keys(keymap || {})) {
+    if (combo.includes("+")) continue;
+    if (combo.length < 2) continue;
+    if (/^[0-9]$/.test(combo[0])) continue;
+    const prefix = combo[0];
+    if (keymap[prefix]) continue;
+    out.add(prefix);
+  }
+  return out;
+}
+
+export function getPrefixEntries(keymap, prefix) {
+  const entries = [];
+  if (!prefix || typeof prefix !== "string") return entries;
+  if (prefix.includes("+")) return entries;
+  for (const [combo, command] of Object.entries(keymap || {})) {
+    if (combo.includes("+")) continue;
+    if (!combo.startsWith(prefix)) continue;
+    if (combo === prefix) continue;
+    const suffix = combo.slice(prefix.length);
+    if (!suffix) continue;
+    entries.push({ suffix, full: combo, command });
+  }
+  entries.sort((a, b) =>
+    a.suffix < b.suffix ? -1 : a.suffix > b.suffix ? 1 : 0,
+  );
+  return entries;
+}
+
 export function canonicalKey(event) {
   const parts = [];
   if (event.ctrlKey) parts.push("ctrl");
@@ -158,7 +203,7 @@ export function parseRepeatCount(raw) {
 }
 
 export const overlaySelectors =
-  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host";
+  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue";
 
 export function deepActiveElement() {
   let el = document.activeElement;
@@ -214,11 +259,11 @@ export function normalizeSettings(data) {
         ? d.fuzzyMatching
         : settingsDefaults.fuzzyMatching,
     timeoutMs:
-      Number.isFinite(d.timeoutMs) && d.timeoutMs > 0
+      Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0
         ? d.timeoutMs
         : settingsDefaults.timeoutMs,
     passthroughMs:
-      Number.isFinite(d.passthroughMs) && d.passthroughMs > 0
+      Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0
         ? d.passthroughMs
         : settingsDefaults.passthroughMs,
     suggestionSources: Array.isArray(d.suggestionSources)
@@ -227,6 +272,14 @@ export function normalizeSettings(data) {
     copyFormat:
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
     hintChars: normalizeHintChars(d.hintChars),
+    clueEnabled:
+      typeof d.clueEnabled === "boolean"
+        ? d.clueEnabled
+        : settingsDefaults.clueEnabled,
+    clueDelayMs:
+      Number.isFinite(d.clueDelayMs) && d.clueDelayMs >= 0
+        ? Math.min(5000, d.clueDelayMs)
+        : settingsDefaults.clueDelayMs,
   };
 }
 

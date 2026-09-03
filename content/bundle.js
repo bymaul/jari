@@ -32,7 +32,7 @@
     K: "nextTab",
     "<<": "moveTabLeft",
     ">>": "moveTabRight",
-    gw: "moveTabToWindow",
+    W: "moveTabToWindow",
     f: "hintClick",
     F: "hintOpen",
     gf: "hintOpenBackground",
@@ -89,8 +89,10 @@
     scrollStep: 120,
     smoothScroll: false,
     fuzzyMatching: true,
-    timeoutMs: 1500,
+    timeoutMs: 0,
     passthroughMs: 1500,
+    clueEnabled: true,
+    clueDelayMs: 300,
     suggestionSources: suggestionSources.slice(),
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT
@@ -108,6 +110,33 @@
     "Fn",
     "AltGraph"
   ]);
+  function isPrefixKey(keymap, key) {
+    if (!key || typeof key !== "string") return false;
+    if (key.includes("+")) return false;
+    if (/^[0-9]$/.test(key)) return false;
+    for (const combo of Object.keys(keymap || {})) {
+      if (combo.includes("+")) continue;
+      if (combo.length > key.length && combo.startsWith(key)) return true;
+    }
+    return false;
+  }
+  function getPrefixEntries(keymap, prefix2) {
+    const entries = [];
+    if (!prefix2 || typeof prefix2 !== "string") return entries;
+    if (prefix2.includes("+")) return entries;
+    for (const [combo, command] of Object.entries(keymap || {})) {
+      if (combo.includes("+")) continue;
+      if (!combo.startsWith(prefix2)) continue;
+      if (combo === prefix2) continue;
+      const suffix = combo.slice(prefix2.length);
+      if (!suffix) continue;
+      entries.push({ suffix, full: combo, command });
+    }
+    entries.sort(
+      (a, b) => a.suffix < b.suffix ? -1 : a.suffix > b.suffix ? 1 : 0
+    );
+    return entries;
+  }
   function canonicalKey(event) {
     const parts = [];
     if (event.ctrlKey) parts.push("ctrl");
@@ -120,7 +149,7 @@
     const n = parseInt(raw, 10);
     return Number.isNaN(n) ? 1 : Math.max(1, n);
   }
-  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host";
+  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue";
   function deepActiveElement() {
     let el = document.activeElement;
     while (el && el.shadowRoot && el.shadowRoot.activeElement) {
@@ -163,11 +192,13 @@
       scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : settingsDefaults.scrollStep,
       smoothScroll: typeof d.smoothScroll === "boolean" ? d.smoothScroll : settingsDefaults.smoothScroll,
       fuzzyMatching: typeof d.fuzzyMatching === "boolean" ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
-      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
-      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
+      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
+      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
-      hintChars: normalizeHintChars(d.hintChars)
+      hintChars: normalizeHintChars(d.hintChars),
+      clueEnabled: typeof d.clueEnabled === "boolean" ? d.clueEnabled : settingsDefaults.clueEnabled,
+      clueDelayMs: Number.isFinite(d.clueDelayMs) && d.clueDelayMs >= 0 ? Math.min(5e3, d.clueDelayMs) : settingsDefaults.clueDelayMs
     };
   }
   function balanceCategories(byCategory, columnCount = 3) {
@@ -205,7 +236,9 @@
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     copyFormat: settingsDefaults.copyFormat,
-    hintChars: settingsDefaults.hintChars
+    hintChars: settingsDefaults.hintChars,
+    clueEnabled: settingsDefaults.clueEnabled,
+    clueDelayMs: settingsDefaults.clueDelayMs
   };
   function merge(data) {
     const s = normalizeSettings(data);
@@ -219,6 +252,8 @@
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
+    state.clueEnabled = s.clueEnabled;
+    state.clueDelayMs = s.clueDelayMs;
   }
   async function load() {
     try {
@@ -240,7 +275,9 @@
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
         copyFormat: state.copyFormat,
-        hintChars: state.hintChars
+        hintChars: state.hintChars,
+        clueEnabled: state.clueEnabled,
+        clueDelayMs: state.clueDelayMs
       }
     });
   }
@@ -284,6 +321,12 @@
   function getHintChars() {
     return state.hintChars;
   }
+  function isClueEnabled() {
+    return state.clueEnabled;
+  }
+  function getClueDelayMs() {
+    return state.clueDelayMs;
+  }
   function toggleSiteEnabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -312,6 +355,8 @@
     getSuggestionSources,
     getCopyFormat,
     getHintChars,
+    isClueEnabled,
+    getClueDelayMs,
     toggleSiteEnabled
   };
 
@@ -5541,6 +5586,92 @@ ${location.href}`;
     openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") }
   };
 
+  // content/clue.js
+  var clueEl = null;
+  var clueTimer = null;
+  var activePrefix = null;
+  function commandLabel(commandName) {
+    return COMMAND_CATALOG[commandName]?.label || commandName;
+  }
+  function isVisible() {
+    return clueEl !== null;
+  }
+  function clearTimer() {
+    if (clueTimer !== null) {
+      clearTimeout(clueTimer);
+      clueTimer = null;
+    }
+  }
+  function hide() {
+    clearTimer();
+    activePrefix = null;
+    if (clueEl) {
+      try {
+        clueEl.remove();
+      } catch {
+      }
+      clueEl = null;
+    }
+  }
+  function render4(prefix2, countStr) {
+    const keymap = settings.getKeymap();
+    const entries = getPrefixEntries(keymap, prefix2);
+    if (entries.length === 0) return;
+    if (clueEl) hide();
+    try {
+      if (document.fullscreenElement) return;
+      const root = document.createElement("div");
+      root.className = "jari-clue";
+      const title = document.createElement("div");
+      title.className = "jari-clue-title";
+      title.textContent = `${countStr || ""}${prefix2} \u2014 ${entries.length} bindings`;
+      root.appendChild(title);
+      const list = document.createElement("div");
+      list.className = "jari-clue-list";
+      for (const { suffix, command } of entries) {
+        const row = document.createElement("div");
+        row.className = "jari-clue-row";
+        const key = document.createElement("span");
+        key.className = "jari-clue-key";
+        key.textContent = suffix;
+        const label = document.createElement("span");
+        label.className = "jari-clue-label";
+        label.textContent = commandLabel(command);
+        row.appendChild(key);
+        row.appendChild(label);
+        list.appendChild(row);
+      }
+      root.appendChild(list);
+      (document.body || document.documentElement).appendChild(root);
+      clueEl = root;
+      activePrefix = prefix2;
+    } catch {
+    }
+  }
+  function schedule(prefix2, countStr = "") {
+    hide();
+    if (!settings.isClueEnabled()) return;
+    const entries = getPrefixEntries(settings.getKeymap(), prefix2);
+    if (entries.length === 0) return;
+    const delay = settings.getClueDelayMs();
+    if (!Number.isFinite(delay) || delay <= 0) {
+      render4(prefix2, countStr);
+      return;
+    }
+    activePrefix = prefix2;
+    clueTimer = setTimeout(() => {
+      clueTimer = null;
+      render4(prefix2, countStr);
+    }, delay);
+  }
+  function getActivePrefix() {
+    return activePrefix;
+  }
+  var Clue = { schedule, hide, isVisible, getActivePrefix };
+  function __resetClueState() {
+    hide();
+  }
+
   // content/content.js
   var pendingCount2 = "";
   var pendingPrefix = null;
@@ -5557,10 +5688,14 @@ ${location.href}`;
     pendingCount2 = "";
     pendingPrefix = null;
     ui.showcmd(null);
+    Clue.hide();
   }
   function restartTimer() {
     clearTimeout(timer);
-    timer = setTimeout(clearPending, settings.getTimeoutMs());
+    timer = null;
+    const timeoutMs = settings.getTimeoutMs();
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return;
+    timer = setTimeout(clearPending, timeoutMs);
   }
   function run(commandName, count, event) {
     const cmd = commands[commandName];
@@ -5591,7 +5726,11 @@ ${location.href}`;
     passthroughMode = true;
     showPill2("passthrough", pillPassthroughText());
     clearTimeout(passthroughTimer);
-    passthroughTimer = setTimeout(exitPassthrough, settings.getPassthroughMs());
+    passthroughTimer = null;
+    const passthroughMs = settings.getPassthroughMs();
+    if (Number.isFinite(passthroughMs) && passthroughMs > 0) {
+      passthroughTimer = setTimeout(exitPassthrough, passthroughMs);
+    }
   }
   function exitPassthrough() {
     if (!passthroughMode) return;
@@ -5618,6 +5757,7 @@ ${location.href}`;
     }
   }
   function handleFullscreenChange() {
+    Clue.hide();
     if (!ignoreMode && !passthroughMode) return;
     if (isFullscreen()) {
       hidePill2("ignore");
@@ -5630,7 +5770,10 @@ ${location.href}`;
   function handleKeydown(event) {
     if (!event.isTrusted) return;
     const overlay4 = Overlays.active();
-    if (overlay4) return overlay4.onKeyDown(event);
+    if (overlay4) {
+      Clue.hide();
+      return overlay4.onKeyDown(event);
+    }
     if (modifierKeys.has(event.key)) return;
     if (passthroughMode) {
       if (event.key === "Escape") {
@@ -5663,6 +5806,7 @@ ${location.href}`;
       commandName = settings.getKeymap()[prefixKey + key] || null;
       pendingPrefix = null;
       ui.showcmd(null);
+      Clue.hide();
     }
     const activeEl = deepActiveElement();
     if (isEditable(activeEl)) {
@@ -5706,9 +5850,10 @@ ${location.href}`;
       restartTimer();
       return;
     }
-    if (!commandName && prefixes[key]) {
+    if (!commandName && isPrefixKey(settings.getKeymap(), key)) {
       pendingPrefix = key;
       ui.showcmd(pendingCount2 + key);
+      Clue.schedule(key, pendingCount2);
       event.preventDefault();
       event.stopImmediatePropagation();
       restartTimer();
@@ -5731,6 +5876,7 @@ ${location.href}`;
   async function boot() {
     await settings.load();
     Events.on("settingsChanged", () => {
+      Clue.hide();
       if (settings.isDisabled()) {
         setIgnore(false);
         exitPassthrough();
@@ -5753,6 +5899,10 @@ ${location.href}`;
     passthroughMode = false;
     if (pills.ignore) hidePill2("ignore");
     if (pills.passthrough) hidePill2("passthrough");
+    try {
+      __resetClueState();
+    } catch {
+    }
     try {
       __resetFindState();
     } catch {

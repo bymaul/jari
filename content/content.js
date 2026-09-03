@@ -2,9 +2,9 @@ import {
   Events,
   canonicalKey,
   deepActiveElement,
+  isPrefixKey,
   modifierKeys,
   parseRepeatCount,
-  prefixes,
 } from "./keymap.js";
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
@@ -13,6 +13,7 @@ import { Overlays } from "./overlays.js";
 import { isEditable } from "./hints-elements.js";
 import { Find, __resetFindState } from "./find.js";
 import { __resetVisualState } from "./visual.js";
+import { Clue, __resetClueState } from "./clue.js";
 
 let pendingCount = "";
 let pendingPrefix = null;
@@ -31,11 +32,15 @@ function clearPending() {
   pendingCount = "";
   pendingPrefix = null;
   ui.showcmd(null);
+  Clue.hide();
 }
 
 function restartTimer() {
   clearTimeout(timer);
-  timer = setTimeout(clearPending, settings.getTimeoutMs());
+  timer = null;
+  const timeoutMs = settings.getTimeoutMs();
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return;
+  timer = setTimeout(clearPending, timeoutMs);
 }
 
 function run(commandName, count, event) {
@@ -71,7 +76,11 @@ function enterPassthrough() {
   passthroughMode = true;
   showPill("passthrough", pillPassthroughText());
   clearTimeout(passthroughTimer);
-  passthroughTimer = setTimeout(exitPassthrough, settings.getPassthroughMs());
+  passthroughTimer = null;
+  const passthroughMs = settings.getPassthroughMs();
+  if (Number.isFinite(passthroughMs) && passthroughMs > 0) {
+    passthroughTimer = setTimeout(exitPassthrough, passthroughMs);
+  }
 }
 
 function exitPassthrough() {
@@ -103,6 +112,7 @@ function hidePill(name) {
 }
 
 function handleFullscreenChange() {
+  Clue.hide();
   if (!ignoreMode && !passthroughMode) return;
   if (isFullscreen()) {
     hidePill("ignore");
@@ -117,7 +127,10 @@ function handleKeydown(event) {
   if (!event.isTrusted) return;
 
   const overlay = Overlays.active();
-  if (overlay) return overlay.onKeyDown(event);
+  if (overlay) {
+    Clue.hide();
+    return overlay.onKeyDown(event);
+  }
 
   if (modifierKeys.has(event.key)) return;
 
@@ -159,6 +172,7 @@ function handleKeydown(event) {
     commandName = settings.getKeymap()[prefixKey + key] || null;
     pendingPrefix = null;
     ui.showcmd(null);
+    Clue.hide();
   }
 
   const activeEl = deepActiveElement();
@@ -208,9 +222,10 @@ function handleKeydown(event) {
     return;
   }
 
-  if (!commandName && prefixes[key]) {
+  if (!commandName && isPrefixKey(settings.getKeymap(), key)) {
     pendingPrefix = key;
     ui.showcmd(pendingCount + key);
+    Clue.schedule(key, pendingCount);
     event.preventDefault();
     event.stopImmediatePropagation();
     restartTimer();
@@ -239,6 +254,7 @@ async function boot() {
   await settings.load();
 
   Events.on("settingsChanged", () => {
+    Clue.hide();
     if (settings.isDisabled()) {
       setIgnore(false);
       exitPassthrough();
@@ -267,6 +283,9 @@ export function __resetState() {
   passthroughMode = false;
   if (pills.ignore) hidePill("ignore");
   if (pills.passthrough) hidePill("passthrough");
+  try {
+    __resetClueState();
+  } catch {}
   try {
     __resetFindState();
   } catch {}

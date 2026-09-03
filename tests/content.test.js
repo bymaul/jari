@@ -258,6 +258,26 @@ test("disabled sites pass every key through except the toggle", () => {
   assertClaimed(toggle);
 });
 
+test("a zero sequence timeout keeps a pending prefix until completed", async () => {
+  settings.set({ timeoutMs: 0 });
+  spyOn("goToParent");
+  handleKeydown(key({ key: "g" }));
+  await new Promise((r) => setTimeout(r, 40));
+  handleKeydown(key({ key: "u" }));
+  assert.equal(spiedCalls.goToParent.length, 1);
+});
+
+test("a zero passthrough timeout keeps passthrough until Escape", async () => {
+  settings.set({ passthroughMs: 0 });
+  spyOn("scrollDown");
+  handleKeydown(key({ key: "p" }));
+  await new Promise((r) => setTimeout(r, 40));
+  const pass = key({ key: "j" });
+  handleKeydown(pass);
+  assert.equal(spiedCalls.scrollDown.length, 0);
+  assertUnclaimed(pass);
+});
+
 test("keys typed into a form field reach the page, Escape blurs", () => {
   spyOn("scrollDown");
   const calls = [];

@@ -88,20 +88,39 @@
         <div class="setting">
           <div class="setting-text">
             <label for="timeout">Sequence timeout</label>
-            <p class="helper">How long a half-typed <code>g</code> prefix or count waits.</p>
+            <p class="helper">How long a half-typed <code>g</code> prefix or count waits. 0 means no timeout.</p>
           </div>
           <div class="setting-control">
-            <input id="timeout" type="number" min="100" max="10000" step="100" />
+            <input id="timeout" type="number" min="0" max="10000" step="100" />
             <span class="unit">ms</span>
           </div>
         </div>
         <div class="setting">
           <div class="setting-text">
             <label for="passthrough-timeout">Passthrough duration</label>
-            <p class="helper">How long <code data-key="passthroughKeys"></code> lets the page have the keys.</p>
+            <p class="helper">How long <code data-key="passthroughKeys"></code> lets the page have the keys. 0 means no timeout.</p>
           </div>
           <div class="setting-control">
-            <input id="passthrough-timeout" type="number" min="100" max="30000" step="100" />
+            <input id="passthrough-timeout" type="number" min="0" max="30000" step="100" />
+            <span class="unit">ms</span>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="clue-enabled">Prefix clue</label>
+            <p class="helper">Show available keys after a prefix like <code>g</code> or <code>y</code>.</p>
+          </div>
+          <div class="setting-control">
+            <input id="clue-enabled" type="checkbox" />
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="clue-delay">Clue delay</label>
+            <p class="helper">How long to wait after a prefix before showing the clue. 0 shows instantly.</p>
+          </div>
+          <div class="setting-control">
+            <input id="clue-delay" type="number" min="0" max="5000" step="50" />
             <span class="unit">ms</span>
           </div>
         </div>

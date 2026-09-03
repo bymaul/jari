@@ -18,6 +18,8 @@ const state = {
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   copyFormat: settingsDefaults.copyFormat,
   hintChars: settingsDefaults.hintChars,
+  clueEnabled: settingsDefaults.clueEnabled,
+  clueDelayMs: settingsDefaults.clueDelayMs,
 };
 
 function merge(data) {
@@ -32,6 +34,8 @@ function merge(data) {
   state.suggestionSources = s.suggestionSources;
   state.copyFormat = s.copyFormat;
   state.hintChars = s.hintChars;
+  state.clueEnabled = s.clueEnabled;
+  state.clueDelayMs = s.clueDelayMs;
 }
 
 async function load() {
@@ -56,6 +60,8 @@ function persist() {
       suggestionSources: state.suggestionSources,
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
+      clueEnabled: state.clueEnabled,
+      clueDelayMs: state.clueDelayMs,
     },
   });
 }
@@ -113,6 +119,14 @@ function getHintChars() {
   return state.hintChars;
 }
 
+function isClueEnabled() {
+  return state.clueEnabled;
+}
+
+function getClueDelayMs() {
+  return state.clueDelayMs;
+}
+
 function toggleSiteEnabled() {
   const host = location.hostname;
   const idx = state.disabledSites.indexOf(host);
@@ -142,5 +156,7 @@ export const settings = {
   getSuggestionSources,
   getCopyFormat,
   getHintChars,
+  isClueEnabled,
+  getClueDelayMs,
   toggleSiteEnabled,
 };

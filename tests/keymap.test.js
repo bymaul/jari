@@ -22,17 +22,22 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
   assert.equal(s.smoothScroll, true);
   assert.equal(s.keymap.j, "scrollToTop");
   assert.equal(s.keymap.t, undefined);
-  assert.equal(s.timeoutMs, 1500);
+  assert.equal(s.timeoutMs, Jari.settingsDefaults.timeoutMs);
   assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
   assert.equal(s.copyFormat, "plain");
 
-  const bad = Jari.normalizeSettings({ scrollStep: "x", timeoutMs: 0, disabledSites: "x" });
+  const bad = Jari.normalizeSettings({ scrollStep: "x", timeoutMs: -1, disabledSites: "x" });
   assert.equal(bad.scrollStep, 120);
-  assert.equal(bad.timeoutMs, 1500);
+  assert.equal(bad.timeoutMs, Jari.settingsDefaults.timeoutMs);
   assert.deepEqual(bad.disabledSites, []);
 
   assert.equal(Jari.normalizeSettings({}).fuzzyMatching, true);
   assert.equal(Jari.normalizeSettings({ fuzzyMatching: false }).fuzzyMatching, false);
+});
+
+test("normalizeSettings allows a zero timeout to disable the expiry", () => {
+  assert.equal(Jari.normalizeSettings({ timeoutMs: 0 }).timeoutMs, 0);
+  assert.equal(Jari.normalizeSettings({ passthroughMs: 0 }).passthroughMs, 0);
 });
 
 test("normalizeSettings fills defaults only when no keymap is stored", () => {

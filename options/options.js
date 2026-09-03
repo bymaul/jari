@@ -25,6 +25,8 @@ const smoothScrollEl = document.querySelector("#smooth-scroll");
 const fuzzyMatchingEl = document.querySelector("#fuzzy-matching");
 const timeoutEl = document.querySelector("#timeout");
 const passthroughEl = document.querySelector("#passthrough-timeout");
+const clueEnabledEl = document.querySelector("#clue-enabled");
+const clueDelayEl = document.querySelector("#clue-delay");
 const sourceTabEl = document.querySelector("#source-tab");
 const sourceHistoryEl = document.querySelector("#source-history");
 const sourceBookmarkEl = document.querySelector("#source-bookmark");
@@ -53,6 +55,8 @@ async function load() {
   fuzzyMatchingEl.checked = settings.isFuzzyMatching();
   timeoutEl.value = settings.getTimeoutMs();
   passthroughEl.value = settings.getPassthroughMs();
+  clueEnabledEl.checked = settings.isClueEnabled();
+  clueDelayEl.value = settings.getClueDelayMs();
   const sources = settings.getSuggestionSources();
   sourceTabEl.checked = sources.includes("tab");
   sourceHistoryEl.checked = sources.includes("history");
@@ -465,6 +469,18 @@ function readPositiveInt(el, fallback) {
   return parseInt(el.value, 10);
 }
 
+function readClueDelay(el, fallback) {
+  const raw = parseInt(el.value, 10);
+  el.value = Number.isFinite(raw) && raw >= 0 ? Math.min(5000, raw) : fallback;
+  return parseInt(el.value, 10);
+}
+
+function readTimeoutMs(el, fallback, max) {
+  const raw = parseInt(el.value, 10);
+  el.value = Number.isFinite(raw) && raw >= 0 ? Math.min(max, raw) : fallback;
+  return parseInt(el.value, 10);
+}
+
 function collectBehaviorSettings() {
   const sources = [];
   if (sourceTabEl.checked) sources.push("tab");
@@ -475,8 +491,10 @@ function collectBehaviorSettings() {
     scrollStep: readPositiveInt(scrollStepEl, settingsDefaults.scrollStep),
     smoothScroll: smoothScrollEl.checked,
     fuzzyMatching: fuzzyMatchingEl.checked,
-    timeoutMs: readPositiveInt(timeoutEl, settingsDefaults.timeoutMs),
-    passthroughMs: readPositiveInt(passthroughEl, settingsDefaults.passthroughMs),
+    timeoutMs: readTimeoutMs(timeoutEl, settingsDefaults.timeoutMs, 10000),
+    passthroughMs: readTimeoutMs(passthroughEl, settingsDefaults.passthroughMs, 30000),
+    clueEnabled: clueEnabledEl.checked,
+    clueDelayMs: readClueDelay(clueDelayEl, settingsDefaults.clueDelayMs),
     suggestionSources: sources,
     copyFormat: copyFormatEl.value,
     hintChars: hintCharsEl.value,
@@ -504,6 +522,8 @@ function reset() {
       fuzzyMatching: settingsDefaults.fuzzyMatching,
       timeoutMs: settingsDefaults.timeoutMs,
       passthroughMs: settingsDefaults.passthroughMs,
+      clueEnabled: settingsDefaults.clueEnabled,
+      clueDelayMs: settingsDefaults.clueDelayMs,
       suggestionSources: settingsDefaults.suggestionSources.slice(),
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,

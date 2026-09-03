@@ -298,6 +298,63 @@
   pointer-events: none;
 }
 
+.jari-clue {
+  position: fixed;
+  right: 0.25em;
+  bottom: 2.25em;
+  z-index: 2147483647;
+  min-width: 18em;
+  max-width: 28em;
+  max-height: 50vh;
+  overflow: auto;
+  box-sizing: border-box;
+  font-family: var(--jari-status-font-family);
+  font-size: var(--jari-status-font-size);
+  background: var(--jari-status-bg);
+  color: var(--jari-status-fg);
+  border: var(--jari-status-border);
+  padding: 0.5ex 0;
+  pointer-events: none;
+  text-align: left;
+}
+
+.jari-clue-title {
+  font-weight: bold;
+  padding: 0 1ex 0.5ex;
+  border-bottom: var(--jari-status-border);
+  margin-bottom: 0.5ex;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jari-clue-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.jari-clue-row {
+  display: flex;
+  gap: 1ex;
+  padding: 0 1ex;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.jari-clue-key {
+  flex: 0 0 auto;
+  min-width: 3ex;
+  font-weight: bold;
+}
+
+.jari-clue-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--jari-muted);
+}
+
 .jari-scroll-highlight {
   position: fixed;
   z-index: 2147483646 !important;
@@ -464,8 +521,20 @@
   outline: 1px solid rgba(0, 180, 216, 0.6);
 }
 @media (forced-colors: active) {
-  ::highlight(jari-find), ::highlight(jari-find-current), ::highlight(jari-visual) { background: Highlight !important; color: HighlightText !important; }
-  .jari-find-hit, .jari-find-current, .jari-visual-highlight { background: Highlight !important; color: HighlightText !important; outline: 1px solid HighlightText !important; forced-color-adjust: none !important; }
+  ::highlight(jari-find),
+  ::highlight(jari-find-current),
+  ::highlight(jari-visual) {
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+  .jari-find-hit,
+  .jari-find-current,
+  .jari-visual-highlight {
+    background: Highlight !important;
+    color: HighlightText !important;
+    outline: 1px solid HighlightText !important;
+    forced-color-adjust: none !important;
+  }
 }
 
 .jari-visual-caret-host {
@@ -494,12 +563,25 @@
 }
 
 @keyframes jari-caret-blink {
-  0%, 50% { opacity: 0.85; }
-  51%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 0.85;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .jari-visual-caret { animation: none !important; opacity: 0.9 !important; }
+  .jari-visual-caret {
+    animation: none !important;
+    opacity: 0.9 !important;
+  }
 }
 @media (forced-colors: active) {
-  .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none !important; }
+  .jari-visual-caret {
+    background: CanvasText !important;
+    border-color: Canvas !important;
+    forced-color-adjust: none !important;
+  }
 }

@@ -31,7 +31,7 @@
     K: "nextTab",
     "<<": "moveTabLeft",
     ">>": "moveTabRight",
-    gw: "moveTabToWindow",
+    W: "moveTabToWindow",
     f: "hintClick",
     F: "hintOpen",
     gf: "hintOpenBackground",
@@ -88,8 +88,10 @@
     scrollStep: 120,
     smoothScroll: false,
     fuzzyMatching: true,
-    timeoutMs: 1500,
+    timeoutMs: 0,
     passthroughMs: 1500,
+    clueEnabled: true,
+    clueDelayMs: 300,
     suggestionSources: suggestionSources.slice(),
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT
@@ -148,11 +150,13 @@
       scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : settingsDefaults.scrollStep,
       smoothScroll: typeof d.smoothScroll === "boolean" ? d.smoothScroll : settingsDefaults.smoothScroll,
       fuzzyMatching: typeof d.fuzzyMatching === "boolean" ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
-      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs > 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
-      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs > 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
+      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
+      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
-      hintChars: normalizeHintChars(d.hintChars)
+      hintChars: normalizeHintChars(d.hintChars),
+      clueEnabled: typeof d.clueEnabled === "boolean" ? d.clueEnabled : settingsDefaults.clueEnabled,
+      clueDelayMs: Number.isFinite(d.clueDelayMs) && d.clueDelayMs >= 0 ? Math.min(5e3, d.clueDelayMs) : settingsDefaults.clueDelayMs
     };
   }
   function balanceCategories(byCategory, columnCount = 3) {
@@ -268,7 +272,9 @@
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     copyFormat: settingsDefaults.copyFormat,
-    hintChars: settingsDefaults.hintChars
+    hintChars: settingsDefaults.hintChars,
+    clueEnabled: settingsDefaults.clueEnabled,
+    clueDelayMs: settingsDefaults.clueDelayMs
   };
   function merge(data) {
     const s = normalizeSettings(data);
@@ -282,6 +288,8 @@
     state.suggestionSources = s.suggestionSources;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
+    state.clueEnabled = s.clueEnabled;
+    state.clueDelayMs = s.clueDelayMs;
   }
   async function load() {
     try {
@@ -303,7 +311,9 @@
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
         copyFormat: state.copyFormat,
-        hintChars: state.hintChars
+        hintChars: state.hintChars,
+        clueEnabled: state.clueEnabled,
+        clueDelayMs: state.clueDelayMs
       }
     });
   }
@@ -347,6 +357,12 @@
   function getHintChars() {
     return state.hintChars;
   }
+  function isClueEnabled() {
+    return state.clueEnabled;
+  }
+  function getClueDelayMs() {
+    return state.clueDelayMs;
+  }
   function toggleSiteEnabled() {
     const host = location.hostname;
     const idx = state.disabledSites.indexOf(host);
@@ -375,6 +391,8 @@
     getSuggestionSources,
     getCopyFormat,
     getHintChars,
+    isClueEnabled,
+    getClueDelayMs,
     toggleSiteEnabled
   };
 
@@ -556,6 +574,8 @@
   var fuzzyMatchingEl = document.querySelector("#fuzzy-matching");
   var timeoutEl = document.querySelector("#timeout");
   var passthroughEl = document.querySelector("#passthrough-timeout");
+  var clueEnabledEl = document.querySelector("#clue-enabled");
+  var clueDelayEl = document.querySelector("#clue-delay");
   var sourceTabEl = document.querySelector("#source-tab");
   var sourceHistoryEl = document.querySelector("#source-history");
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
@@ -578,6 +598,8 @@
     fuzzyMatchingEl.checked = settings.isFuzzyMatching();
     timeoutEl.value = settings.getTimeoutMs();
     passthroughEl.value = settings.getPassthroughMs();
+    clueEnabledEl.checked = settings.isClueEnabled();
+    clueDelayEl.value = settings.getClueDelayMs();
     const sources = settings.getSuggestionSources();
     sourceTabEl.checked = sources.includes("tab");
     sourceHistoryEl.checked = sources.includes("history");
@@ -943,6 +965,16 @@
     el.value = Number.isFinite(raw) && raw > 0 ? raw : fallback;
     return parseInt(el.value, 10);
   }
+  function readClueDelay(el, fallback) {
+    const raw = parseInt(el.value, 10);
+    el.value = Number.isFinite(raw) && raw >= 0 ? Math.min(5e3, raw) : fallback;
+    return parseInt(el.value, 10);
+  }
+  function readTimeoutMs(el, fallback, max) {
+    const raw = parseInt(el.value, 10);
+    el.value = Number.isFinite(raw) && raw >= 0 ? Math.min(max, raw) : fallback;
+    return parseInt(el.value, 10);
+  }
   function collectBehaviorSettings() {
     const sources = [];
     if (sourceTabEl.checked) sources.push("tab");
@@ -953,8 +985,10 @@
       scrollStep: readPositiveInt(scrollStepEl, settingsDefaults.scrollStep),
       smoothScroll: smoothScrollEl.checked,
       fuzzyMatching: fuzzyMatchingEl.checked,
-      timeoutMs: readPositiveInt(timeoutEl, settingsDefaults.timeoutMs),
-      passthroughMs: readPositiveInt(passthroughEl, settingsDefaults.passthroughMs),
+      timeoutMs: readTimeoutMs(timeoutEl, settingsDefaults.timeoutMs, 1e4),
+      passthroughMs: readTimeoutMs(passthroughEl, settingsDefaults.passthroughMs, 3e4),
+      clueEnabled: clueEnabledEl.checked,
+      clueDelayMs: readClueDelay(clueDelayEl, settingsDefaults.clueDelayMs),
       suggestionSources: sources,
       copyFormat: copyFormatEl.value,
       hintChars: hintCharsEl.value
@@ -975,6 +1009,8 @@
       fuzzyMatching: settingsDefaults.fuzzyMatching,
       timeoutMs: settingsDefaults.timeoutMs,
       passthroughMs: settingsDefaults.passthroughMs,
+      clueEnabled: settingsDefaults.clueEnabled,
+      clueDelayMs: settingsDefaults.clueDelayMs,
       suggestionSources: settingsDefaults.suggestionSources.slice(),
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars
