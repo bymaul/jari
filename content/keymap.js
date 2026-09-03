@@ -23,8 +23,8 @@ export const keymapDefaults = {
   t: "omnibar",
   x: "closeTab",
   X: "restoreTab",
-  H: "previousTab",
-  L: "nextTab",
+  J: "previousTab",
+  K: "nextTab",
   "<<": "moveTabLeft",
   ">>": "moveTabRight",
 
@@ -35,8 +35,8 @@ export const keymapDefaults = {
   gf: "hintOpenBackground",
   i: "hintInput",
 
-  S: "historyBack",
-  D: "historyForward",
+  H: "historyBack",
+  L: "historyForward",
 
   r: "reloadTab",
   R: "hardReload",

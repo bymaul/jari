@@ -1,4 +1,5 @@
 import { settings } from "./settings.js";
+import { HINT_CHARSET_DEFAULT } from "./keymap.js";
 import { sendMessage, ui } from "./ui.js";
 import { register } from "./overlays.js";
 import {
@@ -109,12 +110,10 @@ function scheduleRegenerate() {
     render();
     if (holder) holder.style.display = "";
     prefix = savedPrefix;
-    refresh();
-    const any = hints.some((h) => h.label.startsWith(prefix));
-    if (prefix && !any) {
+    if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
       prefix = "";
-      refresh();
     }
+    refresh();
   }, REGENERATE_DELAY);
 }
 
@@ -122,35 +121,10 @@ function isActive() {
   return active;
 }
 
-function normalizeCharset() {
+export function normalizeCharset() {
   const s = settings.getHintChars();
-  if (!s) return "asdfgqwertzxcvb";
+  if (!s) return HINT_CHARSET_DEFAULT;
   return s.toLowerCase();
-}
-
-function hasPrefixConflict(labels) {
-  for (let i = 0; i < labels.length; i++) {
-    for (let j = 0; j < labels.length; j++) {
-      if (i !== j && labels[j].startsWith(labels[i])) return true;
-    }
-  }
-  return false;
-}
-
-function buildUniformLabels(count, chars) {
-  let length = 1;
-  while (Math.pow(chars.length, length) < count) length++;
-  const out = [];
-  for (let k = 0; k < count; k++) {
-    let n = k;
-    let s = "";
-    for (let p = 0; p < length; p++) {
-      s = chars[n % chars.length] + s;
-      n = Math.floor(n / chars.length);
-    }
-    out.push(s);
-  }
-  return out;
 }
 
 export function genLabels(count, charset) {
@@ -158,6 +132,8 @@ export function genLabels(count, charset) {
   if (count <= 0 || chars.length < 2) return [];
   if (count <= chars.length) return chars.slice(0, count);
 
+  // BFS drain: consumed prefixes are removed via `head`, so no label
+  // is ever a prefix of another (exact match always auto-activates).
   const labels = chars.slice();
   let head = 0;
   while (labels.length - head < count) {
@@ -170,8 +146,7 @@ export function genLabels(count, charset) {
     }
     if (labels.length > 10000) break;
   }
-  const out = labels.slice(head, head + count);
-  return hasPrefixConflict(out) ? buildUniformLabels(count, chars) : out;
+  return labels.slice(head, head + count);
 }
 
 function safeFocus(el, opts) {
@@ -281,8 +256,6 @@ function refresh() {
       h.hintEl.style.display = "";
       h.hintEl.classList.remove("jari-hint-hidden");
       updateHintText(h.hintEl, h.label, "");
-    } else if (h.label === prefix) {
-      h.hintEl.style.opacity = "1";
     } else if (h.label.startsWith(prefix)) {
       h.hintEl.style.opacity = "1";
       h.hintEl.style.display = "";
@@ -427,7 +400,6 @@ function render() {
     el: link.link,
     label: link.label,
     hintEl: link,
-    rect: getRealRect(link.link),
   }));
   refresh();
 }
@@ -660,8 +632,6 @@ function onKeyDown(event) {
   }
   if (key === "Enter") {
     consume(event);
-    const visible = hints.filter((h) => h.label.startsWith(prefix));
-    if (visible.length === 1) activate(visible[0].el);
     return true;
   }
   if (key.length === 1) {
