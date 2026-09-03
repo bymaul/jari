@@ -917,12 +917,12 @@
   }
   function isBoundaryAt(t, i) {
     if (i === 0) return true;
-    const prev2 = t[i - 1];
+    const prev = t[i - 1];
     try {
-      if (/[\p{L}\p{N}_]/u.test(prev2)) return false;
+      if (/[\p{L}\p{N}_]/u.test(prev)) return false;
       return true;
     } catch {
-      return !/[\w]/.test(prev2);
+      return !/[\w]/.test(prev);
     }
   }
   function extractHost(url) {
@@ -937,16 +937,16 @@
   }
   function scoreAlignment(indices, t, text) {
     let score = 0;
-    let prev2 = -1;
+    let prev = -1;
     for (const i of indices) {
       score += SCORE_BASE;
-      if (prev2 !== -1) {
-        const gap = i - prev2 - 1;
+      if (prev !== -1) {
+        const gap = i - prev - 1;
         score += gap === 0 ? SCORE_RUN : SCORE_GAP * gap;
       }
       if (isBoundaryAt(t, i)) score += SCORE_BOUNDARY;
       else if (text[i] !== text[i].toLowerCase()) score += SCORE_CAMEL;
-      prev2 = i;
+      prev = i;
     }
     score += SCORE_LEADING * indices[0];
     return score;
@@ -1085,10 +1085,6 @@
     if (!c) return 0;
     return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
   }
-  function bookmarkBoost(item) {
-    if (item.source !== "bookmark") return 0;
-    return 0;
-  }
   var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
   function rankMatches(query2, list, fuzzy = true) {
     const q = String(query2).trim();
@@ -1109,8 +1105,7 @@
       const hBoost = hostBoost(q, item);
       const rScore = recencyScore(item);
       const fScore = frequencyScore(item);
-      const bBoost = bookmarkBoost(item);
-      const totalScore = baseScore + tBoost + hBoost + rScore + fScore + bBoost;
+      const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
       return { item, match: { ...match, score: totalScore, baseScore }, span: last - first + 1, hayLength: hay.length, totalScore };
     }).filter(Boolean).sort((a, b) => {
       if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
@@ -1934,21 +1929,30 @@
     return raw;
   }
 
-  // content/hints.js
-  var MAX_HINTS = 800;
-  var REGENERATE_DELAY = 150;
-  var active3 = false;
-  var hintsHost = null;
-  var holder = null;
-  var elements = [];
-  var hints = [];
-  var prefix = "";
-  var mode2 = "click";
-  var multipleHits = false;
-  var resizeHandler = null;
-  var mutationObserver = null;
-  var regenerateTimer = null;
-  var hintPill = null;
+  // content/hint-layer.js
+  function normalizeCharset() {
+    const s = settings.getHintChars();
+    if (!s) return HINT_CHARSET_DEFAULT;
+    return s.toLowerCase();
+  }
+  function genLabels(count, charset) {
+    const chars = (charset || normalizeCharset()).toUpperCase().split("");
+    if (count <= 0 || chars.length < 2) return [];
+    if (count <= chars.length) return chars.slice(0, count);
+    const labels = chars.slice();
+    let head = 0;
+    while (labels.length - head < count) {
+      if (head >= labels.length) break;
+      const p = labels[head++];
+      for (const c of chars) {
+        labels.push(p + c);
+        if (labels.length - head >= count) break;
+        if (labels.length > 1e4) break;
+      }
+      if (labels.length > 1e4) break;
+    }
+    return labels.slice(head, head + count);
+  }
   function getZIndex(node) {
     let z = 0;
     try {
@@ -1978,6 +1982,180 @@
     }
     (document.documentElement || document.body).appendChild(host);
   }
+  function coordinate(holderEl) {
+    const probe = document.createElement("div");
+    probe.style.position = "absolute";
+    probe.style.top = "0";
+    probe.style.left = "0";
+    probe.textContent = "A";
+    holderEl.prepend(probe);
+    const br = probe.getBoundingClientRect();
+    const ret = {
+      top: br.top + window.pageYOffset - document.documentElement.clientTop,
+      left: br.left + window.pageXOffset - document.documentElement.clientLeft
+    };
+    try {
+      probe.remove();
+    } catch {
+    }
+    return ret;
+  }
+  function updateHintText(hintEl, label, typed) {
+    hintEl.textContent = "";
+    if (!typed) {
+      hintEl.textContent = label;
+      return;
+    }
+    if (label.startsWith(typed)) {
+      const pre = document.createElement("span");
+      pre.className = "jari-hint-matched";
+      pre.textContent = typed;
+      const rest = document.createElement("span");
+      rest.textContent = label.slice(typed.length);
+      hintEl.append(pre, rest);
+      hintEl.classList.remove("jari-hint-hidden");
+    } else {
+      hintEl.textContent = label;
+    }
+  }
+  var HINT_THEMES = {
+    yellow: {
+      border: "#c38a22",
+      background: "linear-gradient(#fff785, #ffc542)",
+      color: "#1a1a1a",
+      matched: "#6a6a6a"
+    },
+    cyan: {
+      border: "#1a7f8f",
+      background: "linear-gradient(#b0f2ff, #00b4d8)",
+      color: "#0a2e3a",
+      matched: "#3a6a7a"
+    }
+  };
+  function hintCss(theme) {
+    const t = HINT_THEMES[theme] || HINT_THEMES.yellow;
+    return `
+    .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
+    .jari-hint {
+      position: absolute;
+      display: inline-block;
+      box-sizing: border-box;
+      font-family: monospace;
+      font-size: 10px;
+      font-weight: bold;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      padding: 1px 3px;
+      border: 1px solid ${t.border};
+      border-radius: 3px;
+      background: ${t.background};
+      color: ${t.color};
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+      text-align: left;
+    }
+    .jari-hint-matched { color: ${t.matched}; opacity: 0.45; }
+    .jari-hint-hidden { opacity: 0; display: none; }
+  `;
+  }
+  function createHintsHost(theme = "yellow") {
+    const host = document.createElement("div");
+    host.className = "jari-hints-host";
+    host.style.position = "fixed";
+    host.style.left = "0";
+    host.style.top = "0";
+    host.style.width = "0";
+    host.style.height = "0";
+    host.style.overflow = "visible";
+    host.style.pointerEvents = "none";
+    host.style.zIndex = "2147483647";
+    try {
+      host.attachShadow({ mode: "open" });
+    } catch {
+      host.shadowRoot = host;
+    }
+    const shadow = host.shadowRoot;
+    const style = document.createElement("style");
+    style.textContent = hintCss(theme);
+    shadow.appendChild(style);
+    const holder2 = document.createElement("section");
+    holder2.className = "jari-hints";
+    holder2.style.display = "block";
+    holder2.style.opacity = "1";
+    shadow.appendChild(holder2);
+    placeHintsHost(host);
+    return { host, holder: holder2 };
+  }
+  function layoutHints(holder2, elements2, labels) {
+    const bof = (() => {
+      try {
+        return coordinate(holder2);
+      } catch {
+        return { top: 0, left: 0 };
+      }
+    })();
+    let lastTop = -1;
+    let lastLeft = -1;
+    const links = elements2.map((elm, i) => {
+      const r = getRealRect(elm);
+      const z = getZIndex(elm);
+      const left = window.pageXOffset + r.left - bof.left;
+      const link = document.createElement("div");
+      link.className = "jari-hint";
+      link.textContent = labels[i];
+      link.dataset.label = labels[i];
+      let lTop = Math.max(r.top + window.pageYOffset - bof.top, 0);
+      if (lTop === lastTop && Math.abs(left - lastLeft) < 20) {
+        link.style.left = `${left + 20 - Math.abs(left - lastLeft)}px`;
+      } else if (left === lastLeft && Math.abs(lTop - lastTop) < 20) {
+        lTop += 20 - Math.abs(lTop - lastTop);
+        link.style.left = `${left}px`;
+      } else {
+        link.style.left = `${left}px`;
+      }
+      link.style.top = `${lTop}px`;
+      link.style.zIndex = String(z + 9999);
+      link.zIndex = link.style.zIndex;
+      link.label = labels[i];
+      link.link = elm;
+      link.targetEl = elm;
+      updateHintText(link, labels[i], "");
+      lastTop = lTop;
+      lastLeft = parseInt(link.style.left, 10);
+      return link;
+    });
+    links.forEach((link) => holder2.appendChild(link));
+    if (links.length > 0) {
+      let bcr = getRealRect(links[0]);
+      for (let i = 1; i < links.length; i++) {
+        const h = links[i];
+        const tcr = getRealRect(h);
+        if (tcr.top === bcr.top && Math.abs(tcr.left - bcr.left) < bcr.width) {
+          h.style.top = `${h.offsetTop + h.offsetHeight}px`;
+        }
+        bcr = getRealRect(h);
+      }
+    }
+    return links;
+  }
+
+  // content/hints.js
+  var MAX_HINTS = 800;
+  var REGENERATE_DELAY = 150;
+  var active3 = false;
+  var hintsHost = null;
+  var holder = null;
+  var elements = [];
+  var hints = [];
+  var prefix = "";
+  var mode2 = "click";
+  var multipleHits = false;
+  var resizeHandler = null;
+  var mutationObserver = null;
+  var regenerateTimer = null;
+  var hintPill = null;
   function showHintPill() {
     if (hintPill) return;
     try {
@@ -2024,29 +2202,6 @@
   }
   function isActive3() {
     return active3;
-  }
-  function normalizeCharset() {
-    const s = settings.getHintChars();
-    if (!s) return HINT_CHARSET_DEFAULT;
-    return s.toLowerCase();
-  }
-  function genLabels(count, charset) {
-    const chars = (charset || normalizeCharset()).toUpperCase().split("");
-    if (count <= 0 || chars.length < 2) return [];
-    if (count <= chars.length) return chars.slice(0, count);
-    const labels = chars.slice();
-    let head = 0;
-    while (labels.length - head < count) {
-      if (head >= labels.length) break;
-      const p = labels[head++];
-      for (const c of chars) {
-        labels.push(p + c);
-        if (labels.length - head >= count) break;
-        if (labels.length > 1e4) break;
-      }
-      if (labels.length > 1e4) break;
-    }
-    return labels.slice(head, head + count);
   }
   function safeFocus(el, opts) {
     try {
@@ -2125,42 +2280,6 @@
       }
     }
   }
-  function coordinate(holderEl) {
-    const probe = document.createElement("div");
-    probe.style.position = "absolute";
-    probe.style.top = "0";
-    probe.style.left = "0";
-    probe.textContent = "A";
-    holderEl.prepend(probe);
-    const br = probe.getBoundingClientRect();
-    const ret = {
-      top: br.top + window.pageYOffset - document.documentElement.clientTop,
-      left: br.left + window.pageXOffset - document.documentElement.clientLeft
-    };
-    try {
-      probe.remove();
-    } catch {
-    }
-    return ret;
-  }
-  function updateHintText(hintEl, label, typed) {
-    hintEl.textContent = "";
-    if (!typed) {
-      hintEl.textContent = label;
-      return;
-    }
-    if (label.startsWith(typed)) {
-      const pre = document.createElement("span");
-      pre.className = "jari-hint-matched";
-      pre.textContent = typed;
-      const rest = document.createElement("span");
-      rest.textContent = label.slice(typed.length);
-      hintEl.append(pre, rest);
-      hintEl.classList.remove("jari-hint-hidden");
-    } else {
-      hintEl.textContent = label;
-    }
-  }
   function refresh() {
     if (!active3) return;
     for (const h of hints) {
@@ -2198,106 +2317,13 @@
       hintsHost = null;
       holder = null;
     }
-    hintsHost = document.createElement("div");
-    hintsHost.className = "jari-hints-host";
-    hintsHost.style.position = "fixed";
-    hintsHost.style.left = "0";
-    hintsHost.style.top = "0";
-    hintsHost.style.width = "0";
-    hintsHost.style.height = "0";
-    hintsHost.style.overflow = "visible";
-    hintsHost.style.pointerEvents = "none";
-    hintsHost.style.zIndex = "2147483647";
-    try {
-      hintsHost.attachShadow({ mode: "open" });
-    } catch {
-      hintsHost.shadowRoot = hintsHost;
-    }
-    const shadow = hintsHost.shadowRoot;
-    const style = document.createElement("style");
-    style.textContent = `
-    .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
-    .jari-hint {
-      position: absolute;
-      display: inline-block;
-      box-sizing: border-box;
-      font-family: monospace;
-      font-size: 10px;
-      font-weight: bold;
-      line-height: 1;
-      letter-spacing: 0.02em;
-      padding: 1px 3px;
-      border: 1px solid #c38a22;
-      border-radius: 3px;
-      background: linear-gradient(#fff785, #ffc542);
-      color: #1a1a1a;
-      text-transform: uppercase;
-      white-space: nowrap;
-      pointer-events: none;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-      text-align: left;
-    }
-    .jari-hint-matched { color: #6a6a6a; opacity: 0.45; }
-    .jari-hint-hidden { opacity: 0; display: none; }
-  `;
-    shadow.appendChild(style);
-    holder = document.createElement("section");
-    holder.className = "jari-hints";
-    holder.style.display = "block";
-    holder.style.opacity = "1";
-    shadow.appendChild(holder);
-    placeHintsHost(hintsHost);
+    const created = createHintsHost("yellow");
+    hintsHost = created.host;
+    holder = created.holder;
     const charset = normalizeCharset();
     const labels = genLabels(elements.length, charset);
     hints = [];
-    const bof = (() => {
-      try {
-        return coordinate(holder);
-      } catch {
-        return { top: 0, left: 0 };
-      }
-    })();
-    let lastTop = -1;
-    let lastLeft = -1;
-    const links = elements.map((elm, i) => {
-      const r = getRealRect(elm);
-      const z = getZIndex(elm);
-      const left = window.pageXOffset + r.left - bof.left;
-      const link = document.createElement("div");
-      link.className = "jari-hint";
-      link.textContent = labels[i];
-      link.dataset.label = labels[i];
-      let lTop = Math.max(r.top + window.pageYOffset - bof.top, 0);
-      if (lTop === lastTop && Math.abs(left - lastLeft) < 20) {
-        link.style.left = `${left + 20 - Math.abs(left - lastLeft)}px`;
-      } else if (left === lastLeft && Math.abs(lTop - lastTop) < 20) {
-        lTop += 20 - Math.abs(lTop - lastTop);
-        link.style.left = `${left}px`;
-      } else {
-        link.style.left = `${left}px`;
-      }
-      link.style.top = `${lTop}px`;
-      link.style.zIndex = String(z + 9999);
-      link.zIndex = link.style.zIndex;
-      link.label = labels[i];
-      link.link = elm;
-      updateHintText(link, labels[i], "");
-      lastTop = lTop;
-      lastLeft = parseInt(link.style.left, 10);
-      return link;
-    });
-    links.forEach((link) => holder.appendChild(link));
-    if (links.length > 0) {
-      let bcr = getRealRect(links[0]);
-      for (let i = 1; i < links.length; i++) {
-        const h = links[i];
-        const tcr = getRealRect(h);
-        if (tcr.top === bcr.top && Math.abs(tcr.left - bcr.left) < bcr.width) {
-          h.style.top = `${h.offsetTop + h.offsetHeight}px`;
-        }
-        bcr = getRealRect(h);
-      }
-    }
+    const links = layoutHints(holder, elements, labels);
     hints = links.map((link) => ({
       el: link.link,
       label: link.label,
@@ -2413,18 +2439,17 @@
     }
     stopTracking();
   }
-  var MODE_CONFIG = {
-    click: { mode: "click", multipleHits: false },
-    open: { mode: "open", multipleHits: false },
-    openBackground: { mode: "openBackground", multipleHits: true },
-    input: { mode: "input", multipleHits: false },
-    yank: { mode: "yank", multipleHits: false }
-  };
+  var VALID_HINT_MODES = /* @__PURE__ */ new Set([
+    "click",
+    "open",
+    "openBackground",
+    "input",
+    "yank"
+  ]);
   function open3(requestedMode) {
     if (active3) close3();
-    const config = MODE_CONFIG[requestedMode] || MODE_CONFIG.click;
-    mode2 = config.mode;
-    multipleHits = config.multipleHits;
+    mode2 = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
+    multipleHits = mode2 === "openBackground";
     let candidates = collectElements(mode2);
     if (mode2 === "input" && candidates.length === 1) {
       focusInput(candidates[0]);
@@ -2573,6 +2598,7 @@
   var hintMap = /* @__PURE__ */ new Map();
   var pendingVisualMode = "visual";
   var findOpenHandler = null;
+  var findNavHandler = null;
   var visualUseHighlights = false;
   var visualFallbackSpans = [];
   function isActive4() {
@@ -2580,6 +2606,9 @@
   }
   function setFindOpen(handler) {
     findOpenHandler = handler;
+  }
+  function setFindNav(handler) {
+    findNavHandler = handler;
   }
   function pillText(m) {
     if (m === "caret") return "caret";
@@ -2921,114 +2950,9 @@
           }
         } catch {
         }
-        try {
-          const walker2 = document.createTreeWalker(
-            document.body,
-            NodeFilter.SHOW_TEXT
-          );
-          let nn = walker2.nextNode();
-          while (nn && visualFallbackSpans.length === 0) {
-            nn = walker2.nextNode();
-          }
-        } catch {
-        }
       }
     } catch {
     }
-  }
-  function normalizeCharset2() {
-    const s = settings.getHintChars();
-    if (!s) return "asdfgqwertzxcvb";
-    return s.toLowerCase();
-  }
-  function hasPrefixConflict(labels) {
-    for (let i = 0; i < labels.length; i++) {
-      for (let j = 0; j < labels.length; j++) {
-        if (i !== j && labels[j].startsWith(labels[i])) return true;
-      }
-    }
-    return false;
-  }
-  function buildUniformLabels(count, chars) {
-    let length = 1;
-    while (Math.pow(chars.length, length) < count) length++;
-    const out = [];
-    for (let k = 0; k < count; k++) {
-      let n = k;
-      let s = "";
-      for (let p = 0; p < length; p++) {
-        s = chars[n % chars.length] + s;
-        n = Math.floor(n / chars.length);
-      }
-      out.push(s);
-    }
-    return out;
-  }
-  function genLabels2(count, charset) {
-    const chars = (charset || normalizeCharset2()).toUpperCase().split("");
-    if (count <= 0 || chars.length < 2) return [];
-    if (count <= chars.length) return chars.slice(0, count);
-    const labels = chars.slice();
-    let head = 0;
-    while (labels.length - head < count) {
-      if (head >= labels.length) break;
-      const p = labels[head++];
-      for (const c of chars) {
-        labels.push(p + c);
-        if (labels.length - head >= count) break;
-        if (labels.length > 1e4) break;
-      }
-      if (labels.length > 1e4) break;
-    }
-    const out = labels.slice(head, head + count);
-    return hasPrefixConflict(out) ? buildUniformLabels(count, chars) : out;
-  }
-  function getZIndex2(node) {
-    let z = 0;
-    try {
-      do {
-        const v = parseInt(
-          window.getComputedStyle(node).getPropertyValue("z-index")
-        );
-        if (!isNaN(v) && v >= 0) z += v;
-        node = node.parentNode;
-      } while (node && node !== document.body && node !== document && node.nodeType !== 11);
-    } catch {
-    }
-    return z;
-  }
-  function placeHintsHost2(host) {
-    try {
-      const topLayer = document.querySelector("dialog[open]");
-      if (topLayer) {
-        const r = topLayer.getBoundingClientRect();
-        const style = window.getComputedStyle(topLayer);
-        if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
-          topLayer.appendChild(host);
-          return;
-        }
-      }
-    } catch {
-    }
-    (document.documentElement || document.body).appendChild(host);
-  }
-  function coordinate2(holderEl) {
-    const probe = document.createElement("div");
-    probe.style.position = "absolute";
-    probe.style.top = "0";
-    probe.style.left = "0";
-    probe.textContent = "A";
-    holderEl.prepend(probe);
-    const br = probe.getBoundingClientRect();
-    const ret = {
-      top: br.top + window.pageYOffset - document.documentElement.clientTop,
-      left: br.left + window.pageXOffset - document.documentElement.clientLeft
-    };
-    try {
-      probe.remove();
-    } catch {
-    }
-    return ret;
   }
   function collectVisualTextElements() {
     let elements2 = getVisibleElements((e, v) => {
@@ -3114,24 +3038,6 @@
     }
     return out;
   }
-  function updateHintText2(hintEl, label, typed) {
-    hintEl.textContent = "";
-    if (!typed) {
-      hintEl.textContent = label;
-      return;
-    }
-    if (label.startsWith(typed)) {
-      const pre = document.createElement("span");
-      pre.className = "jari-hint-matched";
-      pre.textContent = typed;
-      const rest = document.createElement("span");
-      rest.textContent = label.slice(typed.length);
-      hintEl.append(pre, rest);
-      hintEl.classList.remove("jari-hint-hidden");
-    } else {
-      hintEl.textContent = label;
-    }
-  }
   function renderHints() {
     if (hintHost) {
       try {
@@ -3141,77 +3047,17 @@
       hintHost = null;
       hintHolder = null;
     }
-    hintHost = document.createElement("div");
-    hintHost.className = "jari-hints-host";
-    hintHost.style.position = "fixed";
-    hintHost.style.left = "0";
-    hintHost.style.top = "0";
-    hintHost.style.width = "0";
-    hintHost.style.height = "0";
-    hintHost.style.overflow = "visible";
-    hintHost.style.pointerEvents = "none";
-    hintHost.style.zIndex = "2147483647";
-    try {
-      hintHost.attachShadow({ mode: "open" });
-    } catch {
-      hintHost.shadowRoot = hintHost;
-    }
-    const shadow = hintHost.shadowRoot;
-    const style = document.createElement("style");
-    style.textContent = `
-    .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
-    .jari-hint { position: absolute; display: inline-block; box-sizing: border-box; font-family: monospace; font-size: 10px; font-weight: bold; line-height: 1; letter-spacing: 0.02em; padding: 1px 3px; border: 1px solid #1a7f8f; border-radius: 3px; background: linear-gradient(#b0f2ff, #00b4d8); color: #0a2e3a; text-transform: uppercase; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.35); text-align: left; }
-    .jari-hint-matched { color: #3a6a7a; opacity: 0.45; }
-    .jari-hint-hidden { opacity: 0; display: none; }
-  `;
-    shadow.appendChild(style);
-    hintHolder = document.createElement("section");
-    hintHolder.className = "jari-hints";
-    hintHolder.style.display = "block";
-    hintHolder.style.opacity = "1";
-    shadow.appendChild(hintHolder);
-    placeHintsHost2(hintHost);
-    const charset = normalizeCharset2();
-    const labels = genLabels2(hintElements.length, charset);
+    const created = createHintsHost("cyan");
+    hintHost = created.host;
+    hintHolder = created.holder;
+    const charset = normalizeCharset();
+    const labels = genLabels(hintElements.length, charset);
     hintLabels = labels;
     hintMap.clear();
-    const bof = (() => {
-      try {
-        return coordinate2(hintHolder);
-      } catch {
-        return { top: 0, left: 0 };
-      }
-    })();
-    let lastTop = -1;
-    let lastLeft = -1;
-    const hintEls = hintElements.map((elm, i) => {
-      const r = getRealRect(elm);
-      const z = getZIndex2(elm);
-      const left = window.pageXOffset + r.left - bof.left;
-      const link = document.createElement("div");
-      link.className = "jari-hint";
-      link.textContent = labels[i];
-      link.dataset.label = labels[i];
-      let lTop = Math.max(r.top + window.pageYOffset - bof.top, 0);
-      if (lTop === lastTop && Math.abs(left - lastLeft) < 20) {
-        link.style.left = `${left + 20 - Math.abs(left - lastLeft)}px`;
-      } else if (left === lastLeft && Math.abs(lTop - lastTop) < 20) {
-        lTop += 20 - Math.abs(lTop - lastTop);
-        link.style.left = `${left}px`;
-      } else {
-        link.style.left = `${left}px`;
-      }
-      link.style.top = `${lTop}px`;
-      link.style.zIndex = String(z + 9999);
-      link.label = labels[i];
-      link.targetEl = elm;
-      updateHintText2(link, labels[i], "");
-      lastTop = lTop;
-      lastLeft = parseInt(link.style.left, 10);
-      hintMap.set(labels[i], { el: elm, hintEl: link });
-      return link;
-    });
-    hintEls.forEach((link) => hintHolder.appendChild(link));
+    const hintEls = layoutHints(hintHolder, hintElements, labels);
+    for (const link of hintEls) {
+      hintMap.set(link.label, { el: link.link, hintEl: link });
+    }
     refreshHints();
   }
   function refreshHints() {
@@ -3222,13 +3068,13 @@
         hintEl.style.opacity = "1";
         hintEl.style.display = "";
         hintEl.classList.remove("jari-hint-hidden");
-        updateHintText2(hintEl, label, "");
+        updateHintText(hintEl, label, "");
       } else if (label === hintPrefix) {
         hintEl.style.opacity = "1";
       } else if (label.startsWith(hintPrefix)) {
         hintEl.style.opacity = "1";
         hintEl.style.display = "";
-        updateHintText2(hintEl, label, hintPrefix);
+        updateHintText(hintEl, label, hintPrefix);
       } else {
         hintEl.style.opacity = "0";
         hintEl.style.display = "none";
@@ -3425,9 +3271,9 @@
         NodeFilter.SHOW_TEXT
       );
       walker.currentNode = node;
-      const prev2 = walker.previousNode();
-      if (prev2 && prev2.nodeValue.length > 0)
-        return prev2.nodeValue[prev2.nodeValue.length - 1];
+      const prev = walker.previousNode();
+      if (prev && prev.nodeValue.length > 0)
+        return prev.nodeValue[prev.nodeValue.length - 1];
       return null;
     }
     return null;
@@ -3484,10 +3330,10 @@
           NodeFilter.SHOW_TEXT
         );
         walker.currentNode = node;
-        const prev2 = walker.previousNode();
-        if (prev2) {
-          newNode = prev2;
-          newOffset = prev2.nodeValue.length - 1;
+        const prev = walker.previousNode();
+        if (prev) {
+          newNode = prev;
+          newOffset = prev.nodeValue.length - 1;
           if (newOffset < 0) newOffset = 0;
         } else {
           return;
@@ -3559,10 +3405,10 @@
           NodeFilter.SHOW_TEXT
         );
         walker.currentNode = node;
-        const prev2 = walker.previousNode();
-        if (prev2) {
-          newNode = prev2;
-          newOffset = prev2.nodeValue.length - 1;
+        const prev = walker.previousNode();
+        if (prev) {
+          newNode = prev;
+          newOffset = prev.nodeValue.length - 1;
           if (newOffset < 0) newOffset = 0;
         } else {
           return;
@@ -4394,7 +4240,7 @@
         return true;
       }
       if (key2.length === 1) {
-        const charset = normalizeCharset2();
+        const charset = normalizeCharset();
         const lower = key2.toLowerCase();
         if (charset.includes(lower)) {
           consume2(event);
@@ -4545,16 +4391,6 @@
         pendingCount = "";
         return true;
       }
-      if (key === "n" || key === "N") {
-        consume2(event);
-        pendingCount = "";
-        return true;
-      }
-      if (key === "o") {
-        consume2(event);
-        pendingCount = "";
-        return true;
-      }
       if (key === "v" || key === "V") {
         consume2(event);
         const sel = getSelection();
@@ -4652,10 +4488,6 @@
         if (repeat > 1) doGoToLine(repeat);
         else doDocBoundary(1);
         break;
-      case "g":
-        consume2(event);
-        ui.toast("Use gg");
-        break;
       case "o":
         consume2(event);
         swapAnchorFocus();
@@ -4747,8 +4579,6 @@
         break;
     }
     pendingCount = "";
-    if (pendingY && key !== "y") {
-    }
     return true;
   }
   var Visual = {
@@ -4756,6 +4586,7 @@
     close: close4,
     isActive: isActive4,
     setFindOpen,
+    setFindNav,
     enterCaretAtFocus,
     onKeyDown: onKeyDown4,
     showBlockCaret,
@@ -5368,9 +5199,6 @@
     updateStatus();
     ui.toast(`${currentIdx + 1}/${len}`);
   }
-  function prev(count = 1) {
-    next(count, true);
-  }
   function onKeyDown5(event) {
     if (!active5) return false;
     const inInput = document.activeElement === inputEl2;
@@ -5409,9 +5237,6 @@
     }
     return false;
   }
-  function hasHighlightsPublic() {
-    return matches.length > 0;
-  }
   function handleGlobalEsc(event) {
     if (hasHighlights()) {
       event.preventDefault();
@@ -5439,9 +5264,8 @@
     close: closeBar,
     clearHighlights,
     next,
-    prev,
     isActive: isActive5,
-    hasHighlights: hasHighlightsPublic,
+    hasHighlights,
     handleGlobalEsc,
     handleGlobalEnter,
     onKeyDown: onKeyDown5
@@ -5449,6 +5273,7 @@
   register("find", { close: closeAndClear, onKeyDown: onKeyDown5, isActive: isActive5 });
   try {
     Visual.setFindOpen(() => open4());
+    if (typeof Visual.setFindNav === "function") Visual.setFindNav((count, reverse) => next(count, reverse));
   } catch {
   }
   function __resetFindState() {
@@ -5766,6 +5591,10 @@ ${location.href}`;
   var passthroughMode = false;
   var passthroughTimer = null;
   var pills = {};
+  var PILL_IGNORE_TEXT = "ignore";
+  function pillPassthroughText() {
+    return "passthrough (" + settings.getPassthroughMs() + "ms)";
+  }
   function clearPending() {
     pendingCount2 = "";
     pendingPrefix = null;
@@ -5790,7 +5619,7 @@ ${location.href}`;
     clearPending();
     if (on) {
       Overlays.closeAll();
-      showPill2("ignore", "ignore");
+      showPill2("ignore", PILL_IGNORE_TEXT);
     } else {
       hidePill2("ignore");
     }
@@ -5805,10 +5634,7 @@ ${location.href}`;
     clearPending();
     Overlays.closeAll();
     passthroughMode = true;
-    showPill2(
-      "passthrough",
-      "passthrough (" + settings.getPassthroughMs() + "ms)"
-    );
+    showPill2("passthrough", pillPassthroughText());
     clearTimeout(passthroughTimer);
     passthroughTimer = setTimeout(exitPassthrough, settings.getPassthroughMs());
   }
@@ -5842,8 +5668,8 @@ ${location.href}`;
       hidePill2("ignore");
       hidePill2("passthrough");
     } else {
-      if (ignoreMode) showPill2("ignore", "Ignore mode");
-      if (passthroughMode) showPill2("passthrough", "Passthrough");
+      if (ignoreMode) showPill2("ignore", PILL_IGNORE_TEXT);
+      if (passthroughMode) showPill2("passthrough", pillPassthroughText());
     }
   }
   function handleKeydown(event) {
