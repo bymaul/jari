@@ -77,6 +77,30 @@ function chooseWindow(data) {
   render("Move tab to", "Choose a window...");
 }
 
+function requestSuggestions(suggestQuery, onResults) {
+  clearTimeout(suggestTimer);
+  const seq = ++suggestSeq;
+  suggestTimer = setTimeout(async () => {
+    if (!active || seq !== suggestSeq) return;
+    const res = (await sendMessage("suggest", { query: suggestQuery })) || [];
+    if (!active || seq !== suggestSeq) return;
+    tabUrlMap.clear();
+    for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
+    onResults(res);
+  }, 130);
+}
+
+function toSuggestionRow(item, match) {
+  return {
+    kind: "suggestion",
+    title: item.title,
+    url: item.url,
+    match,
+    source: item.source,
+    folderPath: item.folderPath,
+  };
+}
+
 function handleOpenInput(queryText) {
   const q = queryText.trim();
   const kw = parseKeyword(q);
@@ -84,27 +108,14 @@ function handleOpenInput(queryText) {
   query = term;
   tabUrlMap.clear();
   if (!q) {
-    clearTimeout(suggestTimer);
-    suggestSeq++;
     filtered = [];
     selected = 0;
     renderList();
-    const seq = ++suggestSeq;
-    suggestTimer = setTimeout(async () => {
-      if (!active || seq !== suggestSeq) return;
-      const res = (await sendMessage("suggest", { query: "" })) || [];
-      if (!active || seq !== suggestSeq) return;
-      for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-      filtered = res.slice(0, 20).map((item) => ({
-        kind: "suggestion",
-        title: item.title,
-        url: item.url,
-        match: null,
-        source: item.source,
-      }));
+    requestSuggestions("", (res) => {
+      filtered = res.slice(0, 20).map((item) => toSuggestionRow(item, null));
       selected = 0;
       renderList();
-    }, 130);
+    });
     return;
   }
   let row;
@@ -124,25 +135,14 @@ function handleOpenInput(queryText) {
   filtered = [row];
   selected = 0;
   renderList();
-  clearTimeout(suggestTimer);
-  const seq = ++suggestSeq;
-  suggestTimer = setTimeout(async () => {
-    if (!active || seq !== suggestSeq) return;
-    const res = (await sendMessage("suggest", { query: term })) || [];
-    if (!active || seq !== suggestSeq) return;
-    tabUrlMap.clear();
-    for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-    const suggestions = rank(res, term).map(({ item, match }) => ({
-      kind: "suggestion",
-      title: item.title,
-      url: item.url,
-      match,
-      source: item.source,
-    }));
+  requestSuggestions(term, (res) => {
+    const suggestions = rank(res, term).map(({ item, match }) =>
+      toSuggestionRow(item, match),
+    );
     filtered = [row, ...suggestions];
     selected = 0;
     renderList();
-  }, 130);
+  });
 }
 
 function rank(list, query) {
@@ -367,19 +367,19 @@ function onKeyDown(event) {
   }
 }
 
+function openUrl(url) {
+  sendMessage(mode === "open" ? "createTab" : "navigate", { url });
+}
+
 function activate() {
   const item = filtered[selected];
   const rawInput = inputEl ? inputEl.value.trim() : "";
   const kwInput = parseKeyword(rawInput);
   if (!item) {
     if (mode === "open" && !rawInput) sendMessage("createTab");
-    else if (kwInput)
-      sendMessage(mode === "open" ? "createTab" : "navigate", {
-        url: kwInput.url,
-      });
+    else if (kwInput) openUrl(kwInput.url);
     else if (rawInput && Url.looksLikeUrl(rawInput)) {
-      const target = Url.normalizeUrl(rawInput) || rawInput;
-      sendMessage(mode === "open" ? "createTab" : "navigate", { url: target });
+      openUrl(Url.normalizeUrl(rawInput) || rawInput);
     } else if (rawInput)
       sendMessage("search", { query: rawInput, newTab: mode === "open" });
     close();
@@ -389,28 +389,13 @@ function activate() {
     sendMessage("moveTabIntoWindow", { targetWindowId: item.windowId });
   } else if (mode === "open" || mode === "edit") {
     if (item.kind === "search") {
-      if (item.keyword && item.url)
-        sendMessage(mode === "open" ? "createTab" : "navigate", {
-          url: item.url,
-        });
-      else if (kwInput && kwInput.url)
-        sendMessage(mode === "open" ? "createTab" : "navigate", {
-          url: kwInput.url,
-        });
+      if (item.keyword && item.url) openUrl(item.url);
+      else if (kwInput && kwInput.url) openUrl(kwInput.url);
       else sendMessage("search", { query: rawInput, newTab: mode === "open" });
     } else if (item.url) {
-      const existing = tabUrlMap.get(item.url);
-      if (existing && existing.source === "tab" && existing.id) {
-        sendMessage("activateTab", { id: existing.id });
-      } else {
-        const tabMatch = tabUrlMap.get(item.url);
-        if (tabMatch && tabMatch.id)
-          sendMessage("activateTab", { id: tabMatch.id });
-        else
-          sendMessage(mode === "open" ? "createTab" : "navigate", {
-            url: item.url,
-          });
-      }
+      const match = tabUrlMap.get(item.url);
+      if (match && match.id) sendMessage("activateTab", { id: match.id });
+      else openUrl(item.url);
     }
   } else {
     sendMessage("activateTab", { id: item.id });

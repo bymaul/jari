@@ -1,3 +1,5 @@
+import { balanceCategories } from "./keymap.js";
+
 export function sendMessage(action, payload = {}) {
   return new Promise((resolve) => {
     try {
@@ -150,6 +152,29 @@ function buildCategoryTable(cat, headerClass, renderBody) {
   return table;
 }
 
+function buildCategorizedGrid(
+  byCategory,
+  { columnCount = 3, gridClass, columnClass, headerClass, renderEntries },
+) {
+  const grid = document.createElement("div");
+  grid.className = gridClass;
+  for (const cats of balanceCategories(byCategory, columnCount)) {
+    const col = document.createElement("div");
+    col.className = columnClass;
+    for (const cat of cats) {
+      const entries = byCategory.get(cat.id);
+      if (!entries || entries.length === 0) continue;
+      col.appendChild(
+        buildCategoryTable(cat, headerClass, (tbody) =>
+          renderEntries(tbody, entries),
+        ),
+      );
+    }
+    grid.appendChild(col);
+  }
+  return grid;
+}
+
 export const ui = {
   toast,
   showcmd,
@@ -157,6 +182,7 @@ export const ui = {
   copyText,
   statusContainer,
   buildCategoryTable,
+  buildCategorizedGrid,
   withHiddenTextarea,
   consume,
   safeFocus,

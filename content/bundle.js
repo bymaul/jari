@@ -457,6 +457,27 @@
     table.appendChild(tbody);
     return table;
   }
+  function buildCategorizedGrid(byCategory, { columnCount = 3, gridClass, columnClass, headerClass, renderEntries }) {
+    const grid = document.createElement("div");
+    grid.className = gridClass;
+    for (const cats of balanceCategories(byCategory, columnCount)) {
+      const col = document.createElement("div");
+      col.className = columnClass;
+      for (const cat of cats) {
+        const entries = byCategory.get(cat.id);
+        if (!entries || entries.length === 0) continue;
+        col.appendChild(
+          buildCategoryTable(
+            cat,
+            headerClass,
+            (tbody) => renderEntries(tbody, entries)
+          )
+        );
+      }
+      grid.appendChild(col);
+    }
+    return grid;
+  }
   var ui = {
     toast,
     showcmd,
@@ -464,6 +485,7 @@
     copyText,
     statusContainer,
     buildCategoryTable,
+    buildCategorizedGrid,
     withHiddenTextarea,
     consume,
     safeFocus,
@@ -1276,11 +1298,28 @@
     }
     return best;
   }
-  function fuzzyMatch(query2, text) {
+  function matchPreamble(query2, text) {
     const { include, exclude, phrases } = parseQuery(query2);
-    if (include.length === 0 && phrases.length === 0) return null;
     const t = normalizeForMatch(text);
-    for (const ex of exclude) if (t.includes(ex)) return null;
+    if (exclude.some((ex) => t.includes(ex))) return null;
+    return { include, phrases, t };
+  }
+  function collectPhraseIndices(phrases, t, indices) {
+    for (const ph of phrases) {
+      if (!t.includes(ph)) return false;
+      let idx = t.indexOf(ph);
+      while (idx !== -1) {
+        for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+        idx = t.indexOf(ph, idx + 1);
+      }
+    }
+    return true;
+  }
+  function fuzzyMatch(query2, text) {
+    const pre = matchPreamble(query2, text);
+    if (!pre) return null;
+    const { include, phrases, t } = pre;
+    if (include.length === 0 && phrases.length === 0) return null;
     for (const ph of phrases) if (!t.includes(ph)) return null;
     const results = include.map((term) => bestAlignment(term, t, text));
     if (results.some((r) => !r)) return null;
@@ -1301,44 +1340,31 @@
     return { score: total, indices };
   }
   function fuzzyIndices(query2, text) {
-    const { include, exclude, phrases } = parseQuery(query2);
-    const t = normalizeForMatch(text);
-    for (const ex of exclude) if (t.includes(ex)) return [];
+    const pre = matchPreamble(query2, text);
+    if (!pre) return [];
+    const { include, phrases, t } = pre;
     const indices = [];
-    for (const ph of phrases) {
-      if (!t.includes(ph)) return [];
-      let idx = t.indexOf(ph);
-      while (idx !== -1) {
-        for (let i = idx; i < idx + ph.length; i++) indices.push(i);
-        idx = t.indexOf(ph, idx + 1);
-      }
-    }
+    if (!collectPhraseIndices(phrases, t, indices)) return [];
     const results = include.map((term) => bestAlignment(term, t, text));
     for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
   }
   function substringMatch(query2, text) {
-    const { include, exclude, phrases } = parseQuery(query2);
+    const pre = matchPreamble(query2, text);
+    if (!pre) return false;
+    const { include, phrases, t } = pre;
     if (include.length === 0 && phrases.length === 0) return false;
-    const t = normalizeForMatch(text);
-    if (exclude.some((ex) => t.includes(ex))) return false;
     if (phrases.some((ph) => !t.includes(ph))) return false;
     return include.every((term) => t.includes(term));
   }
   function substringIndices(query2, text) {
-    const { include, exclude, phrases } = parseQuery(query2);
+    const pre = matchPreamble(query2, text);
+    if (!pre) return [];
+    const { include, phrases, t } = pre;
     if (include.length === 0 && phrases.length === 0) return [];
-    const t = normalizeForMatch(text);
-    if (exclude.some((ex) => t.includes(ex))) return [];
     if (phrases.some((ph) => !t.includes(ph))) return [];
     const indices = [];
-    for (const ph of phrases) {
-      let idx = t.indexOf(ph);
-      while (idx !== -1) {
-        for (let i = idx; i < idx + ph.length; i++) indices.push(i);
-        idx = t.indexOf(ph, idx + 1);
-      }
-    }
+    collectPhraseIndices(phrases, t, indices);
     for (const term of include) {
       let idx = t.indexOf(term);
       while (idx !== -1) {
@@ -1348,16 +1374,16 @@
     }
     return [...new Set(indices)].sort((a, b) => a - b);
   }
+  function fieldBoost(query2, field, base, weight) {
+    if (!field) return 0;
+    const m = fuzzyMatch(query2, field);
+    return m ? base + m.score * weight : 0;
+  }
   function titleBoost(query2, item) {
-    if (!item.title) return 0;
-    const m = fuzzyMatch(query2, item.title);
-    return m ? 8 + m.score * 0.15 : 0;
+    return fieldBoost(query2, item.title, 8, 0.15);
   }
   function hostBoost(query2, item) {
-    const host = extractHost(item.url || "");
-    if (!host) return 0;
-    const m = fuzzyMatch(query2, host);
-    return m ? 6 + m.score * 0.1 : 0;
+    return fieldBoost(query2, extractHost(item.url || ""), 6, 0.1);
   }
   function recencyScore(item) {
     const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
@@ -1489,6 +1515,28 @@
     active = true;
     render("Move tab to", "Choose a window...");
   }
+  function requestSuggestions(suggestQuery, onResults) {
+    clearTimeout(suggestTimer);
+    const seq = ++suggestSeq;
+    suggestTimer = setTimeout(async () => {
+      if (!active || seq !== suggestSeq) return;
+      const res = await sendMessage("suggest", { query: suggestQuery }) || [];
+      if (!active || seq !== suggestSeq) return;
+      tabUrlMap.clear();
+      for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
+      onResults(res);
+    }, 130);
+  }
+  function toSuggestionRow(item, match) {
+    return {
+      kind: "suggestion",
+      title: item.title,
+      url: item.url,
+      match,
+      source: item.source,
+      folderPath: item.folderPath
+    };
+  }
   function handleOpenInput(queryText) {
     const q = queryText.trim();
     const kw = parseKeyword(q);
@@ -1496,27 +1544,14 @@
     query = term;
     tabUrlMap.clear();
     if (!q) {
-      clearTimeout(suggestTimer);
-      suggestSeq++;
       filtered = [];
       selected = 0;
       renderList();
-      const seq2 = ++suggestSeq;
-      suggestTimer = setTimeout(async () => {
-        if (!active || seq2 !== suggestSeq) return;
-        const res = await sendMessage("suggest", { query: "" }) || [];
-        if (!active || seq2 !== suggestSeq) return;
-        for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-        filtered = res.slice(0, 20).map((item) => ({
-          kind: "suggestion",
-          title: item.title,
-          url: item.url,
-          match: null,
-          source: item.source
-        }));
+      requestSuggestions("", (res) => {
+        filtered = res.slice(0, 20).map((item) => toSuggestionRow(item, null));
         selected = 0;
         renderList();
-      }, 130);
+      });
       return;
     }
     let row;
@@ -1534,25 +1569,14 @@
     filtered = [row];
     selected = 0;
     renderList();
-    clearTimeout(suggestTimer);
-    const seq = ++suggestSeq;
-    suggestTimer = setTimeout(async () => {
-      if (!active || seq !== suggestSeq) return;
-      const res = await sendMessage("suggest", { query: term }) || [];
-      if (!active || seq !== suggestSeq) return;
-      tabUrlMap.clear();
-      for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-      const suggestions = rank(res, term).map(({ item, match }) => ({
-        kind: "suggestion",
-        title: item.title,
-        url: item.url,
-        match,
-        source: item.source
-      }));
+    requestSuggestions(term, (res) => {
+      const suggestions = rank(res, term).map(
+        ({ item, match }) => toSuggestionRow(item, match)
+      );
       filtered = [row, ...suggestions];
       selected = 0;
       renderList();
-    }, 130);
+    });
   }
   function rank(list, query2) {
     return rankMatches(query2, list, settings.isFuzzyMatching());
@@ -1741,19 +1765,18 @@
       move(event.shiftKey ? -1 : 1);
     }
   }
+  function openUrl(url) {
+    sendMessage(mode === "open" ? "createTab" : "navigate", { url });
+  }
   function activate() {
     const item = filtered[selected];
     const rawInput = inputEl ? inputEl.value.trim() : "";
     const kwInput = parseKeyword(rawInput);
     if (!item) {
       if (mode === "open" && !rawInput) sendMessage("createTab");
-      else if (kwInput)
-        sendMessage(mode === "open" ? "createTab" : "navigate", {
-          url: kwInput.url
-        });
+      else if (kwInput) openUrl(kwInput.url);
       else if (rawInput && Url.looksLikeUrl(rawInput)) {
-        const target2 = Url.normalizeUrl(rawInput) || rawInput;
-        sendMessage(mode === "open" ? "createTab" : "navigate", { url: target2 });
+        openUrl(Url.normalizeUrl(rawInput) || rawInput);
       } else if (rawInput)
         sendMessage("search", { query: rawInput, newTab: mode === "open" });
       close();
@@ -1763,28 +1786,13 @@
       sendMessage("moveTabIntoWindow", { targetWindowId: item.windowId });
     } else if (mode === "open" || mode === "edit") {
       if (item.kind === "search") {
-        if (item.keyword && item.url)
-          sendMessage(mode === "open" ? "createTab" : "navigate", {
-            url: item.url
-          });
-        else if (kwInput && kwInput.url)
-          sendMessage(mode === "open" ? "createTab" : "navigate", {
-            url: kwInput.url
-          });
+        if (item.keyword && item.url) openUrl(item.url);
+        else if (kwInput && kwInput.url) openUrl(kwInput.url);
         else sendMessage("search", { query: rawInput, newTab: mode === "open" });
       } else if (item.url) {
-        const existing = tabUrlMap.get(item.url);
-        if (existing && existing.source === "tab" && existing.id) {
-          sendMessage("activateTab", { id: existing.id });
-        } else {
-          const tabMatch = tabUrlMap.get(item.url);
-          if (tabMatch && tabMatch.id)
-            sendMessage("activateTab", { id: tabMatch.id });
-          else
-            sendMessage(mode === "open" ? "createTab" : "navigate", {
-              url: item.url
-            });
-        }
+        const match = tabUrlMap.get(item.url);
+        if (match && match.id) sendMessage("activateTab", { id: match.id });
+        else openUrl(item.url);
       }
     } else {
       sendMessage("activateTab", { id: item.id });
@@ -1918,37 +1926,30 @@
       if (!byCategory.has(id)) byCategory.set(id, []);
       byCategory.get(id).push({ keys, label: meta.label });
     }
-    const columns = balanceCategories(byCategory, COLUMNS);
     listEl2 = document.createElement("div");
     listEl2.className = "jari-help-list";
-    const grid = document.createElement("div");
-    grid.className = "jari-help-columns";
-    for (const col of columns) {
-      const colEl = document.createElement("div");
-      colEl.className = "jari-help-column";
-      for (const cat of col) {
-        const entries = byCategory.get(cat.id);
-        if (!entries || entries.length === 0) continue;
-        colEl.appendChild(
-          ui.buildCategoryTable(cat, "jari-help-cat-header", (tbody) => {
-            for (const { keys, label } of entries) {
-              const tr = document.createElement("tr");
-              const keyTd = document.createElement("td");
-              keyTd.className = "jari-help-key";
-              keyTd.textContent = keys.join(", ");
-              const labelTd = document.createElement("td");
-              labelTd.className = "jari-help-label";
-              labelTd.textContent = label;
-              tr.appendChild(keyTd);
-              tr.appendChild(labelTd);
-              tbody.appendChild(tr);
-            }
-          })
-        );
-      }
-      grid.appendChild(colEl);
-    }
-    listEl2.appendChild(grid);
+    listEl2.appendChild(
+      ui.buildCategorizedGrid(byCategory, {
+        columnCount: COLUMNS,
+        gridClass: "jari-help-columns",
+        columnClass: "jari-help-column",
+        headerClass: "jari-help-cat-header",
+        renderEntries(tbody, entries) {
+          for (const { keys, label } of entries) {
+            const tr = document.createElement("tr");
+            const keyTd = document.createElement("td");
+            keyTd.className = "jari-help-key";
+            keyTd.textContent = keys.join(", ");
+            const labelTd = document.createElement("td");
+            labelTd.className = "jari-help-label";
+            labelTd.textContent = label;
+            tr.appendChild(keyTd);
+            tr.appendChild(labelTd);
+            tbody.appendChild(tr);
+          }
+        }
+      })
+    );
     overlay2.appendChild(listEl2);
     const footer = document.createElement("div");
     footer.className = "jari-help-footer";

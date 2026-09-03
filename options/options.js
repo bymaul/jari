@@ -1,5 +1,4 @@
 import {
-  balanceCategories,
   canonicalKey,
   keymapDefaults,
   modifierKeys,
@@ -79,43 +78,37 @@ function renderKeymap() {
     return;
   }
 
-  const columns = balanceCategories(byCategory, 3);
+  tableEl.appendChild(
+    ui.buildCategorizedGrid(byCategory, {
+      columnCount: 3,
+      gridClass: "jari-keymap-columns",
+      columnClass: "jari-keymap-column",
+      headerClass: "cat-header",
+      renderEntries(tbody, entries) {
+        for (const [name, cmd] of entries) {
+          const row = document.createElement("tr");
+          row.dataset.command = name;
 
-  const grid = document.createElement("div");
-  grid.className = "jari-keymap-columns";
-  for (const cats of columns) {
-    const col = document.createElement("div");
-    col.className = "jari-keymap-column";
-    for (const cat of cats) {
-      col.appendChild(
-        ui.buildCategoryTable(cat, "cat-header", (tbody) => {
-          for (const [name, cmd] of byCategory.get(cat.id)) {
-            const row = document.createElement("tr");
-            row.dataset.command = name;
+          const labelTd = document.createElement("td");
+          labelTd.textContent = cmd.label;
 
-            const labelTd = document.createElement("td");
-            labelTd.textContent = cmd.label;
+          const keyTd = document.createElement("td");
+          const input = document.createElement("input");
+          input.type = "text";
+          input.readOnly = true;
+          input.value = keyFor(name);
+          input.title =
+            "Click, then press a key to rebind. Backspace clears.";
+          input.addEventListener("focus", () => startRecording(input, name));
 
-            const keyTd = document.createElement("td");
-            const input = document.createElement("input");
-            input.type = "text";
-            input.readOnly = true;
-            input.value = keyFor(name);
-            input.title =
-              "Click, then press a key to rebind. Backspace clears.";
-            input.addEventListener("focus", () => startRecording(input, name));
-
-            keyTd.appendChild(input);
-            row.appendChild(labelTd);
-            row.appendChild(keyTd);
-            tbody.appendChild(row);
-          }
-        }),
-      );
-    }
-    grid.appendChild(col);
-  }
-  tableEl.appendChild(grid);
+          keyTd.appendChild(input);
+          row.appendChild(labelTd);
+          row.appendChild(keyTd);
+          tbody.appendChild(row);
+        }
+      },
+    }),
+  );
   refreshKeyLabels();
 }
 

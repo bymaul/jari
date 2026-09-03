@@ -1,4 +1,3 @@
-import { balanceCategories } from "./keymap.js";
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { COMMAND_CATALOG } from "./catalog.js";
@@ -49,38 +48,30 @@ function render() {
     byCategory.get(id).push({ keys, label: meta.label });
   }
 
-  const columns = balanceCategories(byCategory, COLUMNS);
-
   listEl = document.createElement('div');
   listEl.className = 'jari-help-list';
-  const grid = document.createElement('div');
-  grid.className = 'jari-help-columns';
-  for (const col of columns) {
-    const colEl = document.createElement('div');
-    colEl.className = 'jari-help-column';
-    for (const cat of col) {
-      const entries = byCategory.get(cat.id);
-      if (!entries || entries.length === 0) continue;
-      colEl.appendChild(
-        ui.buildCategoryTable(cat, 'jari-help-cat-header', (tbody) => {
-          for (const { keys, label } of entries) {
-            const tr = document.createElement('tr');
-            const keyTd = document.createElement('td');
-            keyTd.className = 'jari-help-key';
-            keyTd.textContent = keys.join(', ');
-            const labelTd = document.createElement('td');
-            labelTd.className = 'jari-help-label';
-            labelTd.textContent = label;
-            tr.appendChild(keyTd);
-            tr.appendChild(labelTd);
-            tbody.appendChild(tr);
-          }
-        }),
-      );
-    }
-    grid.appendChild(colEl);
-  }
-  listEl.appendChild(grid);
+  listEl.appendChild(
+    ui.buildCategorizedGrid(byCategory, {
+      columnCount: COLUMNS,
+      gridClass: 'jari-help-columns',
+      columnClass: 'jari-help-column',
+      headerClass: 'jari-help-cat-header',
+      renderEntries(tbody, entries) {
+        for (const { keys, label } of entries) {
+          const tr = document.createElement('tr');
+          const keyTd = document.createElement('td');
+          keyTd.className = 'jari-help-key';
+          keyTd.textContent = keys.join(', ');
+          const labelTd = document.createElement('td');
+          labelTd.className = 'jari-help-label';
+          labelTd.textContent = label;
+          tr.appendChild(keyTd);
+          tr.appendChild(labelTd);
+          tbody.appendChild(tr);
+        }
+      },
+    }),
+  );
   overlay.appendChild(listEl);
 
   const footer = document.createElement('div');

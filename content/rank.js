@@ -106,11 +106,30 @@ function bestAlignment(term, t, text) {
   return best;
 }
 
-export function fuzzyMatch(query, text) {
+function matchPreamble(query, text) {
   const { include, exclude, phrases } = parseQuery(query);
-  if (include.length === 0 && phrases.length === 0) return null;
   const t = normalizeForMatch(text);
-  for (const ex of exclude) if (t.includes(ex)) return null;
+  if (exclude.some((ex) => t.includes(ex))) return null;
+  return { include, phrases, t };
+}
+
+function collectPhraseIndices(phrases, t, indices) {
+  for (const ph of phrases) {
+    if (!t.includes(ph)) return false;
+    let idx = t.indexOf(ph);
+    while (idx !== -1) {
+      for (let i = idx; i < idx + ph.length; i++) indices.push(i);
+      idx = t.indexOf(ph, idx + 1);
+    }
+  }
+  return true;
+}
+
+export function fuzzyMatch(query, text) {
+  const pre = matchPreamble(query, text);
+  if (!pre) return null;
+  const { include, phrases, t } = pre;
+  if (include.length === 0 && phrases.length === 0) return null;
   for (const ph of phrases) if (!t.includes(ph)) return null;
   const results = include.map((term) => bestAlignment(term, t, text));
   if (results.some((r) => !r)) return null;
@@ -132,45 +151,32 @@ export function fuzzyMatch(query, text) {
 }
 
 export function fuzzyIndices(query, text) {
-  const { include, exclude, phrases } = parseQuery(query);
-  const t = normalizeForMatch(text);
-  for (const ex of exclude) if (t.includes(ex)) return [];
+  const pre = matchPreamble(query, text);
+  if (!pre) return [];
+  const { include, phrases, t } = pre;
   const indices = [];
-  for (const ph of phrases) {
-    if (!t.includes(ph)) return [];
-    let idx = t.indexOf(ph);
-    while (idx !== -1) {
-      for (let i = idx; i < idx + ph.length; i++) indices.push(i);
-      idx = t.indexOf(ph, idx + 1);
-    }
-  }
+  if (!collectPhraseIndices(phrases, t, indices)) return [];
   const results = include.map((term) => bestAlignment(term, t, text));
   for (const r of results) if (r) indices.push(...r.indices);
   return indices.sort((a, b) => a - b);
 }
 
 export function substringMatch(query, text) {
-  const { include, exclude, phrases } = parseQuery(query);
+  const pre = matchPreamble(query, text);
+  if (!pre) return false;
+  const { include, phrases, t } = pre;
   if (include.length === 0 && phrases.length === 0) return false;
-  const t = normalizeForMatch(text);
-  if (exclude.some((ex) => t.includes(ex))) return false;
   if (phrases.some((ph) => !t.includes(ph))) return false;
   return include.every((term) => t.includes(term));
 }
 export function substringIndices(query, text) {
-  const { include, exclude, phrases } = parseQuery(query);
+  const pre = matchPreamble(query, text);
+  if (!pre) return [];
+  const { include, phrases, t } = pre;
   if (include.length === 0 && phrases.length === 0) return [];
-  const t = normalizeForMatch(text);
-  if (exclude.some((ex) => t.includes(ex))) return [];
   if (phrases.some((ph) => !t.includes(ph))) return [];
   const indices = [];
-  for (const ph of phrases) {
-    let idx = t.indexOf(ph);
-    while (idx !== -1) {
-      for (let i = idx; i < idx + ph.length; i++) indices.push(i);
-      idx = t.indexOf(ph, idx + 1);
-    }
-  }
+  collectPhraseIndices(phrases, t, indices);
   for (const term of include) {
     let idx = t.indexOf(term);
     while (idx !== -1) {
@@ -180,16 +186,16 @@ export function substringIndices(query, text) {
   }
   return [...new Set(indices)].sort((a, b) => a - b);
 }
+function fieldBoost(query, field, base, weight) {
+  if (!field) return 0;
+  const m = fuzzyMatch(query, field);
+  return m ? base + m.score * weight : 0;
+}
 function titleBoost(query, item) {
-  if (!item.title) return 0;
-  const m = fuzzyMatch(query, item.title);
-  return m ? 8 + m.score * 0.15 : 0;
+  return fieldBoost(query, item.title, 8, 0.15);
 }
 function hostBoost(query, item) {
-  const host = extractHost(item.url || "");
-  if (!host) return 0;
-  const m = fuzzyMatch(query, host);
-  return m ? 6 + m.score * 0.1 : 0;
+  return fieldBoost(query, extractHost(item.url || ""), 6, 0.1);
 }
 function recencyScore(item) {
   const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
