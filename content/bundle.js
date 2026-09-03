@@ -21,7 +21,7 @@
     h: "scrollLeft",
     l: "scrollRight",
     G: "scrollBottom",
-    w: "showScrollArea",
+    w: "cycleScrollFrame",
     "+": "zoomIn",
     "-": "zoomOut",
     t: "omnibar",
@@ -57,8 +57,6 @@
     gu: "goUp",
     gU: "goToRoot",
     ge: "editUrl",
-    gs: "cycleScrollArea",
-    gS: "resetScrollArea",
     g0: "firstTab",
     g$: "lastTab",
     ";e": "openOptions",
@@ -156,8 +154,17 @@
     const d = data || {};
     const storedKeymap = {};
     for (const [key, command] of Object.entries(d.keymap || {})) {
-      storedKeymap[key] = command;
+      if (command === "cycleScrollArea") {
+        storedKeymap[key] = "cycleScrollFrame";
+      } else if (command === "showScrollArea" || command === "resetScrollArea") {
+        if (key === "w") storedKeymap[key] = "cycleScrollFrame";
+        continue;
+      } else {
+        storedKeymap[key] = command;
+      }
     }
+    if (storedKeymap[";s"] === "cycleScrollFrame") delete storedKeymap[";s"];
+    if (storedKeymap[";S"] === "cycleScrollFrame") delete storedKeymap[";S"];
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
     for (const key of prefixKeys) delete keymap[key];
     return {
@@ -637,6 +644,8 @@
   var scanEpoch = 0;
   var cachedEpoch = -1;
   var cachedAreas = null;
+  var cachedFrames = null;
+  var cachedFramesEpoch = -1;
   var mutationTimeout = null;
   function invalidateScrollCache() {
     if (mutationTimeout) {
@@ -712,6 +721,67 @@
     cachedAreas = areas;
     return areas;
   }
+  function findFrameElements() {
+    if (cachedFramesEpoch === scanEpoch && cachedFrames) return cachedFrames;
+    cachedFramesEpoch = scanEpoch;
+    const frames = [];
+    for (const el of queryAll("iframe,frame", ensureObserved)) {
+      try {
+        if (el.closest && el.closest(overlaySelectors)) continue;
+      } catch {
+      }
+      let rect;
+      try {
+        rect = el.getBoundingClientRect();
+      } catch {
+        continue;
+      }
+      if (!rect) continue;
+      if (rect.width < MIN_SCROLL_AREA_SIZE || rect.height < MIN_SCROLL_AREA_SIZE)
+        continue;
+      if (!isScrollVisible(el)) continue;
+      const vw = window.innerWidth || 0;
+      const vh = window.innerHeight || 0;
+      if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
+        continue;
+      frames.push(el);
+    }
+    cachedFrames = frames;
+    return frames;
+  }
+  function isFrame(el) {
+    if (!el || el === window) return false;
+    const tag = el.tagName;
+    return tag === "IFRAME" || tag === "FRAME";
+  }
+  function focusTarget(el) {
+    if (!el || el === window) return;
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+    }
+    if (!isFrame(el)) return;
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      try {
+        el.focus();
+      } catch {
+      }
+    }
+    try {
+      const win = el.contentWindow;
+      if (win && typeof win.focus === "function") win.focus();
+    } catch {
+    }
+  }
+  function frameWindow(frame) {
+    try {
+      return frame.contentWindow || null;
+    } catch {
+      return null;
+    }
+  }
   function pageCanScroll() {
     const el = document.scrollingElement || document.documentElement;
     if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
@@ -746,8 +816,9 @@
   }
   function cycle() {
     const areas = findScrollableElements();
+    const frames = findFrameElements();
     const pageScrolls = pageCanScroll();
-    const stops = pageScrolls ? [null, ...areas] : areas;
+    const stops = pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames];
     if (stops.length === 0) {
       target = null;
       ui.toast("No scroll areas");
@@ -755,28 +826,14 @@
     }
     const idx = stops.indexOf(target);
     if (idx === -1) {
-      target = pageScrolls ? null : nearestArea(areas) || areas[0];
+      target = pageScrolls ? null : nearestArea(stops) || stops[0];
     } else if (pageScrolls && idx === 0) {
-      target = nearestArea(areas) || areas[0] || null;
+      target = nearestArea(areas) || areas[0] || frames[0] || null;
     } else {
       target = stops[(idx + 1) % stops.length];
     }
     autoPicked = false;
-    showHighlight();
-  }
-  function resetToGlobal() {
-    if (pageCanScroll()) {
-      target = null;
-    } else {
-      const areas = findScrollableElements();
-      if (areas.length === 0) {
-        target = null;
-        ui.toast("No scroll areas");
-        return;
-      }
-      target = nearestArea(areas) || areas[0];
-    }
-    autoPicked = false;
+    focusTarget(target);
     showHighlight();
   }
   function scrollHeightOf(el) {
@@ -794,8 +851,10 @@
     let area = getTarget();
     if (area === window && !pageCanScroll()) {
       const areas = findScrollableElements();
-      if (areas.length === 0) return;
-      target = nearestArea(areas) || areas[0];
+      const frames = findFrameElements();
+      const stops = [...areas, ...frames];
+      if (stops.length === 0) return;
+      target = nearestArea(areas) || areas[0] || frames[0];
       autoPicked = false;
       area = target;
     }
@@ -815,7 +874,7 @@
     el.style.height = rect.height + "px";
     const label = document.createElement("span");
     label.className = "jari-scroll-highlight-label";
-    label.textContent = area === window ? "global scroll" : "current scroll area";
+    label.textContent = area === window ? "global scroll" : isFrame(area) ? "frame" : "current scroll area";
     el.appendChild(label);
     document.body.appendChild(el);
     highlightEl = el;
@@ -826,7 +885,7 @@
       }
     }, HIGHLIGHT_MS);
   }
-  var Scroll = { getTarget, cycle, resetToGlobal, showHighlight };
+  var Scroll = { getTarget, cycle, showHighlight };
 
   // content/rank.js
   var SCORE_BASE = 2;
@@ -1494,9 +1553,7 @@
     scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-    cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas" },
-    resetScrollArea: { category: "scrolling", label: "Reset to page scroll" },
-    showScrollArea: { category: "scrolling", label: "Show scroll area" },
+    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
     zoomIn: { category: "view", label: "Zoom in" },
     zoomOut: { category: "view", label: "Zoom out" },
     newTab: { category: "tabs", label: "New tab" },
@@ -1686,6 +1743,12 @@
   // content/hints-elements.js
   var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
   var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
+  var FRAME_SELECTOR = "iframe,frame";
+  function isFrameElement(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "IFRAME" || tag === "FRAME";
+  }
   function isEditable(el) {
     if (!el) return false;
     const tag = el.tagName;
@@ -1806,6 +1869,23 @@
       }
       if (isElementClickable(e)) v.push(e);
     });
+    for (const frame of getFrameElements()) {
+      if (!elements2.includes(frame)) elements2.push(frame);
+    }
+    elements2 = filterOverlapElements(elements2);
+    return elements2;
+  }
+  function getFrameElements() {
+    const raw = queryAll(FRAME_SELECTOR);
+    const out = [];
+    for (const el of raw) {
+      try {
+        if (el.closest && el.closest(overlaySelectors)) continue;
+      } catch {
+      }
+      out.push(el);
+    }
+    let elements2 = filterInvisibleElements(out);
     elements2 = filterOverlapElements(elements2);
     return elements2;
   }
@@ -2016,6 +2096,22 @@
       }
     }
     safeFocus(el, { preventScroll: true });
+  }
+  function focusFrame(el) {
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+    }
+    safeFocus(el, { preventScroll: true });
+    try {
+      const win = el.contentWindow;
+      if (win && typeof win.focus === "function") win.focus();
+    } catch {
+    }
+    try {
+      ui.toast("Focused frame");
+    } catch {
+    }
   }
   function focusInput(el) {
     try {
@@ -2376,17 +2472,20 @@
   }
   function activate2(el) {
     if (mode2 === "click") {
-      if (isEditable(el)) focusInput(el);
+      if (isFrameElement(el)) focusFrame(el);
+      else if (isEditable(el)) focusInput(el);
       else dispatchClick(el);
       handleActivationEnd();
     } else if (mode2 === "open") {
       const url = getHref(el);
       if (url) sendMessage("openInForegroundTab", { url });
+      else if (isFrameElement(el)) focusFrame(el);
       else dispatchClick(el);
       handleActivationEnd();
     } else if (mode2 === "openBackground") {
       const url = getHref(el);
       if (url) sendMessage("openInBackgroundTab", { url });
+      else if (isFrameElement(el)) focusFrame(el);
       handleActivationEnd();
     } else if (mode2 === "input") {
       focusInput(el);
@@ -5434,8 +5533,52 @@
     else smoothState.y = 0;
     smoothState.rafId = requestAnimationFrame(smoothScrollStep);
   }
+  function frameViewportHeight(frame) {
+    const w = frameWindow(frame);
+    try {
+      if (w && Number.isFinite(w.innerHeight)) return w.innerHeight;
+    } catch {
+    }
+    return clientHeightOf(frame);
+  }
+  function scrollFrameBy(frame, x, y) {
+    const w = frameWindow(frame);
+    if (w) {
+      try {
+        w.scrollBy({ left: x, top: y, behavior: "instant" });
+        return true;
+      } catch {
+      }
+    }
+    focusTarget(frame);
+    try {
+      frame.scrollBy({ left: x, top: y, behavior: "instant" });
+    } catch {
+    }
+    return false;
+  }
+  function scrollFrameTo(frame, top) {
+    const w = frameWindow(frame);
+    if (w) {
+      try {
+        w.scrollTo({ top, behavior: "instant" });
+        return true;
+      } catch {
+      }
+    }
+    focusTarget(frame);
+    try {
+      frame.scrollTo({ top, behavior: "instant" });
+    } catch {
+    }
+    return false;
+  }
   function scrollBy({ x = 0, y = 0, count = 1 }) {
     const el = getScrollElement();
+    if (isFrame(el)) {
+      scrollFrameBy(el, x * count, y * count);
+      return;
+    }
     if (settings.isSmoothScroll() && !prefersReducedMotion()) {
       smoothScrollBy(el, x * count, y * count);
     } else {
@@ -5474,6 +5617,10 @@ ${location.href}`;
       ...COMMAND_CATALOG.scrollTop,
       run: () => {
         const el = getScrollElement();
+        if (isFrame(el)) {
+          scrollFrameTo(el, 0);
+          return;
+        }
         if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
         else el.scrollTo({ top: 0, behavior: "instant" });
       }
@@ -5482,6 +5629,22 @@ ${location.href}`;
       ...COMMAND_CATALOG.scrollBottom,
       run: () => {
         const el = getScrollElement();
+        if (isFrame(el)) {
+          const w = frameWindow(el);
+          let target3;
+          try {
+            if (w) {
+              const doc = w.document.scrollingElement || w.document.documentElement;
+              target3 = Math.max(0, doc.scrollHeight - w.innerHeight);
+            } else {
+              target3 = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
+            }
+          } catch {
+            target3 = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
+          }
+          scrollFrameTo(el, target3);
+          return;
+        }
         const target2 = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
         if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target2 - scrollPosOf(el).y);
         else el.scrollTo({ top: target2, behavior: "instant" });
@@ -5489,23 +5652,37 @@ ${location.href}`;
     },
     scrollPageDown: {
       ...COMMAND_CATALOG.scrollPageDown,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count })
+      run: (c) => {
+        const el = getScrollElement();
+        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+        scrollBy({ y: h * PAGE_RATIO, count: c.count });
+      }
     },
     scrollPageUp: {
       ...COMMAND_CATALOG.scrollPageUp,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count })
+      run: (c) => {
+        const el = getScrollElement();
+        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+        scrollBy({ y: -h * PAGE_RATIO, count: c.count });
+      }
     },
     scrollHalfPageDown: {
       ...COMMAND_CATALOG.scrollHalfPageDown,
-      run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count })
+      run: (c) => {
+        const el = getScrollElement();
+        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+        scrollBy({ y: h * HALF_RATIO, count: c.count });
+      }
     },
     scrollHalfPageUp: {
       ...COMMAND_CATALOG.scrollHalfPageUp,
-      run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count })
+      run: (c) => {
+        const el = getScrollElement();
+        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+        scrollBy({ y: -h * HALF_RATIO, count: c.count });
+      }
     },
-    cycleScrollArea: { ...COMMAND_CATALOG.cycleScrollArea, run: () => Scroll.cycle() },
-    resetScrollArea: { ...COMMAND_CATALOG.resetScrollArea, run: () => Scroll.resetToGlobal() },
-    showScrollArea: { ...COMMAND_CATALOG.showScrollArea, run: () => Scroll.showHighlight() },
+    cycleScrollFrame: { ...COMMAND_CATALOG.cycleScrollFrame, run: () => Scroll.cycle() },
     zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
     newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },

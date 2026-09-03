@@ -5,6 +5,13 @@ export const CLICKABLE_SELECTOR =
   "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
 export const INPUT_SELECTOR =
   'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
+export const FRAME_SELECTOR = "iframe,frame";
+
+export function isFrameElement(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "IFRAME" || tag === "FRAME";
+}
 
 export function isEditable(el) {
   if (!el) return false;
@@ -173,6 +180,23 @@ export function getClickableElements() {
     } catch {}
     if (isElementClickable(e)) v.push(e);
   });
+  for (const frame of getFrameElements()) {
+    if (!elements.includes(frame)) elements.push(frame);
+  }
+  elements = filterOverlapElements(elements);
+  return elements;
+}
+
+export function getFrameElements() {
+  const raw = queryAll(FRAME_SELECTOR);
+  const out = [];
+  for (const el of raw) {
+    try {
+      if (el.closest && el.closest(overlaySelectors)) continue;
+    } catch {}
+    out.push(el);
+  }
+  let elements = filterInvisibleElements(out);
   elements = filterOverlapElements(elements);
   return elements;
 }

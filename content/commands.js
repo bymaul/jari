@@ -1,7 +1,7 @@
 import { Url } from "../shared/url.js";
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
-import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf } from "./scroll.js";
+import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, focusTarget } from "./scroll.js";
 import { Prompt } from "./prompt.js";
 import { Help } from "./help.js";
 import { Hints } from "./hints.js";
@@ -80,8 +80,50 @@ function smoothScrollStep() {
   smoothState.rafId = requestAnimationFrame(smoothScrollStep);
 }
 
+function frameViewportHeight(frame) {
+  const w = frameWindow(frame);
+  try {
+    if (w && Number.isFinite(w.innerHeight)) return w.innerHeight;
+  } catch {}
+  return clientHeightOf(frame);
+}
+
+function scrollFrameBy(frame, x, y) {
+  const w = frameWindow(frame);
+  if (w) {
+    try {
+      w.scrollBy({ left: x, top: y, behavior: "instant" });
+      return true;
+    } catch {}
+  }
+  focusTarget(frame);
+  try {
+    frame.scrollBy({ left: x, top: y, behavior: "instant" });
+  } catch {}
+  return false;
+}
+
+function scrollFrameTo(frame, top) {
+  const w = frameWindow(frame);
+  if (w) {
+    try {
+      w.scrollTo({ top, behavior: "instant" });
+      return true;
+    } catch {}
+  }
+  focusTarget(frame);
+  try {
+    frame.scrollTo({ top, behavior: "instant" });
+  } catch {}
+  return false;
+}
+
 function scrollBy({ x = 0, y = 0, count = 1 }) {
   const el = getScrollElement();
+  if (isFrame(el)) {
+    scrollFrameBy(el, x * count, y * count);
+    return;
+  }
   if (settings.isSmoothScroll() && !prefersReducedMotion()) {
     smoothScrollBy(el, x * count, y * count);
   } else {
@@ -125,6 +167,10 @@ export const commands = {
     ...COMMAND_CATALOG.scrollTop,
     run: () => {
       const el = getScrollElement();
+      if (isFrame(el)) {
+        scrollFrameTo(el, 0);
+        return;
+      }
       if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
       else el.scrollTo({ top: 0, behavior: "instant" });
     },
@@ -133,6 +179,22 @@ export const commands = {
     ...COMMAND_CATALOG.scrollBottom,
     run: () => {
       const el = getScrollElement();
+      if (isFrame(el)) {
+        const w = frameWindow(el);
+        let target;
+        try {
+          if (w) {
+            const doc = w.document.scrollingElement || w.document.documentElement;
+            target = Math.max(0, doc.scrollHeight - w.innerHeight);
+          } else {
+            target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
+          }
+        } catch {
+          target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
+        }
+        scrollFrameTo(el, target);
+        return;
+      }
       const target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
       if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target - scrollPosOf(el).y);
       else el.scrollTo({ top: target, behavior: "instant" });
@@ -140,23 +202,37 @@ export const commands = {
   },
   scrollPageDown: {
     ...COMMAND_CATALOG.scrollPageDown,
-    run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count }),
+    run: (c) => {
+      const el = getScrollElement();
+      const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+      scrollBy({ y: h * PAGE_RATIO, count: c.count });
+    },
   },
   scrollPageUp: {
     ...COMMAND_CATALOG.scrollPageUp,
-    run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * PAGE_RATIO, count: c.count }),
+    run: (c) => {
+      const el = getScrollElement();
+      const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+      scrollBy({ y: -h * PAGE_RATIO, count: c.count });
+    },
   },
   scrollHalfPageDown: {
     ...COMMAND_CATALOG.scrollHalfPageDown,
-    run: (c) => scrollBy({ y: clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
+    run: (c) => {
+      const el = getScrollElement();
+      const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+      scrollBy({ y: h * HALF_RATIO, count: c.count });
+    },
   },
   scrollHalfPageUp: {
     ...COMMAND_CATALOG.scrollHalfPageUp,
-    run: (c) => scrollBy({ y: -clientHeightOf(getScrollElement()) * HALF_RATIO, count: c.count }),
+    run: (c) => {
+      const el = getScrollElement();
+      const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+      scrollBy({ y: -h * HALF_RATIO, count: c.count });
+    },
   },
-  cycleScrollArea: { ...COMMAND_CATALOG.cycleScrollArea, run: () => Scroll.cycle() },
-  resetScrollArea: { ...COMMAND_CATALOG.resetScrollArea, run: () => Scroll.resetToGlobal() },
-  showScrollArea: { ...COMMAND_CATALOG.showScrollArea, run: () => Scroll.showHighlight() },
+  cycleScrollFrame: { ...COMMAND_CATALOG.cycleScrollFrame, run: () => Scroll.cycle() },
   zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
   zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
 

@@ -20,7 +20,7 @@
     h: "scrollLeft",
     l: "scrollRight",
     G: "scrollBottom",
-    w: "showScrollArea",
+    w: "cycleScrollFrame",
     "+": "zoomIn",
     "-": "zoomOut",
     t: "omnibar",
@@ -56,8 +56,6 @@
     gu: "goUp",
     gU: "goToRoot",
     ge: "editUrl",
-    gs: "cycleScrollArea",
-    gS: "resetScrollArea",
     g0: "firstTab",
     g$: "lastTab",
     ";e": "openOptions",
@@ -129,8 +127,17 @@
     const d = data || {};
     const storedKeymap = {};
     for (const [key, command] of Object.entries(d.keymap || {})) {
-      storedKeymap[key] = command;
+      if (command === "cycleScrollArea") {
+        storedKeymap[key] = "cycleScrollFrame";
+      } else if (command === "showScrollArea" || command === "resetScrollArea") {
+        if (key === "w") storedKeymap[key] = "cycleScrollFrame";
+        continue;
+      } else {
+        storedKeymap[key] = command;
+      }
     }
+    if (storedKeymap[";s"] === "cycleScrollFrame") delete storedKeymap[";s"];
+    if (storedKeymap[";S"] === "cycleScrollFrame") delete storedKeymap[";S"];
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
     for (const key of prefixKeys) delete keymap[key];
     return {
@@ -191,9 +198,7 @@
     scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-    cycleScrollArea: { category: "scrolling", label: "Cycle nested scroll areas" },
-    resetScrollArea: { category: "scrolling", label: "Reset to page scroll" },
-    showScrollArea: { category: "scrolling", label: "Show scroll area" },
+    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
     zoomIn: { category: "view", label: "Zoom in" },
     zoomOut: { category: "view", label: "Zoom out" },
     newTab: { category: "tabs", label: "New tab" },

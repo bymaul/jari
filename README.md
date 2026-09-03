@@ -21,9 +21,7 @@ block caret and hints - every key rebindable from the options page.
 - `h` / `l` - scroll left / right
 - `gg` - scroll to top
 - `G` - scroll to bottom
-- `w` - show scroll area
-- `gs` - cycle nested scroll areas
-- `gS` - reset to page scroll
+- `w` - cycle scroll area / frame (focuses frames, so `j`/`k` and `f` then work inside)
 
 ### View & Zoom
 

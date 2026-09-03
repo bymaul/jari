@@ -36,6 +36,8 @@ function getTarget() {
 let scanEpoch = 0;
 let cachedEpoch = -1;
 let cachedAreas = null;
+let cachedFrames = null;
+let cachedFramesEpoch = -1;
 let mutationTimeout = null;
 
 function invalidateScrollCache() {
@@ -132,6 +134,70 @@ function findScrollableElements() {
   return areas;
 }
 
+function findFrameElements() {
+  if (cachedFramesEpoch === scanEpoch && cachedFrames) return cachedFrames;
+  cachedFramesEpoch = scanEpoch;
+  const frames = [];
+  for (const el of queryAll("iframe,frame", ensureObserved)) {
+    try {
+      if (el.closest && el.closest(overlaySelectors)) continue;
+    } catch {}
+    let rect;
+    try {
+      rect = el.getBoundingClientRect();
+    } catch {
+      continue;
+    }
+    if (!rect) continue;
+    if (
+      rect.width < MIN_SCROLL_AREA_SIZE ||
+      rect.height < MIN_SCROLL_AREA_SIZE
+    )
+      continue;
+    if (!isScrollVisible(el)) continue;
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
+      continue;
+    frames.push(el);
+  }
+  cachedFrames = frames;
+  return frames;
+}
+
+export function isFrame(el) {
+  if (!el || el === window) return false;
+  const tag = el.tagName;
+  return tag === "IFRAME" || tag === "FRAME";
+}
+
+export function focusTarget(el) {
+  if (!el || el === window) return;
+  try {
+    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  } catch {}
+  if (!isFrame(el)) return;
+  try {
+    el.focus({ preventScroll: true });
+  } catch {
+    try {
+      el.focus();
+    } catch {}
+  }
+  try {
+    const win = el.contentWindow;
+    if (win && typeof win.focus === "function") win.focus();
+  } catch {}
+}
+
+export function frameWindow(frame) {
+  try {
+    return frame.contentWindow || null;
+  } catch {
+    return null;
+  }
+}
+
 function pageCanScroll() {
   const el = document.scrollingElement || document.documentElement;
   if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
@@ -169,8 +235,9 @@ function nearestArea(areas) {
 
 function cycle() {
   const areas = findScrollableElements();
+  const frames = findFrameElements();
   const pageScrolls = pageCanScroll();
-  const stops = pageScrolls ? [null, ...areas] : areas;
+  const stops = pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames];
   if (stops.length === 0) {
     target = null;
     ui.toast("No scroll areas");
@@ -178,31 +245,14 @@ function cycle() {
   }
   const idx = stops.indexOf(target);
   if (idx === -1) {
-
-    target = pageScrolls ? null : nearestArea(areas) || areas[0];
+    target = pageScrolls ? null : nearestArea(stops) || stops[0];
   } else if (pageScrolls && idx === 0) {
-
-    target = nearestArea(areas) || areas[0] || null;
+    target = nearestArea(areas) || areas[0] || frames[0] || null;
   } else {
     target = stops[(idx + 1) % stops.length];
   }
   autoPicked = false;
-  showHighlight();
-}
-
-function resetToGlobal() {
-  if (pageCanScroll()) {
-    target = null;
-  } else {
-    const areas = findScrollableElements();
-    if (areas.length === 0) {
-      target = null;
-      ui.toast("No scroll areas");
-      return;
-    }
-    target = nearestArea(areas) || areas[0];
-  }
-  autoPicked = false;
+  focusTarget(target);
   showHighlight();
 }
 
@@ -228,10 +278,11 @@ let highlightTimer = null;
 function showHighlight() {
   let area = getTarget();
   if (area === window && !pageCanScroll()) {
-
     const areas = findScrollableElements();
-    if (areas.length === 0) return;
-    target = nearestArea(areas) || areas[0];
+    const frames = findFrameElements();
+    const stops = [...areas, ...frames];
+    if (stops.length === 0) return;
+    target = nearestArea(areas) || areas[0] || frames[0];
     autoPicked = false;
     area = target;
   }
@@ -256,7 +307,12 @@ function showHighlight() {
   el.style.height = rect.height + "px";
   const label = document.createElement("span");
   label.className = "jari-scroll-highlight-label";
-  label.textContent = area === window ? "global scroll" : "current scroll area";
+  label.textContent =
+    area === window
+      ? "global scroll"
+      : isFrame(area)
+        ? "frame"
+        : "current scroll area";
   el.appendChild(label);
   document.body.appendChild(el);
   highlightEl = el;
@@ -268,6 +324,6 @@ function showHighlight() {
   }, HIGHLIGHT_MS);
 }
 
-export const Scroll = { getTarget, cycle, resetToGlobal, showHighlight };
+export const Scroll = { getTarget, cycle, showHighlight };
 
 export { scrollHeightOf, clientHeightOf, scrollPosOf };

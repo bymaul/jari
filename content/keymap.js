@@ -16,7 +16,7 @@ export const keymapDefaults = {
   h: "scrollLeft",
   l: "scrollRight",
   G: "scrollBottom",
-  w: "showScrollArea",
+  w: "cycleScrollFrame",
   "+": "zoomIn",
   "-": "zoomOut",
 
@@ -61,8 +61,6 @@ export const keymapDefaults = {
   gu: "goUp",
   gU: "goToRoot",
   ge: "editUrl",
-  ";s": "cycleScrollArea",
-  ";S": "resetScrollArea",
   g0: "firstTab",
   g$: "lastTab",
   ";e": "openOptions",
@@ -180,8 +178,17 @@ export function normalizeSettings(data) {
   const d = data || {};
   const storedKeymap = {};
   for (const [key, command] of Object.entries(d.keymap || {})) {
-    storedKeymap[key] = command;
+    if (command === "cycleScrollArea") {
+      storedKeymap[key] = "cycleScrollFrame";
+    } else if (command === "showScrollArea" || command === "resetScrollArea") {
+      if (key === "w") storedKeymap[key] = "cycleScrollFrame";
+      continue;
+    } else {
+      storedKeymap[key] = command;
+    }
   }
+  if (storedKeymap[";s"] === "cycleScrollFrame") delete storedKeymap[";s"];
+  if (storedKeymap[";S"] === "cycleScrollFrame") delete storedKeymap[";S"];
   const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
   for (const key of prefixKeys) delete keymap[key];
   return {

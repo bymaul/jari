@@ -10,6 +10,7 @@ import {
   filterInvisibleElements,
   getRealRect,
   isElementClickable,
+  isFrameElement,
   filterAncestors,
   filterOverlapElements,
   getHref,
@@ -177,6 +178,20 @@ function dispatchClick(el) {
     } catch {}
   }
   safeFocus(el, { preventScroll: true });
+}
+
+function focusFrame(el) {
+  try {
+    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  } catch {}
+  safeFocus(el, { preventScroll: true });
+  try {
+    const win = el.contentWindow;
+    if (win && typeof win.focus === "function") win.focus();
+  } catch {}
+  try {
+    ui.toast("Focused frame");
+  } catch {}
 }
 
 function focusInput(el) {
@@ -564,17 +579,20 @@ function handleActivationEnd() {
 
 function activate(el) {
   if (mode === "click") {
-    if (isEditable(el)) focusInput(el);
+    if (isFrameElement(el)) focusFrame(el);
+    else if (isEditable(el)) focusInput(el);
     else dispatchClick(el);
     handleActivationEnd();
   } else if (mode === "open") {
     const url = getHref(el);
     if (url) sendMessage("openInForegroundTab", { url });
+    else if (isFrameElement(el)) focusFrame(el);
     else dispatchClick(el);
     handleActivationEnd();
   } else if (mode === "openBackground") {
     const url = getHref(el);
     if (url) sendMessage("openInBackgroundTab", { url });
+    else if (isFrameElement(el)) focusFrame(el);
     handleActivationEnd();
   } else if (mode === "input") {
     focusInput(el);
