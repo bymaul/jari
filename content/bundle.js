@@ -1090,6 +1090,45 @@
     }
     return clientHeightOf(frame);
   }
+  var CYCLE_FROM_FRAME = "jari-cycle-scroll";
+  function isTopFrame() {
+    try {
+      return window.top === window;
+    } catch {
+      return true;
+    }
+  }
+  function releaseFrameFocus() {
+    try {
+      const active6 = document.activeElement;
+      if (active6 && isFrame(active6)) active6.blur();
+    } catch {
+    }
+    try {
+      window.focus();
+    } catch {
+    }
+  }
+  function forwardCycleToTop() {
+    try {
+      window.top.postMessage({ type: CYCLE_FROM_FRAME }, "*");
+    } catch {
+    }
+    try {
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+    } catch {
+    }
+    try {
+      window.blur();
+    } catch {
+    }
+    try {
+      window.top.focus();
+    } catch {
+    }
+  }
   function pageCanScroll() {
     const el = document.scrollingElement || document.documentElement;
     if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
@@ -1123,10 +1162,16 @@
     return best;
   }
   function cycle() {
+    if (!isTopFrame()) {
+      forwardCycleToTop();
+      return;
+    }
     const areas = findScrollableElements();
     const frames = findFrameElements();
     const pageScrolls = pageCanScroll();
-    const stops = pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames];
+    const stops = [
+      ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames])
+    ];
     if (stops.length === 0) {
       target = null;
       ui.toast("No scroll areas");
@@ -1142,6 +1187,7 @@
     }
     autoPicked = false;
     focusTarget(target);
+    if (!isFrame(target)) releaseFrameFocus();
     showHighlight();
   }
   function scrollHeightOf(el) {
@@ -1194,6 +1240,17 @@
     }, HIGHLIGHT_MS);
   }
   var Scroll = { getTarget, cycle, showHighlight };
+  function handleCycleMessage(event) {
+    if (!isTopFrame()) return;
+    const data = event && event.data;
+    if (!data || data.type !== CYCLE_FROM_FRAME) return;
+    if (event.source === window) return;
+    cycle();
+  }
+  try {
+    window.addEventListener("message", handleCycleMessage);
+  } catch {
+  }
 
   // content/rank.js
   var SCORE_BASE = 2;
