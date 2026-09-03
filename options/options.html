@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jari — Settings</title>
     <link rel="stylesheet" href="options.css" />
-    <!-- content.css styles Jari's own UI (help overlay, showcmd) on
-         this page too. -->
     <link rel="stylesheet" href="../content/content.css" />
   </head>
   <body>
@@ -15,17 +13,20 @@
         <h1>Jari</h1>
         <p class="subtitle">Simple keyboard-driven navigation settings</p>
       </div>
+
+      <p id="save-state" role="status" aria-live="polite">All changes saved</p>
     </header>
 
     <main>
-      <details class="card">
-        <summary class="card-toggle"><span class="card-title">Scrolling</span></summary>
+      <details class="card" id="card-scrolling">
+        <summary class="card-toggle"><span class="card-title">Scrolling</span><span class="card-summary" id="summary-scrolling"></span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="scroll-step">Scroll step</label>
             <p class="helper">
               Distance per <code data-key="scrollDown"></code>/<code data-key="scrollUp"></code>/<code data-key="scrollLeft"></code>/<code data-key="scrollRight"></code> press.
             </p>
+            <p class="field-error" id="error-scroll-step" aria-live="polite" hidden></p>
           </div>
           <div class="setting-control">
             <input id="scroll-step" type="number" min="1" max="500" step="5" />
@@ -43,8 +44,8 @@
         </div>
       </details>
 
-      <details class="card">
-        <summary class="card-toggle"><span class="card-title">Search</span></summary>
+      <details class="card" id="card-search">
+        <summary class="card-toggle"><span class="card-title">Search</span><span class="card-summary" id="summary-search"></span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="fuzzy-matching">Fuzzy matching</label>
@@ -56,10 +57,10 @@
         </div>
         <div class="setting">
           <div class="setting-text">
-            <label>Suggestions</label>
+            <span class="setting-label" id="sources-label">Suggestions</span>
             <p class="helper">Sources shown under the typed query in <code data-key="openOmnibar"></code>.</p>
           </div>
-          <div class="setting-control setting-sources">
+          <div class="setting-control setting-sources" role="group" aria-labelledby="sources-label">
             <label class="check"><input id="source-tab" type="checkbox" /> Tabs</label>
             <label class="check"><input id="source-history" type="checkbox" /> History</label>
             <label class="check"><input id="source-bookmark" type="checkbox" /> Bookmarks</label>
@@ -67,8 +68,8 @@
         </div>
       </details>
 
-      <details class="card">
-        <summary class="card-toggle"><span class="card-title">Clipboard</span></summary>
+      <details class="card" id="card-clipboard">
+        <summary class="card-toggle"><span class="card-title">Clipboard</span><span class="card-summary" id="summary-clipboard"></span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="copy-format">Copy title + URL as</label>
@@ -83,12 +84,13 @@
         </div>
       </details>
 
-      <details class="card">
-        <summary class="card-toggle"><span class="card-title">Timing</span></summary>
+      <details class="card" id="card-timing">
+        <summary class="card-toggle"><span class="card-title">Timing</span><span class="card-summary" id="summary-timing"></span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="timeout">Sequence timeout</label>
             <p class="helper">How long a half-typed <code>g</code> prefix or count waits. 0 means no timeout.</p>
+            <p class="field-error" id="error-timeout" aria-live="polite" hidden></p>
           </div>
           <div class="setting-control">
             <input id="timeout" type="number" min="0" max="10000" step="100" />
@@ -99,6 +101,7 @@
           <div class="setting-text">
             <label for="passthrough-timeout">Passthrough duration</label>
             <p class="helper">How long <code data-key="passthroughKeys"></code> lets the page have the keys. 0 means no timeout.</p>
+            <p class="field-error" id="error-passthrough-timeout" aria-live="polite" hidden></p>
           </div>
           <div class="setting-control">
             <input id="passthrough-timeout" type="number" min="0" max="30000" step="100" />
@@ -118,6 +121,7 @@
           <div class="setting-text">
             <label for="clue-delay">Clue delay</label>
             <p class="helper">How long to wait after a prefix before showing the clue. 0 shows instantly.</p>
+            <p class="field-error" id="error-clue-delay" aria-live="polite" hidden></p>
           </div>
           <div class="setting-control">
             <input id="clue-delay" type="number" min="0" max="5000" step="50" />
@@ -126,21 +130,22 @@
         </div>
       </details>
 
-      <details class="card">
-        <summary class="card-toggle"><span class="card-title">Hints</span></summary>
+      <details class="card" id="card-hints">
+        <summary class="card-toggle"><span class="card-title">Hints</span><span class="card-summary" id="summary-hints"></span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="hint-chars">Hint characters</label>
             <p class="helper">Characters used to generate hint labels for <code data-key="hintClick"></code>/<code data-key="hintOpen"></code>/<code data-key="hintOpenBackground"></code>/<code data-key="hintInput"></code>. Must be at least 2 unique letters or digits.</p>
-          </div>
+            <p class="field-meta" id="hint-chars-meta" aria-live="polite"></p>
+            <p class="field-error" id="error-hint-chars" aria-live="polite" hidden></p>
           <div class="setting-control">
             <input id="hint-chars" type="text" autocomplete="off" spellcheck="false" placeholder="asdfgqwertzxcvb" />
           </div>
         </div>
       </details>
 
-      <details class="card" open>
-        <summary class="card-toggle"><span class="card-title">Keybindings</span></summary>
+      <details class="card" id="card-keybindings" open>
+        <summary class="card-toggle"><span class="card-title">Keybindings</span><span class="card-summary" id="summary-keybindings"></span></summary>
         <p class="helper">
           Click a key field (or focus it and press <code>Enter</code>), then press the key
           combination to bind it. <code>Esc</code> cancels, <code>Backspace</code> clears.
@@ -150,28 +155,31 @@
         </p>
         <div class="keymap-toolbar">
           <input id="keymap-filter" type="search" placeholder="Filter commands by name or key..." aria-label="Filter commands by name or key" />
+          <label class="check"><input id="keymap-unbound" type="checkbox" /> Unbound only</label>
+          <button id="reset-keys" type="button">Reset keys</button>
           <span id="keymap-count" class="keymap-count" aria-live="polite"></span>
         </div>
         <div id="keymap-table"></div>
-        <div class="actions">
-          <button id="save" type="button" class="primary">Save</button>
-          <button id="reset" type="button">Reset to defaults</button>
-          <span id="status" role="status" aria-live="polite"></span>
-        </div>
       </details>
 
-      <details class="card" open>
-        <summary class="card-toggle"><span class="card-title">Disabled sites</span></summary>
+      <details class="card" id="card-disabled" open>
+        <summary class="card-toggle"><span class="card-title">Disabled sites</span><span class="card-summary" id="summary-disabled"></span></summary>
         <p class="helper">
           Jari is turned off on these sites. Press
           <code data-key="toggleSiteEnabled"></code> on a page to toggle it there, or add a host here.
         </p>
         <div class="add-site">
-          <input id="disabled-site-input" type="text" placeholder="example.com" />
+          <input id="disabled-site-input" type="text" placeholder="example.com" aria-label="Add a disabled site host" />
           <button id="add-disabled-site" type="button">Add</button>
         </div>
+        <p class="field-error" id="site-error" aria-live="polite" hidden></p>
         <ul id="disabled-list"></ul>
       </details>
+
+      <div class="actions">
+        <button id="reset" type="button">Reset all to defaults</button>
+        <span id="status" role="status" aria-live="polite"></span>
+      </div>
     </main>
 
     <footer>
@@ -181,8 +189,6 @@
       </div>
     </footer>
 
-    <!-- The bundled content scripts are loaded here too so Jari works on the
-         settings page itself (scroll, help, ignore mode, ...). -->
     <script src="../content/bundle.js"></script>
     <script src="options.bundle.js"></script>
   </body>

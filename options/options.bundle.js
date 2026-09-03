@@ -565,9 +565,10 @@
 
   // options/options.js
   var tableEl = document.querySelector("#keymap-table");
-  var saveBtn = document.querySelector("#save");
   var resetBtn = document.querySelector("#reset");
+  var resetKeysBtn = document.querySelector("#reset-keys");
   var statusEl = document.querySelector("#status");
+  var saveStateEl = document.querySelector("#save-state");
   var disabledList = document.querySelector("#disabled-list");
   var scrollStepEl = document.querySelector("#scroll-step");
   var smoothScrollEl = document.querySelector("#smooth-scroll");
@@ -581,12 +582,147 @@
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
+  var hintCharsMetaEl = document.querySelector("#hint-chars-meta");
   var keymapFilterEl = document.querySelector("#keymap-filter");
+  var keymapUnboundEl = document.querySelector("#keymap-unbound");
   var keymapCountEl = document.querySelector("#keymap-count");
   var siteInputEl = document.querySelector("#disabled-site-input");
   var addSiteBtn = document.querySelector("#add-disabled-site");
+  var siteErrorEl = document.querySelector("#site-error");
+  var summaries = {
+    scrolling: document.querySelector("#summary-scrolling"),
+    search: document.querySelector("#summary-search"),
+    clipboard: document.querySelector("#summary-clipboard"),
+    timing: document.querySelector("#summary-timing"),
+    hints: document.querySelector("#summary-hints"),
+    keybindings: document.querySelector("#summary-keybindings"),
+    disabled: document.querySelector("#summary-disabled")
+  };
+  var cards = {
+    scrolling: document.querySelector("#card-scrolling"),
+    search: document.querySelector("#card-search"),
+    clipboard: document.querySelector("#card-clipboard"),
+    timing: document.querySelector("#card-timing"),
+    hints: document.querySelector("#card-hints"),
+    keybindings: document.querySelector("#card-keybindings"),
+    disabled: document.querySelector("#card-disabled")
+  };
   var IDLE_TITLE = "Click or press Enter, then press a key to rebind.";
   var RECORDING_TITLE = "Press a key to bind. Esc cancels, Backspace clears.";
+  var OPEN_KEY = "jari.options.open";
+  function setSaveState(mode, message) {
+    if (!saveStateEl) return;
+    saveStateEl.classList.remove("saving", "failed");
+    if (mode === "saving") {
+      saveStateEl.classList.add("saving");
+      saveStateEl.textContent = message || "Saving...";
+    } else if (mode === "failed") {
+      saveStateEl.classList.add("failed");
+      saveStateEl.textContent = message || "Save failed \u2014 will retry on next change";
+    } else {
+      saveStateEl.textContent = message || "All changes saved";
+    }
+  }
+  async function savePatch(patch) {
+    setSaveState("saving");
+    try {
+      await settings.update(patch);
+    } catch {
+      setSaveState("failed");
+      return false;
+    }
+    setSaveState("saved");
+    updateSummaries();
+    return true;
+  }
+  function showFieldError(id, message) {
+    const el = document.querySelector(`#${id}`);
+    if (!el) return;
+    el.textContent = message;
+    el.hidden = false;
+  }
+  function clearFieldError(id) {
+    const el = document.querySelector(`#${id}`);
+    if (!el) return;
+    el.textContent = "";
+    el.hidden = true;
+  }
+  function markInvalid(el, invalid) {
+    if (!el) return;
+    if (invalid) el.setAttribute("aria-invalid", "true");
+    else el.removeAttribute("aria-invalid");
+  }
+  function uniqueHintCount(raw) {
+    if (typeof raw !== "string") return 0;
+    return new Set(raw.toLowerCase().replace(/[^a-z0-9]/g, "")).size;
+  }
+  function updateHintMeta() {
+    if (!hintCharsMetaEl) return;
+    const n = uniqueHintCount(hintCharsEl.value);
+    hintCharsMetaEl.textContent = n === 0 ? "" : `${n} unique letter${n === 1 ? "" : "s"}/digit${n === 1 ? "" : "s"}`;
+  }
+  function countUnbound() {
+    rebuildKeyIndex();
+    let unbound = 0;
+    for (const name of Object.keys(COMMAND_CATALOG)) {
+      if (!keyByCommand.has(name)) unbound++;
+    }
+    return unbound;
+  }
+  function updateSummaries() {
+    if (summaries.scrolling) {
+      summaries.scrolling.textContent = `${settings.getScrollStep()}px \xB7 smooth ${settings.isSmoothScroll() ? "on" : "off"}`;
+    }
+    if (summaries.search) {
+      const n = settings.getSuggestionSources().length;
+      summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} \xB7 ${n} source${n === 1 ? "" : "s"}`;
+    }
+    if (summaries.clipboard) {
+      summaries.clipboard.textContent = settings.getCopyFormat() === "markdown" ? "Markdown link" : "Plain (title + URL)";
+    }
+    if (summaries.timing) {
+      const clue = settings.isClueEnabled() ? `${settings.getClueDelayMs()}ms` : "off";
+      summaries.timing.textContent = `timeout ${settings.getTimeoutMs()}ms \xB7 passthrough ${settings.getPassthroughMs()}ms \xB7 clue ${clue}`;
+    }
+    if (summaries.hints) {
+      const chars = settings.getHintChars();
+      summaries.hints.textContent = `${chars} (${chars.length})`;
+    }
+    if (summaries.keybindings) {
+      const total = Object.keys(COMMAND_CATALOG).length;
+      const unbound = countUnbound();
+      summaries.keybindings.textContent = unbound === 0 ? `${total} commands \xB7 all bound` : `${total - unbound}/${total} bound \xB7 ${unbound} unbound`;
+    }
+    if (summaries.disabled) {
+      const n = settings.getDisabledSites().length;
+      summaries.disabled.textContent = n === 0 ? "enabled everywhere" : `${n} site${n === 1 ? "" : "s"}`;
+    }
+  }
+  function restoreOpenState() {
+    try {
+      const stored = window.localStorage?.getItem(OPEN_KEY);
+      if (!stored) return;
+      const open = JSON.parse(stored);
+      if (!open || typeof open !== "object") return;
+      for (const [id, card] of Object.entries(cards)) {
+        if (!card || typeof open[id] !== "boolean") continue;
+        card.open = open[id];
+      }
+    } catch {
+    }
+  }
+  function persistOpenState() {
+    const open = {};
+    for (const [id, card] of Object.entries(cards)) {
+      if (!card) continue;
+      open[id] = card.open;
+    }
+    if (Object.keys(open).length === 0) return;
+    try {
+      window.localStorage.setItem(OPEN_KEY, JSON.stringify(open));
+    } catch {
+    }
+  }
   var activeRecording = null;
   function commandLabel(name) {
     return COMMAND_CATALOG[name]?.label || name;
@@ -606,8 +742,23 @@
     sourceBookmarkEl.checked = sources.includes("bookmark");
     copyFormatEl.value = settings.getCopyFormat();
     hintCharsEl.value = settings.getHintChars();
+    for (const el of [scrollStepEl, timeoutEl, passthroughEl, clueDelayEl, hintCharsEl, siteInputEl]) {
+      markInvalid(el, false);
+    }
+    for (const id of ["error-scroll-step", "error-timeout", "error-passthrough-timeout", "error-clue-delay", "error-hint-chars"]) {
+      clearFieldError(id);
+    }
+    if (siteErrorEl) {
+      siteErrorEl.textContent = "";
+      siteErrorEl.hidden = true;
+    }
+    updateHintMeta();
+    restoreOpenState();
     renderKeymap();
     renderDisabled();
+    updateSummaries();
+    setSaveState("saved");
+    updateAddButton();
   }
   function matchesFilter(name, cmd, filter) {
     return name.toLowerCase().includes(filter) || cmd.label.toLowerCase().includes(filter) || keyFor(name).toLowerCase().includes(filter);
@@ -618,10 +769,15 @@
     rebuildKeyIndex();
     const rawFilter = keymapFilterEl.value.trim();
     const filter = rawFilter.toLowerCase();
+    const unboundOnly = Boolean(keymapUnboundEl?.checked);
     const total = Object.keys(COMMAND_CATALOG).length;
     const byCategory = /* @__PURE__ */ new Map();
     let shown = 0;
+    let unboundTotal = 0;
     for (const [name, cmd] of Object.entries(COMMAND_CATALOG)) {
+      const bound = Boolean(keyFor(name));
+      if (!bound) unboundTotal++;
+      if (unboundOnly && bound) continue;
       const id = cmd.category || "other";
       if (filter && !matchesFilter(name, cmd, filter)) continue;
       shown++;
@@ -629,18 +785,20 @@
       byCategory.get(id).push([name, cmd]);
     }
     if (keymapCountEl) {
-      keymapCountEl.textContent = filter ? `${shown} of ${total} commands` : `${total} commands`;
+      const base = filter || unboundOnly ? `${shown} of ${total} commands` : `${total} commands`;
+      keymapCountEl.textContent = unboundTotal === 0 ? base : `${base} \xB7 ${unboundTotal} unbound`;
     }
     if (byCategory.size === 0) {
       const empty = document.createElement("div");
       empty.className = "jari-keymap-filter-empty";
       const msg = document.createElement("span");
-      msg.textContent = `No commands match "${rawFilter}". `;
+      msg.textContent = unboundOnly && !filter ? "Every command is bound. " : `No commands match "${rawFilter}". `;
       const clear = document.createElement("button");
       clear.type = "button";
-      clear.textContent = "Clear filter";
+      clear.textContent = unboundOnly && !filter ? "Show all" : "Clear filter";
       clear.addEventListener("click", () => {
         keymapFilterEl.value = "";
+        if (keymapUnboundEl) keymapUnboundEl.checked = false;
         renderKeymap();
         keymapFilterEl.focus();
       });
@@ -673,6 +831,7 @@
             input.dataset.command = name;
             input.value = keyFor(name);
             input.placeholder = "unbound";
+            input.dataset.bound = keyFor(name) ? "true" : "false";
             input.title = IDLE_TITLE;
             input.setAttribute(
               "aria-label",
@@ -835,7 +994,13 @@
     showConflict(input, name, combo, conflict);
   }
   function persistKeymap() {
-    return settings.update({ keymap: { ...settings.getKeymap() } }).then(() => true).catch(() => {
+    setSaveState("saving");
+    return settings.update({ keymap: { ...settings.getKeymap() } }).then(() => {
+      setSaveState("saved");
+      updateSummaries();
+      return true;
+    }).catch(() => {
+      setSaveState("failed");
       status("Save failed");
       return false;
     });
@@ -892,9 +1057,11 @@
       if (!input) continue;
       if (isRecording(input)) continue;
       input.value = keyFor(name);
+      input.dataset.bound = keyFor(name) ? "true" : "false";
       if (clearBtn) clearBtn.disabled = !keyFor(name);
     }
     refreshKeyLabels();
+    updateSummaries();
   }
   function focusInputFor(name) {
     const input = tableEl.querySelector(`.key-input[data-command="${name}"]`);
@@ -960,48 +1127,63 @@
     status(`${combo} is already bound \u2014 choose Reassign or Keep both`);
     cancel.focus();
   }
-  function readPositiveInt(el, fallback) {
-    const raw = parseInt(el.value, 10);
-    el.value = Number.isFinite(raw) && raw > 0 ? raw : fallback;
-    return parseInt(el.value, 10);
+  function commitNumber(el, errorId, { min, max, fallback, settingKey, label, unit }) {
+    const raw = el.value.trim();
+    const parsed = Number(raw);
+    const invalid = raw === "" || !Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max;
+    if (invalid) {
+      el.value = settings[fallback]();
+      markInvalid(el, true);
+      showFieldError(errorId, `Enter ${min}-${max}${unit ? ` ${unit}` : ""} (reset to ${el.value})`);
+      status(`${label}: reset to ${el.value}`);
+      return;
+    }
+    markInvalid(el, false);
+    clearFieldError(errorId);
+    el.value = String(parsed);
+    savePatch({ [settingKey]: parsed });
   }
-  function readClueDelay(el, fallback) {
-    const raw = parseInt(el.value, 10);
-    el.value = Number.isFinite(raw) && raw >= 0 ? Math.min(5e3, raw) : fallback;
-    return parseInt(el.value, 10);
+  function commitHintChars() {
+    const raw = hintCharsEl.value;
+    const trimmed = raw.trim().toLowerCase();
+    const deduped = [...new Set(trimmed.replace(/[^a-z0-9]/g, ""))].join("");
+    if (deduped.length < 2) {
+      hintCharsEl.value = settings.getHintChars();
+      markInvalid(hintCharsEl, true);
+      showFieldError("error-hint-chars", "Need at least 2 unique letters or digits (reset to previous)");
+      status("Hint characters: need at least 2 unique letters or digits");
+      updateHintMeta();
+      return;
+    }
+    markInvalid(hintCharsEl, false);
+    clearFieldError("error-hint-chars");
+    const cleaned = deduped !== trimmed;
+    hintCharsEl.value = deduped;
+    updateHintMeta();
+    savePatch({ hintChars: normalizeHintChars(deduped) }).then((ok) => {
+      if (ok && cleaned) status(`Cleaned up hint characters: ${deduped}`);
+    });
   }
-  function readTimeoutMs(el, fallback, max) {
-    const raw = parseInt(el.value, 10);
-    el.value = Number.isFinite(raw) && raw >= 0 ? Math.min(max, raw) : fallback;
-    return parseInt(el.value, 10);
-  }
-  function collectBehaviorSettings() {
+  function collectSources() {
     const sources = [];
     if (sourceTabEl.checked) sources.push("tab");
     if (sourceHistoryEl.checked) sources.push("history");
     if (sourceBookmarkEl.checked) sources.push("bookmark");
-    hintCharsEl.value = normalizeHintChars(hintCharsEl.value);
-    return {
-      scrollStep: readPositiveInt(scrollStepEl, settingsDefaults.scrollStep),
-      smoothScroll: smoothScrollEl.checked,
-      fuzzyMatching: fuzzyMatchingEl.checked,
-      timeoutMs: readTimeoutMs(timeoutEl, settingsDefaults.timeoutMs, 1e4),
-      passthroughMs: readTimeoutMs(passthroughEl, settingsDefaults.passthroughMs, 3e4),
-      clueEnabled: clueEnabledEl.checked,
-      clueDelayMs: readClueDelay(clueDelayEl, settingsDefaults.clueDelayMs),
-      suggestionSources: sources,
-      copyFormat: copyFormatEl.value,
-      hintChars: hintCharsEl.value
-    };
+    return sources;
   }
-  function save() {
-    const patch = collectBehaviorSettings();
-    patch.keymap = { ...settings.getKeymap() };
-    patch.disabledSites = settings.getDisabledSites();
-    settings.update(patch).then(() => status("Saved")).catch(() => status("Save failed"));
+  function resetKeys() {
+    cancelRecordingSilent();
+    if (!window.confirm?.("Reset all keybindings to defaults?")) return;
+    savePatch({ keymap: { ...keymapDefaults } }).then((ok) => {
+      if (!ok) return;
+      renderKeymap();
+      status("Keybindings reset to defaults");
+    });
   }
   function reset() {
     cancelRecordingSilent();
+    if (!window.confirm?.("Reset all settings (including disabled sites) to defaults?")) return;
+    setSaveState("saving");
     settings.update({
       keymap: { ...keymapDefaults },
       scrollStep: settingsDefaults.scrollStep,
@@ -1013,8 +1195,12 @@
       clueDelayMs: settingsDefaults.clueDelayMs,
       suggestionSources: settingsDefaults.suggestionSources.slice(),
       copyFormat: settingsDefaults.copyFormat,
-      hintChars: settingsDefaults.hintChars
-    }).then(() => load2()).then(() => status("Reset to defaults")).catch(() => status("Save failed"));
+      hintChars: settingsDefaults.hintChars,
+      disabledSites: []
+    }).then(() => load2()).then(() => status("Reset everything to defaults")).catch(() => {
+      setSaveState("failed");
+      status("Save failed");
+    });
   }
   function renderDisabled() {
     disabledList.textContent = "";
@@ -1024,40 +1210,68 @@
       li.className = "empty";
       li.textContent = "No disabled sites.";
       disabledList.appendChild(li);
+    } else {
+      for (const site of sites) {
+        const li = document.createElement("li");
+        const siteSpan = document.createElement("span");
+        siteSpan.textContent = site;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "Enable";
+        btn.title = `Re-enable Jari on ${site}`;
+        btn.setAttribute("aria-label", `Re-enable Jari on ${site}`);
+        btn.addEventListener("click", async () => {
+          const ok = await savePatch({ disabledSites: sites.filter((s) => s !== site) });
+          renderDisabled();
+          if (ok) status(`Enabled: ${site}`);
+        });
+        li.appendChild(siteSpan);
+        li.appendChild(btn);
+        disabledList.appendChild(li);
+      }
+    }
+    updateSummaries();
+  }
+  function showSiteError(message) {
+    if (!siteErrorEl) {
+      status(message);
       return;
     }
-    for (const site of sites) {
-      const li = document.createElement("li");
-      const siteSpan = document.createElement("span");
-      siteSpan.textContent = site;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = "Enable";
-      btn.addEventListener("click", () => {
-        settings.update({ disabledSites: sites.filter((s) => s !== site) });
-        renderDisabled();
-      });
-      li.appendChild(siteSpan);
-      li.appendChild(btn);
-      disabledList.appendChild(li);
-    }
+    siteErrorEl.textContent = message;
+    siteErrorEl.hidden = false;
+    markInvalid(siteInputEl, true);
   }
-  function addDisabledSite() {
-    const host = normalizeHost(siteInputEl.value);
+  function clearSiteError() {
+    if (!siteErrorEl) return;
+    siteErrorEl.textContent = "";
+    siteErrorEl.hidden = true;
+    markInvalid(siteInputEl, false);
+  }
+  function updateAddButton() {
+    if (!addSiteBtn || !siteInputEl) return;
+    addSiteBtn.disabled = siteInputEl.value.trim() === "";
+  }
+  async function addDisabledSite() {
+    const raw = siteInputEl.value;
+    const host = normalizeHost(raw);
     if (!host) {
-      status("Enter a hostname like example.com");
+      showSiteError("Enter a hostname like example.com");
       siteInputEl.focus();
       return;
     }
     const sites = settings.getDisabledSites();
     if (sites.includes(host)) {
-      status("Already disabled: " + host);
-    } else {
-      settings.update({ disabledSites: [...sites, host] });
-      status("Disabled: " + host);
+      showSiteError(`Already disabled: ${host}`);
+      siteInputEl.focus();
+      return;
     }
+    clearSiteError();
+    const ok = await savePatch({ disabledSites: [...sites, host] });
     siteInputEl.value = "";
+    updateAddButton();
     renderDisabled();
+    if (ok) status(`Disabled: ${host}`);
+    siteInputEl.focus();
   }
   function status(message) {
     statusEl.textContent = message;
@@ -1066,9 +1280,10 @@
       statusEl.textContent = "";
     }, 2500);
   }
-  saveBtn.addEventListener("click", save);
   resetBtn.addEventListener("click", reset);
+  resetKeysBtn?.addEventListener("click", resetKeys);
   keymapFilterEl.addEventListener("input", renderKeymap);
+  keymapUnboundEl?.addEventListener("change", renderKeymap);
   keymapFilterEl.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && keymapFilterEl.value) {
       keymapFilterEl.value = "";
@@ -1076,8 +1291,72 @@
     }
   });
   addSiteBtn.addEventListener("click", addDisabledSite);
+  siteInputEl.addEventListener("input", () => {
+    if (siteInputEl.value.trim() !== "") clearSiteError();
+    updateAddButton();
+  });
   siteInputEl.addEventListener("keydown", (event) => {
     if (event.key === "Enter") addDisabledSite();
   });
+  scrollStepEl.addEventListener(
+    "change",
+    () => commitNumber(scrollStepEl, "error-scroll-step", {
+      min: 1,
+      max: 500,
+      fallback: "getScrollStep",
+      settingKey: "scrollStep",
+      label: "Scroll step",
+      unit: "px"
+    })
+  );
+  timeoutEl.addEventListener(
+    "change",
+    () => commitNumber(timeoutEl, "error-timeout", {
+      min: 0,
+      max: 1e4,
+      fallback: "getTimeoutMs",
+      settingKey: "timeoutMs",
+      label: "Sequence timeout",
+      unit: "ms"
+    })
+  );
+  passthroughEl.addEventListener(
+    "change",
+    () => commitNumber(passthroughEl, "error-passthrough-timeout", {
+      min: 0,
+      max: 3e4,
+      fallback: "getPassthroughMs",
+      settingKey: "passthroughMs",
+      label: "Passthrough duration",
+      unit: "ms"
+    })
+  );
+  clueDelayEl.addEventListener(
+    "change",
+    () => commitNumber(clueDelayEl, "error-clue-delay", {
+      min: 0,
+      max: 5e3,
+      fallback: "getClueDelayMs",
+      settingKey: "clueDelayMs",
+      label: "Clue delay",
+      unit: "ms"
+    })
+  );
+  smoothScrollEl.addEventListener("change", () => savePatch({ smoothScroll: smoothScrollEl.checked }));
+  fuzzyMatchingEl.addEventListener("change", () => savePatch({ fuzzyMatching: fuzzyMatchingEl.checked }));
+  clueEnabledEl.addEventListener("change", () => savePatch({ clueEnabled: clueEnabledEl.checked }));
+  copyFormatEl.addEventListener("change", () => savePatch({ copyFormat: copyFormatEl.value }));
+  for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
+    el.addEventListener("change", () => savePatch({ suggestionSources: collectSources() }));
+  }
+  hintCharsEl.addEventListener("input", () => {
+    clearFieldError("error-hint-chars");
+    markInvalid(hintCharsEl, false);
+    updateHintMeta();
+  });
+  hintCharsEl.addEventListener("change", commitHintChars);
+  for (const card of Object.values(cards)) {
+    card?.addEventListener("toggle", persistOpenState);
+  }
   load2();
 })();
