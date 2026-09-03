@@ -1,34 +1,6 @@
+import "./setup.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
-
-globalThis.window = {
-  addEventListener: () => {},
-  matchMedia: () => ({ matches: false }),
-  innerHeight: 800,
-  scrollX: 0,
-  scrollY: 0,
-};
-globalThis.document = {
-  addEventListener: () => {},
-  fullscreenElement: null,
-  activeElement: null,
-  body: { appendChild: () => {} },
-  documentElement: { style: {}, appendChild: () => {} },
-  createElement: () => ({ appendChild: () => {}, remove: () => {}, setAttribute: () => {} }),
-  querySelector: () => null,
-  execCommand: () => {},
-};
-globalThis.location = { hostname: "test.example" };
-globalThis.chrome = {
-  storage: {
-    sync: { get: async () => ({}), set: async () => {} },
-    onChanged: { addListener: () => {} },
-  },
-  runtime: {
-    sendMessage: async () => {},
-    onMessage: { addListener: () => {} },
-  },
-};
 
 const { settings } = await import("../content/settings.js");
 const { genLabels, normalizeCharset } = await import("../content/hints.js");

@@ -2,6 +2,7 @@ import {
   canonicalKey,
   keymapDefaults,
   modifierKeys,
+  normalizeHintChars,
   prefixKeys,
   settingsDefaults,
 } from "../content/keymap.js";
@@ -9,9 +10,6 @@ import { normalizeHost } from "../shared/url.js";
 import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
 import { ui } from "../content/ui.js";
-
-const SETTINGS_DEFAULTS = settingsDefaults;
-const COMMANDS = COMMAND_CATALOG;
 
 const tableEl = document.querySelector("#keymap-table");
 const saveBtn = document.querySelector("#save");
@@ -61,9 +59,10 @@ function matchesFilter(name, cmd, filter) {
 
 function renderKeymap() {
   tableEl.textContent = "";
+  rebuildKeyIndex();
   const filter = keymapFilterEl.value.trim().toLowerCase();
   const byCategory = new Map();
-  for (const [name, cmd] of Object.entries(COMMANDS)) {
+  for (const [name, cmd] of Object.entries(COMMAND_CATALOG)) {
     const id = cmd.category || "other";
     if (filter && !matchesFilter(name, cmd, filter)) continue;
     if (!byCategory.has(id)) byCategory.set(id, []);
@@ -118,11 +117,16 @@ function refreshKeyLabels() {
   }
 }
 
-function keyFor(commandName) {
+let keyByCommand = new Map();
+function rebuildKeyIndex() {
+  keyByCommand = new Map();
   for (const [key, name] of Object.entries(settings.getKeymap())) {
-    if (name === commandName) return key;
+    if (!keyByCommand.has(name)) keyByCommand.set(name, key);
   }
-  return "";
+}
+
+function keyFor(commandName) {
+  return keyByCommand.get(commandName) || "";
 }
 
 function startRecording(input, name) {
@@ -203,33 +207,24 @@ function startRecording(input, name) {
   input.addEventListener("keydown", handler);
 }
 
+function readPositiveInt(el, fallback) {
+  const raw = parseInt(el.value, 10);
+  el.value = Number.isFinite(raw) && raw > 0 ? raw : fallback;
+  return parseInt(el.value, 10);
+}
+
 function collectBehaviorSettings() {
-  const raw = parseInt(scrollStepEl.value, 10);
-  scrollStepEl.value =
-    Number.isFinite(raw) && raw > 0 ? raw : SETTINGS_DEFAULTS.scrollStep;
-  const tRaw = parseInt(timeoutEl.value, 10);
-  timeoutEl.value =
-    Number.isFinite(tRaw) && tRaw > 0 ? tRaw : SETTINGS_DEFAULTS.timeoutMs;
-  const pRaw = parseInt(passthroughEl.value, 10);
-  passthroughEl.value =
-    Number.isFinite(pRaw) && pRaw > 0 ? pRaw : SETTINGS_DEFAULTS.passthroughMs;
   const sources = [];
   if (sourceTabEl.checked) sources.push("tab");
   if (sourceHistoryEl.checked) sources.push("history");
   if (sourceBookmarkEl.checked) sources.push("bookmark");
-  const hintCharsRaw = hintCharsEl.value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  const deduped = [...new Set(hintCharsRaw)].join("");
-  if (deduped.length >= 2) {
-    hintCharsEl.value = deduped;
-  } else {
-    hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
-  }
+  hintCharsEl.value = normalizeHintChars(hintCharsEl.value);
   return {
-    scrollStep: parseInt(scrollStepEl.value, 10),
+    scrollStep: readPositiveInt(scrollStepEl, settingsDefaults.scrollStep),
     smoothScroll: smoothScrollEl.checked,
     fuzzyMatching: fuzzyMatchingEl.checked,
-    timeoutMs: parseInt(timeoutEl.value, 10),
-    passthroughMs: parseInt(passthroughEl.value, 10),
+    timeoutMs: readPositiveInt(timeoutEl, settingsDefaults.timeoutMs),
+    passthroughMs: readPositiveInt(passthroughEl, settingsDefaults.passthroughMs),
     suggestionSources: sources,
     copyFormat: copyFormatEl.value,
     hintChars: hintCharsEl.value,
@@ -248,35 +243,21 @@ function save() {
 }
 
 function reset() {
-
   settings
     .update({
       keymap: { ...keymapDefaults },
-      scrollStep: SETTINGS_DEFAULTS.scrollStep,
-      smoothScroll: SETTINGS_DEFAULTS.smoothScroll,
-      fuzzyMatching: SETTINGS_DEFAULTS.fuzzyMatching,
-      timeoutMs: SETTINGS_DEFAULTS.timeoutMs,
-      passthroughMs: SETTINGS_DEFAULTS.passthroughMs,
-      suggestionSources: SETTINGS_DEFAULTS.suggestionSources.slice(),
-      copyFormat: SETTINGS_DEFAULTS.copyFormat,
-      hintChars: SETTINGS_DEFAULTS.hintChars,
+      scrollStep: settingsDefaults.scrollStep,
+      smoothScroll: settingsDefaults.smoothScroll,
+      fuzzyMatching: settingsDefaults.fuzzyMatching,
+      timeoutMs: settingsDefaults.timeoutMs,
+      passthroughMs: settingsDefaults.passthroughMs,
+      suggestionSources: settingsDefaults.suggestionSources.slice(),
+      copyFormat: settingsDefaults.copyFormat,
+      hintChars: settingsDefaults.hintChars,
     })
+    .then(() => load())
     .then(() => status("Reset to defaults"))
     .catch(() => status("Save failed"));
-  scrollStepEl.value = SETTINGS_DEFAULTS.scrollStep;
-  smoothScrollEl.checked = SETTINGS_DEFAULTS.smoothScroll;
-  fuzzyMatchingEl.checked = SETTINGS_DEFAULTS.fuzzyMatching;
-  timeoutEl.value = SETTINGS_DEFAULTS.timeoutMs;
-  passthroughEl.value = SETTINGS_DEFAULTS.passthroughMs;
-
-  sourceTabEl.checked = SETTINGS_DEFAULTS.suggestionSources.includes("tab");
-  sourceHistoryEl.checked =
-    SETTINGS_DEFAULTS.suggestionSources.includes("history");
-  sourceBookmarkEl.checked =
-    SETTINGS_DEFAULTS.suggestionSources.includes("bookmark");
-  copyFormatEl.value = SETTINGS_DEFAULTS.copyFormat;
-  hintCharsEl.value = SETTINGS_DEFAULTS.hintChars;
-  renderKeymap();
 }
 
 function renderDisabled() {
