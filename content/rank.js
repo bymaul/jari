@@ -14,10 +14,6 @@ function normalizeForMatch(s) {
     return String(s).toLowerCase();
   }
 }
-// eslint-disable-next-line no-unused-vars
-function queryTerms(query) {
-  return normalizeForMatch(query).trim().split(/\s+/).filter(Boolean);
-}
 export function parseQuery(query) {
   const normalized = normalizeForMatch(query);
   const phrases = [];
@@ -211,11 +207,6 @@ function frequencyScore(item) {
   if (!c) return 0;
   return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
 }
-function bookmarkBoost(item) {
-  if (item.source !== "bookmark") return 0;
-  return 0;
-}
-
 const SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
 
 export function rankMatches(query, list, fuzzy = true) {
@@ -238,8 +229,7 @@ export function rankMatches(query, list, fuzzy = true) {
       const hBoost = hostBoost(q, item);
       const rScore = recencyScore(item);
       const fScore = frequencyScore(item);
-      const bBoost = bookmarkBoost(item);
-      const totalScore = baseScore + tBoost + hBoost + rScore + fScore + bBoost;
+      const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
       return { item, match: { ...match, score: totalScore, baseScore }, span: last - first + 1, hayLength: hay.length, totalScore };
     })
     .filter(Boolean)

@@ -524,19 +524,18 @@ function close() {
   stopTracking();
 }
 
-const MODE_CONFIG = {
-  click: { mode: "click", multipleHits: false },
-  open: { mode: "open", multipleHits: false },
-  openBackground: { mode: "openBackground", multipleHits: true },
-  input: { mode: "input", multipleHits: false },
-  yank: { mode: "yank", multipleHits: false },
-};
+const VALID_HINT_MODES = new Set([
+  "click",
+  "open",
+  "openBackground",
+  "input",
+  "yank",
+]);
 
 function open(requestedMode) {
   if (active) close();
-  const config = MODE_CONFIG[requestedMode] || MODE_CONFIG.click;
-  mode = config.mode;
-  multipleHits = config.multipleHits;
+  mode = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
+  multipleHits = mode === "openBackground";
 
   let candidates = collectElements(mode);
 

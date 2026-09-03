@@ -21,6 +21,11 @@ let passthroughMode = false;
 let passthroughTimer = null;
 const pills = {};
 
+const PILL_IGNORE_TEXT = "ignore";
+function pillPassthroughText() {
+  return "passthrough (" + settings.getPassthroughMs() + "ms)";
+}
+
 function clearPending() {
   pendingCount = "";
   pendingPrefix = null;
@@ -57,7 +62,7 @@ function setIgnore(on) {
   clearPending();
   if (on) {
     Overlays.closeAll();
-    showPill("ignore", "ignore");
+    showPill("ignore", PILL_IGNORE_TEXT);
   } else {
     hidePill("ignore");
   }
@@ -75,10 +80,7 @@ function enterPassthrough() {
 
   Overlays.closeAll();
   passthroughMode = true;
-  showPill(
-    "passthrough",
-    "passthrough (" + settings.getPassthroughMs() + "ms)",
-  );
+  showPill("passthrough", pillPassthroughText());
   clearTimeout(passthroughTimer);
   passthroughTimer = setTimeout(exitPassthrough, settings.getPassthroughMs());
 }
@@ -117,8 +119,8 @@ function handleFullscreenChange() {
     hidePill("ignore");
     hidePill("passthrough");
   } else {
-    if (ignoreMode) showPill("ignore", "Ignore mode");
-    if (passthroughMode) showPill("passthrough", "Passthrough");
+    if (ignoreMode) showPill("ignore", PILL_IGNORE_TEXT);
+    if (passthroughMode) showPill("passthrough", pillPassthroughText());
   }
 }
 

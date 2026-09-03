@@ -581,10 +581,6 @@ function next(count = 1, reverse = false) {
   ui.toast(`${currentIdx + 1}/${len}`);
 }
 
-function prev(count = 1) {
-  next(count, true);
-}
-
 function onKeyDown(event) {
   if (!active) return false;
   const inInput = document.activeElement === inputEl;
@@ -624,10 +620,6 @@ function onKeyDown(event) {
   return false;
 }
 
-function hasHighlightsPublic() {
-  return matches.length > 0;
-}
-
 function handleGlobalEsc(event) {
   if (hasHighlights()) {
     event.preventDefault();
@@ -657,9 +649,8 @@ export const Find = {
   close: closeBar,
   clearHighlights,
   next,
-  prev,
   isActive,
-  hasHighlights: hasHighlightsPublic,
+  hasHighlights,
   handleGlobalEsc,
   handleGlobalEnter,
   onKeyDown,
@@ -669,6 +660,7 @@ register("find", { close: closeAndClear, onKeyDown, isActive });
 
 try {
   Visual.setFindOpen(() => open());
+  if (typeof Visual.setFindNav === "function") Visual.setFindNav((count, reverse) => next(count, reverse));
 } catch {}
 
 export const __testHelpers = {

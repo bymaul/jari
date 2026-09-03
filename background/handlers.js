@@ -307,8 +307,7 @@ export const handlers = {
           const bms = await chrome.bookmarks.search(qRaw);
           for (const bm of bms) if (bm.url) {
             const path = folderMap.get(bm.parentId) || [];
-            const isBar = path.some(p => /bar/i.test(p));
-            push(bm.title, bm.url, "bookmark", { dateAdded: bm.dateAdded || 0, folderPath: path.join(" / "), folderBoost: isBar ? 3 : 0 });
+            push(bm.title, bm.url, "bookmark", { dateAdded: bm.dateAdded || 0, folderPath: path.join(" / ") });
           }
         } catch (err) {
           console.debug("[jari] Bookmark search failed:", err);
@@ -348,12 +347,10 @@ export const handlers = {
 
     }
 
-    if (id) {
-      try {
-        await chrome.tabs.update(id, { active: true });
-      } catch (err) {
-        return { ok: false, error: String(err) };
-      }
+    try {
+      await chrome.tabs.update(id, { active: true });
+    } catch (err) {
+      return { ok: false, error: String(err) };
     }
     if (windowId) {
       try {

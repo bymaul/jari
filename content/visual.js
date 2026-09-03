@@ -37,6 +37,7 @@ let hintMap = new Map();
 let pendingVisualMode = "visual";
 
 let findOpenHandler = null;
+let findNavHandler = null;
 
 let visualUseHighlights = false;
 let visualFallbackSpans = [];
@@ -46,6 +47,9 @@ function isActive() {
 }
 function setFindOpen(handler) {
   findOpenHandler = handler;
+}
+function setFindNav(handler) {
+  findNavHandler = handler;
 }
 function pillText(m) {
   if (m === "caret") return "caret";
@@ -411,16 +415,6 @@ function applyVisualHighlight() {
             visualFallbackSpans.push(s);
           } catch {}
           n = walker.nextNode();
-        }
-      } catch {}
-      try {
-        const walker2 = document.createTreeWalker(
-          document.body,
-          NodeFilter.SHOW_TEXT,
-        );
-        let nn = walker2.nextNode();
-        while (nn && visualFallbackSpans.length === 0) {
-          nn = walker2.nextNode();
         }
       } catch {}
     }
@@ -2141,16 +2135,6 @@ function onKeyDown(event) {
       pendingCount = "";
       return true;
     }
-    if (key === "n" || key === "N") {
-      consume(event);
-      pendingCount = "";
-      return true;
-    }
-    if (key === "o") {
-      consume(event);
-      pendingCount = "";
-      return true;
-    }
     if (key === "v" || key === "V") {
       consume(event);
       const sel = getSelection();
@@ -2245,10 +2229,6 @@ function onKeyDown(event) {
       consume(event);
       if (repeat > 1) doGoToLine(repeat);
       else doDocBoundary(1);
-      break;
-    case "g":
-      consume(event);
-      ui.toast("Use gg");
       break;
     case "o":
       consume(event);
@@ -2350,9 +2330,6 @@ function onKeyDown(event) {
       break;
   }
   pendingCount = "";
-  if (pendingY && key !== "y") {
-    // keep y pending only for immediate yy, otherwise timeout will clear
-  }
   return true;
 }
 
@@ -2361,6 +2338,7 @@ export const Visual = {
   close,
   isActive,
   setFindOpen,
+  setFindNav,
   enterCaretAtFocus,
   onKeyDown,
   showBlockCaret,
