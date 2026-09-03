@@ -1060,6 +1060,14 @@
       return null;
     }
   }
+  function frameViewportHeight(frame) {
+    const w = frameWindow(frame);
+    try {
+      if (w && Number.isFinite(w.innerHeight)) return w.innerHeight;
+    } catch {
+    }
+    return clientHeightOf(frame);
+  }
   function pageCanScroll() {
     const el = document.scrollingElement || document.documentElement;
     if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
@@ -5258,45 +5266,33 @@
     else smoothState.y = 0;
     smoothState.rafId = requestAnimationFrame(smoothScrollStep);
   }
-  function frameViewportHeight(frame) {
+  function shouldSmooth() {
+    return settings.isSmoothScroll() && !prefersReducedMotion();
+  }
+  function scrollFrame(frame, apply) {
     const w = frameWindow(frame);
+    if (w) {
+      try {
+        apply(w);
+        return true;
+      } catch {
+      }
+    }
+    focusTarget(frame);
     try {
-      if (w && Number.isFinite(w.innerHeight)) return w.innerHeight;
+      apply(frame);
     } catch {
     }
-    return clientHeightOf(frame);
+    return false;
   }
   function scrollFrameBy(frame, x, y) {
-    const w = frameWindow(frame);
-    if (w) {
-      try {
-        w.scrollBy({ left: x, top: y, behavior: "instant" });
-        return true;
-      } catch {
-      }
-    }
-    focusTarget(frame);
-    try {
-      frame.scrollBy({ left: x, top: y, behavior: "instant" });
-    } catch {
-    }
-    return false;
+    return scrollFrame(
+      frame,
+      (t) => t.scrollBy({ left: x, top: y, behavior: "instant" })
+    );
   }
   function scrollFrameTo(frame, top) {
-    const w = frameWindow(frame);
-    if (w) {
-      try {
-        w.scrollTo({ top, behavior: "instant" });
-        return true;
-      } catch {
-      }
-    }
-    focusTarget(frame);
-    try {
-      frame.scrollTo({ top, behavior: "instant" });
-    } catch {
-    }
-    return false;
+    return scrollFrame(frame, (t) => t.scrollTo({ top, behavior: "instant" }));
   }
   function scrollBy({ x = 0, y = 0, count = 1 }) {
     const el = getScrollElement();
@@ -5304,7 +5300,7 @@
       scrollFrameBy(el, x * count, y * count);
       return;
     }
-    if (settings.isSmoothScroll() && !prefersReducedMotion()) {
+    if (shouldSmooth()) {
       smoothScrollBy(el, x * count, y * count);
     } else {
       el.scrollBy({ left: x * count, top: y * count, behavior: "instant" });
@@ -5333,6 +5329,24 @@ ${location.href}`;
       return Promise.resolve("");
     }
   }
+  function scrollPageBy(ratio, direction) {
+    return (c) => {
+      const el = getScrollElement();
+      const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+      scrollBy({ y: direction * h * ratio, count: c.count });
+    };
+  }
+  async function openClipboardWith(action) {
+    const text = await readClipboardText();
+    if (!text) return ui.toast("Clipboard empty");
+    const res = await sendMessage(action, { url: text });
+    if (res && !res.ok) ui.toast("Not a URL");
+  }
+  function goTo(urlFn) {
+    const target2 = urlFn(location.href);
+    if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
+    sendMessage("navigate", { url: target2 });
+  }
   var commands = {
     scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
     scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
@@ -5346,7 +5360,7 @@ ${location.href}`;
           scrollFrameTo(el, 0);
           return;
         }
-        if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
+        if (shouldSmooth()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
         else el.scrollTo({ top: 0, behavior: "instant" });
       }
     },
@@ -5371,65 +5385,24 @@ ${location.href}`;
           return;
         }
         const target2 = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
-        if (settings.isSmoothScroll() && !prefersReducedMotion()) smoothScrollBy(el, 0, target2 - scrollPosOf(el).y);
+        if (shouldSmooth()) smoothScrollBy(el, 0, target2 - scrollPosOf(el).y);
         else el.scrollTo({ top: target2, behavior: "instant" });
       }
     },
-    scrollPageDown: {
-      ...COMMAND_CATALOG.scrollPageDown,
-      run: (c) => {
-        const el = getScrollElement();
-        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
-        scrollBy({ y: h * PAGE_RATIO, count: c.count });
-      }
-    },
-    scrollPageUp: {
-      ...COMMAND_CATALOG.scrollPageUp,
-      run: (c) => {
-        const el = getScrollElement();
-        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
-        scrollBy({ y: -h * PAGE_RATIO, count: c.count });
-      }
-    },
-    scrollHalfPageDown: {
-      ...COMMAND_CATALOG.scrollHalfPageDown,
-      run: (c) => {
-        const el = getScrollElement();
-        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
-        scrollBy({ y: h * HALF_RATIO, count: c.count });
-      }
-    },
-    scrollHalfPageUp: {
-      ...COMMAND_CATALOG.scrollHalfPageUp,
-      run: (c) => {
-        const el = getScrollElement();
-        const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
-        scrollBy({ y: -h * HALF_RATIO, count: c.count });
-      }
-    },
+    scrollPageDown: { ...COMMAND_CATALOG.scrollPageDown, run: scrollPageBy(PAGE_RATIO, 1) },
+    scrollPageUp: { ...COMMAND_CATALOG.scrollPageUp, run: scrollPageBy(PAGE_RATIO, -1) },
+    scrollHalfPageDown: { ...COMMAND_CATALOG.scrollHalfPageDown, run: scrollPageBy(HALF_RATIO, 1) },
+    scrollHalfPageUp: { ...COMMAND_CATALOG.scrollHalfPageUp, run: scrollPageBy(HALF_RATIO, -1) },
     cycleScrollFrame: { ...COMMAND_CATALOG.cycleScrollFrame, run: () => Scroll.cycle() },
     zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
     newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
     closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
     restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
-    openClipboard: {
-      ...COMMAND_CATALOG.openClipboard,
-      run: async () => {
-        const text = await readClipboardText();
-        if (!text) return ui.toast("Clipboard empty");
-        const res = await sendMessage("navigate", { url: text });
-        if (res && !res.ok) ui.toast("Not a URL");
-      }
-    },
+    openClipboard: { ...COMMAND_CATALOG.openClipboard, run: () => openClipboardWith("navigate") },
     openClipboardBackground: {
       ...COMMAND_CATALOG.openClipboardBackground,
-      run: async () => {
-        const text = await readClipboardText();
-        if (!text) return ui.toast("Clipboard empty");
-        const res = await sendMessage("openInBackgroundTab", { url: text });
-        if (res && !res.ok) ui.toast("Not a URL");
-      }
+      run: () => openClipboardWith("openInBackgroundTab")
     },
     previousTab: { ...COMMAND_CATALOG.previousTab, run: (c) => sendMessage("previousTab", { count: c.count }) },
     nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
@@ -5459,22 +5432,8 @@ ${location.href}`;
     openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
     reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
     forceReload: { ...COMMAND_CATALOG.forceReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
-    goToParent: {
-      ...COMMAND_CATALOG.goToParent,
-      run: () => {
-        const target2 = Url.parentUrlOf(location.href);
-        if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
-        sendMessage("navigate", { url: target2 });
-      }
-    },
-    goToRoot: {
-      ...COMMAND_CATALOG.goToRoot,
-      run: () => {
-        const target2 = Url.rootUrlOf(location.href);
-        if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
-        sendMessage("navigate", { url: target2 });
-      }
-    },
+    goToParent: { ...COMMAND_CATALOG.goToParent, run: () => goTo(Url.parentUrlOf) },
+    goToRoot: { ...COMMAND_CATALOG.goToRoot, run: () => goTo(Url.rootUrlOf) },
     editUrl: {
       ...COMMAND_CATALOG.editUrl,
       run: () => Prompt.openEditUrl()

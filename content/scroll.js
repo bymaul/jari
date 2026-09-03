@@ -193,6 +193,14 @@ export function frameWindow(frame) {
   }
 }
 
+export function frameViewportHeight(frame) {
+  const w = frameWindow(frame);
+  try {
+    if (w && Number.isFinite(w.innerHeight)) return w.innerHeight;
+  } catch {}
+  return clientHeightOf(frame);
+}
+
 function pageCanScroll() {
   const el = document.scrollingElement || document.documentElement;
   if (!el || el.scrollHeight <= el.clientHeight + 1) return false;

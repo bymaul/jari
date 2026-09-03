@@ -181,18 +181,7 @@
       });
       if (others.length === 0) return { ok: true, needWindowChoice: false };
       if (others.length === 1) {
-        const targetWindowId = others[0].windowId;
-        await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
-        const tabs = await chrome.tabs.query({ windowId: targetWindowId });
-        const last = tabs[tabs.length - 1];
-        if (last) {
-          try {
-            await focusWindow(targetWindowId);
-          } catch (err) {
-            console.error("[jari] moveTabToWindow auto-merge window focus failed", err);
-          }
-          await chrome.tabs.update(last.id, { active: true });
-        }
+        await moveTabIntoWindowAndFocus(tab.id, others[0].windowId, "moveTabToWindow auto-merge");
         return { ok: true, movedToWindow: true };
       }
       return {
@@ -206,44 +195,13 @@
     moveTabIntoWindow: async (sender, { targetWindowId } = {}) => {
       const tab = sender.tab;
       if (!tab || !tab.id || !targetWindowId) return { ok: false };
-      await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
-      const tabs = await chrome.tabs.query({ windowId: targetWindowId });
-      const last = tabs[tabs.length - 1];
-      if (last) {
-        try {
-          await focusWindow(targetWindowId);
-        } catch (err) {
-          console.error("[jari] moveTabIntoWindow window focus failed", err);
-        }
-        await chrome.tabs.update(last.id, { active: true });
-      }
+      await moveTabIntoWindowAndFocus(tab.id, targetWindowId, "moveTabIntoWindow");
       return { ok: true };
     },
-    moveTabLeft: async (sender) => {
-      const tab = sender.tab;
-      if (tab && tab.id) {
-        await chrome.tabs.move(tab.id, { index: Math.max(0, tab.index - 1) });
-      }
-      return { ok: true };
-    },
-    goToFirstTab: async () => {
-      const tabs = await chrome.tabs.query({ currentWindow: true });
-      if (tabs.length) await chrome.tabs.update(tabs[0].id, { active: true });
-      return { ok: true };
-    },
-    goToLastTab: async () => {
-      const tabs = await chrome.tabs.query({ currentWindow: true });
-      if (tabs.length)
-        await chrome.tabs.update(tabs[tabs.length - 1].id, { active: true });
-      return { ok: true };
-    },
-    moveTabRight: async (sender) => {
-      const tab = sender.tab;
-      if (tab && tab.id) {
-        await chrome.tabs.move(tab.id, { index: tab.index + 1 });
-      }
-      return { ok: true };
-    },
+    moveTabLeft: async (sender) => moveTab(sender, -1),
+    goToFirstTab: async () => activateTabByIndex(0),
+    goToLastTab: async () => activateTabByIndex(-1),
+    moveTabRight: async (sender) => moveTab(sender, 1),
     duplicateTab: async (sender) => {
       if (sender.tab && sender.tab.id) {
         await chrome.tabs.duplicate(sender.tab.id);
@@ -423,11 +381,7 @@
         return { ok: false, error: String(err) };
       }
       if (windowId) {
-        try {
-          await focusWindow(windowId);
-        } catch (err) {
-          console.error("[jari] activateTab window focus failed", err);
-        }
+        await focusWindow(windowId, "activateTab");
       }
       return { ok: true };
     },
@@ -441,18 +395,8 @@
       await chrome.tabs.setZoom(tab.id, next);
       return { ok: true, zoom: next };
     },
-    openInBackgroundTab: async (_, { url } = {}) => {
-      const target = normalizeUrl(url);
-      if (!target) return { ok: false };
-      await chrome.tabs.create({ url: target, active: false });
-      return { ok: true };
-    },
-    openInForegroundTab: async (_, { url } = {}) => {
-      const target = normalizeUrl(url);
-      if (!target) return { ok: false };
-      await chrome.tabs.create({ url: target, active: true });
-      return { ok: true };
-    },
+    openInBackgroundTab: async (_, { url } = {}) => openTab(url, false),
+    openInForegroundTab: async (_, { url } = {}) => openTab(url, true),
     openSettings: async () => {
       await chrome.runtime.openOptionsPage();
       return { ok: true };
@@ -491,12 +435,44 @@
     await chrome.tabs.update(tabs[nextIndex].id, { active: true });
     return { ok: true };
   }
-  async function focusWindow(windowId) {
-    const win = await chrome.windows.get(windowId);
-    if (win && win.state === "minimized") {
-      await chrome.windows.update(windowId, { focused: true, state: "normal" });
-    } else {
-      await chrome.windows.update(windowId, { focused: true });
+  async function openTab(url, active) {
+    const target = normalizeUrl(url);
+    if (!target) return { ok: false };
+    await chrome.tabs.create({ url: target, active });
+    return { ok: true };
+  }
+  async function moveTab(sender, delta) {
+    const tab = sender.tab;
+    if (tab && tab.id) {
+      await chrome.tabs.move(tab.id, { index: Math.max(0, tab.index + delta) });
+    }
+    return { ok: true };
+  }
+  async function activateTabByIndex(index) {
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const tab = tabs[index < 0 ? tabs.length + index : index];
+    if (tab) await chrome.tabs.update(tab.id, { active: true });
+    return { ok: true };
+  }
+  async function moveTabIntoWindowAndFocus(tabId, targetWindowId, context) {
+    await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
+    const tabs = await chrome.tabs.query({ windowId: targetWindowId });
+    const last = tabs[tabs.length - 1];
+    if (last) {
+      await focusWindow(targetWindowId, context);
+      await chrome.tabs.update(last.id, { active: true });
+    }
+  }
+  async function focusWindow(windowId, context = "focusWindow") {
+    try {
+      const win = await chrome.windows.get(windowId);
+      if (win && win.state === "minimized") {
+        await chrome.windows.update(windowId, { focused: true, state: "normal" });
+      } else {
+        await chrome.windows.update(windowId, { focused: true });
+      }
+    } catch (err) {
+      console.error(`[jari] ${context} window focus failed`, err);
     }
   }
 
