@@ -90,45 +90,8 @@ function isActive() {
   return active;
 }
 
-function safeFocus(el, opts) {
-  try {
-    el.focus(opts);
-  } catch {
-    try {
-      el.focus();
-    } catch {}
-  }
-}
-
-function dispatchClick(el) {
-  try {
-    el.scrollIntoView({ block: "nearest", inline: "nearest" });
-  } catch {}
-  for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
-    try {
-      el.dispatchEvent(
-        new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          button: 0,
-          buttons: type === "mousedown" ? 1 : 0,
-        }),
-      );
-    } catch {}
-  }
-  safeFocus(el, { preventScroll: true });
-}
-
 function focusFrame(el) {
-  try {
-    el.scrollIntoView({ block: "nearest", inline: "nearest" });
-  } catch {}
-  safeFocus(el, { preventScroll: true });
-  try {
-    const win = el.contentWindow;
-    if (win && typeof win.focus === "function") win.focus();
-  } catch {}
+  ui.focusFrameElement(el);
   try {
     ui.toast("Focused frame");
   } catch {}
@@ -138,7 +101,7 @@ function focusInput(el) {
   try {
     el.scrollIntoView({ block: "center", inline: "center" });
   } catch {}
-  safeFocus(el, { preventScroll: true });
+  ui.safeFocus(el, { preventScroll: true });
   if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
     try {
       const len = el.value ? el.value.length : 0;
@@ -386,13 +349,13 @@ function activate(el) {
   if (mode === "click") {
     if (isFrameElement(el)) focusFrame(el);
     else if (isEditable(el)) focusInput(el);
-    else dispatchClick(el);
+    else ui.dispatchClick(el);
     handleActivationEnd();
   } else if (mode === "open") {
     const url = getHref(el);
     if (url) sendMessage("openInForegroundTab", { url });
     else if (isFrameElement(el)) focusFrame(el);
-    else dispatchClick(el);
+    else ui.dispatchClick(el);
     handleActivationEnd();
   } else if (mode === "openBackground") {
     const url = getHref(el);
@@ -414,17 +377,12 @@ function activate(el) {
   }
 }
 
-function consume(event) {
-  event.preventDefault();
-  event.stopImmediatePropagation();
-}
-
 function onKeyDown(event) {
   if (!active) return false;
   const key = event.key;
 
   if (key === "Escape") {
-    consume(event);
+    ui.consume(event);
     if (prefix) {
       prefix = "";
       refresh();
@@ -434,17 +392,17 @@ function onKeyDown(event) {
     return true;
   }
   if (key === "Shift") {
-    consume(event);
+    ui.consume(event);
     flip();
     return true;
   }
   if (key === " " || event.code === "Space") {
-    consume(event);
+    ui.consume(event);
     if (holder) holder.style.display = "none";
     return true;
   }
   if (key === "Backspace") {
-    consume(event);
+    ui.consume(event);
     if (prefix) {
       prefix = prefix.slice(0, -1);
       refresh();
@@ -454,14 +412,14 @@ function onKeyDown(event) {
     return true;
   }
   if (key === "Enter") {
-    consume(event);
+    ui.consume(event);
     return true;
   }
   if (key.length === 1) {
     const charset = normalizeCharset();
     const lower = key.toLowerCase();
     if (charset.includes(lower)) {
-      consume(event);
+      ui.consume(event);
       const next = prefix + lower.toUpperCase();
       const exact = hints.find((h) => h.label === next);
       prefix = next;
@@ -470,14 +428,14 @@ function onKeyDown(event) {
       return true;
     }
   }
-  consume(event);
+  ui.consume(event);
   return true;
 }
 
 function onKeyUp(event) {
   if (!active) return false;
   if (event.key === " " || event.code === "Space") {
-    consume(event);
+    ui.consume(event);
     if (holder) holder.style.display = "";
     return true;
   }

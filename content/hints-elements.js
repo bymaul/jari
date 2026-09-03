@@ -231,6 +231,33 @@ export function isOpenableLink(el) {
   }
 }
 
+export function getLinkAncestor(el) {
+  if (!el) return null;
+  if (el.closest) {
+    try {
+      const a = el.closest("a");
+      if (a && isOpenableLink(a)) return a;
+      const hrefEl = el.closest("[href]");
+      if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
+    } catch {}
+  }
+  let cur = el;
+  while (cur) {
+    if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
+    if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
+      return cur;
+    const parent = cur.parentElement;
+    if (parent) {
+      cur = parent;
+    } else {
+      const root = cur.getRootNode && cur.getRootNode();
+      if (root && root.host) cur = root.host;
+      else break;
+    }
+  }
+  return null;
+}
+
 export function getLinkElements() {
   let elements = getVisibleElements((e, v) => {
     if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)

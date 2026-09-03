@@ -396,6 +396,53 @@
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => showcmd(null), ms);
   }
+  function consume(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  function safeFocus(el, opts) {
+    try {
+      el.focus(opts);
+    } catch {
+      try {
+        el.focus();
+      } catch {
+      }
+    }
+  }
+  function dispatchClick(el) {
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+    }
+    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
+      try {
+        el.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 0,
+            buttons: type === "mousedown" ? 1 : 0
+          })
+        );
+      } catch {
+      }
+    }
+    safeFocus(el, { preventScroll: true });
+  }
+  function focusFrameElement(el) {
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+    }
+    safeFocus(el, { preventScroll: true });
+    try {
+      const win = el.contentWindow;
+      if (win && typeof win.focus === "function") win.focus();
+    } catch {
+    }
+  }
   function buildCategoryTable(cat, headerClass, renderBody) {
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
@@ -417,7 +464,11 @@
     copyText,
     statusContainer,
     buildCategoryTable,
-    withHiddenTextarea
+    withHiddenTextarea,
+    consume,
+    safeFocus,
+    dispatchClick,
+    focusFrameElement
   };
 
   // shared/url.js
@@ -757,14 +808,7 @@
     } catch {
     }
     if (!isFrame(el)) return;
-    try {
-      el.focus({ preventScroll: true });
-    } catch {
-      try {
-        el.focus();
-      } catch {
-      }
-    }
+    ui.safeFocus(el, { preventScroll: true });
     try {
       const win = el.contentWindow;
       if (win && typeof win.focus === "function") win.focus();
@@ -1893,6 +1937,33 @@
       return false;
     }
   }
+  function getLinkAncestor(el) {
+    if (!el) return null;
+    if (el.closest) {
+      try {
+        const a = el.closest("a");
+        if (a && isOpenableLink(a)) return a;
+        const hrefEl = el.closest("[href]");
+        if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
+      } catch {
+      }
+    }
+    let cur = el;
+    while (cur) {
+      if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
+      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
+        return cur;
+      const parent = cur.parentElement;
+      if (parent) {
+        cur = parent;
+      } else {
+        const root = cur.getRootNode && cur.getRootNode();
+        if (root && root.host) cur = root.host;
+        else break;
+      }
+    }
+    return null;
+  }
   function getLinkElements() {
     let elements2 = getVisibleElements((e, v) => {
       if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)
@@ -2203,48 +2274,8 @@
   function isActive3() {
     return active3;
   }
-  function safeFocus(el, opts) {
-    try {
-      el.focus(opts);
-    } catch {
-      try {
-        el.focus();
-      } catch {
-      }
-    }
-  }
-  function dispatchClick(el) {
-    try {
-      el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch {
-    }
-    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
-      try {
-        el.dispatchEvent(
-          new MouseEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            button: 0,
-            buttons: type === "mousedown" ? 1 : 0
-          })
-        );
-      } catch {
-      }
-    }
-    safeFocus(el, { preventScroll: true });
-  }
   function focusFrame(el) {
-    try {
-      el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch {
-    }
-    safeFocus(el, { preventScroll: true });
-    try {
-      const win = el.contentWindow;
-      if (win && typeof win.focus === "function") win.focus();
-    } catch {
-    }
+    ui.focusFrameElement(el);
     try {
       ui.toast("Focused frame");
     } catch {
@@ -2255,7 +2286,7 @@
       el.scrollIntoView({ block: "center", inline: "center" });
     } catch {
     }
-    safeFocus(el, { preventScroll: true });
+    ui.safeFocus(el, { preventScroll: true });
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
       try {
         const len = el.value ? el.value.length : 0;
@@ -2481,13 +2512,13 @@
     if (mode2 === "click") {
       if (isFrameElement(el)) focusFrame(el);
       else if (isEditable(el)) focusInput(el);
-      else dispatchClick(el);
+      else ui.dispatchClick(el);
       handleActivationEnd();
     } else if (mode2 === "open") {
       const url = getHref(el);
       if (url) sendMessage("openInForegroundTab", { url });
       else if (isFrameElement(el)) focusFrame(el);
-      else dispatchClick(el);
+      else ui.dispatchClick(el);
       handleActivationEnd();
     } else if (mode2 === "openBackground") {
       const url = getHref(el);
@@ -2508,15 +2539,11 @@
       close3();
     }
   }
-  function consume(event) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
   function onKeyDown3(event) {
     if (!active3) return false;
     const key = event.key;
     if (key === "Escape") {
-      consume(event);
+      ui.consume(event);
       if (prefix) {
         prefix = "";
         refresh();
@@ -2526,17 +2553,17 @@
       return true;
     }
     if (key === "Shift") {
-      consume(event);
+      ui.consume(event);
       flip();
       return true;
     }
     if (key === " " || event.code === "Space") {
-      consume(event);
+      ui.consume(event);
       if (holder) holder.style.display = "none";
       return true;
     }
     if (key === "Backspace") {
-      consume(event);
+      ui.consume(event);
       if (prefix) {
         prefix = prefix.slice(0, -1);
         refresh();
@@ -2546,14 +2573,14 @@
       return true;
     }
     if (key === "Enter") {
-      consume(event);
+      ui.consume(event);
       return true;
     }
     if (key.length === 1) {
       const charset = normalizeCharset();
       const lower = key.toLowerCase();
       if (charset.includes(lower)) {
-        consume(event);
+        ui.consume(event);
         const next2 = prefix + lower.toUpperCase();
         const exact = hints.find((h) => h.label === next2);
         prefix = next2;
@@ -2562,13 +2589,13 @@
         return true;
       }
     }
-    consume(event);
+    ui.consume(event);
     return true;
   }
   function onKeyUp(event) {
     if (!active3) return false;
     if (event.key === " " || event.code === "Space") {
-      consume(event);
+      ui.consume(event);
       if (holder) holder.style.display = "";
       return true;
     }
@@ -3951,32 +3978,8 @@
   function getCaretLinkElement() {
     const sel = getSelection();
     if (!sel || !sel.focusNode) return null;
-    let el = sel.focusNode.parentElement;
-    if (!el && sel.focusNode.parentNode) el = sel.focusNode.parentNode;
-    if (!el) return null;
-    try {
-      if (el.closest) {
-        const a = el.closest("a");
-        if (a && isOpenableLink(a)) return a;
-        const hrefEl = el.closest("[href]");
-        if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
-      }
-      let cur = el;
-      while (cur) {
-        if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
-        if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
-          return cur;
-        const parent = cur.parentElement;
-        if (parent) cur = parent;
-        else {
-          const root = cur.getRootNode && cur.getRootNode();
-          if (root && root.host) cur = root.host;
-          else break;
-        }
-      }
-    } catch {
-    }
-    return null;
+    const el = sel.focusNode.parentElement || sel.focusNode.parentNode || null;
+    return getLinkAncestor(el);
   }
   function activateCaretLink() {
     const link = getCaretLinkElement();
@@ -3985,30 +3988,8 @@
       return false;
     }
     try {
-      link.scrollIntoView({ block: "nearest", inline: "nearest" });
+      ui.dispatchClick(link);
     } catch {
-    }
-    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
-      try {
-        link.dispatchEvent(
-          new MouseEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            button: 0,
-            buttons: type === "mousedown" ? 1 : 0
-          })
-        );
-      } catch {
-      }
-    }
-    try {
-      link.focus({ preventScroll: true });
-    } catch {
-      try {
-        link.focus();
-      } catch {
-      }
     }
     return true;
   }
@@ -4137,10 +4118,6 @@
     ensureVisible();
     updateBlockCaret();
   }
-  function consume2(event) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
   function getRepeatCount() {
     const n = parseInt(pendingCount || "1", 10);
     const c = Number.isNaN(n) ? 1 : Math.max(1, n);
@@ -4210,7 +4187,7 @@
     if (hintActive) {
       const key2 = event.key;
       if (key2 === "Escape") {
-        consume2(event);
+        ui.consume(event);
         if (hintPrefix) {
           hintPrefix = "";
           refreshHints();
@@ -4220,7 +4197,7 @@
         return true;
       }
       if (key2 === "Backspace") {
-        consume2(event);
+        ui.consume(event);
         if (hintPrefix) {
           hintPrefix = hintPrefix.slice(0, -1);
           refreshHints();
@@ -4230,7 +4207,7 @@
         return true;
       }
       if (key2 === "Enter") {
-        consume2(event);
+        ui.consume(event);
         const visible = Array.from(hintMap.entries()).filter(
           ([label]) => label.startsWith(hintPrefix)
         );
@@ -4243,7 +4220,7 @@
         const charset = normalizeCharset();
         const lower = key2.toLowerCase();
         if (charset.includes(lower)) {
-          consume2(event);
+          ui.consume(event);
           const next2 = hintPrefix + lower.toUpperCase();
           const exact = hintMap.get(next2);
           hintPrefix = next2;
@@ -4254,29 +4231,29 @@
           return true;
         }
       }
-      consume2(event);
+      ui.consume(event);
       return true;
     }
     if (!active4) return false;
     if (pendingF) {
       const ch = event.key;
       if (ch.length === 1) {
-        consume2(event);
+        ui.consume(event);
         handleFChar(ch);
         return true;
       }
       if (ch === "Escape") {
-        consume2(event);
+        ui.consume(event);
         pendingF = null;
         ui.toast("Cancelled");
         return true;
       }
-      consume2(event);
+      ui.consume(event);
       return true;
     }
     const key = event.key;
     if (key === "Escape") {
-      consume2(event);
+      ui.consume(event);
       if (isCaret()) {
         close4(false);
       } else {
@@ -4290,7 +4267,7 @@
     if (/^[0-9]$/.test(key)) {
       if (key === "0" && pendingCount === "") {
       } else {
-        consume2(event);
+        ui.consume(event);
         if (pendingCount.length < 9) pendingCount += key;
         if (pillEl) pillEl.textContent = pillText(mode3) + " " + pendingCount;
         return true;
@@ -4304,12 +4281,12 @@
       pendingCount = "";
       if (pillEl) pillEl.textContent = pillText(mode3);
       pendingF = { dir, till, count };
-      consume2(event);
+      ui.consume(event);
       ui.toast(`/${till ? "t" : "f"}-char\u2026`);
       return true;
     }
     if (key === ";" || key === ",") {
-      consume2(event);
+      ui.consume(event);
       if (!lastF) {
         ui.toast("No f/t yet");
         return true;
@@ -4326,7 +4303,7 @@
     }
     if (key === "g") {
       if (pendingG) {
-        consume2(event);
+        ui.consume(event);
         const n = getRepeatCount();
         if (n > 1) doGoToLine(n);
         else doDocBoundary(-1);
@@ -4334,7 +4311,7 @@
         if (pillEl) pillEl.textContent = pillText(mode3);
         return true;
       } else {
-        consume2(event);
+        ui.consume(event);
         pendingG = true;
         if (pillEl) pillEl.textContent = pillText(mode3) + " g";
         setTimeout(() => {
@@ -4359,14 +4336,14 @@
         if (pillEl && pillEl.textContent.endsWith(" y"))
           pillEl.textContent = pillText(mode3);
         if (key === "y") {
-          consume2(event);
+          ui.consume(event);
           for (let i = 0; i < repeat; i++) yankLineFromCaret();
           pendingCount = "";
           return true;
         }
       }
       if (key === "y") {
-        consume2(event);
+        ui.consume(event);
         pendingY = true;
         if (pillEl) pillEl.textContent = pillText(mode3) + " y";
         setTimeout(() => {
@@ -4379,20 +4356,20 @@
         return true;
       }
       if (key === "Y") {
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) yankLineFromCaret();
         pendingCount = "";
         return true;
       }
       if (key === "/") {
-        consume2(event);
+        ui.consume(event);
         close4(false);
         if (findOpenHandler) findOpenHandler();
         pendingCount = "";
         return true;
       }
       if (key === "v" || key === "V") {
-        consume2(event);
+        ui.consume(event);
         const sel = getSelection();
         if (key === "v") {
           mode3 = "visual";
@@ -4428,7 +4405,7 @@
         return true;
       }
       if (key === "Enter") {
-        consume2(event);
+        ui.consume(event);
         if (!activateCaretLink()) {
           ui.toast("No link at caret");
         } else {
@@ -4441,59 +4418,59 @@
     switch (key) {
       case "h":
       case "ArrowLeft":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doMoveChar(-1);
         break;
       case "l":
       case "ArrowRight":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doMoveChar(1);
         break;
       case "j":
       case "ArrowDown":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doMoveLine(1);
         break;
       case "k":
       case "ArrowUp":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doMoveLine(-1);
         break;
       case "w":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doMoveWord(1);
         break;
       case "b":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doMoveWord(-1);
         break;
       case "e":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doMoveWordEnd(1);
         break;
       case "0":
-        consume2(event);
+        ui.consume(event);
         doLineBoundary(-1);
         break;
       case "^":
-        consume2(event);
+        ui.consume(event);
         doFirstNonBlank();
         break;
       case "$":
-        consume2(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) doLineBoundary(1);
         break;
       case "G":
-        consume2(event);
+        ui.consume(event);
         if (repeat > 1) doGoToLine(repeat);
         else doDocBoundary(1);
         break;
       case "o":
-        consume2(event);
+        ui.consume(event);
         swapAnchorFocus();
         break;
       case "y":
-        consume2(event);
+        ui.consume(event);
         yankSelection();
         try {
           collapseToFocus();
@@ -4511,7 +4488,7 @@
         updateBlockCaret();
         break;
       case "v":
-        consume2(event);
+        ui.consume(event);
         if (mode3 === "visual") {
           enterCaretAtFocus();
         } else if (mode3 === "line") {
@@ -4522,7 +4499,7 @@
         }
         break;
       case "V":
-        consume2(event);
+        ui.consume(event);
         if (mode3 === "line" || mode3 === "visual") {
           enterCaretAtFocus();
         } else {
@@ -4531,7 +4508,7 @@
         }
         break;
       case "Y":
-        consume2(event);
+        ui.consume(event);
         yankSelection();
         try {
           collapseToFocus();
@@ -4551,7 +4528,7 @@
       case "n":
       case "N":
         if (isCaret()) {
-          consume2(event);
+          ui.consume(event);
           if (findNavHandler) {
             const reverse = key === "N";
             findNavHandler(repeat, reverse);
@@ -4561,20 +4538,20 @@
           break;
         }
         if (key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
-          consume2(event);
+          ui.consume(event);
           ui.toast(`${isCaret() ? "No caret" : "No visual"}: ${key}`);
         } else {
-          consume2(event);
+          ui.consume(event);
         }
         break;
       default:
         if (isCaret()) {
-          consume2(event);
+          ui.consume(event);
         } else if (key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
-          consume2(event);
+          ui.consume(event);
           ui.toast(`No visual: ${key}`);
         } else {
-          consume2(event);
+          ui.consume(event);
         }
         break;
     }
@@ -4859,61 +4836,13 @@
     if (matches.length === 0) return null;
     const r = matches[currentIdx];
     if (!r || !r.startContainer) return null;
-    let el = r.startContainer.parentElement;
-    if (!el) return null;
-    if (el.closest) {
-      const a = el.closest("a");
-      if (a && isOpenableLink(a)) return a;
-      const hrefEl = el.closest("[href]");
-      if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
-    }
-    while (el) {
-      if (el.tagName === "A" && isOpenableLink(el)) return el;
-      if (el.getAttribute && el.getAttribute("href") && isOpenableLink(el)) return el;
-      const parent = el.parentElement;
-      if (parent) {
-        el = parent;
-      } else {
-        const root = el.getRootNode && el.getRootNode();
-        if (root && root.host) el = root.host;
-        else break;
-      }
-    }
-    return null;
-  }
-  function dispatchClick2(el) {
-    try {
-      el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch {
-    }
-    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
-      try {
-        el.dispatchEvent(
-          new MouseEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            button: 0,
-            buttons: type === "mousedown" ? 1 : 0
-          })
-        );
-      } catch {
-      }
-    }
-    try {
-      el.focus({ preventScroll: true });
-    } catch {
-      try {
-        el.focus();
-      } catch {
-      }
-    }
+    return getLinkAncestor(r.startContainer.parentElement);
   }
   function activateCurrentLink() {
     const link = getCurrentLinkElement();
     if (!link) return false;
     try {
-      dispatchClick2(link);
+      ui.dispatchClick(link);
     } catch {
     }
     return true;

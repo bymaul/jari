@@ -2,7 +2,7 @@
 import { register } from "./overlays.js";
 import { ui } from "./ui.js";
 import { overlaySelectors } from "./keymap.js";
-import { isOpenableLink, isElementDrawn } from "./hints-elements.js";
+import { isElementDrawn, getLinkAncestor } from "./hints-elements.js";
 import { Visual } from "./visual.js";
 
 const MAX_MATCHES = 1500;
@@ -255,60 +255,14 @@ function getCurrentLinkElement() {
   if (matches.length === 0) return null;
   const r = matches[currentIdx];
   if (!r || !r.startContainer) return null;
-  let el = r.startContainer.parentElement;
-  if (!el) return null;
-  if (el.closest) {
-    const a = el.closest("a");
-    if (a && isOpenableLink(a)) return a;
-    const hrefEl = el.closest("[href]");
-    if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
-  }
-  while (el) {
-    if (el.tagName === "A" && isOpenableLink(el)) return el;
-    if (el.getAttribute && el.getAttribute("href") && isOpenableLink(el)) return el;
-    const parent = el.parentElement;
-    if (parent) {
-      el = parent;
-    } else {
-      const root = el.getRootNode && el.getRootNode();
-      if (root && root.host) el = root.host;
-      else break;
-    }
-  }
-  return null;
-}
-
-function dispatchClick(el) {
-  try {
-    el.scrollIntoView({ block: "nearest", inline: "nearest" });
-  } catch {}
-  for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
-    try {
-      el.dispatchEvent(
-        new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          button: 0,
-          buttons: type === "mousedown" ? 1 : 0,
-        }),
-      );
-    } catch {}
-  }
-  try {
-    el.focus({ preventScroll: true });
-  } catch {
-    try {
-      el.focus();
-    } catch {}
-  }
+  return getLinkAncestor(r.startContainer.parentElement);
 }
 
 function activateCurrentLink() {
   const link = getCurrentLinkElement();
   if (!link) return false;
   try {
-    dispatchClick(link);
+    ui.dispatchClick(link);
   } catch {}
   return true;
 }

@@ -433,6 +433,53 @@
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => showcmd(null), ms);
   }
+  function consume(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  function safeFocus(el, opts) {
+    try {
+      el.focus(opts);
+    } catch {
+      try {
+        el.focus();
+      } catch {
+      }
+    }
+  }
+  function dispatchClick(el) {
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+    }
+    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
+      try {
+        el.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 0,
+            buttons: type === "mousedown" ? 1 : 0
+          })
+        );
+      } catch {
+      }
+    }
+    safeFocus(el, { preventScroll: true });
+  }
+  function focusFrameElement(el) {
+    try {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {
+    }
+    safeFocus(el, { preventScroll: true });
+    try {
+      const win = el.contentWindow;
+      if (win && typeof win.focus === "function") win.focus();
+    } catch {
+    }
+  }
   function buildCategoryTable(cat, headerClass, renderBody) {
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
@@ -454,7 +501,11 @@
     copyText,
     statusContainer,
     buildCategoryTable,
-    withHiddenTextarea
+    withHiddenTextarea,
+    consume,
+    safeFocus,
+    dispatchClick,
+    focusFrameElement
   };
 
   // options/options.js

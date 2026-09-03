@@ -177,13 +177,7 @@ export function focusTarget(el) {
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
   } catch {}
   if (!isFrame(el)) return;
-  try {
-    el.focus({ preventScroll: true });
-  } catch {
-    try {
-      el.focus();
-    } catch {}
-  }
+  ui.safeFocus(el, { preventScroll: true });
   try {
     const win = el.contentWindow;
     if (win && typeof win.focus === "function") win.focus();

@@ -16,7 +16,7 @@ import {
   filterOverlapElements,
   filterAncestors,
   getRealRect,
-  isOpenableLink,
+  getLinkAncestor,
 } from "./hints-elements.js";
 import { overlaySelectors } from "./keymap.js";
 
@@ -1501,31 +1501,8 @@ function yankLineFromCaret() {
 function getCaretLinkElement() {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return null;
-  let el = sel.focusNode.parentElement;
-  if (!el && sel.focusNode.parentNode) el = sel.focusNode.parentNode;
-  if (!el) return null;
-  try {
-    if (el.closest) {
-      const a = el.closest("a");
-      if (a && isOpenableLink(a)) return a;
-      const hrefEl = el.closest("[href]");
-      if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
-    }
-    let cur = el;
-    while (cur) {
-      if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
-      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
-        return cur;
-      const parent = cur.parentElement;
-      if (parent) cur = parent;
-      else {
-        const root = cur.getRootNode && cur.getRootNode();
-        if (root && root.host) cur = root.host;
-        else break;
-      }
-    }
-  } catch {}
-  return null;
+  const el = sel.focusNode.parentElement || sel.focusNode.parentNode || null;
+  return getLinkAncestor(el);
 }
 
 function activateCaretLink() {
@@ -1535,28 +1512,8 @@ function activateCaretLink() {
     return false;
   }
   try {
-    link.scrollIntoView({ block: "nearest", inline: "nearest" });
+    ui.dispatchClick(link);
   } catch {}
-  for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
-    try {
-      link.dispatchEvent(
-        new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          button: 0,
-          buttons: type === "mousedown" ? 1 : 0,
-        }),
-      );
-    } catch {}
-  }
-  try {
-    link.focus({ preventScroll: true });
-  } catch {
-    try {
-      link.focus();
-    } catch {}
-  }
   return true;
 }
 
@@ -1685,11 +1642,6 @@ function moveToPosition(node, offset) {
   updateBlockCaret();
 }
 
-function consume(event) {
-  event.preventDefault();
-  event.stopImmediatePropagation();
-}
-
 function getRepeatCount() {
   const n = parseInt(pendingCount || "1", 10);
   const c = Number.isNaN(n) ? 1 : Math.max(1, n);
@@ -1762,7 +1714,7 @@ function onKeyDown(event) {
   if (hintActive) {
     const key = event.key;
     if (key === "Escape") {
-      consume(event);
+      ui.consume(event);
       if (hintPrefix) {
         hintPrefix = "";
         refreshHints();
@@ -1772,7 +1724,7 @@ function onKeyDown(event) {
       return true;
     }
     if (key === "Backspace") {
-      consume(event);
+      ui.consume(event);
       if (hintPrefix) {
         hintPrefix = hintPrefix.slice(0, -1);
         refreshHints();
@@ -1782,7 +1734,7 @@ function onKeyDown(event) {
       return true;
     }
     if (key === "Enter") {
-      consume(event);
+      ui.consume(event);
       const visible = Array.from(hintMap.entries()).filter(([label]) =>
         label.startsWith(hintPrefix),
       );
@@ -1795,7 +1747,7 @@ function onKeyDown(event) {
       const charset = normalizeCharset();
       const lower = key.toLowerCase();
       if (charset.includes(lower)) {
-        consume(event);
+        ui.consume(event);
         const next = hintPrefix + lower.toUpperCase();
         const exact = hintMap.get(next);
         hintPrefix = next;
@@ -1806,7 +1758,7 @@ function onKeyDown(event) {
         return true;
       }
     }
-    consume(event);
+    ui.consume(event);
     return true;
   }
 
@@ -1815,24 +1767,24 @@ function onKeyDown(event) {
   if (pendingF) {
     const ch = event.key;
     if (ch.length === 1) {
-      consume(event);
+      ui.consume(event);
       handleFChar(ch);
       return true;
     }
     if (ch === "Escape") {
-      consume(event);
+      ui.consume(event);
       pendingF = null;
       ui.toast("Cancelled");
       return true;
     }
-    consume(event);
+    ui.consume(event);
     return true;
   }
 
   const key = event.key;
 
   if (key === "Escape") {
-    consume(event);
+    ui.consume(event);
     if (isCaret()) {
       close(false);
     } else {
@@ -1847,7 +1799,7 @@ function onKeyDown(event) {
   if (/^[0-9]$/.test(key)) {
     if (key === "0" && pendingCount === "") {
     } else {
-      consume(event);
+      ui.consume(event);
       if (pendingCount.length < 9) pendingCount += key;
       if (pillEl) pillEl.textContent = pillText(mode) + " " + pendingCount;
       return true;
@@ -1862,12 +1814,12 @@ function onKeyDown(event) {
     pendingCount = "";
     if (pillEl) pillEl.textContent = pillText(mode);
     pendingF = { dir, till, count };
-    consume(event);
+    ui.consume(event);
     ui.toast(`/${till ? "t" : "f"}-char…`);
     return true;
   }
   if (key === ";" || key === ",") {
-    consume(event);
+    ui.consume(event);
     if (!lastF) {
       ui.toast("No f/t yet");
       return true;
@@ -1885,7 +1837,7 @@ function onKeyDown(event) {
 
   if (key === "g") {
     if (pendingG) {
-      consume(event);
+      ui.consume(event);
       const n = getRepeatCount();
       if (n > 1) doGoToLine(n);
       else doDocBoundary(-1);
@@ -1893,7 +1845,7 @@ function onKeyDown(event) {
       if (pillEl) pillEl.textContent = pillText(mode);
       return true;
     } else {
-      consume(event);
+      ui.consume(event);
       pendingG = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " g";
       setTimeout(() => {
@@ -1920,14 +1872,14 @@ function onKeyDown(event) {
       if (pillEl && pillEl.textContent.endsWith(" y"))
         pillEl.textContent = pillText(mode);
       if (key === "y") {
-        consume(event);
+        ui.consume(event);
         for (let i = 0; i < repeat; i++) yankLineFromCaret();
         pendingCount = "";
         return true;
       }
     }
     if (key === "y") {
-      consume(event);
+      ui.consume(event);
       pendingY = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " y";
       setTimeout(() => {
@@ -1940,20 +1892,20 @@ function onKeyDown(event) {
       return true;
     }
     if (key === "Y") {
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) yankLineFromCaret();
       pendingCount = "";
       return true;
     }
     if (key === "/") {
-      consume(event);
+      ui.consume(event);
       close(false);
       if (findOpenHandler) findOpenHandler();
       pendingCount = "";
       return true;
     }
     if (key === "v" || key === "V") {
-      consume(event);
+      ui.consume(event);
       const sel = getSelection();
       if (key === "v") {
         mode = "visual";
@@ -1986,7 +1938,7 @@ function onKeyDown(event) {
       return true;
     }
     if (key === "Enter") {
-      consume(event);
+      ui.consume(event);
       if (!activateCaretLink()) {
         ui.toast("No link at caret");
       } else {
@@ -2000,59 +1952,59 @@ function onKeyDown(event) {
   switch (key) {
     case "h":
     case "ArrowLeft":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doMoveChar(-1);
       break;
     case "l":
     case "ArrowRight":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doMoveChar(1);
       break;
     case "j":
     case "ArrowDown":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doMoveLine(1);
       break;
     case "k":
     case "ArrowUp":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doMoveLine(-1);
       break;
     case "w":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doMoveWord(1);
       break;
     case "b":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doMoveWord(-1);
       break;
     case "e":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doMoveWordEnd(1);
       break;
     case "0":
-      consume(event);
+      ui.consume(event);
       doLineBoundary(-1);
       break;
     case "^":
-      consume(event);
+      ui.consume(event);
       doFirstNonBlank();
       break;
     case "$":
-      consume(event);
+      ui.consume(event);
       for (let i = 0; i < repeat; i++) doLineBoundary(1);
       break;
     case "G":
-      consume(event);
+      ui.consume(event);
       if (repeat > 1) doGoToLine(repeat);
       else doDocBoundary(1);
       break;
     case "o":
-      consume(event);
+      ui.consume(event);
       swapAnchorFocus();
       break;
     case "y":
-      consume(event);
+      ui.consume(event);
       yankSelection();
       try {
         collapseToFocus();
@@ -2069,7 +2021,7 @@ function onKeyDown(event) {
       updateBlockCaret();
       break;
     case "v":
-      consume(event);
+      ui.consume(event);
       if (mode === "visual") {
         enterCaretAtFocus();
       } else if (mode === "line") {
@@ -2080,7 +2032,7 @@ function onKeyDown(event) {
       }
       break;
     case "V":
-      consume(event);
+      ui.consume(event);
       if (mode === "line" || mode === "visual") {
         enterCaretAtFocus();
       } else {
@@ -2089,7 +2041,7 @@ function onKeyDown(event) {
       }
       break;
     case "Y":
-      consume(event);
+      ui.consume(event);
       yankSelection();
       try {
         collapseToFocus();
@@ -2108,7 +2060,7 @@ function onKeyDown(event) {
     case "n":
     case "N":
       if (isCaret()) {
-        consume(event);
+        ui.consume(event);
         if (findNavHandler) {
           const reverse = key === "N";
           findNavHandler(repeat, reverse);
@@ -2124,25 +2076,25 @@ function onKeyDown(event) {
         !event.altKey &&
         !event.metaKey
       ) {
-        consume(event);
+        ui.consume(event);
         ui.toast(`${isCaret() ? "No caret" : "No visual"}: ${key}`);
       } else {
-        consume(event);
+        ui.consume(event);
       }
       break;
     default:
       if (isCaret()) {
-        consume(event);
+        ui.consume(event);
       } else if (
         key.length === 1 &&
         !event.ctrlKey &&
         !event.altKey &&
         !event.metaKey
       ) {
-        consume(event);
+        ui.consume(event);
         ui.toast(`No visual: ${key}`);
       } else {
-        consume(event);
+        ui.consume(event);
       }
       break;
   }
