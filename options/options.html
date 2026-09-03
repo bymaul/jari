@@ -18,8 +18,8 @@
     </header>
 
     <main>
-      <section class="card">
-        <h2>Scrolling</h2>
+      <details class="card">
+        <summary class="card-toggle"><span class="card-title">Scrolling</span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="scroll-step">Scroll step</label>
@@ -41,10 +41,10 @@
             <input id="smooth-scroll" type="checkbox" />
           </div>
         </div>
-      </section>
+      </details>
 
-      <section class="card">
-        <h2>Search</h2>
+      <details class="card">
+        <summary class="card-toggle"><span class="card-title">Search</span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="fuzzy-matching">Fuzzy matching</label>
@@ -65,10 +65,10 @@
             <label class="check"><input id="source-bookmark" type="checkbox" /> Bookmarks</label>
           </div>
         </div>
-      </section>
+      </details>
 
-      <section class="card">
-        <h2>Clipboard</h2>
+      <details class="card">
+        <summary class="card-toggle"><span class="card-title">Clipboard</span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="copy-format">Copy title + URL as</label>
@@ -81,10 +81,10 @@
             </select>
           </div>
         </div>
-      </section>
+      </details>
 
-      <section class="card">
-        <h2>Timing</h2>
+      <details class="card">
+        <summary class="card-toggle"><span class="card-title">Timing</span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="timeout">Sequence timeout</label>
@@ -105,10 +105,10 @@
             <span class="unit">ms</span>
           </div>
         </div>
-      </section>
+      </details>
 
-      <section class="card">
-        <h2>Hints</h2>
+      <details class="card">
+        <summary class="card-toggle"><span class="card-title">Hints</span></summary>
         <div class="setting">
           <div class="setting-text">
             <label for="hint-chars">Hint characters</label>
@@ -118,28 +118,31 @@
             <input id="hint-chars" type="text" autocomplete="off" spellcheck="false" placeholder="asdfgqwertzxcvb" />
           </div>
         </div>
-      </section>
+      </details>
 
-      <section class="card">
-        <h2>Keybindings</h2>
+      <details class="card" open>
+        <summary class="card-toggle"><span class="card-title">Keybindings</span></summary>
         <p class="helper">
-          Click a key field, then press the key (or key combination) to bind it. Backspace clears a
-          binding. Digits <code>0-9</code> are reserved for the repeat count and cannot be bound.
-          Prefix keys (<code>g</code>, <code>;</code>, <code>y</code>) can't be bound alone —
-          pressing one makes the input wait for the next key and binds the pair (<code>g</code> then
-          <code>o</code> binds <code>go</code>); Escape or Backspace cancels the wait.
+          Click a key field (or focus it and press <code>Enter</code>), then press the key
+          combination to bind it. <code>Esc</code> cancels, <code>Backspace</code> clears.
+          Digits <code>0-9</code> are reserved for the repeat count. Prefix keys
+          (<code>g</code>, <code>;</code>, <code>y</code>) bind as pairs — press the prefix,
+          then the next key. Bindings save immediately.
         </p>
-        <input id="keymap-filter" type="search" placeholder="Filter commands by name or key..." />
+        <div class="keymap-toolbar">
+          <input id="keymap-filter" type="search" placeholder="Filter commands by name or key..." aria-label="Filter commands by name or key" />
+          <span id="keymap-count" class="keymap-count" aria-live="polite"></span>
+        </div>
         <div id="keymap-table"></div>
         <div class="actions">
           <button id="save" type="button" class="primary">Save</button>
           <button id="reset" type="button">Reset to defaults</button>
-          <span id="status" role="status"></span>
+          <span id="status" role="status" aria-live="polite"></span>
         </div>
-      </section>
+      </details>
 
-      <section class="card">
-        <h2>Disabled sites</h2>
+      <details class="card" open>
+        <summary class="card-toggle"><span class="card-title">Disabled sites</span></summary>
         <p class="helper">
           Jari is turned off on these sites. Press
           <code data-key="toggleSiteEnabled"></code> on a page to toggle it there, or add a host here.
@@ -149,7 +152,7 @@
           <button id="add-disabled-site" type="button">Add</button>
         </div>
         <ul id="disabled-list"></ul>
-      </section>
+      </details>
     </main>
 
     <footer>

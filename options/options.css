@@ -57,7 +57,7 @@ main {
   padding: 12px 20px 20px;
 }
 
-section.card {
+.card {
   background: var(--panel);
   border: 1px solid var(--border);
   padding: 12px 16px;
@@ -74,6 +74,61 @@ h2 {
   padding-bottom: 6px;
 }
 
+/* Collapsible behavior cards: the summary header mirrors the h2 style. */
+.card-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  list-style: none;
+}
+
+.card-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.card-toggle::after {
+  content: '+';
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+}
+
+details.card[open] > .card-toggle::after {
+  content: '–';
+}
+
+.card-toggle:hover::after {
+  color: var(--fg);
+}
+
+.card-toggle:focus-visible {
+  outline: 1px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.card-title {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--fg);
+}
+
+details.card[open] > .card-toggle {
+  margin-bottom: 6px;
+}
+
+details.card:not([open]) > .card-toggle {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 p.helper {
   color: var(--muted);
   font-size: 12px;
@@ -82,7 +137,7 @@ p.helper {
 }
 
 /* The intro helper text on the keybindings card sits between the heading and table. */
-section.card > p.helper {
+.card > p.helper {
   margin-bottom: 10px;
 }
 
@@ -195,22 +250,16 @@ code {
   font-size: 12px;
 }
 
-/* Keybindings: three columns of category tables, tight rows. */
+/* Keybindings: two columns of category tables, tight rows. */
 .jari-keymap-columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 24px;
   align-items: start;
 }
 
 .jari-keymap-column {
   min-width: 0;
-}
-
-@media (max-width: 900px) {
-  .jari-keymap-columns {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 620px) {
@@ -233,7 +282,7 @@ code {
 }
 
 #keymap-table td:last-child {
-  width: 96px;
+  width: 148px;
 }
 
 #keymap-table tr.cat-header th {
@@ -247,27 +296,113 @@ code {
 }
 
 #keymap-table td input {
-  width: 100%;
-  min-width: 60px;
+  flex: 1;
+  min-width: 0;
   padding: 2px 6px;
   background: #1e1e26;
   border: 1px solid var(--border);
   color: var(--fg);
   font-family: var(--mono);
   font-size: 12px;
+  cursor: pointer;
+}
+
+#keymap-table td input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+#keymap-table td input:focus-visible {
+  border-color: var(--fg);
+  outline: 1px solid var(--fg);
+  outline-offset: -1px;
 }
 
 #keymap-table td input.recording {
   background: var(--fg);
   border-color: var(--fg);
   color: var(--bg);
+  cursor: text;
+}
+
+/* Key cell: input + inline clear button. */
+.key-cell {
+  vertical-align: top;
+}
+
+.key-cell-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.key-clear {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.key-clear:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.key-clear:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.key-clear:disabled:hover {
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+/* Inline conflict confirm shown under the input. */
+.key-conflict {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.key-conflict-msg {
+  color: var(--fg);
+}
+
+.key-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.key-conflict-actions button {
+  padding: 1px 8px;
+  font-size: 11px;
 }
 
 /* Keymap filter */
-#keymap-filter {
-  width: 100%;
-  padding: 4px 8px;
+.keymap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 10px;
+}
+
+.keymap-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#keymap-filter {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
   background: #1e1e26;
   border: 1px solid var(--border);
   color: var(--fg);
@@ -281,6 +416,9 @@ code {
 }
 
 .jari-keymap-filter-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px;
   color: var(--muted);
   font-size: 12px;

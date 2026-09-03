@@ -107,6 +107,18 @@
     "Fn",
     "AltGraph"
   ]);
+  var clearingKeys = /* @__PURE__ */ new Set(["Backspace", "Delete"]);
+  function isReservedCombo(combo) {
+    return /^[0-9]$/.test(combo);
+  }
+  function findBindingConflict(keymap, combo, commandName) {
+    const existing = keymap[combo];
+    if (existing && existing !== commandName) return existing;
+    return null;
+  }
+  function keysForCommand(keymap, commandName) {
+    return Object.entries(keymap).filter(([, cmd]) => cmd === commandName).map(([key]) => key);
+  }
   function canonicalKey(event) {
     const parts = [];
     if (event.ctrlKey) parts.push("ctrl");
@@ -550,9 +562,15 @@
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
   var keymapFilterEl = document.querySelector("#keymap-filter");
+  var keymapCountEl = document.querySelector("#keymap-count");
   var siteInputEl = document.querySelector("#disabled-site-input");
   var addSiteBtn = document.querySelector("#add-disabled-site");
-  var RESERVED_KEYS = /^[0-9]$/;
+  var IDLE_TITLE = "Click or press Enter, then press a key to rebind.";
+  var RECORDING_TITLE = "Press a key to bind. Esc cancels, Backspace clears.";
+  var activeRecording = null;
+  function commandLabel(name) {
+    return COMMAND_CATALOG[name]?.label || name;
+  }
   async function load2() {
     await settings.load();
     scrollStepEl.value = settings.getScrollStep();
@@ -573,26 +591,45 @@
     return name.toLowerCase().includes(filter) || cmd.label.toLowerCase().includes(filter) || keyFor(name).toLowerCase().includes(filter);
   }
   function renderKeymap() {
+    cancelRecordingSilent();
     tableEl.textContent = "";
     rebuildKeyIndex();
-    const filter = keymapFilterEl.value.trim().toLowerCase();
+    const rawFilter = keymapFilterEl.value.trim();
+    const filter = rawFilter.toLowerCase();
+    const total = Object.keys(COMMAND_CATALOG).length;
     const byCategory = /* @__PURE__ */ new Map();
+    let shown = 0;
     for (const [name, cmd] of Object.entries(COMMAND_CATALOG)) {
       const id = cmd.category || "other";
       if (filter && !matchesFilter(name, cmd, filter)) continue;
+      shown++;
       if (!byCategory.has(id)) byCategory.set(id, []);
       byCategory.get(id).push([name, cmd]);
+    }
+    if (keymapCountEl) {
+      keymapCountEl.textContent = filter ? `${shown} of ${total} commands` : `${total} commands`;
     }
     if (byCategory.size === 0) {
       const empty = document.createElement("div");
       empty.className = "jari-keymap-filter-empty";
-      empty.textContent = `No commands match "${keymapFilterEl.value.trim()}".`;
+      const msg = document.createElement("span");
+      msg.textContent = `No commands match "${rawFilter}". `;
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.textContent = "Clear filter";
+      clear.addEventListener("click", () => {
+        keymapFilterEl.value = "";
+        renderKeymap();
+        keymapFilterEl.focus();
+      });
+      empty.appendChild(msg);
+      empty.appendChild(clear);
       tableEl.appendChild(empty);
       return;
     }
     tableEl.appendChild(
       ui.buildCategorizedGrid(byCategory, {
-        columnCount: 3,
+        columnCount: 2,
         gridClass: "jari-keymap-columns",
         columnClass: "jari-keymap-column",
         headerClass: "cat-header",
@@ -601,15 +638,47 @@
             const row = document.createElement("tr");
             row.dataset.command = name;
             const labelTd = document.createElement("td");
+            labelTd.className = "key-label";
             labelTd.textContent = cmd.label;
             const keyTd = document.createElement("td");
+            keyTd.className = "key-cell";
+            const fieldRow = document.createElement("div");
+            fieldRow.className = "key-cell-row";
             const input = document.createElement("input");
             input.type = "text";
             input.readOnly = true;
+            input.className = "key-input";
+            input.dataset.command = name;
             input.value = keyFor(name);
-            input.title = "Click, then press a key to rebind. Backspace clears.";
-            input.addEventListener("focus", () => startRecording(input, name));
-            keyTd.appendChild(input);
+            input.placeholder = "unbound";
+            input.title = IDLE_TITLE;
+            input.setAttribute(
+              "aria-label",
+              `${cmd.label} shortcut. ${IDLE_TITLE}`
+            );
+            const clearBtn = document.createElement("button");
+            clearBtn.type = "button";
+            clearBtn.className = "key-clear";
+            clearBtn.textContent = "\xD7";
+            clearBtn.title = `Clear ${cmd.label} binding`;
+            clearBtn.setAttribute("aria-label", `Clear ${cmd.label} binding`);
+            clearBtn.disabled = !keyFor(name);
+            clearBtn.addEventListener("click", (event) => {
+              event.stopPropagation();
+              clearBinding(name);
+            });
+            input.addEventListener("click", () => startRecording(input, name));
+            input.addEventListener(
+              "keydown",
+              (event) => onKeyInputKeydown(event, input, name)
+            );
+            input.addEventListener("blur", (event) => onKeyInputBlur(event, input));
+            input.addEventListener("focus", () => {
+              if (!isRecording(input)) input.select?.();
+            });
+            keyTd.appendChild(fieldRow);
+            fieldRow.appendChild(input);
+            fieldRow.appendChild(clearBtn);
             row.appendChild(labelTd);
             row.appendChild(keyTd);
             tbody.appendChild(row);
@@ -634,70 +703,240 @@
   function keyFor(commandName) {
     return keyByCommand.get(commandName) || "";
   }
+  function isRecording(input) {
+    return activeRecording?.input === input;
+  }
   function startRecording(input, name) {
-    const previous = input.value;
+    if (isRecording(input)) return;
+    cancelRecordingSilent();
+    dismissConflict(input);
+    activeRecording = { input, name, previous: input.value, waitingPrefix: null };
     input.value = "press a key...";
     input.classList.add("recording");
-    let waitingPrefix = null;
-    const commit = (combo) => {
-      input.removeEventListener("keydown", handler);
-      input.classList.remove("recording");
-      waitingPrefix = null;
-      const keymap = settings.getKeymap();
-      for (const [k, cmd] of Object.entries(keymap)) {
-        if (k === combo || cmd === name) delete keymap[k];
+    input.title = RECORDING_TITLE;
+    input.removeAttribute("placeholder");
+  }
+  function cancelRecordingSilent() {
+    if (!activeRecording) return;
+    const { input, previous } = activeRecording;
+    activeRecording = null;
+    if (!input.isConnected) return;
+    dismissConflict(input);
+    input.classList.remove("recording");
+    input.value = previous;
+    input.placeholder = "unbound";
+    input.title = IDLE_TITLE;
+  }
+  function cancelRecording() {
+    if (!activeRecording) return;
+    cancelRecordingSilent();
+    status("Cancelled \u2014 no changes");
+  }
+  function exitRecording() {
+    if (!activeRecording) return;
+    const { input } = activeRecording;
+    activeRecording = null;
+    dismissConflict(input);
+    input.classList.remove("recording");
+    input.placeholder = "unbound";
+    input.title = IDLE_TITLE;
+  }
+  function onKeyInputBlur(event, input) {
+    if (!isRecording(input)) return;
+    const next = event.relatedTarget;
+    const cell = input.closest(".key-cell");
+    if (next && cell && cell.contains(next)) return;
+    cancelRecordingSilent();
+  }
+  function onKeyInputKeydown(event, input, name) {
+    if (!isRecording(input)) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        event.stopPropagation();
+        startRecording(input, name);
       }
-      keymap[combo] = name;
-      status("Binding set");
-      renderKeymap();
-    };
-    const handler = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (modifierKeys.has(event.key)) return;
-      if (event.key === "Escape" || event.key === "Backspace") {
-        if (waitingPrefix) {
-          waitingPrefix = null;
-          input.value = "press a key...";
-          status(
-            "Prefix cancelled \u2014 press a key, or Esc/Backspace to clear the binding"
-          );
-          return;
-        }
-        input.removeEventListener("keydown", handler);
-        input.classList.remove("recording");
-        const keymap = settings.getKeymap();
-        for (const [k, cmd] of Object.entries(keymap)) {
-          if (cmd === name) delete keymap[k];
-        }
-        status("Binding cleared");
-        renderKeymap();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+    if (modifierKeys.has(event.key)) return;
+    if (event.key === "Escape") {
+      if (activeRecording.waitingPrefix) {
+        activeRecording.waitingPrefix = null;
+        input.value = "press a key...";
+        status("Prefix cancelled \u2014 press a key, or Esc again to stop");
         return;
       }
-      const combo = canonicalKey(event);
-      if (waitingPrefix) {
-        commit(waitingPrefix + combo);
+      cancelRecording();
+      return;
+    }
+    if (clearingKeys.has(event.key)) {
+      if (activeRecording.waitingPrefix) {
+        activeRecording.waitingPrefix = null;
+        input.value = "press a key...";
+        status("Prefix cancelled \u2014 press a key");
         return;
       }
-      if (prefixKeys.has(combo)) {
-        waitingPrefix = combo;
-        input.value = combo + " \u2014 press the next key, or Esc/Backspace to cancel";
-        status(
-          "Prefix keys can't be bound alone; press the next key of the sequence"
-        );
-        return;
+      clearBinding(name);
+      return;
+    }
+    const combo = canonicalKey(event);
+    if (activeRecording.waitingPrefix) {
+      const full = activeRecording.waitingPrefix + combo;
+      activeRecording.waitingPrefix = null;
+      attemptCommit(full, name, input);
+      return;
+    }
+    if (prefixKeys.has(combo)) {
+      activeRecording.waitingPrefix = combo;
+      input.value = `${combo} \u2014 press the next key...`;
+      status("Prefix key \u2014 press the next key (Esc cancels)");
+      return;
+    }
+    if (isReservedCombo(combo)) {
+      exitRecording();
+      input.value = keyFor(name);
+      status("Digits 0-9 are reserved for the repeat count");
+      return;
+    }
+    attemptCommit(combo, name, input);
+  }
+  function attemptCommit(combo, name, input) {
+    const conflict = findBindingConflict(settings.getKeymap(), combo, name);
+    if (!conflict) {
+      commitCombo(combo, name, null);
+      return;
+    }
+    showConflict(input, name, combo, conflict);
+  }
+  function persistKeymap() {
+    return settings.update({ keymap: { ...settings.getKeymap() } }).then(() => true).catch(() => {
+      status("Save failed");
+      return false;
+    });
+  }
+  async function commitCombo(combo, name, swapWith, doSwap = false) {
+    const keymap = settings.getKeymap();
+    const previous = keysForCommand(keymap, name)[0] || "";
+    for (const [k, cmd] of Object.entries(keymap)) {
+      if (k === combo || cmd === name || swapWith && cmd === swapWith) {
+        delete keymap[k];
       }
-      if (RESERVED_KEYS.test(combo)) {
-        input.removeEventListener("keydown", handler);
-        input.classList.remove("recording");
-        input.value = previous;
-        status("Digits 0-9 are reserved for the repeat count");
-        renderKeymap();
-        return;
+    }
+    keymap[combo] = name;
+    const swapped = doSwap && swapWith && previous && previous !== combo;
+    if (swapped) keymap[previous] = swapWith;
+    const ok = await persistKeymap();
+    exitRecording();
+    updateAllInputs();
+    if (!ok) return;
+    if (swapped) {
+      status(`Swapped: ${combo} \u2192 ${commandLabel(name)}, ${previous} \u2192 ${commandLabel(swapWith)}`);
+    } else if (swapWith) {
+      status(`Saved ${combo} \u2192 ${commandLabel(name)} (unbound ${commandLabel(swapWith)})`);
+    } else {
+      status(`Saved ${combo} \u2192 ${commandLabel(name)}`);
+    }
+    focusInputFor(name);
+  }
+  async function clearBinding(name) {
+    cancelRecordingSilent();
+    const keymap = settings.getKeymap();
+    let had = false;
+    for (const [k, cmd] of Object.entries(keymap)) {
+      if (cmd === name) {
+        delete keymap[k];
+        had = true;
       }
-      commit(combo);
-    };
-    input.addEventListener("keydown", handler);
+    }
+    if (!had) {
+      updateAllInputs();
+      return;
+    }
+    const ok = await persistKeymap();
+    updateAllInputs();
+    if (ok) status(`Cleared ${commandLabel(name)} \u2014 now unbound`);
+    focusInputFor(name);
+  }
+  function updateAllInputs() {
+    rebuildKeyIndex();
+    for (const row of tableEl.querySelectorAll("tr[data-command]")) {
+      const name = row.dataset.command;
+      const input = row.querySelector(".key-input");
+      const clearBtn = row.querySelector(".key-clear");
+      if (!input) continue;
+      if (isRecording(input)) continue;
+      input.value = keyFor(name);
+      if (clearBtn) clearBtn.disabled = !keyFor(name);
+    }
+    refreshKeyLabels();
+  }
+  function focusInputFor(name) {
+    const input = tableEl.querySelector(`.key-input[data-command="${name}"]`);
+    if (input) input.focus();
+  }
+  function dismissConflict(input) {
+    const cell = input?.closest?.(".key-cell");
+    cell?.querySelector?.(".key-conflict")?.remove();
+  }
+  function showConflict(input, name, combo, conflictingCommand) {
+    const cell = input.closest(".key-cell");
+    if (!cell) {
+      commitCombo(combo, name, conflictingCommand);
+      return;
+    }
+    dismissConflict(input);
+    input.value = `${combo} \u2014 taken`;
+    const box = document.createElement("div");
+    box.className = "key-conflict";
+    const msg = document.createElement("div");
+    msg.className = "key-conflict-msg";
+    msg.textContent = `${combo} is already ${commandLabel(conflictingCommand)}.`;
+    const actions = document.createElement("div");
+    actions.className = "key-conflict-actions";
+    const reassign = document.createElement("button");
+    reassign.type = "button";
+    reassign.className = "primary";
+    reassign.textContent = "Reassign";
+    reassign.title = `Unbind ${commandLabel(conflictingCommand)} and use ${combo} here`;
+    reassign.addEventListener("click", () => commitCombo(combo, name, conflictingCommand, false));
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Keep both";
+    cancel.title = "Cancel \u2014 keep the existing binding (Esc)";
+    cancel.addEventListener("click", () => {
+      dismissConflict(input);
+      if (!isRecording(input)) return;
+      input.value = "press a key...";
+      input.focus();
+      status("Kept the existing binding");
+    });
+    actions.appendChild(reassign);
+    const previous = keysForCommand(settings.getKeymap(), name)[0] || "";
+    if (previous && previous !== combo) {
+      const swap = document.createElement("button");
+      swap.type = "button";
+      swap.textContent = "Swap";
+      swap.title = `Use ${combo} here and move ${commandLabel(conflictingCommand)} to ${previous}`;
+      swap.addEventListener("click", () => commitCombo(combo, name, conflictingCommand, true));
+      actions.appendChild(swap);
+    }
+    actions.appendChild(cancel);
+    box.appendChild(msg);
+    box.appendChild(actions);
+    box.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        cancel.click();
+      }
+    });
+    cell.appendChild(box);
+    status(`${combo} is already bound \u2014 choose Reassign or Keep both`);
+    cancel.focus();
   }
   function readPositiveInt(el, fallback) {
     const raw = parseInt(el.value, 10);
@@ -728,6 +967,7 @@
     settings.update(patch).then(() => status("Saved")).catch(() => status("Save failed"));
   }
   function reset() {
+    cancelRecordingSilent();
     settings.update({
       keymap: { ...keymapDefaults },
       scrollStep: settingsDefaults.scrollStep,
@@ -788,11 +1028,17 @@
     clearTimeout(statusEl._timer);
     statusEl._timer = setTimeout(() => {
       statusEl.textContent = "";
-    }, 2e3);
+    }, 2500);
   }
   saveBtn.addEventListener("click", save);
   resetBtn.addEventListener("click", reset);
   keymapFilterEl.addEventListener("input", renderKeymap);
+  keymapFilterEl.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && keymapFilterEl.value) {
+      keymapFilterEl.value = "";
+      renderKeymap();
+    }
+  });
   addSiteBtn.addEventListener("click", addDisabledSite);
   siteInputEl.addEventListener("keydown", (event) => {
     if (event.key === "Enter") addDisabledSite();

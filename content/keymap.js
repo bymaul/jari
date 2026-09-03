@@ -125,6 +125,24 @@ export const modifierKeys = new Set([
   "AltGraph",
 ]);
 
+export const clearingKeys = new Set(["Backspace", "Delete"]);
+
+export function isReservedCombo(combo) {
+  return /^[0-9]$/.test(combo);
+}
+
+export function findBindingConflict(keymap, combo, commandName) {
+  const existing = keymap[combo];
+  if (existing && existing !== commandName) return existing;
+  return null;
+}
+
+export function keysForCommand(keymap, commandName) {
+  return Object.entries(keymap)
+    .filter(([, cmd]) => cmd === commandName)
+    .map(([key]) => key);
+}
+
 export function canonicalKey(event) {
   const parts = [];
   if (event.ctrlKey) parts.push("ctrl");

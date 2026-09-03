@@ -76,3 +76,25 @@ test("balanceCategories spreads categories across the columns", () => {
     for (const cat of col) assert.ok(byCategory.has(cat.id));
   }
 });
+
+test("isReservedCombo reserves bare digits for the repeat count", () => {
+  assert.equal(Jari.isReservedCombo("5"), true);
+  assert.equal(Jari.isReservedCombo("0"), true);
+  assert.equal(Jari.isReservedCombo("ctrl+5"), false);
+  assert.equal(Jari.isReservedCombo("g"), false);
+  assert.equal(Jari.isReservedCombo("gg"), false);
+});
+
+test("findBindingConflict reports only bindings owned by another command", () => {
+  const keymap = { j: "scrollDown", k: "scrollUp" };
+  assert.equal(Jari.findBindingConflict(keymap, "j", "scrollUp"), "scrollDown");
+  assert.equal(Jari.findBindingConflict(keymap, "j", "scrollDown"), null);
+  assert.equal(Jari.findBindingConflict(keymap, "z", "scrollDown"), null);
+});
+
+test("keysForCommand lists every key bound to a command", () => {
+  const keymap = { j: "scrollDown", z: "scrollDown", k: "scrollUp" };
+  assert.deepEqual(Jari.keysForCommand(keymap, "scrollDown").sort(), ["j", "z"]);
+  assert.deepEqual(Jari.keysForCommand(keymap, "scrollUp"), ["k"]);
+  assert.deepEqual(Jari.keysForCommand(keymap, "closeTab"), []);
+});
