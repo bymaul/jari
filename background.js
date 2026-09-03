@@ -122,6 +122,23 @@
       const tab = await chrome.tabs.create(target ? { url: target } : {});
       return tab ? { ok: true, id: tab.id } : { ok: false };
     },
+    openIncognitoTab: async (_, { url } = {}) => {
+      const target = url === void 0 ? void 0 : normalizeUrl(url);
+      if (url !== void 0 && !target) return { ok: false };
+      const windows = await chrome.windows.getAll({});
+      const incognito = (windows || []).find((win2) => win2 && win2.incognito);
+      if (incognito) {
+        const tab = await chrome.tabs.create(
+          target ? { windowId: incognito.id, url: target, active: true } : { windowId: incognito.id, active: true }
+        );
+        await focusWindow(incognito.id, "openIncognitoTab");
+        return tab ? { ok: true, id: tab.id } : { ok: false };
+      }
+      const win = await chrome.windows.create(
+        target ? { url: target, incognito: true } : { incognito: true }
+      );
+      return win ? { ok: true, id: win.id } : { ok: false };
+    },
     navigate: async (sender, { url } = {}) => {
       const target = normalizeUrl(url);
       if (!target || !sender.tab || !sender.tab.id) return { ok: false };

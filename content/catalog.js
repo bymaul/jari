@@ -16,6 +16,7 @@ export const COMMAND_CATALOG = {
   zoomOut: { category: "zoom", label: "Zoom out" },
 
   newTab: { category: "tabs", label: "New tab" },
+  newIncognitoTab: { category: "tabs", label: "New incognito tab" },
   closeTab: { category: "tabs", label: "Close tab", repeatable: true },
   restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
   previousTab: { category: "tabs", label: "Previous tab", repeatable: true },

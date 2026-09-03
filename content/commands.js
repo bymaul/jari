@@ -221,6 +221,7 @@ export const commands = {
   zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
 
   newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
+  newIncognitoTab: { ...COMMAND_CATALOG.newIncognitoTab, run: () => sendMessage("openIncognitoTab") },
   closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
   restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
   openClipboard: { ...COMMAND_CATALOG.openClipboard, run: () => openClipboardWith("navigate") },

@@ -31,6 +31,7 @@ block caret and hints - every key rebindable from the options page.
 ### Tabs
 
 - `t` - open URL or search
+- `T` - new incognito tab
 - `gt` - search tabs
 - `x` - close tab
 - `X` - reopen closed tab

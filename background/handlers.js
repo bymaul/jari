@@ -27,6 +27,26 @@ export const handlers = {
     return tab ? { ok: true, id: tab.id } : { ok: false };
   },
 
+  openIncognitoTab: async (_, { url } = {}) => {
+    const target = url === undefined ? undefined : normalizeUrl(url);
+    if (url !== undefined && !target) return { ok: false };
+    const windows = await chrome.windows.getAll({});
+    const incognito = (windows || []).find((win) => win && win.incognito);
+    if (incognito) {
+      const tab = await chrome.tabs.create(
+        target
+          ? { windowId: incognito.id, url: target, active: true }
+          : { windowId: incognito.id, active: true },
+      );
+      await focusWindow(incognito.id, "openIncognitoTab");
+      return tab ? { ok: true, id: tab.id } : { ok: false };
+    }
+    const win = await chrome.windows.create(
+      target ? { url: target, incognito: true } : { incognito: true },
+    );
+    return win ? { ok: true, id: win.id } : { ok: false };
+  },
+
   navigate: async (sender, { url } = {}) => {
     const target = normalizeUrl(url);
     if (!target || !sender.tab || !sender.tab.id) return { ok: false };
