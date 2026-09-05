@@ -8,6 +8,9 @@
 Scroll, manage tabs and history, follow links, find in page, and select text
 without leaving the home row.
 
+Works on Chrome, Edge, and Firefox (Manifest V3). No data collection -
+see [PRIVACY.md](PRIVACY.md).
+
 ## Keys
 
 Most commands take a repeat count (`3j`, `2x`). `0-9` are reserved for it.
@@ -39,9 +42,32 @@ Overlapping bindings are allowed but flagged - the single key fires first.
 
 ## Install
 
-Chrome/Edge: `chrome://extensions` → Developer mode → Load unpacked.
-Firefox: `about:debugging` → Load Temporary Add-on.
-Build the target manifest first (below) - the checked-in one targets Chrome.
+Download the latest `jari-chrome-<version>.zip` or `jari-firefox-<version>.zip`
+from [Releases](https://github.com/bymaul/jari/releases) and unzip it, then:
+
+- Chrome/Edge: `chrome://extensions` → Developer mode → Load unpacked →
+  select the unzipped folder.
+- Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on →
+  select the `manifest.json` inside the unzipped folder. (Temporary add-ons
+  are removed when Firefox restarts; signed store builds are planned.)
+
+Or build from source (below) and load this folder the same way. The checked-in
+`manifest.json` targets Chrome - run `npm run build:firefox` first for Firefox.
+
+## Permissions - why each one
+
+| Permission | Used for |
+| --- | --- |
+| `tabs`, `sessions` | Switch, close, reopen, move, duplicate tabs |
+| `history`, `bookmarks` | Omnibox (`t`) suggestions from your history and bookmarks |
+| `search` | Open a search in a maximized incognito window (`T`) |
+| `storage` | Persist your settings via the browser's synced storage |
+| `clipboardRead` | Open a URL from your clipboard (`gp`/`gP`) |
+| `clipboardWrite` | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API |
+| `<all_urls>` content script | Link hints, scrolling, find, and visual mode on the pages you visit |
+
+Jari makes no network requests of its own and sends nothing anywhere.
+Details in [PRIVACY.md](PRIVACY.md).
 
 ## Build & dev
 
@@ -50,8 +76,27 @@ npm install
 npm run lint          # eslint, must be clean
 npm test              # node --test
 npm run build:chrome  # or: npm run build:firefox
+npm run dist          # release zips for both targets under dist/
 ```
 
 Source lives in `content/`, `options/`, `background/`, `shared/` and is
 bundled by esbuild into `content/bundle.js`, `options/options.bundle.js`,
 `background.js` - rebuild after touching source and commit both together.
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
+## Support & contributing
+
+- Bug reports and feature requests:
+  [GitHub Issues](https://github.com/bymaul/jari/issues). Please include your
+  browser + version, the Jari version, the page URL (if public), and the keys
+  you pressed.
+- Security issues: please open a private
+  [security advisory](https://github.com/bymaul/jari/security/advisories/new)
+  instead of a public issue.
+- Pull requests are welcome. Keep changes small, run `npm run lint` and
+  `npm test`, and rebuild the bundles before committing.
+
+## License
+
+[MIT](LICENSE)

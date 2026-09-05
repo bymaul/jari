@@ -1,14 +1,21 @@
 {
   "name": "jari",
   "version": "0.3.0",
-  "private": true,
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
+  "license": "MIT",
+  "author": "Maulana Ahmad Aji Triadi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bymaul/jari.git"
+  },
+  "homepage": "https://github.com/bymaul/jari",
   "type": "module",
   "scripts": {
     "lint": "eslint .",
     "test": "node --test",
     "build:chrome": "node build.js chrome",
-    "build:firefox": "node build.js firefox"
+    "build:firefox": "node build.js firefox",
+    "dist": "node build.js dist"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

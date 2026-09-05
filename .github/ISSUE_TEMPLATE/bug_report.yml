@@ -1,0 +1,31 @@
+---
+name: Bug report
+description: Report a problem with Jari
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Jari version
+      description: From the Releases page or commit hash if built from source
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser + version
+      description: e.g. Chrome 126, Firefox 128
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Page URL
+      description: Only if public - never share private URLs
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The keys you pressed and what you expected vs what happened
+    validations:
+      required: true
