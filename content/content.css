@@ -245,7 +245,8 @@
   cursor: pointer;
 }
 
-.jari-help-footer button:hover {
+.jari-help-footer button:hover,
+.jari-help-footer button:focus-visible {
   background: var(--jari-of-bg);
   color: var(--jari-of-fg);
 }

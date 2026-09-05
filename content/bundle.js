@@ -185,7 +185,6 @@
       storedKeymap[key] = command;
     }
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
-    for (const key of prefixKeys) delete keymap[key];
     return {
       keymap,
       disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
@@ -5769,6 +5768,10 @@ ${location.href}`;
   }
   function handleKeydown(event) {
     if (!event.isTrusted) return;
+    if (window.__jariOptionsRecording) {
+      clearPending();
+      return;
+    }
     const overlay4 = Overlays.active();
     if (overlay4) {
       Clue.hide();

@@ -14,6 +14,11 @@
   box-sizing: border-box;
 }
 
+/* Focused elements keep their own style — no focus rings anywhere. */
+:focus-visible {
+  outline: none;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -117,13 +122,9 @@ details.card[open] > .card-toggle::after {
   content: "–";
 }
 
-.card-toggle:hover::after {
+.card-toggle:hover::after,
+.card-toggle:focus-visible::after {
   color: var(--fg);
-}
-
-.card-toggle:focus-visible {
-  outline: 1px solid var(--fg);
-  outline-offset: 2px;
 }
 
 .card-title {
@@ -243,11 +244,6 @@ code {
   font-size: 12px;
 }
 
-.setting-control input[type="number"]:focus {
-  border-color: var(--fg);
-  outline: none;
-}
-
 .setting-control input[aria-invalid="true"],
 #keymap-filter[aria-invalid="true"],
 .add-site input[aria-invalid="true"] {
@@ -271,11 +267,6 @@ code {
   font-size: 12px;
 }
 
-.setting-control select:focus {
-  border-color: var(--fg);
-  outline: none;
-}
-
 .setting-control input[type="text"] {
   width: 180px;
   padding: 3px 6px;
@@ -284,11 +275,6 @@ code {
   color: var(--fg);
   font-family: var(--mono);
   font-size: 12px;
-}
-
-.setting-control input[type="text"]:focus {
-  border-color: var(--fg);
-  outline: none;
 }
 
 .setting-sources {
@@ -339,7 +325,7 @@ code {
 }
 
 #keymap-table td:last-child {
-  width: 148px;
+  width: 190px;
 }
 
 #keymap-table tr.cat-header th {
@@ -352,86 +338,99 @@ code {
   padding: 5px 8px 3px;
 }
 
-#keymap-table td input {
-  flex: 1;
-  min-width: 0;
-  padding: 2px 6px;
-  background: #1e1e26;
-  border: 1px solid var(--border);
-  color: var(--fg);
-  font-family: var(--mono);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-#keymap-table tr:not(.cat-header):hover td {
+#keymap-table tr:not(.cat-header):hover td,
+#keymap-table tr:not(.cat-header):focus-within td {
   background: #2c2c36;
-}
-
-#keymap-table td input::placeholder {
-  color: var(--muted);
-  opacity: 1;
-}
-
-#keymap-table td input[data-bound="false"] {
-  color: var(--muted);
-  font-style: italic;
-}
-
-#keymap-table td input:focus-visible {
-  border-color: var(--fg);
-  outline: 1px solid var(--fg);
-  outline-offset: -1px;
-}
-
-#keymap-table td input.recording {
-  background: var(--fg);
-  border-color: var(--fg);
-  color: var(--bg);
-  cursor: text;
 }
 
 .key-cell {
   vertical-align: top;
 }
 
-.key-cell-row {
+.key-inline {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
 
-.key-clear {
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 4px 1px 7px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.chip.overlap {
+  border-color: #e06c75;
+}
+
+.chip.overlap .chip-key {
+  color: #e06c75;
+}
+
+.chip-key {
+  white-space: nowrap;
+}
+
+.chip-remove {
   flex: 0 0 auto;
-  padding: 1px 7px;
+  padding: 0 5px;
   font-size: 12px;
   line-height: 1.4;
   color: var(--muted);
+  border: none;
+  background: transparent;
 }
 
-.key-clear:not(:disabled) {
-  opacity: 0.55;
+.chip-remove:hover,
+.chip-remove:focus-visible {
+  color: var(--fg);
+  border: none;
 }
 
-.key-clear:not(:disabled):hover {
+#keymap-table tr:hover .chip-remove,
+#keymap-table tr:focus-within .chip-remove,
+.chip-remove:focus-visible {
   opacity: 1;
+}
+
+.key-add {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+}
+
+.key-add:hover,
+.key-add:focus-visible {
   color: var(--fg);
 }
 
-.key-clear:disabled {
-  opacity: 0;
-  cursor: default;
+.key-add.recording {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
 }
 
-#keymap-table tr:hover .key-clear:not(:disabled),
-#keymap-table tr:focus-within .key-clear:not(:disabled),
-.key-clear:not(:disabled):focus-visible {
-  opacity: 1;
-}
-
-.key-clear:disabled:hover {
-  border-color: var(--border);
+.key-recording-hint {
+  margin-top: 2px;
+  font-size: 11px;
   color: var(--muted);
+  line-height: 1.4;
+}
+
+.key-overlap-warn {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .key-conflict {
@@ -490,11 +489,6 @@ code {
   font-size: 12px;
 }
 
-#keymap-filter:focus {
-  border-color: var(--fg);
-  outline: none;
-}
-
 .jari-keymap-filter-empty {
   display: flex;
   align-items: center;
@@ -521,7 +515,8 @@ button {
   cursor: pointer;
 }
 
-button:hover {
+button:hover,
+button:focus-visible {
   border-color: var(--fg);
   color: var(--fg);
 }
@@ -537,7 +532,8 @@ button.primary {
   font-weight: bold;
 }
 
-button.primary:hover {
+button.primary:hover,
+button.primary:focus-visible {
   background: var(--panel);
   color: var(--fg);
 }
@@ -563,9 +559,39 @@ button.primary:hover {
   font-size: 12px;
 }
 
-.add-site input:focus {
-  border-color: var(--fg);
-  outline: none;
+dialog.jari-confirm-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  max-width: 380px;
+  color: var(--fg);
+}
+
+dialog.jari-confirm-box::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.jari-confirm-msg {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.jari-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.jari-confirm-actions .danger {
+  background: #e06c75;
+  border-color: #e06c75;
+  color: var(--bg);
+}
+
+.jari-confirm-actions .danger:hover,
+.jari-confirm-actions .danger:focus-visible {
+  border-color: #e06c75;
+  color: #e06c75;
 }
 
 #disabled-list {

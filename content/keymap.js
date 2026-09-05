@@ -140,6 +140,31 @@ export function findBindingConflict(keymap, combo, commandName) {
   return null;
 }
 
+export function isBindablePrefixStarter(combo) {
+  if (!combo || typeof combo !== "string") return false;
+  if (combo.includes("+")) return false;
+  if (combo.length !== 1) return false;
+  if (/^[0-9]$/.test(combo)) return false;
+  return true;
+}
+
+export function findOverlapConflicts(keymap, combo) {
+  const out = [];
+  if (!combo || typeof combo !== "string") return out;
+  if (combo.includes("+")) return out;
+  for (const [key, command] of Object.entries(keymap || {})) {
+    if (key === combo) continue;
+    if (key.includes("+")) continue;
+    if (key.length > combo.length && key.startsWith(combo)) {
+      out.push({ key, command, kind: "shadows" });
+    } else if (combo.length > key.length && combo.startsWith(key)) {
+      out.push({ key, command, kind: "shadowed-by" });
+    }
+  }
+  out.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return out;
+}
+
 export function keysForCommand(keymap, commandName) {
   return Object.entries(keymap)
     .filter(([, cmd]) => cmd === commandName)
@@ -243,7 +268,6 @@ export function normalizeSettings(data) {
     storedKeymap[key] = command;
   }
   const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
-  for (const key of prefixKeys) delete keymap[key];
   return {
     keymap,
     disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],

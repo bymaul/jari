@@ -118,6 +118,29 @@
     if (existing && existing !== commandName) return existing;
     return null;
   }
+  function isBindablePrefixStarter(combo) {
+    if (!combo || typeof combo !== "string") return false;
+    if (combo.includes("+")) return false;
+    if (combo.length !== 1) return false;
+    if (/^[0-9]$/.test(combo)) return false;
+    return true;
+  }
+  function findOverlapConflicts(keymap, combo) {
+    const out = [];
+    if (!combo || typeof combo !== "string") return out;
+    if (combo.includes("+")) return out;
+    for (const [key, command] of Object.entries(keymap || {})) {
+      if (key === combo) continue;
+      if (key.includes("+")) continue;
+      if (key.length > combo.length && key.startsWith(combo)) {
+        out.push({ key, command, kind: "shadows" });
+      } else if (combo.length > key.length && combo.startsWith(key)) {
+        out.push({ key, command, kind: "shadowed-by" });
+      }
+    }
+    out.sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+    return out;
+  }
   function keysForCommand(keymap, commandName) {
     return Object.entries(keymap).filter(([, cmd]) => cmd === commandName).map(([key]) => key);
   }
@@ -143,7 +166,6 @@
       storedKeymap[key] = command;
     }
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
-    for (const key of prefixKeys) delete keymap[key];
     return {
       keymap,
       disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
@@ -607,8 +629,8 @@
     keybindings: document.querySelector("#card-keybindings"),
     disabled: document.querySelector("#card-disabled")
   };
-  var IDLE_TITLE = "Click or press Enter, then press a key to rebind.";
-  var RECORDING_TITLE = "Press a key to bind. Esc cancels, Backspace clears.";
+  var ADD_LABEL = "+";
+  var RECORDING_TITLE = "Press a key to bind. Esc cancels. Any letter can start a prefix \u2014 press Enter to keep it single.";
   var OPEN_KEY = "jari.options.open";
   function setSaveState(mode, message) {
     if (!saveStateEl) return;
@@ -742,10 +764,23 @@
     sourceBookmarkEl.checked = sources.includes("bookmark");
     copyFormatEl.value = settings.getCopyFormat();
     hintCharsEl.value = settings.getHintChars();
-    for (const el of [scrollStepEl, timeoutEl, passthroughEl, clueDelayEl, hintCharsEl, siteInputEl]) {
+    for (const el of [
+      scrollStepEl,
+      timeoutEl,
+      passthroughEl,
+      clueDelayEl,
+      hintCharsEl,
+      siteInputEl
+    ]) {
       markInvalid(el, false);
     }
-    for (const id of ["error-scroll-step", "error-timeout", "error-passthrough-timeout", "error-clue-delay", "error-hint-chars"]) {
+    for (const id of [
+      "error-scroll-step",
+      "error-timeout",
+      "error-passthrough-timeout",
+      "error-clue-delay",
+      "error-hint-chars"
+    ]) {
       clearFieldError(id);
     }
     if (siteErrorEl) {
@@ -761,7 +796,9 @@
     updateAddButton();
   }
   function matchesFilter(name, cmd, filter) {
-    return name.toLowerCase().includes(filter) || cmd.label.toLowerCase().includes(filter) || keyFor(name).toLowerCase().includes(filter);
+    if (name.toLowerCase().includes(filter)) return true;
+    if (cmd.label.toLowerCase().includes(filter)) return true;
+    return keysFor(name).some((key) => key.toLowerCase().includes(filter));
   }
   function renderKeymap() {
     cancelRecordingSilent();
@@ -775,7 +812,7 @@
     let shown = 0;
     let unboundTotal = 0;
     for (const [name, cmd] of Object.entries(COMMAND_CATALOG)) {
-      const bound = Boolean(keyFor(name));
+      const bound = keysFor(name).length > 0;
       if (!bound) unboundTotal++;
       if (unboundOnly && bound) continue;
       const id = cmd.category || "other";
@@ -822,44 +859,37 @@
             labelTd.textContent = cmd.label;
             const keyTd = document.createElement("td");
             keyTd.className = "key-cell";
-            const fieldRow = document.createElement("div");
-            fieldRow.className = "key-cell-row";
-            const input = document.createElement("input");
-            input.type = "text";
-            input.readOnly = true;
-            input.className = "key-input";
-            input.dataset.command = name;
-            input.value = keyFor(name);
-            input.placeholder = "unbound";
-            input.dataset.bound = keyFor(name) ? "true" : "false";
-            input.title = IDLE_TITLE;
-            input.setAttribute(
+            const inline = document.createElement("div");
+            inline.className = "key-inline";
+            const bindings = keysFor(name);
+            const overlaps = rowOverlaps(name);
+            for (const combo of bindings) {
+              inline.appendChild(buildChip(name, cmd, combo, overlaps.mine.has(combo)));
+            }
+            const addBtn = document.createElement("button");
+            addBtn.type = "button";
+            addBtn.className = "key-add";
+            addBtn.dataset.command = name;
+            addBtn.textContent = ADD_LABEL;
+            addBtn.title = `Add another binding for ${cmd.label}`;
+            addBtn.setAttribute(
               "aria-label",
-              `${cmd.label} shortcut. ${IDLE_TITLE}`
+              `Add another binding for ${cmd.label}`
             );
-            const clearBtn = document.createElement("button");
-            clearBtn.type = "button";
-            clearBtn.className = "key-clear";
-            clearBtn.textContent = "\xD7";
-            clearBtn.title = `Clear ${cmd.label} binding`;
-            clearBtn.setAttribute("aria-label", `Clear ${cmd.label} binding`);
-            clearBtn.disabled = !keyFor(name);
-            clearBtn.addEventListener("click", (event) => {
-              event.stopPropagation();
-              clearBinding(name);
-            });
-            input.addEventListener("click", () => startRecording(input, name));
-            input.addEventListener(
+            addBtn.addEventListener("click", () => startRecording(addBtn, name));
+            addBtn.addEventListener(
               "keydown",
-              (event) => onKeyInputKeydown(event, input, name)
+              (event) => onAddKeydown(event, addBtn, name)
             );
-            input.addEventListener("blur", (event) => onKeyInputBlur(event, input));
-            input.addEventListener("focus", () => {
-              if (!isRecording(input)) input.select?.();
-            });
-            keyTd.appendChild(fieldRow);
-            fieldRow.appendChild(input);
-            fieldRow.appendChild(clearBtn);
+            addBtn.addEventListener("blur", (event) => onAddBlur(event, addBtn));
+            inline.appendChild(addBtn);
+            keyTd.appendChild(inline);
+            const hint = document.createElement("div");
+            hint.className = "key-recording-hint";
+            hint.hidden = true;
+            keyTd.appendChild(hint);
+            const overlapNote = buildOverlapNote(overlaps);
+            if (overlapNote) keyTd.appendChild(overlapNote);
             row.appendChild(labelTd);
             row.appendChild(keyTd);
             tbody.appendChild(row);
@@ -870,74 +900,142 @@
     refreshKeyLabels();
   }
   function refreshKeyLabels() {
-    for (const el of document.querySelectorAll("[data-key]")) {
-      el.textContent = keyFor(el.dataset.key) || "unbound";
+    for (const el of document.querySelectorAll("code[data-key]")) {
+      const keys = keysFor(el.dataset.key);
+      el.textContent = keys.length > 0 ? keys.join(", ") : "unbound";
     }
   }
   var keyByCommand = /* @__PURE__ */ new Map();
   function rebuildKeyIndex() {
     keyByCommand = /* @__PURE__ */ new Map();
     for (const [key, name] of Object.entries(settings.getKeymap())) {
-      if (!keyByCommand.has(name)) keyByCommand.set(name, key);
+      if (!keyByCommand.has(name)) keyByCommand.set(name, []);
+      keyByCommand.get(name).push(key);
+    }
+    for (const keys of keyByCommand.values()) keys.sort();
+  }
+  function keysFor(commandName) {
+    return (keyByCommand.get(commandName) || []).slice();
+  }
+  function buildChip(name, cmd, combo, overlapped) {
+    const chip = document.createElement("span");
+    chip.className = overlapped ? "chip overlap" : "chip";
+    chip.tabIndex = 0;
+    chip.dataset.command = name;
+    chip.dataset.binding = combo;
+    chip.title = overlapped ? `${combo} \u2192 ${cmd.label}. Overlaps another binding \u2014 single key fires first. Backspace removes.` : `${combo} \u2192 ${cmd.label}. Backspace removes.`;
+    chip.setAttribute(
+      "aria-label",
+      overlapped ? `${combo}, ${cmd.label}, overlaps another binding. Press Delete to remove.` : `${combo}, ${cmd.label}. Press Delete to remove.`
+    );
+    const keySpan = document.createElement("span");
+    keySpan.className = "chip-key";
+    keySpan.textContent = combo;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "chip-remove";
+    rm.textContent = "\xD7";
+    rm.title = `Remove ${combo} from ${cmd.label}`;
+    rm.setAttribute("aria-label", `Remove ${combo} from ${cmd.label}`);
+    rm.addEventListener("click", (event) => {
+      event.stopPropagation();
+      clearBinding(name, combo);
+    });
+    chip.addEventListener("keydown", (event) => {
+      if (clearingKeys.has(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        clearBinding(name, combo);
+      }
+    });
+    chip.appendChild(keySpan);
+    chip.appendChild(rm);
+    return chip;
+  }
+  function rowOverlaps(name) {
+    const keymap = settings.getKeymap();
+    const mine = /* @__PURE__ */ new Set();
+    const others = /* @__PURE__ */ new Set();
+    for (const combo of keysFor(name)) {
+      for (const overlap of findOverlapConflicts(keymap, combo)) {
+        mine.add(combo);
+        others.add(overlap.key);
+      }
+    }
+    return { mine, others: [...others].sort() };
+  }
+  function buildOverlapNote(overlaps) {
+    if (!overlaps || overlaps.others.length === 0) return null;
+    const warn = document.createElement("div");
+    warn.className = "key-overlap-warn";
+    warn.textContent = `Overlaps ${overlaps.others.join(", ")} \u2014 single key fires first`;
+    return warn;
+  }
+  function recordingHintEl(button) {
+    const cell = button?.closest?.(".key-cell");
+    return cell?.querySelector?.(".key-recording-hint") || null;
+  }
+  function isRecording(button) {
+    return activeRecording?.button === button;
+  }
+  function setRecordingFlag(on) {
+    try {
+      window.__jariOptionsRecording = Boolean(on);
+    } catch {
     }
   }
-  function keyFor(commandName) {
-    return keyByCommand.get(commandName) || "";
-  }
-  function isRecording(input) {
-    return activeRecording?.input === input;
-  }
-  function startRecording(input, name) {
-    if (isRecording(input)) return;
+  function startRecording(button, name) {
+    if (isRecording(button)) return;
     cancelRecordingSilent();
-    dismissConflict(input);
-    activeRecording = { input, name, previous: input.value, waitingPrefix: null };
-    input.value = "press a key...";
-    input.classList.add("recording");
-    input.title = RECORDING_TITLE;
-    input.removeAttribute("placeholder");
+    dismissConflict(button);
+    const hint = recordingHintEl(button);
+    activeRecording = { button, name, waitingPrefix: null };
+    setRecordingFlag(true);
+    button.classList.add("recording");
+    button.title = RECORDING_TITLE;
+    if (hint) {
+      hint.textContent = "Press a key\u2026 Esc cancels.";
+      hint.hidden = false;
+    }
   }
   function cancelRecordingSilent() {
     if (!activeRecording) return;
-    const { input, previous } = activeRecording;
+    const { button } = activeRecording;
     activeRecording = null;
-    if (!input.isConnected) return;
-    dismissConflict(input);
-    input.classList.remove("recording");
-    input.value = previous;
-    input.placeholder = "unbound";
-    input.title = IDLE_TITLE;
+    setRecordingFlag(false);
+    if (!button.isConnected) return;
+    dismissConflict(button);
+    button.classList.remove("recording");
+    const hint = recordingHintEl(button);
+    if (hint) hint.hidden = true;
   }
   function cancelRecording() {
     if (!activeRecording) return;
+    const { button } = activeRecording;
     cancelRecordingSilent();
     status("Cancelled \u2014 no changes");
+    if (button.isConnected) button.focus?.();
   }
   function exitRecording() {
     if (!activeRecording) return;
-    const { input } = activeRecording;
+    const { button } = activeRecording;
     activeRecording = null;
-    dismissConflict(input);
-    input.classList.remove("recording");
-    input.placeholder = "unbound";
-    input.title = IDLE_TITLE;
+    setRecordingFlag(false);
+    dismissConflict(button);
+    if (!button.isConnected) return;
+    button.classList.remove("recording");
+    const hint = recordingHintEl(button);
+    if (hint) hint.hidden = true;
   }
-  function onKeyInputBlur(event, input) {
-    if (!isRecording(input)) return;
+  function onAddBlur(event, button) {
+    if (!isRecording(button)) return;
     const next = event.relatedTarget;
-    const cell = input.closest(".key-cell");
+    const cell = button.closest(".key-cell");
     if (next && cell && cell.contains(next)) return;
     cancelRecordingSilent();
   }
-  function onKeyInputKeydown(event, input, name) {
-    if (!isRecording(input)) {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        event.stopPropagation();
-        startRecording(input, name);
-      }
-      return;
-    }
+  function onAddKeydown(event, button, name) {
+    if (!isRecording(button)) return;
     event.preventDefault();
     event.stopPropagation();
     if (typeof event.stopImmediatePropagation === "function") {
@@ -947,7 +1045,8 @@
     if (event.key === "Escape") {
       if (activeRecording.waitingPrefix) {
         activeRecording.waitingPrefix = null;
-        input.value = "press a key...";
+        const hint = recordingHintEl(button);
+        if (hint) hint.textContent = "Press a key\u2026 Esc cancels.";
         status("Prefix cancelled \u2014 press a key, or Esc again to stop");
         return;
       }
@@ -957,41 +1056,60 @@
     if (clearingKeys.has(event.key)) {
       if (activeRecording.waitingPrefix) {
         activeRecording.waitingPrefix = null;
-        input.value = "press a key...";
         status("Prefix cancelled \u2014 press a key");
         return;
       }
-      clearBinding(name);
+      cancelRecordingSilent();
+      status("Cancelled \u2014 no changes (remove bindings with the \xD7 on each key)");
+      if (button.isConnected) button.focus?.();
+      return;
+    }
+    if (event.key === "Enter" && activeRecording.waitingPrefix) {
+      const single = activeRecording.waitingPrefix;
+      activeRecording.waitingPrefix = null;
+      attemptCommit(single, name, button);
       return;
     }
     const combo = canonicalKey(event);
     if (activeRecording.waitingPrefix) {
       const full = activeRecording.waitingPrefix + combo;
       activeRecording.waitingPrefix = null;
-      attemptCommit(full, name, input);
+      attemptCommit(full, name, button);
       return;
     }
-    if (prefixKeys.has(combo)) {
+    if (isBindablePrefixStarter(combo)) {
       activeRecording.waitingPrefix = combo;
-      input.value = `${combo} \u2014 press the next key...`;
-      status("Prefix key \u2014 press the next key (Esc cancels)");
+      const hint = recordingHintEl(button);
+      if (hint)
+        hint.textContent = `Next key for ${combo}\u2026 or Enter for ${combo} alone`;
+      status(
+        `Prefix ${combo} \u2014 press the next key, or Enter to bind ${combo} alone`
+      );
       return;
     }
     if (isReservedCombo(combo)) {
       exitRecording();
-      input.value = keyFor(name);
       status("Digits 0-9 are reserved for the repeat count");
+      if (button.isConnected) button.focus?.();
       return;
     }
-    attemptCommit(combo, name, input);
+    attemptCommit(combo, name, button);
   }
-  function attemptCommit(combo, name, input) {
-    const conflict = findBindingConflict(settings.getKeymap(), combo, name);
+  function attemptCommit(combo, name, button) {
+    const keymap = settings.getKeymap();
+    if (keymap[combo] === name) {
+      exitRecording();
+      renderKeymap();
+      status(`${combo} is already bound to ${commandLabel(name)}`);
+      focusChipFor(name, combo);
+      return;
+    }
+    const conflict = findBindingConflict(keymap, combo, name);
     if (!conflict) {
       commitCombo(combo, name, null);
       return;
     }
-    showConflict(input, name, combo, conflict);
+    showConflict(button, name, combo, conflict);
   }
   function persistKeymap() {
     setSaveState("saving");
@@ -1007,78 +1125,103 @@
   }
   async function commitCombo(combo, name, swapWith, doSwap = false) {
     const keymap = settings.getKeymap();
-    const previous = keysForCommand(keymap, name)[0] || "";
-    for (const [k, cmd] of Object.entries(keymap)) {
-      if (k === combo || cmd === name || swapWith && cmd === swapWith) {
-        delete keymap[k];
-      }
-    }
+    const previous = keysForCommand(keymap, name).filter((k) => k !== combo)[0] || "";
+    delete keymap[combo];
     keymap[combo] = name;
     const swapped = doSwap && swapWith && previous && previous !== combo;
     if (swapped) keymap[previous] = swapWith;
+    const overlaps = findOverlapConflicts(keymap, combo);
     const ok = await persistKeymap();
     exitRecording();
-    updateAllInputs();
+    renderKeymap();
     if (!ok) return;
+    const overlapNote = overlaps.length > 0 ? ` (note: overlaps ${overlaps.map((o) => o.key).join(", ")} \u2014 single key fires first)` : "";
     if (swapped) {
-      status(`Swapped: ${combo} \u2192 ${commandLabel(name)}, ${previous} \u2192 ${commandLabel(swapWith)}`);
+      status(
+        `Swapped: ${combo} \u2192 ${commandLabel(name)}, ${previous} \u2192 ${commandLabel(swapWith)}${overlapNote}`
+      );
     } else if (swapWith) {
-      status(`Saved ${combo} \u2192 ${commandLabel(name)} (unbound ${commandLabel(swapWith)})`);
+      status(
+        `Saved ${combo} \u2192 ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${combo})${overlapNote}`
+      );
     } else {
-      status(`Saved ${combo} \u2192 ${commandLabel(name)}`);
+      status(`Saved ${combo} \u2192 ${commandLabel(name)}${overlapNote}`);
     }
-    focusInputFor(name);
+    focusChipFor(name, combo);
   }
-  async function clearBinding(name) {
+  async function clearBinding(name, specificKey) {
     cancelRecordingSilent();
     const keymap = settings.getKeymap();
-    let had = false;
-    for (const [k, cmd] of Object.entries(keymap)) {
-      if (cmd === name) {
-        delete keymap[k];
-        had = true;
+    const removed = [];
+    if (specificKey) {
+      if (keymap[specificKey] === name) {
+        delete keymap[specificKey];
+        removed.push(specificKey);
+      }
+    } else {
+      for (const [k, cmd] of Object.entries(keymap)) {
+        if (cmd === name) {
+          delete keymap[k];
+          removed.push(k);
+        }
       }
     }
-    if (!had) {
-      updateAllInputs();
+    if (removed.length === 0) {
+      renderKeymap();
       return;
     }
     const ok = await persistKeymap();
-    updateAllInputs();
-    if (ok) status(`Cleared ${commandLabel(name)} \u2014 now unbound`);
-    focusInputFor(name);
-  }
-  function updateAllInputs() {
-    rebuildKeyIndex();
-    for (const row of tableEl.querySelectorAll("tr[data-command]")) {
-      const name = row.dataset.command;
-      const input = row.querySelector(".key-input");
-      const clearBtn = row.querySelector(".key-clear");
-      if (!input) continue;
-      if (isRecording(input)) continue;
-      input.value = keyFor(name);
-      input.dataset.bound = keyFor(name) ? "true" : "false";
-      if (clearBtn) clearBtn.disabled = !keyFor(name);
+    renderKeymap();
+    if (!ok) return;
+    if (removed.length === 1) {
+      const rest = keysFor(name).length;
+      status(
+        rest > 0 ? `Removed ${removed[0]} from ${commandLabel(name)}` : `Removed ${removed[0]} \u2014 ${commandLabel(name)} now unbound`
+      );
+    } else {
+      status(`Cleared ${commandLabel(name)} \u2014 now unbound`);
     }
-    refreshKeyLabels();
-    updateSummaries();
+    focusAddFor(name);
   }
-  function focusInputFor(name) {
-    const input = tableEl.querySelector(`.key-input[data-command="${name}"]`);
-    if (input) input.focus();
+  function focusChipFor(name, combo) {
+    for (const row of tableEl.querySelectorAll("tr[data-command]")) {
+      if (row.dataset.command !== name) continue;
+      for (const chip of row.querySelectorAll(".chip")) {
+        if (chip.dataset.binding === combo) {
+          chip.focus?.();
+          return true;
+        }
+      }
+      const add = row.querySelector(".key-add");
+      if (add) add.focus?.();
+      return false;
+    }
+    return false;
   }
-  function dismissConflict(input) {
-    const cell = input?.closest?.(".key-cell");
+  function focusAddFor(name) {
+    for (const row of tableEl.querySelectorAll("tr[data-command]")) {
+      if (row.dataset.command !== name) continue;
+      const add = row.querySelector(".key-add");
+      if (add) add.focus?.();
+      return;
+    }
+  }
+  function dismissConflict(anchor) {
+    const cell = anchor?.closest?.(".key-cell");
     cell?.querySelector?.(".key-conflict")?.remove();
   }
-  function showConflict(input, name, combo, conflictingCommand) {
-    const cell = input.closest(".key-cell");
+  function showConflict(button, name, combo, conflictingCommand) {
+    const cell = button.closest(".key-cell");
     if (!cell) {
       commitCombo(combo, name, conflictingCommand);
       return;
     }
-    dismissConflict(input);
-    input.value = `${combo} \u2014 taken`;
+    dismissConflict(button);
+    const hint = recordingHintEl(button);
+    if (hint) {
+      hint.textContent = `${combo} is taken \u2014 choose below, or Esc to keep recording`;
+      hint.hidden = false;
+    }
     const box = document.createElement("div");
     box.className = "key-conflict";
     const msg = document.createElement("div");
@@ -1090,27 +1233,34 @@
     reassign.type = "button";
     reassign.className = "primary";
     reassign.textContent = "Reassign";
-    reassign.title = `Unbind ${commandLabel(conflictingCommand)} and use ${combo} here`;
-    reassign.addEventListener("click", () => commitCombo(combo, name, conflictingCommand, false));
+    reassign.title = `Move ${combo} here from ${commandLabel(conflictingCommand)} (keeps your other bindings)`;
+    reassign.addEventListener(
+      "click",
+      () => commitCombo(combo, name, conflictingCommand, false)
+    );
     const cancel = document.createElement("button");
     cancel.type = "button";
     cancel.textContent = "Keep both";
     cancel.title = "Cancel \u2014 keep the existing binding (Esc)";
     cancel.addEventListener("click", () => {
-      dismissConflict(input);
-      if (!isRecording(input)) return;
-      input.value = "press a key...";
-      input.focus();
+      dismissConflict(button);
+      if (!isRecording(button)) return;
+      const hint2 = recordingHintEl(button);
+      if (hint2) hint2.textContent = "Press a key\u2026 Esc cancels.";
+      button.focus?.();
       status("Kept the existing binding");
     });
     actions.appendChild(reassign);
-    const previous = keysForCommand(settings.getKeymap(), name)[0] || "";
+    const previous = keysForCommand(settings.getKeymap(), name).filter((k) => k !== combo)[0] || "";
     if (previous && previous !== combo) {
       const swap = document.createElement("button");
       swap.type = "button";
       swap.textContent = "Swap";
       swap.title = `Use ${combo} here and move ${commandLabel(conflictingCommand)} to ${previous}`;
-      swap.addEventListener("click", () => commitCombo(combo, name, conflictingCommand, true));
+      swap.addEventListener(
+        "click",
+        () => commitCombo(combo, name, conflictingCommand, true)
+      );
       actions.appendChild(swap);
     }
     actions.appendChild(cancel);
@@ -1134,7 +1284,10 @@
     if (invalid) {
       el.value = settings[fallback]();
       markInvalid(el, true);
-      showFieldError(errorId, `Enter ${min}-${max}${unit ? ` ${unit}` : ""} (reset to ${el.value})`);
+      showFieldError(
+        errorId,
+        `Enter ${min}-${max}${unit ? ` ${unit}` : ""} (reset to ${el.value})`
+      );
       status(`${label}: reset to ${el.value}`);
       return;
     }
@@ -1150,7 +1303,10 @@
     if (deduped.length < 2) {
       hintCharsEl.value = settings.getHintChars();
       markInvalid(hintCharsEl, true);
-      showFieldError("error-hint-chars", "Need at least 2 unique letters or digits (reset to previous)");
+      showFieldError(
+        "error-hint-chars",
+        "Need at least 2 unique letters or digits (reset to previous)"
+      );
       status("Hint characters: need at least 2 unique letters or digits");
       updateHintMeta();
       return;
@@ -1171,18 +1327,64 @@
     if (sourceBookmarkEl.checked) sources.push("bookmark");
     return sources;
   }
-  function resetKeys() {
+  var confirmCount = 0;
+  function confirmDialog(message, confirmLabel) {
+    const previousFocus = document.activeElement;
+    setRecordingFlag(true);
+    return new Promise((resolve) => {
+      const dialog = document.createElement("dialog");
+      dialog.className = "jari-confirm-box";
+      const msgId = `jari-confirm-msg-${++confirmCount}`;
+      dialog.setAttribute("aria-labelledby", msgId);
+      const msg = document.createElement("p");
+      msg.className = "jari-confirm-msg";
+      msg.id = msgId;
+      msg.textContent = message;
+      const actions = document.createElement("div");
+      actions.className = "jari-confirm-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => dialog.close("cancel"));
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = "primary danger";
+      ok.textContent = confirmLabel || "Confirm";
+      ok.setAttribute("autofocus", "");
+      ok.addEventListener("click", () => dialog.close("ok"));
+      actions.appendChild(cancel);
+      actions.appendChild(ok);
+      dialog.appendChild(msg);
+      dialog.appendChild(actions);
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close("cancel");
+      });
+      dialog.addEventListener("close", () => {
+        dialog.remove();
+        setRecordingFlag(false);
+        if (previousFocus?.isConnected) ui.safeFocus(previousFocus);
+        resolve(dialog.returnValue === "ok");
+      });
+      document.body.appendChild(dialog);
+      dialog.showModal();
+    });
+  }
+  async function resetKeys() {
     cancelRecordingSilent();
-    if (!window.confirm?.("Reset all keybindings to defaults?")) return;
+    if (!await confirmDialog("Reset all keybindings to defaults?", "Reset keys")) return;
     savePatch({ keymap: { ...keymapDefaults } }).then((ok) => {
       if (!ok) return;
       renderKeymap();
       status("Keybindings reset to defaults");
     });
   }
-  function reset() {
+  async function reset() {
     cancelRecordingSilent();
-    if (!window.confirm?.("Reset all settings (including disabled sites) to defaults?")) return;
+    if (!await confirmDialog(
+      "Reset all settings (including disabled sites) to defaults?",
+      "Reset all"
+    ))
+      return;
     setSaveState("saving");
     settings.update({
       keymap: { ...keymapDefaults },
@@ -1221,7 +1423,9 @@
         btn.title = `Re-enable Jari on ${site}`;
         btn.setAttribute("aria-label", `Re-enable Jari on ${site}`);
         btn.addEventListener("click", async () => {
-          const ok = await savePatch({ disabledSites: sites.filter((s) => s !== site) });
+          const ok = await savePatch({
+            disabledSites: sites.filter((s) => s !== site)
+          });
           renderDisabled();
           if (ok) status(`Enabled: ${site}`);
         });
@@ -1342,12 +1546,27 @@
       unit: "ms"
     })
   );
-  smoothScrollEl.addEventListener("change", () => savePatch({ smoothScroll: smoothScrollEl.checked }));
-  fuzzyMatchingEl.addEventListener("change", () => savePatch({ fuzzyMatching: fuzzyMatchingEl.checked }));
-  clueEnabledEl.addEventListener("change", () => savePatch({ clueEnabled: clueEnabledEl.checked }));
-  copyFormatEl.addEventListener("change", () => savePatch({ copyFormat: copyFormatEl.value }));
+  smoothScrollEl.addEventListener(
+    "change",
+    () => savePatch({ smoothScroll: smoothScrollEl.checked })
+  );
+  fuzzyMatchingEl.addEventListener(
+    "change",
+    () => savePatch({ fuzzyMatching: fuzzyMatchingEl.checked })
+  );
+  clueEnabledEl.addEventListener(
+    "change",
+    () => savePatch({ clueEnabled: clueEnabledEl.checked })
+  );
+  copyFormatEl.addEventListener(
+    "change",
+    () => savePatch({ copyFormat: copyFormatEl.value })
+  );
   for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
-    el.addEventListener("change", () => savePatch({ suggestionSources: collectSources() }));
+    el.addEventListener(
+      "change",
+      () => savePatch({ suggestionSources: collectSources() })
+    );
   }
   hintCharsEl.addEventListener("input", () => {
     clearFieldError("error-hint-chars");

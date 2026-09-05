@@ -126,6 +126,12 @@ function handleFullscreenChange() {
 function handleKeydown(event) {
   if (!event.isTrusted) return;
 
+  // The options page recorder claims keys while rebinding (see options.js).
+  if (window.__jariOptionsRecording) {
+    clearPending();
+    return;
+  }
+
   const overlay = Overlays.active();
   if (overlay) {
     Clue.hide();

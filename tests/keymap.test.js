@@ -103,3 +103,34 @@ test("keysForCommand lists every key bound to a command", () => {
   assert.deepEqual(Jari.keysForCommand(keymap, "scrollUp"), ["k"]);
   assert.deepEqual(Jari.keysForCommand(keymap, "closeTab"), []);
 });
+
+test("isBindablePrefixStarter allows any single non-digit key", () => {
+  assert.equal(Jari.isBindablePrefixStarter("z"), true);
+  assert.equal(Jari.isBindablePrefixStarter("g"), true);
+  assert.equal(Jari.isBindablePrefixStarter(";"), true);
+  assert.equal(Jari.isBindablePrefixStarter("G"), true);
+  assert.equal(Jari.isBindablePrefixStarter(","), true);
+  assert.equal(Jari.isBindablePrefixStarter("5"), false);
+  assert.equal(Jari.isBindablePrefixStarter("0"), false);
+  assert.equal(Jari.isBindablePrefixStarter("ctrl+t"), false);
+  assert.equal(Jari.isBindablePrefixStarter("gg"), false);
+  assert.equal(Jari.isBindablePrefixStarter(""), false);
+});
+
+test("findOverlapConflicts reports prefix shadowing in both directions", () => {
+  const keymap = { z: "closeTab", zf: "hintYank", j: "scrollDown" };
+  assert.deepEqual(Jari.findOverlapConflicts(keymap, "z"), [
+    { key: "zf", command: "hintYank", kind: "shadows" },
+  ]);
+  assert.deepEqual(Jari.findOverlapConflicts(keymap, "zf"), [
+    { key: "z", command: "closeTab", kind: "shadowed-by" },
+  ]);
+  assert.deepEqual(Jari.findOverlapConflicts(keymap, "j"), []);
+  assert.deepEqual(Jari.findOverlapConflicts(keymap, "ctrl+t"), []);
+});
+
+test("normalizeSettings keeps bare prefix bindings so custom prefixes survive", () => {
+  const s = Jari.normalizeSettings({ keymap: { z: "closeTab", zf: "hintYank" } });
+  assert.equal(s.keymap.z, "closeTab");
+  assert.equal(s.keymap.zf, "hintYank");
+});
