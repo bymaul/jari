@@ -27,6 +27,8 @@ First public release.
 - Fully rebindable multi-binding keymap with free prefixes, autosaving
   settings page (`;e`), cheatsheet (`?`), ignore/passthrough and per-site
   disable.
+- Firefox support: dedicated add-on ID and no-data-collection declaration
+  (`browser_specific_settings.gecko`), background scripts variant.
 
 ### Privacy
 
