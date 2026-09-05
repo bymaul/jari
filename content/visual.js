@@ -121,18 +121,10 @@ function showBlockCaret() {
         opacity: 0.85;
         border: 1px solid #c38a22;
         box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-        animation: jari-caret-blink 1s steps(1) infinite;
         pointer-events: none;
         will-change: transform;
         backface-visibility: hidden;
         transform: translate3d(0,0,0);
-      }
-      @keyframes jari-caret-blink {
-        0%, 50% { opacity: 0.85; }
-        51%, 100% { opacity: 0; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .jari-visual-caret { animation: none !important; opacity: 0.9 !important; }
       }
       @media (forced-colors: active) {
         .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
@@ -161,66 +153,265 @@ function hideBlockCaret() {
   }
 }
 
+function isUsableCaretRect(rect) {
+  return (
+    !!rect &&
+    Number.isFinite(rect.left) &&
+    Number.isFinite(rect.top) &&
+    typeof rect.height === "number" &&
+    rect.height > 0
+  );
+}
+
+function firstUsableRect(list) {
+  if (!list || typeof list.length !== "number") return null;
+  for (const r of list) {
+    if (isUsableCaretRect(r)) return r;
+  }
+  return null;
+}
+
+function lineHeightForElement(el) {
+  try {
+    if (
+      el &&
+      typeof window !== "undefined" &&
+      typeof window.getComputedStyle === "function"
+    ) {
+      const cs = window.getComputedStyle(el);
+      const lh = parseFloat(cs && cs.lineHeight);
+      if (Number.isFinite(lh) && lh > 0 && lh < 200) return lh;
+      const fs = parseFloat(cs && cs.fontSize);
+      if (Number.isFinite(fs) && fs > 0 && fs < 200)
+        return Math.round(fs * 1.2);
+    }
+  } catch {}
+  return 16;
+}
+
+// Pure geometry pick for the block caret. Priority: collapsed focus rect,
+// then selection client rects, then nearest rendered neighbor char (x taken
+// from its inner edge), then parent position with line height. The parent
+// block rect is only ever used for left/top - never for height - so the
+// caret cannot stretch to full element height on whitespace.
+function resolveCaretGeometry({
+  collapsed,
+  clientRects,
+  before,
+  after,
+  parentRect,
+  fallbackHeight,
+}) {
+  if (isUsableCaretRect(collapsed)) {
+    return {
+      left: collapsed.left,
+      top: collapsed.top,
+      height: collapsed.height,
+      width: collapsed.width || 0,
+    };
+  }
+  const listRect = firstUsableRect(clientRects);
+  if (listRect) {
+    return {
+      left: listRect.left,
+      top: listRect.top,
+      height: listRect.height,
+      width: listRect.width || 0,
+    };
+  }
+  if (isUsableCaretRect(before)) {
+    const left = Number.isFinite(before.right) ? before.right : before.left;
+    return { left, top: before.top, height: before.height, width: 0 };
+  }
+  if (isUsableCaretRect(after)) {
+    const left = Number.isFinite(after.left) ? after.left : after.right;
+    return { left, top: after.top, height: after.height, width: 0 };
+  }
+  if (
+    parentRect &&
+    Number.isFinite(parentRect.left) &&
+    Number.isFinite(parentRect.top)
+  ) {
+    const height =
+      Number.isFinite(fallbackHeight) && fallbackHeight > 0
+        ? fallbackHeight
+        : 16;
+    return {
+      left: parentRect.left,
+      top: parentRect.top,
+      height,
+      width: parentRect.width || 0,
+    };
+  }
+  return null;
+}
+
+function readSingleCharRect(node, start, end) {
+  try {
+    const r = document.createRange();
+    r.setStart(node, start);
+    r.setEnd(node, end);
+    const hit = firstUsableRect(r.getClientRects());
+    if (hit) return hit;
+    const bounds = r.getBoundingClientRect();
+    if (isUsableCaretRect(bounds)) return bounds;
+  } catch {}
+  return null;
+}
+
+// Nearest rendered char before/after the caret offset. Collapsed whitespace
+// (runs of spaces, trailing space, tabs) yields 0-height rects, so scan
+// outward for the closest char that actually renders.
+function readNeighborCharRects(focusNode, focusOffset) {
+  let before = null;
+  let after = null;
+  try {
+    if (
+      !focusNode ||
+      typeof Node === "undefined" ||
+      focusNode.nodeType !== Node.TEXT_NODE
+    ) {
+      return { before, after };
+    }
+    const len = focusNode.nodeValue ? focusNode.nodeValue.length : 0;
+    const off = Math.max(0, Math.min(focusOffset | 0, len));
+    for (let i = off - 1, steps = 0; i >= 0 && steps < 32; i--, steps++) {
+      before = readSingleCharRect(focusNode, i, i + 1);
+      if (before) break;
+    }
+    for (let i = off, steps = 0; i < len && steps < 32; i++, steps++) {
+      after = readSingleCharRect(focusNode, i, i + 1);
+      if (after) break;
+    }
+    if (!before || !after) {
+      const edge = readAdjacentTextCharRect(focusNode, !before, !after);
+      if (!before) before = edge.before;
+      if (!after) after = edge.after;
+    }
+  } catch {}
+  return { before, after };
+}
+
+function readAdjacentTextCharRect(focusNode, wantBefore, wantAfter) {
+  const out = { before: null, after: null };
+  try {
+    if (
+      typeof Node === "undefined" ||
+      typeof NodeFilter === "undefined" ||
+      !document.body
+    ) {
+      return out;
+    }
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
+    walker.currentNode = focusNode;
+    if (wantBefore) {
+      const prev = walker.previousNode();
+      if (prev && prev.nodeValue) {
+        for (
+          let i = prev.nodeValue.length - 1, steps = 0;
+          i >= 0 && steps < 32;
+          i--, steps++
+        ) {
+          out.before = readSingleCharRect(prev, i, i + 1);
+          if (out.before) break;
+        }
+      }
+    }
+    if (wantAfter) {
+      walker.currentNode = focusNode;
+      const next = walker.nextNode();
+      if (next && next.nodeValue) {
+        for (let i = 0, steps = 0; i < next.nodeValue.length && steps < 32; i++, steps++) {
+          out.after = readSingleCharRect(next, i, i + 1);
+          if (out.after) break;
+        }
+      }
+    }
+  } catch {}
+  return out;
+}
+
 function updateBlockCaretImmediate() {
   if (!active || !caretEl || !caretHost) return;
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
   try {
     const range = sel.getRangeAt(0);
-    let rect = null;
+    const focusNode = sel.focusNode;
+    const focusOffset = sel.focusOffset;
+    let collapsed = null;
+    let clientRects = null;
     try {
-      const focusNode = sel.focusNode;
-      const focusOffset = sel.focusOffset;
       if (focusNode) {
         const r = document.createRange();
         r.setStart(focusNode, focusOffset);
         r.collapse(true);
-        rect = r.getBoundingClientRect();
-        if (!rect || (rect.width === 0 && rect.height === 0)) {
-          const cr = range.getClientRects();
-          if (cr && cr.length) rect = cr[0];
-          else rect = range.getBoundingClientRect();
+        collapsed = r.getBoundingClientRect();
+        if (!isUsableCaretRect(collapsed)) {
+          try {
+            clientRects = range.getClientRects();
+          } catch {
+            clientRects = null;
+          }
         }
       } else {
-        rect = range.getBoundingClientRect();
+        collapsed = range.getBoundingClientRect();
       }
     } catch {
       try {
-        rect = range.getBoundingClientRect();
+        collapsed = range.getBoundingClientRect();
       } catch {
-        rect = null;
+        collapsed = null;
       }
     }
-    if (!rect) return;
-    if (rect.width === 0 && rect.height === 0) {
-      const el =
-        sel.focusNode && sel.focusNode.parentElement
-          ? sel.focusNode.parentElement
-          : null;
-      if (el) {
-        const cr = el.getClientRects();
-        if (cr && cr.length) rect = cr[0];
-        else rect = el.getBoundingClientRect();
+    let before = null;
+    let after = null;
+    if (!isUsableCaretRect(collapsed) && !firstUsableRect(clientRects)) {
+      const neighbors = readNeighborCharRects(focusNode, focusOffset);
+      before = neighbors.before;
+      after = neighbors.after;
+    }
+    let parentRect = null;
+    let parentEl = null;
+    if (
+      !isUsableCaretRect(collapsed) &&
+      !firstUsableRect(clientRects) &&
+      !isUsableCaretRect(before) &&
+      !isUsableCaretRect(after)
+    ) {
+      try {
+        parentEl =
+          focusNode && focusNode.parentElement ? focusNode.parentElement : null;
+        if (parentEl) {
+          const cr = parentEl.getClientRects();
+          parentRect =
+            (cr && cr.length ? cr[0] : null) || parentEl.getBoundingClientRect();
+        }
+      } catch {
+        parentRect = null;
       }
     }
-    if (!rect) return;
-    caretEl.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
-    caretEl.style.height = `${Math.max(12, rect.height)}px`;
+    const geo = resolveCaretGeometry({
+      collapsed,
+      clientRects,
+      before,
+      after,
+      parentRect,
+      fallbackHeight: parentEl ? lineHeightForElement(parentEl) : 16,
+    });
+    if (!geo) return;
+    caretEl.style.transform = `translate3d(${geo.left}px, ${geo.top}px, 0)`;
+    caretEl.style.height = `${Math.max(12, geo.height)}px`;
     if (mode === "line") {
-      caretEl.style.width = `${Math.max(20, rect.width)}px`;
+      caretEl.style.width = `${Math.max(20, geo.width || 0)}px`;
       caretEl.style.opacity = "0.35";
     } else {
       caretEl.style.width = `7px`;
       caretEl.style.opacity = "0.85";
     }
-    try {
-      if (
-        window.matchMedia &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ) {
-        caretEl.style.animation = "none";
-      }
-    } catch {}
   } catch {}
 }
 function updateBlockCaret() {
@@ -2098,6 +2289,13 @@ export const Visual = {
   showBlockCaret,
   hideBlockCaret,
   updateBlockCaret,
+};
+
+export const __visualCaret = {
+  isUsableCaretRect,
+  firstUsableRect,
+  lineHeightForElement,
+  resolveCaretGeometry,
 };
 
 register("visual", {

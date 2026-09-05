@@ -557,28 +557,11 @@
   opacity: 0.85 !important;
   border: 1px solid #c38a22 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
-  animation: jari-caret-blink 1s steps(1) infinite !important;
   pointer-events: none !important;
   will-change: transform !important;
   backface-visibility: hidden !important;
 }
 
-@keyframes jari-caret-blink {
-  0%,
-  50% {
-    opacity: 0.85;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .jari-visual-caret {
-    animation: none !important;
-    opacity: 0.9 !important;
-  }
-}
 @media (forced-colors: active) {
   .jari-visual-caret {
     background: CanvasText !important;
