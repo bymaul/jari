@@ -32,6 +32,7 @@ const clueDelayEl = document.querySelector("#clue-delay");
 const sourceTabEl = document.querySelector("#source-tab");
 const sourceHistoryEl = document.querySelector("#source-history");
 const sourceBookmarkEl = document.querySelector("#source-bookmark");
+const maxResultsEl = document.querySelector("#max-results");
 const copyFormatEl = document.querySelector("#copy-format");
 const hintCharsEl = document.querySelector("#hint-chars");
 const hintCharsMetaEl = document.querySelector("#hint-chars-meta");
@@ -143,7 +144,7 @@ function updateSummaries() {
   }
   if (summaries.search) {
     const n = settings.getSuggestionSources().length;
-    summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} · ${n} source${n === 1 ? "" : "s"}`;
+    summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} · ${n} source${n === 1 ? "" : "s"} · max ${settings.getMaxResults()}`;
   }
   if (summaries.clipboard) {
     summaries.clipboard.textContent =
@@ -224,10 +225,12 @@ async function load() {
   sourceTabEl.checked = sources.includes("tab");
   sourceHistoryEl.checked = sources.includes("history");
   sourceBookmarkEl.checked = sources.includes("bookmark");
+  maxResultsEl.value = settings.getMaxResults();
   copyFormatEl.value = settings.getCopyFormat();
   hintCharsEl.value = settings.getHintChars();
   for (const el of [
     scrollStepEl,
+    maxResultsEl,
     timeoutEl,
     passthroughEl,
     clueDelayEl,
@@ -238,6 +241,7 @@ async function load() {
   }
   for (const id of [
     "error-scroll-step",
+    "error-max-results",
     "error-timeout",
     "error-passthrough-timeout",
     "error-clue-delay",
@@ -942,6 +946,7 @@ async function reset() {
       clueEnabled: settingsDefaults.clueEnabled,
       clueDelayMs: settingsDefaults.clueDelayMs,
       suggestionSources: settingsDefaults.suggestionSources.slice(),
+      maxResults: settingsDefaults.maxResults,
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,
       disabledSites: [],
@@ -1067,6 +1072,15 @@ scrollStepEl.addEventListener("change", () =>
     settingKey: "scrollStep",
     label: "Scroll step",
     unit: "px",
+  }),
+);
+maxResultsEl.addEventListener("change", () =>
+  commitNumber(maxResultsEl, "error-max-results", {
+    min: 5,
+    max: 100,
+    fallback: "getMaxResults",
+    settingKey: "maxResults",
+    label: "Max results",
   }),
 );
 timeoutEl.addEventListener("change", () =>

@@ -253,7 +253,6 @@ export const commands = {
   duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
   togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
   toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
-  searchTabs: { ...COMMAND_CATALOG.searchTabs, run: () => Prompt.open() },
   openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
   openOmnibarIncognito: { ...COMMAND_CATALOG.openOmnibarIncognito, run: () => Prompt.openIncognito() },
   reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },

@@ -117,6 +117,16 @@ test("rankMatches with fuzzy matching off keeps the original order", () => {
   );
 });
 
+test("rankMatches finds youtube from the ytb shorthand", () => {
+  const items = [
+    { title: "GitHub: opencode", url: "https://github.com/anomalyco/opencode", source: "tab" },
+    { title: "lofi hip hop radio - YouTube", url: "https://www.youtube.com/watch?v=jfKfPfyJRdk", source: "tab" },
+  ];
+  const titles = rankMatches("ytb", items).map((x) => x.item.title);
+  assert.ok(titles.includes("lofi hip hop radio - YouTube"));
+  assert.equal(titles[0], "lofi hip hop radio - YouTube");
+});
+
 test("fuzzyIndices skips terms that are not in the field", () => {
   assert.deepEqual(fuzzyIndices("pria youtube", "Pria"), [0, 1, 2, 3]);
   assert.deepEqual(fuzzyIndices("pria youtube", "YouTube"), [0, 1, 2, 3, 4, 5, 6]);

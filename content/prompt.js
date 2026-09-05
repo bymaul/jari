@@ -42,13 +42,13 @@ function isActive() {
   return active;
 }
 
-async function open() {
-  if (active) return;
-  tabs = (await sendMessage("listTabs")) || [];
-  if (tabs.length === 0) return;
-  mode = "tabs";
-  active = true;
-  render("Tabs", "Search tabs...");
+export function parseTabPrefix(text) {
+  const m = String(text || "").match(/^t\s+(.*\S)\s*$/i);
+  return m ? m[1] : null;
+}
+
+export function isTabListAll(text) {
+  return /^\s*t\s+$/i.test(String(text || ""));
 }
 
 function openOmnibar() {
@@ -56,7 +56,7 @@ function openOmnibar() {
   tabs = [];
   mode = "open";
   active = true;
-  render("Open", "Search or type URL");
+  render("Open", "Search, URL, or t for tabs");
 }
 
 function openIncognito() {
@@ -110,9 +110,15 @@ function toSuggestionRow(item, match) {
 }
 
 function handleOpenInput(queryText) {
+  if (isTabListAll(queryText)) {
+    handleTabListAll();
+    return;
+  }
   const q = queryText.trim();
-  const kw = parseKeyword(q);
-  const term = kw ? kw.rest : Url.suggestionTerm(q);
+  const tabQuery = parseTabPrefix(q);
+  const effective = tabQuery != null ? tabQuery : q;
+  const kw = tabQuery != null ? null : parseKeyword(effective);
+  const term = kw ? kw.rest : Url.suggestionTerm(effective);
   query = term;
   tabUrlMap.clear();
   if (!q) {
@@ -120,7 +126,9 @@ function handleOpenInput(queryText) {
     selected = 0;
     renderList();
     requestSuggestions("", (res) => {
-      filtered = res.slice(0, 20).map((item) => toSuggestionRow(item, null));
+      filtered = res
+        .slice(0, settings.getMaxResults())
+        .map((item) => toSuggestionRow(item, null));
       selected = 0;
       renderList();
     });
@@ -135,19 +143,43 @@ function handleOpenInput(queryText) {
       keyword: kw.keyword,
     };
   } else {
-    const isUrl = Url.looksLikeUrl(q);
+    const isUrl = Url.looksLikeUrl(effective);
     row = isUrl
-      ? { kind: "url", title: q, url: q }
-      : { kind: "search", title: q, url: null };
+      ? { kind: "url", title: effective, url: effective }
+      : { kind: "search", title: effective, url: null };
   }
   filtered = [row];
   selected = 0;
   renderList();
   requestSuggestions(term, (res) => {
-    const suggestions = rank(res, term).map(({ item, match }) =>
+    const pool =
+      tabQuery != null ? res.filter((item) => item.source === "tab") : res;
+    const suggestions = rank(pool, term).map(({ item, match }) =>
       toSuggestionRow(item, match),
     );
-    filtered = [row, ...suggestions];
+    filtered = tabQuery != null ? suggestions : [row, ...suggestions];
+    selected = 0;
+    renderList();
+  });
+}
+
+function handleTabListAll() {
+  clearTimeout(suggestTimer);
+  suggestSeq++;
+  query = "";
+  filtered = [];
+  selected = 0;
+  renderList();
+  sendMessage("listTabs").then((res) => {
+    if (!active || !inputEl || !isTabListAll(inputEl.value)) return;
+    tabUrlMap.clear();
+    filtered = (res || [])
+      .map((item) => {
+        const tab = { ...item, source: "tab" };
+        if (tab.url) tabUrlMap.set(tab.url, tab);
+        return toSuggestionRow(tab, null);
+      })
+      .slice(0, settings.getMaxResults());
     selected = 0;
     renderList();
   });
@@ -169,12 +201,12 @@ function render(title, placeholder) {
   inputEl.type = "text";
   inputEl.placeholder = placeholder;
   inputEl.addEventListener("input", () => {
-    const q = inputEl.value.trim();
-    query = q;
+    const raw = inputEl.value;
+    query = raw.trim();
     if (mode === "open" || mode === "edit" || mode === "incognito") {
-      handleOpenInput(q);
+      handleOpenInput(raw);
     } else {
-      filtered = q ? rankTabs(q, tabs) : tabs;
+      filtered = query ? rankTabs(query, tabs) : tabs;
       selected = 0;
       renderList();
     }
@@ -296,7 +328,7 @@ function renderTabRow(tab, winLabel) {
 }
 
 function renderList() {
-  const rows = filtered.slice(0, 50);
+  const rows = filtered.slice(0, settings.getMaxResults());
   listEl.textContent = "";
   if (mode === "open" || mode === "edit" || mode === "incognito") {
     for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
@@ -397,14 +429,18 @@ function searchQuery(text) {
 function activate() {
   const item = filtered[selected];
   const rawInput = inputEl ? inputEl.value.trim() : "";
-  const kwInput = parseKeyword(rawInput);
+  const inOmnibar =
+    mode === "open" || mode === "edit" || mode === "incognito";
+  const tabRest = inOmnibar ? parseTabPrefix(rawInput) : null;
+  const effectiveInput = tabRest != null ? tabRest : rawInput;
+  const kwInput = parseKeyword(effectiveInput);
   if (!item) {
     if (mode === "open" && !rawInput) sendMessage("createTab");
     else if (mode === "incognito" && !rawInput) sendMessage("openIncognitoTab");
     else if (kwInput) openUrl(kwInput.url);
-    else if (rawInput && Url.looksLikeUrl(rawInput)) {
-      openUrl(Url.normalizeUrl(rawInput) || rawInput);
-    } else if (rawInput) searchQuery(rawInput);
+    else if (effectiveInput && Url.looksLikeUrl(effectiveInput)) {
+      openUrl(Url.normalizeUrl(effectiveInput) || effectiveInput);
+    } else if (effectiveInput) searchQuery(effectiveInput);
     close();
     return;
   }
@@ -453,7 +489,6 @@ function close() {
 }
 
 export const Prompt = {
-  open,
   openOmnibar,
   openIncognito,
   openEditUrl,

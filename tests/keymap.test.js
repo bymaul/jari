@@ -69,10 +69,19 @@ test("normalizeSettings validates suggestionSources and copyFormat", () => {
   assert.equal(Jari.normalizeSettings({ copyFormat: "bogus" }).copyFormat, "plain");
 });
 
+test("normalizeSettings clamps maxResults", () => {
+  assert.equal(Jari.normalizeSettings({}).maxResults, 50);
+  assert.equal(Jari.normalizeSettings({ maxResults: 10 }).maxResults, 10);
+  assert.equal(Jari.normalizeSettings({ maxResults: 4 }).maxResults, 5);
+  assert.equal(Jari.normalizeSettings({ maxResults: 101 }).maxResults, 100);
+  assert.equal(Jari.normalizeSettings({ maxResults: 7.9 }).maxResults, 7);
+  assert.equal(Jari.normalizeSettings({ maxResults: "lots" }).maxResults, 50);
+});
+
 test("balanceCategories spreads categories across the columns", () => {
   const byCategory = new Map([
     ["scrolling", ["scrollDown", "scrollUp"]],
-    ["tabs", ["searchTabs"]],
+    ["tabs", ["openOmnibar"]],
   ]);
   const columns = Jari.balanceCategories(byCategory, 3);
   const total = columns.reduce((n, col) => n + col.length, 0);

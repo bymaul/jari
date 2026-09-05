@@ -3,6 +3,14 @@
 (() => {
   // shared/constants.js
   var suggestionSources = ["tab", "history", "bookmark"];
+  var maxResultsDefault = 50;
+  var maxResultsMin = 5;
+  var maxResultsMax = 100;
+  function clampMaxResults(n) {
+    const v = Math.floor(n);
+    if (!Number.isFinite(v)) return maxResultsDefault;
+    return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
+  }
   var MIN_SCROLL_AREA_SIZE = 16;
 
   // content/keymap.js
@@ -53,7 +61,6 @@
     N: "findPrev",
     v: "enterVisual",
     V: "enterVisualLine",
-    gt: "searchTabs",
     gg: "scrollToTop",
     gu: "goToParent",
     gU: "goToRoot",
@@ -94,6 +101,7 @@
     clueEnabled: true,
     clueDelayMs: 300,
     suggestionSources: suggestionSources.slice(),
+    maxResults: maxResultsDefault,
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT
   };
@@ -194,6 +202,7 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
+      maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
       clueEnabled: typeof d.clueEnabled === "boolean" ? d.clueEnabled : settingsDefaults.clueEnabled,
@@ -234,6 +243,7 @@
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
+    maxResults: settingsDefaults.maxResults,
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
     clueEnabled: settingsDefaults.clueEnabled,
@@ -249,6 +259,7 @@
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
     state.suggestionSources = s.suggestionSources;
+    state.maxResults = s.maxResults;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
     state.clueEnabled = s.clueEnabled;
@@ -273,6 +284,7 @@
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
+        maxResults: state.maxResults,
         copyFormat: state.copyFormat,
         hintChars: state.hintChars,
         clueEnabled: state.clueEnabled,
@@ -314,6 +326,9 @@
   function getSuggestionSources() {
     return state.suggestionSources;
   }
+  function getMaxResults() {
+    return state.maxResults;
+  }
   function getCopyFormat() {
     return state.copyFormat;
   }
@@ -352,6 +367,7 @@
     getTimeoutMs,
     getPassthroughMs,
     getSuggestionSources,
+    getMaxResults,
     getCopyFormat,
     getHintChars,
     isClueEnabled,
@@ -1586,20 +1602,19 @@
   function isActive() {
     return active;
   }
-  async function open() {
-    if (active) return;
-    tabs = await sendMessage("listTabs") || [];
-    if (tabs.length === 0) return;
-    mode = "tabs";
-    active = true;
-    render("Tabs", "Search tabs...");
+  function parseTabPrefix(text) {
+    const m = String(text || "").match(/^t\s+(.*\S)\s*$/i);
+    return m ? m[1] : null;
+  }
+  function isTabListAll(text) {
+    return /^\s*t\s+$/i.test(String(text || ""));
   }
   function openOmnibar() {
     if (active) return;
     tabs = [];
     mode = "open";
     active = true;
-    render("Open", "Search or type URL");
+    render("Open", "Search, URL, or t for tabs");
   }
   function openIncognito() {
     if (active) return;
@@ -1647,9 +1662,15 @@
     };
   }
   function handleOpenInput(queryText) {
+    if (isTabListAll(queryText)) {
+      handleTabListAll();
+      return;
+    }
     const q = queryText.trim();
-    const kw = parseKeyword(q);
-    const term = kw ? kw.rest : Url.suggestionTerm(q);
+    const tabQuery = parseTabPrefix(q);
+    const effective = tabQuery != null ? tabQuery : q;
+    const kw = tabQuery != null ? null : parseKeyword(effective);
+    const term = kw ? kw.rest : Url.suggestionTerm(effective);
     query = term;
     tabUrlMap.clear();
     if (!q) {
@@ -1657,7 +1678,7 @@
       selected = 0;
       renderList();
       requestSuggestions("", (res) => {
-        filtered = res.slice(0, 20).map((item) => toSuggestionRow(item, null));
+        filtered = res.slice(0, settings.getMaxResults()).map((item) => toSuggestionRow(item, null));
         selected = 0;
         renderList();
       });
@@ -1672,17 +1693,37 @@
         keyword: kw.keyword
       };
     } else {
-      const isUrl = Url.looksLikeUrl(q);
-      row = isUrl ? { kind: "url", title: q, url: q } : { kind: "search", title: q, url: null };
+      const isUrl = Url.looksLikeUrl(effective);
+      row = isUrl ? { kind: "url", title: effective, url: effective } : { kind: "search", title: effective, url: null };
     }
     filtered = [row];
     selected = 0;
     renderList();
     requestSuggestions(term, (res) => {
-      const suggestions = rank(res, term).map(
+      const pool = tabQuery != null ? res.filter((item) => item.source === "tab") : res;
+      const suggestions = rank(pool, term).map(
         ({ item, match }) => toSuggestionRow(item, match)
       );
-      filtered = [row, ...suggestions];
+      filtered = tabQuery != null ? suggestions : [row, ...suggestions];
+      selected = 0;
+      renderList();
+    });
+  }
+  function handleTabListAll() {
+    clearTimeout(suggestTimer);
+    suggestSeq++;
+    query = "";
+    filtered = [];
+    selected = 0;
+    renderList();
+    sendMessage("listTabs").then((res) => {
+      if (!active || !inputEl || !isTabListAll(inputEl.value)) return;
+      tabUrlMap.clear();
+      filtered = (res || []).map((item) => {
+        const tab = { ...item, source: "tab" };
+        if (tab.url) tabUrlMap.set(tab.url, tab);
+        return toSuggestionRow(tab, null);
+      }).slice(0, settings.getMaxResults());
       selected = 0;
       renderList();
     });
@@ -1700,12 +1741,12 @@
     inputEl.type = "text";
     inputEl.placeholder = placeholder;
     inputEl.addEventListener("input", () => {
-      const q = inputEl.value.trim();
-      query = q;
+      const raw = inputEl.value;
+      query = raw.trim();
       if (mode === "open" || mode === "edit" || mode === "incognito") {
-        handleOpenInput(q);
+        handleOpenInput(raw);
       } else {
-        filtered = q ? rankTabs(q, tabs) : tabs;
+        filtered = query ? rankTabs(query, tabs) : tabs;
         selected = 0;
         renderList();
       }
@@ -1810,7 +1851,7 @@
     return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query);
   }
   function renderList() {
-    const rows = filtered.slice(0, 50);
+    const rows = filtered.slice(0, settings.getMaxResults());
     listEl.textContent = "";
     if (mode === "open" || mode === "edit" || mode === "incognito") {
       for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
@@ -1890,14 +1931,17 @@
   function activate() {
     const item = filtered[selected];
     const rawInput = inputEl ? inputEl.value.trim() : "";
-    const kwInput = parseKeyword(rawInput);
+    const inOmnibar = mode === "open" || mode === "edit" || mode === "incognito";
+    const tabRest = inOmnibar ? parseTabPrefix(rawInput) : null;
+    const effectiveInput = tabRest != null ? tabRest : rawInput;
+    const kwInput = parseKeyword(effectiveInput);
     if (!item) {
       if (mode === "open" && !rawInput) sendMessage("createTab");
       else if (mode === "incognito" && !rawInput) sendMessage("openIncognitoTab");
       else if (kwInput) openUrl(kwInput.url);
-      else if (rawInput && Url.looksLikeUrl(rawInput)) {
-        openUrl(Url.normalizeUrl(rawInput) || rawInput);
-      } else if (rawInput) searchQuery(rawInput);
+      else if (effectiveInput && Url.looksLikeUrl(effectiveInput)) {
+        openUrl(Url.normalizeUrl(effectiveInput) || effectiveInput);
+      } else if (effectiveInput) searchQuery(effectiveInput);
       close();
       return;
     }
@@ -1939,7 +1983,6 @@
     restoreFocus = null;
   }
   var Prompt = {
-    open,
     openOmnibar,
     openIncognito,
     openEditUrl,
@@ -1973,7 +2016,6 @@
     nextTab: { category: "tabs", label: "Next tab", repeatable: true },
     goToFirstTab: { category: "tabs", label: "Go to first tab" },
     goToLastTab: { category: "tabs", label: "Go to last tab" },
-    searchTabs: { category: "tabs", label: "Search tabs" },
     openOmnibar: { category: "tabs", label: "Open URL or search" },
     openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
     openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
@@ -2021,7 +2063,7 @@
   function isActive2() {
     return active2;
   }
-  function open2() {
+  function open() {
     if (active2) return;
     active2 = true;
     render2();
@@ -2127,7 +2169,7 @@
     gPending = false;
     active2 = false;
   }
-  var Help = { open: open2, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
+  var Help = { open, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
   register("help", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
 
   // content/hint-layer.js
@@ -2607,7 +2649,7 @@
     "input",
     "yank"
   ]);
-  function open3(requestedMode) {
+  function open2(requestedMode) {
     if (active3) close3();
     mode2 = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
     multipleHits = mode2 === "openBackground";
@@ -2731,7 +2773,7 @@
     }
     return false;
   }
-  var Hints = { open: open3, close: close3, isActive: isActive3, onKeyDown: onKeyDown3, genLabels };
+  var Hints = { open: open2, close: close3, isActive: isActive3, onKeyDown: onKeyDown3, genLabels };
   register("hints", { close: close3, onKeyDown: onKeyDown3, isActive: isActive3 });
 
   // content/highlight.js
@@ -5284,7 +5326,7 @@
     inputEl2.focus();
     updateStatus();
   }
-  function open4() {
+  function open3() {
     if (active5) return;
     useHighlights = detectHighlightSupport();
     active5 = true;
@@ -5458,7 +5500,7 @@
     return true;
   }
   var Find = {
-    open: open4,
+    open: open3,
     close: closeBar,
     clearHighlights,
     next,
@@ -5470,7 +5512,7 @@
   };
   register("find", { close: closeAndClear, onKeyDown: onKeyDown5, isActive: isActive5 });
   try {
-    Visual.setFindOpen(() => open4());
+    Visual.setFindOpen(() => open3());
     if (typeof Visual.setFindNav === "function") Visual.setFindNav((count, reverse) => next(count, reverse));
   } catch {
   }
@@ -5701,7 +5743,6 @@ ${location.href}`;
     duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
     togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
     toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
-    searchTabs: { ...COMMAND_CATALOG.searchTabs, run: () => Prompt.open() },
     openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
     openOmnibarIncognito: { ...COMMAND_CATALOG.openOmnibarIncognito, run: () => Prompt.openIncognito() },
     reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },

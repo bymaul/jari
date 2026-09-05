@@ -1,4 +1,4 @@
-import { suggestionSources } from "../shared/constants.js";
+import { clampMaxResults, suggestionSources } from "../shared/constants.js";
 import { normalizeUrl } from "../shared/url.js";
 
 export function clampCount(count, max = 20) {
@@ -17,6 +17,18 @@ async function getSuggestionSources() {
     console.debug("[jari] Failed to get suggestion sources:", err);
   }
   return suggestionSources.slice();
+}
+
+async function getMaxResults() {
+  try {
+    const stored = await chrome.storage.sync.get("settings");
+    if (stored.settings && stored.settings.maxResults !== undefined) {
+      return clampMaxResults(stored.settings.maxResults);
+    }
+  } catch (err) {
+    console.debug("[jari] Failed to get max results:", err);
+  }
+  return clampMaxResults();
 }
 
 export const handlers = {
@@ -221,7 +233,7 @@ export const handlers = {
       try {
         const tabs = await chrome.tabs.query({});
         tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-        for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
+        for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { id: tab.id, lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
       } catch (err) {
         console.debug("[jari] Tab search failed:", err);
       }
@@ -263,14 +275,28 @@ export const handlers = {
         } catch (err) {
           console.debug("[jari] History search failed:", err);
         }
+        // Chrome's history search is substring-only, so a fuzzy query like
+        // "ytb" never matches "youtube". Add recent history as a wider pool;
+        // the content side ranks it fuzzily. push() dedups by URL.
+        try {
+          const recent = await chrome.history.search({ text: "", maxResults: 100, startTime: Date.now() - 90 * 86400000 });
+          for (const item of recent) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
+        } catch (err) {
+          console.debug("[jari] Recent history pool failed:", err);
+        }
       }
       if (sources.includes("bookmark")) {
         try {
           const folderMap = await getBookmarkFolderMap();
-          const bms = await chrome.bookmarks.search(qRaw);
-          for (const bm of bms) if (bm.url) {
-            const path = folderMap.get(bm.parentId) || [];
-            push(bm.title, bm.url, "bookmark", { dateAdded: bm.dateAdded || 0, folderPath: path.join(" / ") });
+          const tree = await chrome.bookmarks.getTree();
+          const stack = [...(tree || [])];
+          while (stack.length) {
+            const node = stack.pop();
+            if (node.url) {
+              const path = folderMap.get(node.parentId) || [];
+              push(node.title, node.url, "bookmark", { dateAdded: node.dateAdded || 0, folderPath: path.join(" / ") });
+            }
+            if (node.children) stack.push(...node.children);
           }
         } catch (err) {
           console.debug("[jari] Bookmark search failed:", err);
@@ -278,7 +304,7 @@ export const handlers = {
       }
     }
     const items = Array.from(map.values());
-    return items.slice(0, 50);
+    return items.slice(0, await getMaxResults());
   },
 
   search: async (sender, { query = "", newTab = true, incognito = false } = {}) => {

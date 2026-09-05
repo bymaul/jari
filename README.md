@@ -14,7 +14,7 @@ Most commands take a repeat count (`3j`, `2x`). `0-9` are reserved for it.
 
 - Scroll: `j`/`k`/`h`/`l`, `gg`/`G` top/bottom, `w` cycle scroll area
 - Zoom: `+`/`-`
-- Tabs: `t` URL/search, `T` incognito, `gt` search tabs, `x`/`X` close/reopen,
+- Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
   `J`/`K` prev/next, `g0`/`g$` first/last, `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
 - History: `H`/`L` back/forward

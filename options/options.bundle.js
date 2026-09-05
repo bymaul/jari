@@ -3,6 +3,14 @@
 (() => {
   // shared/constants.js
   var suggestionSources = ["tab", "history", "bookmark"];
+  var maxResultsDefault = 50;
+  var maxResultsMin = 5;
+  var maxResultsMax = 100;
+  function clampMaxResults(n) {
+    const v = Math.floor(n);
+    if (!Number.isFinite(v)) return maxResultsDefault;
+    return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
+  }
 
   // content/keymap.js
   var Events = {
@@ -52,7 +60,6 @@
     N: "findPrev",
     v: "enterVisual",
     V: "enterVisualLine",
-    gt: "searchTabs",
     gg: "scrollToTop",
     gu: "goToParent",
     gU: "goToRoot",
@@ -93,6 +100,7 @@
     clueEnabled: true,
     clueDelayMs: 300,
     suggestionSources: suggestionSources.slice(),
+    maxResults: maxResultsDefault,
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT
   };
@@ -175,6 +183,7 @@
       timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
+      maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
       clueEnabled: typeof d.clueEnabled === "boolean" ? d.clueEnabled : settingsDefaults.clueEnabled,
@@ -244,7 +253,6 @@
     nextTab: { category: "tabs", label: "Next tab", repeatable: true },
     goToFirstTab: { category: "tabs", label: "Go to first tab" },
     goToLastTab: { category: "tabs", label: "Go to last tab" },
-    searchTabs: { category: "tabs", label: "Search tabs" },
     openOmnibar: { category: "tabs", label: "Open URL or search" },
     openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
     openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
@@ -293,6 +301,7 @@
     timeoutMs: settingsDefaults.timeoutMs,
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
+    maxResults: settingsDefaults.maxResults,
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
     clueEnabled: settingsDefaults.clueEnabled,
@@ -308,6 +317,7 @@
     state.timeoutMs = s.timeoutMs;
     state.passthroughMs = s.passthroughMs;
     state.suggestionSources = s.suggestionSources;
+    state.maxResults = s.maxResults;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
     state.clueEnabled = s.clueEnabled;
@@ -332,6 +342,7 @@
         timeoutMs: state.timeoutMs,
         passthroughMs: state.passthroughMs,
         suggestionSources: state.suggestionSources,
+        maxResults: state.maxResults,
         copyFormat: state.copyFormat,
         hintChars: state.hintChars,
         clueEnabled: state.clueEnabled,
@@ -373,6 +384,9 @@
   function getSuggestionSources() {
     return state.suggestionSources;
   }
+  function getMaxResults() {
+    return state.maxResults;
+  }
   function getCopyFormat() {
     return state.copyFormat;
   }
@@ -411,6 +425,7 @@
     getTimeoutMs,
     getPassthroughMs,
     getSuggestionSources,
+    getMaxResults,
     getCopyFormat,
     getHintChars,
     isClueEnabled,
@@ -602,6 +617,7 @@
   var sourceTabEl = document.querySelector("#source-tab");
   var sourceHistoryEl = document.querySelector("#source-history");
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
+  var maxResultsEl = document.querySelector("#max-results");
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
   var hintCharsMetaEl = document.querySelector("#hint-chars-meta");
@@ -697,7 +713,7 @@
     }
     if (summaries.search) {
       const n = settings.getSuggestionSources().length;
-      summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} \xB7 ${n} source${n === 1 ? "" : "s"}`;
+      summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} \xB7 ${n} source${n === 1 ? "" : "s"} \xB7 max ${settings.getMaxResults()}`;
     }
     if (summaries.clipboard) {
       summaries.clipboard.textContent = settings.getCopyFormat() === "markdown" ? "Markdown link" : "Plain (title + URL)";
@@ -762,10 +778,12 @@
     sourceTabEl.checked = sources.includes("tab");
     sourceHistoryEl.checked = sources.includes("history");
     sourceBookmarkEl.checked = sources.includes("bookmark");
+    maxResultsEl.value = settings.getMaxResults();
     copyFormatEl.value = settings.getCopyFormat();
     hintCharsEl.value = settings.getHintChars();
     for (const el of [
       scrollStepEl,
+      maxResultsEl,
       timeoutEl,
       passthroughEl,
       clueDelayEl,
@@ -776,6 +794,7 @@
     }
     for (const id of [
       "error-scroll-step",
+      "error-max-results",
       "error-timeout",
       "error-passthrough-timeout",
       "error-clue-delay",
@@ -1396,6 +1415,7 @@
       clueEnabled: settingsDefaults.clueEnabled,
       clueDelayMs: settingsDefaults.clueDelayMs,
       suggestionSources: settingsDefaults.suggestionSources.slice(),
+      maxResults: settingsDefaults.maxResults,
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,
       disabledSites: []
@@ -1511,6 +1531,16 @@
       settingKey: "scrollStep",
       label: "Scroll step",
       unit: "px"
+    })
+  );
+  maxResultsEl.addEventListener(
+    "change",
+    () => commitNumber(maxResultsEl, "error-max-results", {
+      min: 5,
+      max: 100,
+      fallback: "getMaxResults",
+      settingKey: "maxResults",
+      label: "Max results"
     })
   );
   timeoutEl.addEventListener(

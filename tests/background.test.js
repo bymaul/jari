@@ -112,3 +112,104 @@ test("search with incognito opens the search URL in an incognito window", async 
     },
   ]);
 });
+
+function stubSuggestChrome(maxResults) {
+  const saved = {
+    query: globalThis.chrome.tabs.query,
+    history: globalThis.chrome.history,
+    bookmarks: globalThis.chrome.bookmarks,
+    storageGet: globalThis.chrome.storage.sync.get,
+  };
+  const settings = { suggestionSources: ["tab", "history", "bookmark"] };
+  if (maxResults !== undefined) settings.maxResults = maxResults;
+  globalThis.chrome.storage.sync.get = async () => ({ settings });
+  globalThis.chrome.tabs.query = async () => [
+    {
+      id: 7,
+      title: "lofi hip hop radio - YouTube",
+      url: "https://www.youtube.com/watch?v=x",
+      lastAccessed: 100,
+    },
+  ];
+  globalThis.chrome.history = {
+    // Chrome's own search is substring-only: nothing contains "ytb".
+    search: async ({ text }) =>
+      text
+        ? []
+        : [
+            {
+              title: "YouTube - Broadcast Yourself",
+              url: "https://www.youtube.com/",
+              visitCount: 50,
+              lastVisitTime: 200,
+              typedCount: 5,
+            },
+            { title: "Extra 1", url: "https://extra1.example", visitCount: 1 },
+            { title: "Extra 2", url: "https://extra2.example", visitCount: 1 },
+            { title: "Extra 3", url: "https://extra3.example", visitCount: 1 },
+            { title: "Extra 4", url: "https://extra4.example", visitCount: 1 },
+          ],
+    getVisits: async () => [],
+  };
+  globalThis.chrome.bookmarks = {
+    getTree: async () => [
+      {
+        id: "0",
+        children: [
+          {
+            id: "1",
+            title: "Music",
+            children: [
+              {
+                id: "3",
+                title: "YTB Fan Club",
+                url: "https://fan.example",
+                parentId: "1",
+                dateAdded: 300,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  return () => {
+    if (saved.query === undefined) delete globalThis.chrome.tabs.query;
+    else globalThis.chrome.tabs.query = saved.query;
+    if (saved.history === undefined) delete globalThis.chrome.history;
+    else globalThis.chrome.history = saved.history;
+    if (saved.bookmarks === undefined) delete globalThis.chrome.bookmarks;
+    else globalThis.chrome.bookmarks = saved.bookmarks;
+    globalThis.chrome.storage.sync.get = saved.storageGet;
+  };
+}
+
+test("suggest keeps tab ids and pools recent history and all bookmarks for fuzzy matching", async () => {
+  const restore = stubSuggestChrome();
+  try {
+    const res = await handlers.suggest({}, { query: "ytb" });
+    const byUrl = new Map(res.map((item) => [item.url, item]));
+    const tab = byUrl.get("https://www.youtube.com/watch?v=x");
+    assert.ok(tab, "expected the open tab in results");
+    assert.equal(tab.source, "tab");
+    assert.equal(tab.id, 7);
+    const history = byUrl.get("https://www.youtube.com/");
+    assert.ok(history, "expected recent history despite no substring match");
+    assert.equal(history.source, "history");
+    const bookmark = byUrl.get("https://fan.example");
+    assert.ok(bookmark, "expected the bookmark despite no substring match");
+    assert.equal(bookmark.folderPath, "Music");
+  } finally {
+    restore();
+  }
+});
+
+test("suggest caps results at the maxResults setting", async () => {
+  const restore = stubSuggestChrome(5);
+  try {
+    const res = await handlers.suggest({}, { query: "ytb" });
+    assert.equal(res.length, 5);
+  } finally {
+    restore();
+  }
+});

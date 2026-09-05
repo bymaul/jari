@@ -16,6 +16,7 @@ const state = {
   timeoutMs: settingsDefaults.timeoutMs,
   passthroughMs: settingsDefaults.passthroughMs,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
+  maxResults: settingsDefaults.maxResults,
   copyFormat: settingsDefaults.copyFormat,
   hintChars: settingsDefaults.hintChars,
   clueEnabled: settingsDefaults.clueEnabled,
@@ -32,6 +33,7 @@ function merge(data) {
   state.timeoutMs = s.timeoutMs;
   state.passthroughMs = s.passthroughMs;
   state.suggestionSources = s.suggestionSources;
+  state.maxResults = s.maxResults;
   state.copyFormat = s.copyFormat;
   state.hintChars = s.hintChars;
   state.clueEnabled = s.clueEnabled;
@@ -58,6 +60,7 @@ function persist() {
       timeoutMs: state.timeoutMs,
       passthroughMs: state.passthroughMs,
       suggestionSources: state.suggestionSources,
+      maxResults: state.maxResults,
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
       clueEnabled: state.clueEnabled,
@@ -111,6 +114,10 @@ function getSuggestionSources() {
   return state.suggestionSources;
 }
 
+function getMaxResults() {
+  return state.maxResults;
+}
+
 function getCopyFormat() {
   return state.copyFormat;
 }
@@ -154,6 +161,7 @@ export const settings = {
   getTimeoutMs,
   getPassthroughMs,
   getSuggestionSources,
+  getMaxResults,
   getCopyFormat,
   getHintChars,
   isClueEnabled,

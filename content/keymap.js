@@ -1,4 +1,4 @@
-import { suggestionSources } from "../shared/constants.js";
+import { clampMaxResults, maxResultsDefault, suggestionSources } from "../shared/constants.js";
 
 export const Events = {
   listeners: {},
@@ -57,7 +57,6 @@ export const keymapDefaults = {
   v: "enterVisual",
   V: "enterVisualLine",
 
-  gt: "searchTabs",
   gg: "scrollToTop",
   gu: "goToParent",
   gU: "goToRoot",
@@ -107,6 +106,8 @@ export const settingsDefaults = {
   clueDelayMs: 300,
 
   suggestionSources: suggestionSources.slice(),
+
+  maxResults: maxResultsDefault,
 
   copyFormat: "plain",
 
@@ -293,6 +294,10 @@ export function normalizeSettings(data) {
     suggestionSources: Array.isArray(d.suggestionSources)
       ? d.suggestionSources.filter((s) => suggestionSources.includes(s))
       : settingsDefaults.suggestionSources.slice(),
+    maxResults:
+      d.maxResults === undefined
+        ? settingsDefaults.maxResults
+        : clampMaxResults(d.maxResults),
     copyFormat:
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
     hintChars: normalizeHintChars(d.hintChars),

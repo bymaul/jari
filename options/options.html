@@ -66,6 +66,16 @@
             <label class="check"><input id="source-bookmark" type="checkbox" /> Bookmarks</label>
           </div>
         </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="max-results">Max results</label>
+            <p class="helper">Suggestions shown under the typed query in <code data-key="openOmnibar"></code>.</p>
+            <p class="field-error" id="error-max-results" aria-live="polite" hidden></p>
+          </div>
+          <div class="setting-control">
+            <input id="max-results" type="number" min="5" max="100" step="1" />
+          </div>
+        </div>
       </details>
 
       <details class="card" id="card-clipboard">

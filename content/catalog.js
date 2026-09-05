@@ -23,7 +23,6 @@ export const COMMAND_CATALOG = {
   nextTab: { category: "tabs", label: "Next tab", repeatable: true },
   goToFirstTab: { category: "tabs", label: "Go to first tab" },
   goToLastTab: { category: "tabs", label: "Go to last tab" },
-  searchTabs: { category: "tabs", label: "Search tabs" },
   openOmnibar: { category: "tabs", label: "Open URL or search" },
   openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
   openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
