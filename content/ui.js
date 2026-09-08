@@ -106,16 +106,28 @@ function safeFocus(el, opts) {
   }
 }
 
+const CLICK_EVENTS = [
+  "mouseover",
+  "pointerdown",
+  "mousedown",
+  "pointerup",
+  "mouseup",
+  "click",
+  "focus",
+  "focusin",
+];
+
 function dispatchClick(el) {
   try {
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
   } catch {}
-  for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
+  for (const type of CLICK_EVENTS) {
     try {
       el.dispatchEvent(
         new MouseEvent(type, {
           bubbles: true,
           cancelable: true,
+          composed: true,
           view: window,
           button: 0,
           buttons: type === "mousedown" ? 1 : 0,
@@ -124,6 +136,24 @@ function dispatchClick(el) {
     } catch {}
   }
   safeFocus(el, { preventScroll: true });
+}
+
+const HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
+
+function dispatchHover(el) {
+  for (const type of HOVER_EVENTS) {
+    try {
+      el.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: type !== "mouseenter" && type !== "pointerenter",
+          cancelable: true,
+          composed: true,
+          view: window,
+          button: 0,
+        }),
+      );
+    } catch {}
+  }
 }
 
 function focusFrameElement(el) {
@@ -187,5 +217,6 @@ export const ui = {
   consume,
   safeFocus,
   dispatchClick,
+  dispatchHover,
   focusFrameElement,
 };

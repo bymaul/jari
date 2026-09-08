@@ -1,12 +1,12 @@
 /* global CSS, Highlight, NodeFilter */
-import { register } from "./overlays.js";
+import { register, touch } from "./overlays.js";
 import { ui } from "./ui.js";
-import { overlaySelectors } from "./keymap.js";
+import { canonicalKey, keysForCommand, overlaySelectors } from "./keymap.js";
+import { settings } from "./settings.js";
 import { isElementDrawn, getLinkAncestor } from "./hints-elements.js";
 import {
   detectHighlightSupport,
   clearHighlightNames,
-  unwrapSpans,
 } from "./highlight.js";
 import { Visual } from "./visual.js";
 
@@ -23,8 +23,18 @@ let currentIdx = 0;
 let lastQuery = "";
 let pendingQuery = "";
 
+let findRegex = false;
+let findWholeWord = false;
+let findCase = false;
+let toggleButtons = {};
+
+const FIND_HISTORY_KEY = "findHistory";
+const MAX_FIND_HISTORY = 20;
+let findHistory = [];
+let historyIdx = -1;
+let historyDraft = "";
+
 let useHighlights = false;
-let fallbackSpans = [];
 let inputDebounce = null;
 let findObserver = null;
 let findObserverTimer = null;
@@ -57,7 +67,7 @@ function shouldSkipNode(node) {
   if (isOverlayElement(parent)) return true;
   if (parent.closest) {
     try {
-      if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-find-hit, .jari-find-current, .jari-hints-host")) return true;
+      if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host")) return true;
       if (parent.closest('[aria-hidden="true"]')) return true;
       if (parent.closest('[hidden]')) return true;
     } catch {}
@@ -186,26 +196,43 @@ function collectTextNodes() {
   return out;
 }
 
+export function buildMatcher(query, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
+  if (!query) return null;
+  try {
+    if (regex) return new RegExp(query, caseSensitive ? "g" : "gi");
+    let src = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (wholeWord) src = `\\b${src}\\b`;
+    return new RegExp(src, caseSensitive ? "g" : "gi");
+  } catch {
+    return null;
+  }
+}
+
 function buildMatches(query) {
   if (!query) return [];
-  const caseSensitive = hasUpperCase(query);
-  const needle = caseSensitive ? query : query.toLowerCase();
+  const caseSensitive = findCase || (!findRegex && hasUpperCase(query));
+  const matcher = buildMatcher(query, {
+    regex: findRegex,
+    wholeWord: findWholeWord,
+    caseSensitive,
+  });
+  if (!matcher) return [];
   const nodes = collectTextNodes();
   const out = [];
   for (const node of nodes) {
-    const text = node.nodeValue;
-    const hay = caseSensitive ? text : text.toLowerCase();
-    let pos = 0;
-    while (true) {
-      const idx = hay.indexOf(needle, pos);
-      if (idx === -1) break;
+    matcher.lastIndex = 0;
+    let m;
+    while ((m = matcher.exec(node.nodeValue)) !== null) {
+      if (m[0].length === 0) {
+        matcher.lastIndex++;
+        continue;
+      }
       try {
         const range = document.createRange();
-        range.setStart(node, idx);
-        range.setEnd(node, idx + query.length);
+        range.setStart(node, m.index);
+        range.setEnd(node, m.index + m[0].length);
         out.push(range);
       } catch {}
-      pos = idx + query.length;
       if (out.length >= MAX_MATCHES) break;
     }
     if (out.length >= MAX_MATCHES) break;
@@ -217,15 +244,10 @@ function clearHighlightApi() {
   clearHighlightNames("jari-find", "jari-find-current");
 }
 
-function clearFallback() {
-  unwrapSpans(fallbackSpans);
-}
-
 function clearHighlights() {
   matches = [];
   currentIdx = 0;
   clearHighlightApi();
-  clearFallback();
   updateStatus();
 }
 
@@ -247,7 +269,6 @@ function activateCurrentLink() {
 
 function applyHighlights() {
   clearHighlightApi();
-  clearFallback();
   if (matches.length === 0) return;
   const valid = matches.filter(r => {
     try {
@@ -260,43 +281,21 @@ function applyHighlights() {
     if (matches.length === 0) { updateStatus(); return; }
   }
   const cur = matches[currentIdx];
-  if (useHighlights) {
-    try {
-      const others = valid.filter((_, i) => i !== currentIdx);
-      if (others.length > 0) {
-        CSS.highlights.set("jari-find", new Highlight(...others));
-      } else {
-        try { CSS.highlights.delete("jari-find"); } catch {}
-      }
-      if (cur) {
-        CSS.highlights.set("jari-find-current", new Highlight(cur));
-      } else {
-        try { CSS.highlights.delete("jari-find-current"); } catch {}
-      }
-      return;
-    } catch {
-      useHighlights = false;
+  if (!useHighlights) return;
+  try {
+    const others = valid.filter((_, i) => i !== currentIdx);
+    if (others.length > 0) {
+      CSS.highlights.set("jari-find", new Highlight(...others));
+    } else {
+      try { CSS.highlights.delete("jari-find"); } catch {}
     }
-  }
-  const byNode = new Map();
-  for (let i = 0; i < valid.length; i++) {
-    const r = valid[i];
-    const node = r.startContainer;
-    if (!node || !node.isConnected) continue;
-    if (!byNode.has(node)) byNode.set(node, []);
-    byNode.get(node).push({ range: r, idx: i });
-  }
-  for (const list of byNode.values()) {
-    list.sort((a, b) => b.range.startOffset - a.range.startOffset);
-    for (const { range, idx } of list) {
-      try {
-        if (!range.startContainer.isConnected) continue;
-        const span = document.createElement("span");
-        span.className = idx === currentIdx ? "jari-find-current" : "jari-find-hit";
-        range.surroundContents(span);
-        fallbackSpans.push(span);
-      } catch {}
+    if (cur) {
+      CSS.highlights.set("jari-find-current", new Highlight(cur));
+    } else {
+      try { CSS.highlights.delete("jari-find-current"); } catch {}
     }
+  } catch {
+    useHighlights = false;
   }
 }
 
@@ -312,8 +311,15 @@ function scrollToCurrent() {
       const style = window.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") return;
     } catch {}
-    el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
     let rect = null;
+    try { rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect(); } catch {}
+    if (rect && rectIntersectsViewport(rect)) return;
+    const fixed = findFixedAncestor(el);
+    if (fixed) {
+      scrollFixedMatchIntoView(el, fixed, rect);
+      return;
+    }
+    el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
     try { rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect(); } catch {}
     if (rect) {
       const vh = window.innerHeight || document.documentElement.clientHeight;
@@ -322,6 +328,180 @@ function scrollToCurrent() {
       }
     }
   } catch {}
+}
+
+function rectIntersectsViewport(rect) {
+  if (!rect) return false;
+  try {
+    const vw = window.innerWidth || document.documentElement.clientWidth;
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    return rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw;
+  } catch {
+    return false;
+  }
+}
+
+function findFixedAncestor(el) {
+  try {
+    let node = el;
+    while (node && node.nodeType === 1) {
+      if (window.getComputedStyle(node).position === "fixed") return node;
+      const root = node.getRootNode ? node.getRootNode() : null;
+      node = (root && root.host) || node.parentElement;
+    }
+  } catch {}
+  return null;
+}
+
+function isScrollableBox(node) {
+  try {
+    if (
+      node.scrollHeight <= node.clientHeight + 1 &&
+      node.scrollWidth <= node.clientWidth + 1
+    )
+      return false;
+    const style = window.getComputedStyle(node);
+    return (
+      style.overflowY === "auto" ||
+      style.overflowY === "scroll" ||
+      style.overflowY === "overlay" ||
+      style.overflowX === "auto" ||
+      style.overflowX === "scroll" ||
+      style.overflowX === "overlay"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function nearestScrollableAncestor(el, stopAfter) {
+  try {
+    let node = el && el.parentElement ? el.parentElement : null;
+    while (node && node.nodeType === 1) {
+      if (isScrollableBox(node)) return node;
+      if (node === stopAfter) return null;
+      node = node.parentElement;
+    }
+  } catch {}
+  return null;
+}
+
+function scrollFixedMatchIntoView(el, fixed, rect) {
+  try {
+    if (!rect) {
+      try {
+        rect = el.getBoundingClientRect();
+      } catch {
+        return;
+      }
+    }
+    if (rectIntersectsViewport(rect)) return;
+    const box = nearestScrollableAncestor(el, fixed);
+    if (!box) return;
+    const crect = box.getBoundingClientRect();
+    if (crect.top > rect.top) box.scrollTop -= crect.top - rect.top;
+    else if (rect.bottom > crect.bottom) box.scrollTop += rect.bottom - crect.bottom;
+    if (crect.left > rect.left) box.scrollLeft -= crect.left - rect.left;
+    else if (rect.right > crect.right) box.scrollLeft += rect.right - crect.right;
+  } catch {}
+}
+
+function executeQuery(q) {
+  pendingQuery = q;
+  const query = (q || "").trim();
+  clearTimeout(inputDebounce);
+  if (!query) {
+    matches = [];
+    currentIdx = 0;
+    clearHighlightApi();
+    updateStatus();
+    return;
+  }
+  inputDebounce = setTimeout(() => {
+    runQuery(query);
+  }, 80);
+}
+
+function runQuery(query) {
+  try {
+    matches = buildMatches(query);
+    currentIdx = 0;
+    if (matches.length > 0) lastQuery = query;
+    applyHighlights();
+    if (matches.length > 0) scrollToCurrent();
+    updateStatus();
+  } catch {}
+}
+
+function findFlagLabel(name) {
+  return name === "regex" ? ".*" : name === "wholeWord" ? "\\b" : "Aa";
+}
+
+function refreshToggles() {
+  for (const [name, btn] of Object.entries(toggleButtons)) {
+    try {
+      const on =
+        name === "regex" ? findRegex : name === "wholeWord" ? findWholeWord : findCase;
+      btn.classList.toggle("jari-find-toggle-on", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    } catch {}
+  }
+}
+
+function toggleFindFlag(name) {
+  if (name === "regex") findRegex = !findRegex;
+  else if (name === "wholeWord") findWholeWord = !findWholeWord;
+  else findCase = !findCase;
+  refreshToggles();
+  const q = (inputEl && inputEl.value.trim()) || pendingQuery || lastQuery;
+  if (q) {
+    clearTimeout(inputDebounce);
+    runQuery(q);
+  } else {
+    updateStatus();
+  }
+}
+
+async function loadFindHistory() {
+  try {
+    const stored = await chrome.storage.local.get(FIND_HISTORY_KEY);
+    const list = stored && stored[FIND_HISTORY_KEY];
+    if (Array.isArray(list)) {
+      findHistory = list.filter((s) => typeof s === "string" && s).slice(0, MAX_FIND_HISTORY);
+    }
+  } catch {}
+}
+
+async function pushFindHistory(q) {
+  const query = (q || "").trim();
+  if (!query) return;
+  findHistory = [query, ...findHistory.filter((s) => s !== query)].slice(
+    0,
+    MAX_FIND_HISTORY,
+  );
+  historyIdx = -1;
+  try {
+    await chrome.storage.local.set({ [FIND_HISTORY_KEY]: findHistory });
+  } catch {}
+}
+
+function stepHistory(delta) {
+  if (!inputEl || findHistory.length === 0) return;
+  if (historyIdx === -1 && delta > 0) historyDraft = inputEl.value;
+  historyIdx = Math.min(
+    findHistory.length - 1,
+    Math.max(-1, historyIdx + delta),
+  );
+  inputEl.value = historyIdx === -1 ? historyDraft : findHistory[historyIdx];
+  executeQuery(inputEl.value);
+}
+
+function activeFlagSuffix() {
+  const flags = [];
+  if (findRegex) flags.push(".*");
+  if (findWholeWord) flags.push("\\b");
+  if (findCase) flags.push("Aa");
+  return flags.length > 0 ? ` · ${flags.join(" ")}` : "";
 }
 
 function updateStatus() {
@@ -337,10 +517,17 @@ function updateStatus() {
     return;
   }
   if (matches.length === 0) {
-    statusEl.textContent = `No match for "${q}"`;
+    if (
+      findRegex &&
+      !buildMatcher(q, { regex: true, wholeWord: findWholeWord, caseSensitive: findCase })
+    ) {
+      statusEl.textContent = "Invalid pattern";
+    } else {
+      statusEl.textContent = `No match for "${q}"${activeFlagSuffix()}`;
+    }
     statusEl.classList.add("jari-find-no-match");
   } else {
-    statusEl.textContent = `${currentIdx + 1}/${matches.length}`;
+    statusEl.textContent = `${currentIdx + 1}/${matches.length}${activeFlagSuffix()}`;
     statusEl.classList.remove("jari-find-no-match");
   }
 }
@@ -362,39 +549,49 @@ function renderBar() {
   statusEl.className = "jari-find-status";
   bar.appendChild(label);
   bar.appendChild(inputEl);
+  toggleButtons = {};
+  for (const [name, command, label] of [
+    ["regex", "toggleFindRegex", "Regular expression"],
+    ["wholeWord", "toggleFindWholeWord", "Whole word"],
+    ["findCase", "toggleFindCase", "Match case"],
+  ]) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "jari-find-toggle";
+    btn.textContent = findFlagLabel(name);
+    const bound = keysForCommand(settings.getKeymap(), command);
+    btn.title = bound.length > 0 ? `${label} (${bound.join(", ")})` : label;
+    btn.setAttribute("aria-pressed", "false");
+    btn.setAttribute("aria-label", btn.title);
+    btn.addEventListener("click", () => {
+      toggleFindFlag(name);
+      try {
+        inputEl.focus();
+      } catch {}
+    });
+    toggleButtons[name] = btn;
+    bar.appendChild(btn);
+  }
   bar.appendChild(statusEl);
   overlay.appendChild(bar);
   (document.body || document.documentElement).appendChild(overlay);
 
   restoreFocus = document.activeElement;
+  historyIdx = -1;
+  historyDraft = "";
 
   inputEl.addEventListener("input", () => {
-    pendingQuery = inputEl.value;
-    const q = pendingQuery.trim();
-    clearTimeout(inputDebounce);
-    if (!q) {
-      matches = [];
-      currentIdx = 0;
-      clearHighlightApi();
-      clearFallback();
-      updateStatus();
-      return;
-    }
-    inputDebounce = setTimeout(() => {
-      try {
-        const latest = (inputEl && inputEl.value.trim()) || q;
-        if (latest !== q) return;
-        matches = buildMatches(latest);
-        currentIdx = 0;
-        if (matches.length > 0) lastQuery = latest;
-        applyHighlights();
-        if (matches.length > 0) scrollToCurrent();
-        updateStatus();
-      } catch {}
-    }, 80);
+    historyIdx = -1;
+    executeQuery(inputEl.value);
   });
 
-  inputEl.addEventListener("keydown", (e) => e.stopPropagation());
+  inputEl.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      stepHistory(e.key === "ArrowUp" ? 1 : -1);
+    }
+  });
 
   inputEl.focus();
   updateStatus();
@@ -402,10 +599,12 @@ function renderBar() {
 
 function open() {
   if (active) return;
+  touch("find");
   useHighlights = detectHighlightSupport();
   active = true;
   startFindObserver();
   pendingQuery = "";
+  loadFindHistory();
   renderBar();
 }
 
@@ -481,12 +680,12 @@ function next(count = 1, reverse = false) {
     }
     pendingQuery = q;
     lastQuery = q;
+    pushFindHistory(q);
     matches = buildMatches(q);
     currentIdx = 0;
     if (matches.length === 0) {
       ui.toast(`No match for "${q}"`);
       clearHighlightApi();
-      clearFallback();
       updateStatus();
       return;
     }
@@ -513,8 +712,56 @@ function next(count = 1, reverse = false) {
   ui.toast(`${currentIdx + 1}/${len}`);
 }
 
+const FIND_TOGGLE_COMMANDS = {
+  toggleFindRegex: "regex",
+  toggleFindWholeWord: "wholeWord",
+  toggleFindCase: "findCase",
+};
+
+export function findToggleCommandFor(keymap, combo) {
+  try {
+    const cmd = keymap ? keymap[combo] : null;
+    if (cmd && Object.prototype.hasOwnProperty.call(FIND_TOGGLE_COMMANDS, cmd)) {
+      return cmd;
+    }
+  } catch {}
+  return null;
+}
+
+function enableFindFlag(name) {
+  if (name === "regex") findRegex = true;
+  else if (name === "wholeWord") findWholeWord = true;
+  else findCase = true;
+}
+
+function toggleOrOpen(name) {
+  if (isActive()) {
+    toggleFindFlag(name);
+    try {
+      if (inputEl) inputEl.focus();
+    } catch {}
+    return;
+  }
+  open();
+  if (!inputEl) return;
+  enableFindFlag(name);
+  refreshToggles();
+  updateStatus();
+}
+
 function onKeyDown(event) {
   if (!active) return false;
+  const combo = canonicalKey(event);
+  const toggleCmd = findToggleCommandFor(settings.getKeymap(), combo);
+  if (toggleCmd && (combo.includes("+") || document.activeElement !== inputEl)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleFindFlag(FIND_TOGGLE_COMMANDS[toggleCmd]);
+    try {
+      if (inputEl) inputEl.focus();
+    } catch {}
+    return true;
+  }
   const inInput = document.activeElement === inputEl;
   if (inInput) {
     if (event.key === "Escape") {
@@ -531,6 +778,7 @@ function onKeyDown(event) {
         closeAndClear();
       } else {
         lastQuery = q;
+        pushFindHistory(q);
         closeBar();
       }
       return true;
@@ -581,6 +829,7 @@ export const Find = {
   close: closeBar,
   clearHighlights,
   next,
+  toggleOrOpen,
   isActive,
   hasHighlights,
   handleGlobalEsc,
@@ -597,7 +846,13 @@ try {
 
 export const __testHelpers = {
   buildMatches,
+  buildMatcher,
+  findToggleCommandFor,
   hasUpperCase,
+  rectIntersectsViewport,
+  findFixedAncestor,
+  nearestScrollableAncestor,
+  scrollFixedMatchIntoView,
 };
 
 export function __resetFindState() {
@@ -605,5 +860,11 @@ export function __resetFindState() {
   lastQuery = "";
   pendingQuery = "";
   useHighlights = false;
+  findRegex = false;
+  findWholeWord = false;
+  findCase = false;
+  findHistory = [];
+  historyIdx = -1;
+  historyDraft = "";
 }
 

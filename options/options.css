@@ -6,6 +6,7 @@
   --muted: #606079;
   --link: #7e98e8;
   --danger: #e08a8a;
+  --focus: #cdcdcd;
   --mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
   --page-width: 1080px;
 }
@@ -14,7 +15,6 @@
   box-sizing: border-box;
 }
 
-/* Focused elements keep their own style — no focus rings anywhere. */
 :focus-visible {
   outline: none;
 }
@@ -279,6 +279,38 @@ code {
   color: var(--fg);
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.setting-control input[type="text"],
+.setting-control input[type="number"],
+.setting-control select,
+#keymap-filter,
+.add-site input {
+  transition: border-color 120ms ease-in-out;
+}
+
+.setting-control input[type="text"]:focus-visible:not([aria-invalid="true"]),
+.setting-control input[type="number"]:focus-visible:not([aria-invalid="true"]),
+.setting-control select:focus-visible,
+#keymap-filter:focus-visible,
+.add-site input:focus-visible:not([aria-invalid="true"]) {
+  outline: none;
+  border-color: var(--focus);
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setting-control input[type="text"],
+  .setting-control input[type="number"],
+  .setting-control select,
+  #keymap-filter,
+  .add-site input {
+    transition: none;
+  }
 }
 
 .setting-sources {

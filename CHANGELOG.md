@@ -4,6 +4,30 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Added
+
+- Hover, yank-text and open-in-this-tab hint actions (unbound by default).
+- Same-origin iframe links get their own hints; crowded pages keep
+  on-screen hints first when the 800-hint cap applies.
+- Customizable hint theme (yellow/cyan/dark) and label size, plus an
+  extra clickable selector for site-specific elements.
+- Find in-bar regex/whole-word/case toggles (rebindable
+  `toggleFind*` commands, `Alt+R/W/C` by default) and query
+  history (`Up`/`Down`).
+- `;w` to reset the scroll area, `*.example.com` disabled-site wildcards,
+  searchable help and cheatsheet filter, which-key clue narrowing.
+- White focus borders on the options page.
+- Stored keymaps gain bindings for newly added commands (existing
+  custom binds are never clobbered).
+- The hint status pill shows the pending prefix.
+
+### Fixed
+
+- Find no longer scrolls the page when the match sits in fixed content.
+- Help lists unbound commands; option reset covers all settings.
+
 ## [0.3.0] - 2026-09-05
 
 First public release.

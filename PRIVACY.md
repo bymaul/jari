@@ -18,6 +18,7 @@ sent to the developer or any third party.
 | Clipboard read | Open a URL from your clipboard (`gp`/`gP`) | Opened as a tab, otherwise discarded |
 | Clipboard write | Copy URL / title (`yy`, `Y`, `yf`) | Your clipboard only |
 | Settings (`storage.sync`) | Persist your keybindings and options | Your browser's synced storage, never to us |
+| Find history (`storage.local`) | Recall past `/` queries with `Up`/`Down` | This device only, never synced or sent anywhere |
 
 ## Network use
 

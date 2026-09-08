@@ -246,7 +246,7 @@
   }
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 1;
+  var SETTINGS_SCHEMA_VERSION = 4;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -292,6 +292,9 @@
     "/": "findText",
     n: "findNext",
     N: "findPrev",
+    "alt+r": "toggleFindRegex",
+    "alt+w": "toggleFindWholeWord",
+    "alt+c": "toggleFindCase",
     v: "enterVisual",
     V: "enterVisualLine",
     gg: "scrollToTop",
@@ -326,6 +329,11 @@
     { id: "help", label: "Help" }
   ];
   var HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+  var HINT_THEMES = ["yellow", "cyan", "dark"];
+  var HINT_THEME_DEFAULT = "yellow";
+  var HINT_FONT_SIZE_DEFAULT = 10;
+  var HINT_FONT_SIZE_MIN = 8;
+  var HINT_FONT_SIZE_MAX = 20;
   var settingsDefaults = {
     scrollStep: 120,
     smoothScroll: false,
@@ -337,7 +345,10 @@
     suggestionSources: suggestionSources.slice(),
     maxResults: maxResultsDefault,
     copyFormat: "plain",
-    hintChars: HINT_CHARSET_DEFAULT
+    hintChars: HINT_CHARSET_DEFAULT,
+    clickableSelector: "",
+    hintTheme: HINT_THEME_DEFAULT,
+    hintFontSize: HINT_FONT_SIZE_DEFAULT
   };
   var prefixKeys = new Set(Object.keys(prefixes));
   var modifierKeys = /* @__PURE__ */ new Set([
@@ -352,6 +363,9 @@
     "Fn",
     "AltGraph"
   ]);
+  function keysForCommand(keymap, commandName) {
+    return Object.entries(keymap).filter(([, cmd]) => cmd === commandName).map(([key]) => key);
+  }
   function isPrefixKey(keymap, key) {
     if (!key || typeof key !== "string") return false;
     if (key.includes("+")) return false;
@@ -413,6 +427,18 @@
     visit(document);
     return out;
   }
+  function normalizeClickableSelector(raw) {
+    if (typeof raw !== "string") return settingsDefaults.clickableSelector;
+    return raw.trim().slice(0, 500);
+  }
+  function normalizeHintTheme(raw) {
+    return HINT_THEMES.includes(raw) ? raw : HINT_THEME_DEFAULT;
+  }
+  function normalizeHintFontSize(raw) {
+    const n = Math.round(Number(raw));
+    if (!Number.isFinite(n)) return settingsDefaults.hintFontSize;
+    return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, n));
+  }
   function normalizeHintChars(raw) {
     if (typeof raw !== "string") return settingsDefaults.hintChars;
     const chars = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -424,8 +450,35 @@
     const d = { ...data || {} };
     let version = Number.isInteger(d.schemaVersion) && d.schemaVersion > 0 ? d.schemaVersion : 0;
     if (version < 1) version = 1;
+    if (version < 2) {
+      if (d.clickableSelector === void 0) d.clickableSelector = "";
+      version = 2;
+    }
+    if (version < 3) {
+      if (d.hintTheme === void 0) d.hintTheme = HINT_THEME_DEFAULT;
+      if (d.hintFontSize === void 0) d.hintFontSize = HINT_FONT_SIZE_DEFAULT;
+      version = 3;
+    }
+    if (version < 4) {
+      d.keymap = backfillNewBindings(d.keymap);
+      version = 4;
+    }
     d.schemaVersion = version;
     return d;
+  }
+  function backfillNewBindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const used = new Set(Object.values(keymap));
+    const out = { ...keymap };
+    for (const [combo, command] of Object.entries(keymapDefaults)) {
+      if (!(combo in out) && !used.has(command)) {
+        out[combo] = command;
+        used.add(command);
+      }
+    }
+    return out;
   }
   function normalizeSettings(data) {
     const d = migrateSettings(data);
@@ -448,6 +501,9 @@
       maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
+      clickableSelector: normalizeClickableSelector(d.clickableSelector),
+      hintTheme: normalizeHintTheme(d.hintTheme),
+      hintFontSize: normalizeHintFontSize(d.hintFontSize),
       clueEnabled: typeof d.clueEnabled === "boolean" ? d.clueEnabled : settingsDefaults.clueEnabled,
       clueDelayMs: Number.isFinite(d.clueDelayMs) && d.clueDelayMs >= 0 ? Math.min(5e3, d.clueDelayMs) : settingsDefaults.clueDelayMs
     };
@@ -479,6 +535,7 @@
   var STORAGE_KEY = "settings";
   var persistedLocal = false;
   var state = {
+    schemaVersion: SETTINGS_SCHEMA_VERSION,
     keymap: { ...keymapDefaults },
     disabledSites: [],
     scrollStep: settingsDefaults.scrollStep,
@@ -490,11 +547,15 @@
     maxResults: settingsDefaults.maxResults,
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
+    clickableSelector: settingsDefaults.clickableSelector,
+    hintTheme: settingsDefaults.hintTheme,
+    hintFontSize: settingsDefaults.hintFontSize,
     clueEnabled: settingsDefaults.clueEnabled,
     clueDelayMs: settingsDefaults.clueDelayMs
   };
   function merge(data) {
     const s = normalizeSettings(data);
+    state.schemaVersion = s.schemaVersion;
     state.keymap = s.keymap;
     state.disabledSites = s.disabledSites;
     state.scrollStep = s.scrollStep;
@@ -506,6 +567,9 @@
     state.maxResults = s.maxResults;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
+    state.clickableSelector = s.clickableSelector;
+    state.hintTheme = s.hintTheme;
+    state.hintFontSize = s.hintFontSize;
     state.clueEnabled = s.clueEnabled;
     state.clueDelayMs = s.clueDelayMs;
   }
@@ -533,7 +597,7 @@
   }
   function snapshot() {
     return {
-      schemaVersion: SETTINGS_SCHEMA_VERSION,
+      schemaVersion: state.schemaVersion,
       keymap: { ...state.keymap },
       disabledSites: state.disabledSites.slice(),
       scrollStep: state.scrollStep,
@@ -545,6 +609,9 @@
       maxResults: state.maxResults,
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
+      clickableSelector: state.clickableSelector,
+      hintTheme: state.hintTheme,
+      hintFontSize: state.hintFontSize,
       clueEnabled: state.clueEnabled,
       clueDelayMs: state.clueDelayMs
     };
@@ -613,6 +680,15 @@
   function getHintChars() {
     return state.hintChars;
   }
+  function getClickableSelector() {
+    return state.clickableSelector;
+  }
+  function getHintTheme() {
+    return state.hintTheme;
+  }
+  function getHintFontSize() {
+    return state.hintFontSize;
+  }
   function isClueEnabled() {
     return state.clueEnabled;
   }
@@ -651,6 +727,9 @@
     getMaxResults,
     getCopyFormat,
     getHintChars,
+    getClickableSelector,
+    getHintTheme,
+    getHintFontSize,
     isClueEnabled,
     getClueDelayMs,
     toggleSiteEnabled
@@ -752,17 +831,28 @@
       }
     }
   }
+  var CLICK_EVENTS = [
+    "mouseover",
+    "pointerdown",
+    "mousedown",
+    "pointerup",
+    "mouseup",
+    "click",
+    "focus",
+    "focusin"
+  ];
   function dispatchClick(el) {
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
     } catch {
     }
-    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
+    for (const type of CLICK_EVENTS) {
       try {
         el.dispatchEvent(
           new MouseEvent(type, {
             bubbles: true,
             cancelable: true,
+            composed: true,
             view: window,
             button: 0,
             buttons: type === "mousedown" ? 1 : 0
@@ -772,6 +862,23 @@
       }
     }
     safeFocus(el, { preventScroll: true });
+  }
+  var HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
+  function dispatchHover(el) {
+    for (const type of HOVER_EVENTS) {
+      try {
+        el.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: type !== "mouseenter" && type !== "pointerenter",
+            cancelable: true,
+            composed: true,
+            view: window,
+            button: 0
+          })
+        );
+      } catch {
+      }
+    }
   }
   function focusFrameElement(el) {
     try {
@@ -832,10 +939,12 @@
     consume,
     safeFocus,
     dispatchClick,
+    dispatchHover,
     focusFrameElement
   };
 
   // content/hints-elements.js
+  var SHOW_ELEMENT = 1;
   var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
   var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
   var FRAME_SELECTOR = "iframe,frame";
@@ -865,18 +974,48 @@
     const windowWidth = window.innerWidth || document.documentElement.clientWidth;
     return (ignoreSize || isElementDrawn(el, rect)) && rect.top < windowHeight && rect.bottom > 0 && rect.left < windowWidth && rect.right > 0;
   }
-  function getVisibleElements(filter) {
-    const all = Array.from(document.documentElement.getElementsByTagName("*"));
-    const visibleElements = [];
-    for (let i = 0; i < all.length; i++) {
-      const e = all[i];
-      if (e.shadowRoot) {
-        const cc = e.shadowRoot.querySelectorAll("*");
-        for (let j = 0; j < cc.length; j++) all.push(cc[j]);
+  function listElements(root, whatToShow, filter) {
+    const out = [];
+    try {
+      const walker = document.createTreeWalker(root, whatToShow, null);
+      let node = walker.nextNode();
+      while (node) {
+        try {
+          if (filter(node)) out.push(node);
+        } catch {
+        }
+        if (node.shadowRoot) {
+          try {
+            out.push(...listElements(node.shadowRoot, whatToShow, filter));
+          } catch {
+          }
+        }
+        node = walker.nextNode();
       }
-      const rect = e.getBoundingClientRect();
-      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && window.getComputedStyle(e).visibility !== "hidden") {
-        filter(e, visibleElements);
+    } catch {
+    }
+    return out;
+  }
+  function getVisibleElements(filter) {
+    const visibleElements = [];
+    for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
+      let rect;
+      try {
+        rect = e.getBoundingClientRect();
+      } catch {
+        continue;
+      }
+      let hidden;
+      try {
+        hidden = window.getComputedStyle(e).visibility === "hidden";
+      } catch {
+        hidden = true;
+      }
+      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && !hidden) {
+        try {
+          filter(e, visibleElements);
+        } catch {
+        }
       }
     }
     return visibleElements;
@@ -903,11 +1042,48 @@
       return elm.getBoundingClientRect();
     }
   }
+  function isExplicitlyRequested(e) {
+    let selector;
+    try {
+      selector = settings.getClickableSelector() || "";
+    } catch {
+      return false;
+    }
+    if (!selector) return false;
+    try {
+      return !!e.matches && e.matches(selector);
+    } catch {
+      return false;
+    }
+  }
+  function viewportScore(el) {
+    let rect;
+    try {
+      rect = getHintRect(el);
+    } catch {
+      return Infinity;
+    }
+    if (!rect || rect.width <= 0 || rect.height <= 0) return Infinity;
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    if (vw <= 0 || vh <= 0) return 0;
+    const visW = Math.max(0, Math.min(rect.right, vw) - Math.max(rect.left, 0));
+    const visH = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
+    if (visW <= 0 || visH <= 0) return Infinity;
+    const coverage = visW * visH / (rect.width * rect.height);
+    const cx = rect.left + rect.width / 2 - vw / 2;
+    const cy = rect.top + rect.height / 2 - vh / 2;
+    return (coverage >= 0.99 ? 0 : 1e9) + Math.hypot(cx, cy);
+  }
+  function prioritizeForViewport(elements2) {
+    return elements2.map((el, i) => ({ el, i, score: viewportScore(el) })).sort((a, b) => a.score - b.score || a.i - b.i).map(({ el }) => el);
+  }
   function isElementClickable(e) {
     try {
       if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
     } catch {
     }
+    if (isExplicitlyRequested(e)) return true;
     try {
       const style = window.getComputedStyle(e);
       if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
@@ -927,6 +1103,10 @@
     if (elements2.length === 0) return elements2;
     const result = [];
     elements2.forEach((e) => {
+      if (isExplicitlyRequested(e)) {
+        result.push(e);
+        return;
+      }
       for (let j = 0; j < result.length; j++) {
         if (result[j].contains(e)) {
           if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
@@ -945,7 +1125,7 @@
     elements2 = elements2.filter((e) => {
       const be = getRealRect(e);
       if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
-      if (e.matches && (e.matches("input, textarea, select, form") || e.contentEditable === "true"))
+      if (e.matches && e.matches("input, textarea, select, form") || e.contentEditable === "true" || isExplicitlyRequested(e))
         return true;
       try {
         if (e.closest && e.closest(overlaySelectors)) return false;
@@ -956,12 +1136,34 @@
     });
     return filterAncestors(elements2);
   }
-  function getClickableElements() {
+  function matchesHintSelector(e, selectorString, pattern) {
+    if (!selectorString && !pattern) return true;
+    try {
+      if (selectorString && e.matches && e.matches(selectorString)) return true;
+    } catch {
+    }
+    if (pattern) {
+      try {
+        pattern.lastIndex = 0;
+        const text = e.innerText || "";
+        if (pattern.test(text)) return true;
+        const label = e.getAttribute ? e.getAttribute("aria-label") : "";
+        if (label) {
+          pattern.lastIndex = 0;
+          if (pattern.test(label)) return true;
+        }
+      } catch {
+      }
+    }
+    return false;
+  }
+  function getClickableElements(selectorString = "", pattern = null) {
     let elements2 = getVisibleElements((e, v) => {
       try {
         if (e.closest && e.closest(overlaySelectors)) return;
       } catch {
       }
+      if (!matchesHintSelector(e, selectorString, pattern)) return;
       if (isElementClickable(e)) v.push(e);
     });
     for (const frame of getFrameElements()) {
@@ -984,7 +1186,7 @@
     elements2 = filterOverlapElements(elements2);
     return elements2;
   }
-  function getHref(el) {
+  function getHref(el, base) {
     try {
       if (el.href) return el.href;
     } catch {
@@ -993,14 +1195,14 @@
     if (!raw) return null;
     if (raw.startsWith("#") || raw.trim() === "") return null;
     try {
-      const url = new URL(raw, location.href);
+      const url = new URL(raw, base || location.href);
       return url.href;
     } catch {
       return null;
     }
   }
-  function isOpenableLink(el) {
-    const href = getHref(el);
+  function isOpenableLink(el, base) {
+    const href = getHref(el, base);
     if (!href) return false;
     try {
       const url = new URL(href);
@@ -1068,10 +1270,166 @@
   function collectElements(requestedMode) {
     let raw = [];
     if (requestedMode === "click") raw = getClickableElements();
-    else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "yank")
+    else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "openCurrent" || requestedMode === "yank")
       raw = getLinkElements();
     else if (requestedMode === "input") raw = getInputElements();
+    else if (requestedMode === "yankText" || requestedMode === "hover")
+      raw = getClickableElements();
+    try {
+      for (const el of collectIframeElements(requestedMode)) {
+        if (!raw.includes(el)) raw.push(el);
+      }
+    } catch {
+    }
     return raw;
+  }
+  function translateRect(rect, dx, dy) {
+    return {
+      left: rect.left + dx,
+      top: rect.top + dy,
+      right: rect.right + dx,
+      bottom: rect.bottom + dy,
+      width: rect.width,
+      height: rect.height
+    };
+  }
+  function getHintRect(el) {
+    try {
+      if (el && el._jariViewportRect) return el._jariViewportRect;
+    } catch {
+    }
+    return getRealRect(el);
+  }
+  function getAccessibleFrameDocs() {
+    const out = [];
+    let frames;
+    try {
+      frames = queryAll(FRAME_SELECTOR);
+    } catch {
+      return out;
+    }
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    for (const frame of frames) {
+      try {
+        if (frame.closest && frame.closest(overlaySelectors)) continue;
+      } catch {
+      }
+      let doc;
+      try {
+        doc = frame.contentDocument;
+      } catch {
+        continue;
+      }
+      if (!doc || !doc.body) continue;
+      let rect;
+      try {
+        rect = frame.getBoundingClientRect();
+      } catch {
+        continue;
+      }
+      if (!rect) continue;
+      if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
+        continue;
+      out.push({ frame, doc, rect });
+    }
+    return out;
+  }
+  function eachInnerElement(doc, fn) {
+    const visit = (root) => {
+      let nodes;
+      try {
+        nodes = root.querySelectorAll("*");
+      } catch {
+        return;
+      }
+      for (const el of nodes) {
+        try {
+          fn(el);
+        } catch {
+        }
+        if (el.shadowRoot) visit(el.shadowRoot);
+      }
+    };
+    try {
+      if (doc.body) visit(doc.body);
+    } catch {
+    }
+  }
+  function innerPointVisible(el, be) {
+    try {
+      const doc = el.ownerDocument;
+      if (!doc || typeof doc.elementFromPoint !== "function") return true;
+      const hit = doc.elementFromPoint(
+        be.left + be.width / 2,
+        be.top + be.height / 2
+      );
+      return !hit || hit.contains(el) || el.contains(hit);
+    } catch {
+      return true;
+    }
+  }
+  function matchesInnerInput(el) {
+    try {
+      if (!el.matches || !el.matches(INPUT_SELECTOR)) return false;
+    } catch {
+      return false;
+    }
+    const type = el.getAttribute ? (el.getAttribute("type") || "").toLowerCase() : "";
+    return type !== "hidden" && !el.disabled;
+  }
+  function matchesInnerLink(el, base) {
+    try {
+      if (!el.matches || !el.matches("[href]")) return false;
+    } catch {
+      return false;
+    }
+    return !el.disabled && !el.readOnly && isOpenableLink(el, base);
+  }
+  function collectIframeElements(requestedMode) {
+    const out = [];
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    for (const { frame, doc, rect } of getAccessibleFrameDocs()) {
+      const dx = rect.left + (frame.clientLeft || 0);
+      const dy = rect.top + (frame.clientTop || 0);
+      let base = location.href;
+      try {
+        base = doc.URL || doc.baseURI || location.href;
+      } catch {
+      }
+      eachInnerElement(doc, (el) => {
+        if (requestedMode === "click" || requestedMode === "yankText" || requestedMode === "hover") {
+          if (!isElementClickable(el)) return;
+        } else if (requestedMode === "input") {
+          if (!matchesInnerInput(el)) return;
+        } else {
+          if (!matchesInnerLink(el, base)) return;
+        }
+        let be;
+        try {
+          be = el.getBoundingClientRect();
+        } catch {
+          return;
+        }
+        if (!be || be.width <= 0 || be.height <= 0) return;
+        if (!isElementDrawn(el, be)) return;
+        const t = translateRect(be, dx, dy);
+        if (t.bottom <= 0 || t.right <= 0 || t.top >= vh || t.left >= vw) return;
+        try {
+          if (el.closest && el.closest(overlaySelectors)) return;
+        } catch {
+        }
+        if (el.disabled || el.readOnly) return;
+        if (!innerPointVisible(el, be)) return;
+        try {
+          el._jariViewportRect = t;
+        } catch {
+        }
+        out.push(el);
+      });
+    }
+    return out;
   }
 
   // content/scroll.js
@@ -1652,17 +2010,39 @@
 
   // content/overlays.js
   var overlays = [];
-  function register(name, api) {
-    overlays.push({ name, ...api });
+  var openOrder = [];
+  function register(name, api, opts = {}) {
+    overlays.push({ name, modal: opts.modal !== false, ...api });
+  }
+  function touch(name) {
+    const idx = openOrder.indexOf(name);
+    if (idx >= 0) openOrder.splice(idx, 1);
+    openOrder.push(name);
+  }
+  function byName(name) {
+    return overlays.find((overlay4) => overlay4.name === name);
   }
   var Overlays = {
     closeAll() {
-      for (const overlay4 of overlays) {
-        if (overlay4.isActive()) overlay4.close();
+      const seen = /* @__PURE__ */ new Set();
+      for (let i = openOrder.length - 1; i >= 0; i--) {
+        const overlay4 = byName(openOrder[i]);
+        if (overlay4 && !seen.has(overlay4.name) && overlay4.isActive()) {
+          seen.add(overlay4.name);
+          overlay4.close();
+        }
       }
+      for (const overlay4 of overlays) {
+        if (!seen.has(overlay4.name) && overlay4.isActive()) overlay4.close();
+      }
+      openOrder.length = 0;
     },
     active() {
-      return overlays.find((overlay4) => overlay4.isActive()) || null;
+      for (let i = openOrder.length - 1; i >= 0; i--) {
+        const overlay4 = byName(openOrder[i]);
+        if (overlay4 && overlay4.modal && overlay4.isActive()) return overlay4;
+      }
+      return overlays.find((overlay4) => overlay4.modal && overlay4.isActive()) || null;
     }
   };
 
@@ -1835,6 +2215,7 @@
     return rank(list, q).map((x) => x.item);
   }
   function render(title, placeholder) {
+    touch("prompt");
     overlay = document.createElement("div");
     overlay.className = "jari-overlay jari-prompt";
     inputEl = document.createElement("input");
@@ -2142,11 +2523,17 @@
     hintClick: { category: "hints", label: "Click link" },
     hintOpen: { category: "hints", label: "Open link in new tab" },
     hintOpenBackground: { category: "hints", label: "Open link in background tab" },
+    hintOpenCurrent: { category: "hints", label: "Open link in this tab" },
     hintInput: { category: "hints", label: "Focus input" },
     hintYank: { category: "hints", label: "Copy link URL" },
+    hintYankText: { category: "hints", label: "Copy link text" },
+    hintHover: { category: "hints", label: "Hover element" },
     findText: { category: "find", label: "Find in page" },
     findNext: { category: "find", label: "Next match", repeatable: true },
     findPrev: { category: "find", label: "Previous match", repeatable: true },
+    toggleFindRegex: { category: "find", label: "Toggle regex search" },
+    toggleFindWholeWord: { category: "find", label: "Toggle whole-word search" },
+    toggleFindCase: { category: "find", label: "Toggle case-sensitive search" },
     enterVisual: { category: "visual", label: "Visual mode" },
     enterVisualLine: { category: "visual", label: "Visual line mode" },
     showHelp: { category: "help", label: "Show this help" },
@@ -2174,6 +2561,7 @@
   function open() {
     if (active2) return;
     active2 = true;
+    touch("help");
     render2();
     overlay2.tabIndex = -1;
     overlay2.focus();
@@ -2197,8 +2585,7 @@
     }
     const byCategory = /* @__PURE__ */ new Map();
     for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
-      const keys = byCommand.get(commandName);
-      if (!keys) continue;
+      const keys = byCommand.get(commandName) || [];
       const id = meta.category || "other";
       if (!byCategory.has(id)) byCategory.set(id, []);
       byCategory.get(id).push({ keys, label: meta.label, commandName });
@@ -2216,7 +2603,12 @@
             const tr = document.createElement("tr");
             const keyTd = document.createElement("td");
             keyTd.className = "jari-help-key";
-            keyTd.textContent = keys.join(", ");
+            if (keys.length === 0) {
+              keyTd.textContent = "unbound";
+              keyTd.classList.add("jari-unbound");
+            } else {
+              keyTd.textContent = keys.join(", ");
+            }
             const labelTd = document.createElement("td");
             labelTd.className = "jari-help-label";
             labelTd.textContent = label;
@@ -2539,7 +2931,7 @@
       hintEl.textContent = label;
     }
   }
-  var HINT_THEMES = {
+  var HINT_THEMES2 = {
     yellow: {
       border: "#c38a22",
       background: "linear-gradient(#fff785, #ffc542)",
@@ -2551,10 +2943,22 @@
       background: "linear-gradient(#b0f2ff, #00b4d8)",
       color: "#0a2e3a",
       matched: "#3a6a7a"
+    },
+    dark: {
+      border: "#e0a363",
+      background: "linear-gradient(#2b2b38, #1c1c24)",
+      color: "#f5f0e6",
+      matched: "#8a8a99"
     }
   };
-  function hintCss(theme) {
-    const t = HINT_THEMES[theme] || HINT_THEMES.yellow;
+  function hintFontSize(raw) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return HINT_FONT_SIZE_DEFAULT;
+    return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, Math.round(n)));
+  }
+  function hintCss(theme, fontSize) {
+    const t = HINT_THEMES2[theme] || HINT_THEMES2.yellow;
+    const size = hintFontSize(fontSize);
     return `
     .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
     .jari-hint {
@@ -2562,7 +2966,7 @@
       display: inline-block;
       box-sizing: border-box;
       font-family: monospace !important;
-      font-size: 10px !important;
+      font-size: ${size}px !important;
       font-weight: bold !important;
       line-height: 1 !important;
       letter-spacing: 0.02em !important;
@@ -2581,7 +2985,7 @@
     .jari-hint-hidden { opacity: 0; display: none; }
   `;
   }
-  function createHintsHost(theme = "yellow") {
+  function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFAULT) {
     const host = document.createElement("div");
     host.className = "jari-hints-host";
     host.style.position = "fixed";
@@ -2599,7 +3003,7 @@
     }
     const shadow = host.shadowRoot;
     const style = document.createElement("style");
-    style.textContent = hintCss(theme);
+    style.textContent = hintCss(theme, fontSize);
     shadow.appendChild(style);
     const holder2 = document.createElement("section");
     holder2.className = "jari-hints";
@@ -2609,7 +3013,44 @@
     placeHintsHost(host);
     return { host, holder: holder2 };
   }
-  function layoutHints(holder2, elements2, labels) {
+  function estimateLabelBox(label, fontSize) {
+    const size = hintFontSize(fontSize);
+    return {
+      w: Math.ceil(String(label).length * size * 0.62 + 10),
+      h: Math.ceil(size + 8)
+    };
+  }
+  function boxesOverlap(a, b) {
+    return a.left < b.left + b.w && b.left < a.left + a.w && a.top < b.top + b.h && b.top < a.top + a.h;
+  }
+  var LABEL_SHIFTS = [
+    [0, 0],
+    [12, 0],
+    [0, 18],
+    [12, 18],
+    [-12, 0],
+    [0, 36]
+  ];
+  function resolveLabelBox(home, w, h, placed) {
+    for (const [dx, dy] of LABEL_SHIFTS) {
+      const box = {
+        left: Math.max(0, home.left + dx),
+        top: Math.max(0, home.top + dy),
+        w,
+        h
+      };
+      let hit = false;
+      for (const p of placed) {
+        if (boxesOverlap(box, p)) {
+          hit = true;
+          break;
+        }
+      }
+      if (!hit) return box;
+    }
+    return { left: Math.max(0, home.left), top: Math.max(0, home.top), w, h };
+  }
+  function layoutHints(holder2, elements2, labels, fontSize = HINT_FONT_SIZE_DEFAULT) {
     const bof = (() => {
       try {
         return coordinate(holder2);
@@ -2617,34 +3058,29 @@
         return { top: 0, left: 0 };
       }
     })();
-    let lastTop = -1;
-    let lastLeft = -1;
+    const placed = [];
     const links = elements2.map((elm, i) => {
-      const r = getRealRect(elm);
+      const r = getHintRect(elm);
       const z = getZIndex(elm);
-      const left = window.pageXOffset + r.left - bof.left;
+      const home = {
+        left: window.pageXOffset + r.left - bof.left,
+        top: Math.max(r.top + window.pageYOffset - bof.top, 0)
+      };
+      const est = estimateLabelBox(labels[i], fontSize);
+      const box = resolveLabelBox(home, est.w, est.h, placed);
+      placed.push(box);
       const link = document.createElement("div");
       link.className = "jari-hint";
       link.textContent = labels[i];
       link.dataset.label = labels[i];
-      let lTop = Math.max(r.top + window.pageYOffset - bof.top, 0);
-      if (lTop === lastTop && Math.abs(left - lastLeft) < 20) {
-        link.style.left = `${left + 20 - Math.abs(left - lastLeft)}px`;
-      } else if (left === lastLeft && Math.abs(lTop - lastTop) < 20) {
-        lTop += 20 - Math.abs(lTop - lastTop);
-        link.style.left = `${left}px`;
-      } else {
-        link.style.left = `${left}px`;
-      }
-      link.style.top = `${lTop}px`;
+      link.style.left = `${box.left}px`;
+      link.style.top = `${box.top}px`;
       link.style.zIndex = String(z + 9999);
       link.zIndex = link.style.zIndex;
       link.label = labels[i];
       link.link = elm;
       link.targetEl = elm;
       updateHintText(link, labels[i], "");
-      lastTop = lTop;
-      lastLeft = parseInt(link.style.left, 10);
       return link;
     });
     links.forEach((link) => holder2.appendChild(link));
@@ -2707,7 +3143,7 @@
         ui.toast("No hints");
         return;
       }
-      const capped = fresh.length > MAX_HINTS ? fresh.slice(0, MAX_HINTS) : fresh;
+      const capped = fresh.length > MAX_HINTS ? prioritizeForViewport(fresh).slice(0, MAX_HINTS) : fresh;
       if (capped.length !== fresh.length) {
         ui.toast(`Too many hints (${capped.length} shown)`);
       }
@@ -2798,19 +3234,47 @@
       hintsHost = null;
       holder = null;
     }
-    const created = createHintsHost("yellow");
+    const created = createHintsHost(
+      settings.getHintTheme(),
+      settings.getHintFontSize()
+    );
     hintsHost = created.host;
     holder = created.holder;
     const charset = normalizeCharset();
     const labels = genLabels(elements.length, charset);
     hints = [];
-    const links = layoutHints(holder, elements, labels);
+    const links = layoutHints(
+      holder,
+      elements,
+      labels,
+      settings.getHintFontSize()
+    );
     hints = links.map((link) => ({
       el: link.link,
       label: link.label,
       hintEl: link
     }));
     refresh();
+  }
+  function flashElement(el) {
+    try {
+      const r = getHintRect(el);
+      if (!r || r.width <= 0 || r.height <= 0) return;
+      const d = document.createElement("div");
+      d.className = "jari-flash";
+      d.style.left = `${r.left}px`;
+      d.style.top = `${r.top}px`;
+      d.style.width = `${r.width}px`;
+      d.style.height = `${r.height}px`;
+      (document.body || document.documentElement).appendChild(d);
+      setTimeout(() => {
+        try {
+          d.remove();
+        } catch {
+        }
+      }, 150);
+    } catch {
+    }
   }
   var scrollLockPrevent = null;
   var keyUpHandler = null;
@@ -2924,13 +3388,16 @@
     "click",
     "open",
     "openBackground",
+    "openCurrent",
     "input",
-    "yank"
+    "yank",
+    "yankText",
+    "hover"
   ]);
   function open2(requestedMode) {
     if (active3) close3();
     mode2 = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
-    multipleHits = mode2 === "openBackground";
+    multipleHits = mode2 === "openBackground" || mode2 === "hover";
     let candidates = collectElements(mode2);
     if (mode2 === "input" && candidates.length === 1) {
       focusInput(candidates[0]);
@@ -2942,12 +3409,13 @@
       return;
     }
     if (candidates.length > MAX_HINTS) {
-      candidates = candidates.slice(0, MAX_HINTS);
+      candidates = prioritizeForViewport(candidates).slice(0, MAX_HINTS);
       ui.toast(`Too many hints (${candidates.length} shown)`);
     }
     elements = candidates;
     prefix = "";
     active3 = true;
+    touch("hints");
     render3();
     startTracking();
   }
@@ -2959,6 +3427,7 @@
     }
   }
   function activate2(el) {
+    flashElement(el);
     if (mode2 === "click") {
       if (isFrameElement(el)) focusFrame(el);
       else if (isEditable(el)) focusInput(el);
@@ -2975,6 +3444,18 @@
       if (url) sendMessage("openInBackgroundTab", { url });
       else if (isFrameElement(el)) focusFrame(el);
       handleActivationEnd();
+    } else if (mode2 === "openCurrent") {
+      const url = getHref(el);
+      if (url) {
+        sendMessage("navigate", { url });
+        close3();
+      } else if (isFrameElement(el)) {
+        focusFrame(el);
+        close3();
+      } else {
+        ui.dispatchClick(el);
+        close3();
+      }
     } else if (mode2 === "input") {
       focusInput(el);
       close3();
@@ -2987,6 +3468,18 @@
         ui.toast("No link");
       }
       close3();
+    } else if (mode2 === "yankText") {
+      const text = (el.innerText || el.textContent || "").trim();
+      if (text) {
+        ui.copyText(text);
+        ui.toast("Yanked text");
+      } else {
+        ui.toast("No text");
+      }
+      close3();
+    } else if (mode2 === "hover") {
+      ui.dispatchHover(el);
+      handleActivationEnd();
     }
   }
   function onKeyDown3(event) {
@@ -4771,6 +5264,7 @@
   function enter(newMode) {
     if (hintActive) closeHints();
     if (active4) close4(false);
+    touch("visual");
     pendingVisualMode = newMode || "visual";
     showVisualHints(pendingVisualMode);
   }
@@ -5212,8 +5706,16 @@
   var currentIdx2 = 0;
   var lastQuery = "";
   var pendingQuery = "";
+  var findRegex = false;
+  var findWholeWord = false;
+  var findCase = false;
+  var toggleButtons = {};
+  var FIND_HISTORY_KEY = "findHistory";
+  var MAX_FIND_HISTORY = 20;
+  var findHistory = [];
+  var historyIdx = -1;
+  var historyDraft = "";
   var useHighlights = false;
-  var fallbackSpans = [];
   var inputDebounce = null;
   var findObserver = null;
   var findObserverTimer = null;
@@ -5241,7 +5743,7 @@
     if (isOverlayElement(parent)) return true;
     if (parent.closest) {
       try {
-        if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-find-hit, .jari-find-current, .jari-hints-host")) return true;
+        if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host")) return true;
         if (parent.closest('[aria-hidden="true"]')) return true;
         if (parent.closest("[hidden]")) return true;
       } catch {
@@ -5381,27 +5883,43 @@
     }
     return out;
   }
+  function buildMatcher(query3, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
+    if (!query3) return null;
+    try {
+      if (regex) return new RegExp(query3, caseSensitive ? "g" : "gi");
+      let src = query3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (wholeWord) src = `\\b${src}\\b`;
+      return new RegExp(src, caseSensitive ? "g" : "gi");
+    } catch {
+      return null;
+    }
+  }
   function buildMatches(query3) {
     if (!query3) return [];
-    const caseSensitive = hasUpperCase(query3);
-    const needle = caseSensitive ? query3 : query3.toLowerCase();
+    const caseSensitive = findCase || !findRegex && hasUpperCase(query3);
+    const matcher = buildMatcher(query3, {
+      regex: findRegex,
+      wholeWord: findWholeWord,
+      caseSensitive
+    });
+    if (!matcher) return [];
     const nodes = collectTextNodes();
     const out = [];
     for (const node of nodes) {
-      const text = node.nodeValue;
-      const hay = caseSensitive ? text : text.toLowerCase();
-      let pos = 0;
-      while (true) {
-        const idx = hay.indexOf(needle, pos);
-        if (idx === -1) break;
+      matcher.lastIndex = 0;
+      let m;
+      while ((m = matcher.exec(node.nodeValue)) !== null) {
+        if (m[0].length === 0) {
+          matcher.lastIndex++;
+          continue;
+        }
         try {
           const range = document.createRange();
-          range.setStart(node, idx);
-          range.setEnd(node, idx + query3.length);
+          range.setStart(node, m.index);
+          range.setEnd(node, m.index + m[0].length);
           out.push(range);
         } catch {
         }
-        pos = idx + query3.length;
         if (out.length >= MAX_MATCHES) break;
       }
       if (out.length >= MAX_MATCHES) break;
@@ -5411,14 +5929,10 @@
   function clearHighlightApi() {
     clearHighlightNames("jari-find", "jari-find-current");
   }
-  function clearFallback() {
-    unwrapSpans(fallbackSpans);
-  }
   function clearHighlights() {
     matches2 = [];
     currentIdx2 = 0;
     clearHighlightApi();
-    clearFallback();
     updateStatus();
   }
   function getCurrentLinkElement() {
@@ -5438,7 +5952,6 @@
   }
   function applyHighlights() {
     clearHighlightApi();
-    clearFallback();
     if (matches2.length === 0) return;
     const valid = matches2.filter((r) => {
       try {
@@ -5456,50 +5969,27 @@
       }
     }
     const cur = matches2[currentIdx2];
-    if (useHighlights) {
-      try {
-        const others = valid.filter((_, i) => i !== currentIdx2);
-        if (others.length > 0) {
-          CSS.highlights.set("jari-find", new Highlight(...others));
-        } else {
-          try {
-            CSS.highlights.delete("jari-find");
-          } catch {
-          }
-        }
-        if (cur) {
-          CSS.highlights.set("jari-find-current", new Highlight(cur));
-        } else {
-          try {
-            CSS.highlights.delete("jari-find-current");
-          } catch {
-          }
-        }
-        return;
-      } catch {
-        useHighlights = false;
-      }
-    }
-    const byNode = /* @__PURE__ */ new Map();
-    for (let i = 0; i < valid.length; i++) {
-      const r = valid[i];
-      const node = r.startContainer;
-      if (!node || !node.isConnected) continue;
-      if (!byNode.has(node)) byNode.set(node, []);
-      byNode.get(node).push({ range: r, idx: i });
-    }
-    for (const list of byNode.values()) {
-      list.sort((a, b) => b.range.startOffset - a.range.startOffset);
-      for (const { range, idx } of list) {
+    if (!useHighlights) return;
+    try {
+      const others = valid.filter((_, i) => i !== currentIdx2);
+      if (others.length > 0) {
+        CSS.highlights.set("jari-find", new Highlight(...others));
+      } else {
         try {
-          if (!range.startContainer.isConnected) continue;
-          const span = document.createElement("span");
-          span.className = idx === currentIdx2 ? "jari-find-current" : "jari-find-hit";
-          range.surroundContents(span);
-          fallbackSpans.push(span);
+          CSS.highlights.delete("jari-find");
         } catch {
         }
       }
+      if (cur) {
+        CSS.highlights.set("jari-find-current", new Highlight(cur));
+      } else {
+        try {
+          CSS.highlights.delete("jari-find-current");
+        } catch {
+        }
+      }
+    } catch {
+      useHighlights = false;
     }
   }
   function scrollToCurrent() {
@@ -5515,8 +6005,18 @@
         if (style.display === "none" || style.visibility === "hidden") return;
       } catch {
       }
-      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
       let rect = null;
+      try {
+        rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect();
+      } catch {
+      }
+      if (rect && rectIntersectsViewport(rect)) return;
+      const fixed = findFixedAncestor(el);
+      if (fixed) {
+        scrollFixedMatchIntoView(el, fixed, rect);
+        return;
+      }
+      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
       try {
         rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect();
       } catch {
@@ -5533,6 +6033,162 @@
     } catch {
     }
   }
+  function rectIntersectsViewport(rect) {
+    if (!rect) return false;
+    try {
+      const vw = window.innerWidth || document.documentElement.clientWidth;
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      return rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw;
+    } catch {
+      return false;
+    }
+  }
+  function findFixedAncestor(el) {
+    try {
+      let node = el;
+      while (node && node.nodeType === 1) {
+        if (window.getComputedStyle(node).position === "fixed") return node;
+        const root = node.getRootNode ? node.getRootNode() : null;
+        node = root && root.host || node.parentElement;
+      }
+    } catch {
+    }
+    return null;
+  }
+  function isScrollableBox(node) {
+    try {
+      if (node.scrollHeight <= node.clientHeight + 1 && node.scrollWidth <= node.clientWidth + 1)
+        return false;
+      const style = window.getComputedStyle(node);
+      return style.overflowY === "auto" || style.overflowY === "scroll" || style.overflowY === "overlay" || style.overflowX === "auto" || style.overflowX === "scroll" || style.overflowX === "overlay";
+    } catch {
+      return false;
+    }
+  }
+  function nearestScrollableAncestor(el, stopAfter) {
+    try {
+      let node = el && el.parentElement ? el.parentElement : null;
+      while (node && node.nodeType === 1) {
+        if (isScrollableBox(node)) return node;
+        if (node === stopAfter) return null;
+        node = node.parentElement;
+      }
+    } catch {
+    }
+    return null;
+  }
+  function scrollFixedMatchIntoView(el, fixed, rect) {
+    try {
+      if (!rect) {
+        try {
+          rect = el.getBoundingClientRect();
+        } catch {
+          return;
+        }
+      }
+      if (rectIntersectsViewport(rect)) return;
+      const box = nearestScrollableAncestor(el, fixed);
+      if (!box) return;
+      const crect = box.getBoundingClientRect();
+      if (crect.top > rect.top) box.scrollTop -= crect.top - rect.top;
+      else if (rect.bottom > crect.bottom) box.scrollTop += rect.bottom - crect.bottom;
+      if (crect.left > rect.left) box.scrollLeft -= crect.left - rect.left;
+      else if (rect.right > crect.right) box.scrollLeft += rect.right - crect.right;
+    } catch {
+    }
+  }
+  function executeQuery(q) {
+    pendingQuery = q;
+    const query3 = (q || "").trim();
+    clearTimeout(inputDebounce);
+    if (!query3) {
+      matches2 = [];
+      currentIdx2 = 0;
+      clearHighlightApi();
+      updateStatus();
+      return;
+    }
+    inputDebounce = setTimeout(() => {
+      runQuery(query3);
+    }, 80);
+  }
+  function runQuery(query3) {
+    try {
+      matches2 = buildMatches(query3);
+      currentIdx2 = 0;
+      if (matches2.length > 0) lastQuery = query3;
+      applyHighlights();
+      if (matches2.length > 0) scrollToCurrent();
+      updateStatus();
+    } catch {
+    }
+  }
+  function findFlagLabel(name) {
+    return name === "regex" ? ".*" : name === "wholeWord" ? "\\b" : "Aa";
+  }
+  function refreshToggles() {
+    for (const [name, btn] of Object.entries(toggleButtons)) {
+      try {
+        const on = name === "regex" ? findRegex : name === "wholeWord" ? findWholeWord : findCase;
+        btn.classList.toggle("jari-find-toggle-on", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      } catch {
+      }
+    }
+  }
+  function toggleFindFlag(name) {
+    if (name === "regex") findRegex = !findRegex;
+    else if (name === "wholeWord") findWholeWord = !findWholeWord;
+    else findCase = !findCase;
+    refreshToggles();
+    const q = inputEl2 && inputEl2.value.trim() || pendingQuery || lastQuery;
+    if (q) {
+      clearTimeout(inputDebounce);
+      runQuery(q);
+    } else {
+      updateStatus();
+    }
+  }
+  async function loadFindHistory() {
+    try {
+      const stored = await chrome.storage.local.get(FIND_HISTORY_KEY);
+      const list = stored && stored[FIND_HISTORY_KEY];
+      if (Array.isArray(list)) {
+        findHistory = list.filter((s) => typeof s === "string" && s).slice(0, MAX_FIND_HISTORY);
+      }
+    } catch {
+    }
+  }
+  async function pushFindHistory(q) {
+    const query3 = (q || "").trim();
+    if (!query3) return;
+    findHistory = [query3, ...findHistory.filter((s) => s !== query3)].slice(
+      0,
+      MAX_FIND_HISTORY
+    );
+    historyIdx = -1;
+    try {
+      await chrome.storage.local.set({ [FIND_HISTORY_KEY]: findHistory });
+    } catch {
+    }
+  }
+  function stepHistory(delta) {
+    if (!inputEl2 || findHistory.length === 0) return;
+    if (historyIdx === -1 && delta > 0) historyDraft = inputEl2.value;
+    historyIdx = Math.min(
+      findHistory.length - 1,
+      Math.max(-1, historyIdx + delta)
+    );
+    inputEl2.value = historyIdx === -1 ? historyDraft : findHistory[historyIdx];
+    executeQuery(inputEl2.value);
+  }
+  function activeFlagSuffix() {
+    const flags = [];
+    if (findRegex) flags.push(".*");
+    if (findWholeWord) flags.push("\\b");
+    if (findCase) flags.push("Aa");
+    return flags.length > 0 ? ` \xB7 ${flags.join(" ")}` : "";
+  }
   function updateStatus() {
     if (!statusEl) return;
     if (!pendingQuery && matches2.length === 0 && !lastQuery) {
@@ -5546,10 +6202,14 @@
       return;
     }
     if (matches2.length === 0) {
-      statusEl.textContent = `No match for "${q}"`;
+      if (findRegex && !buildMatcher(q, { regex: true, wholeWord: findWholeWord, caseSensitive: findCase })) {
+        statusEl.textContent = "Invalid pattern";
+      } else {
+        statusEl.textContent = `No match for "${q}"${activeFlagSuffix()}`;
+      }
       statusEl.classList.add("jari-find-no-match");
     } else {
-      statusEl.textContent = `${currentIdx2 + 1}/${matches2.length}`;
+      statusEl.textContent = `${currentIdx2 + 1}/${matches2.length}${activeFlagSuffix()}`;
       statusEl.classList.remove("jari-find-no-match");
     }
   }
@@ -5570,46 +6230,58 @@
     statusEl.className = "jari-find-status";
     bar.appendChild(label);
     bar.appendChild(inputEl2);
+    toggleButtons = {};
+    for (const [name, command, label2] of [
+      ["regex", "toggleFindRegex", "Regular expression"],
+      ["wholeWord", "toggleFindWholeWord", "Whole word"],
+      ["findCase", "toggleFindCase", "Match case"]
+    ]) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "jari-find-toggle";
+      btn.textContent = findFlagLabel(name);
+      const bound = keysForCommand(settings.getKeymap(), command);
+      btn.title = bound.length > 0 ? `${label2} (${bound.join(", ")})` : label2;
+      btn.setAttribute("aria-pressed", "false");
+      btn.setAttribute("aria-label", btn.title);
+      btn.addEventListener("click", () => {
+        toggleFindFlag(name);
+        try {
+          inputEl2.focus();
+        } catch {
+        }
+      });
+      toggleButtons[name] = btn;
+      bar.appendChild(btn);
+    }
     bar.appendChild(statusEl);
     overlay3.appendChild(bar);
     (document.body || document.documentElement).appendChild(overlay3);
     restoreFocus2 = document.activeElement;
+    historyIdx = -1;
+    historyDraft = "";
     inputEl2.addEventListener("input", () => {
-      pendingQuery = inputEl2.value;
-      const q = pendingQuery.trim();
-      clearTimeout(inputDebounce);
-      if (!q) {
-        matches2 = [];
-        currentIdx2 = 0;
-        clearHighlightApi();
-        clearFallback();
-        updateStatus();
-        return;
-      }
-      inputDebounce = setTimeout(() => {
-        try {
-          const latest = inputEl2 && inputEl2.value.trim() || q;
-          if (latest !== q) return;
-          matches2 = buildMatches(latest);
-          currentIdx2 = 0;
-          if (matches2.length > 0) lastQuery = latest;
-          applyHighlights();
-          if (matches2.length > 0) scrollToCurrent();
-          updateStatus();
-        } catch {
-        }
-      }, 80);
+      historyIdx = -1;
+      executeQuery(inputEl2.value);
     });
-    inputEl2.addEventListener("keydown", (e) => e.stopPropagation());
+    inputEl2.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        stepHistory(e.key === "ArrowUp" ? 1 : -1);
+      }
+    });
     inputEl2.focus();
     updateStatus();
   }
   function open3() {
     if (active5) return;
+    touch("find");
     useHighlights = detectHighlightSupport();
     active5 = true;
     startFindObserver();
     pendingQuery = "";
+    loadFindHistory();
     renderBar();
   }
   function closeBar() {
@@ -5686,12 +6358,12 @@
       }
       pendingQuery = q;
       lastQuery = q;
+      pushFindHistory(q);
       matches2 = buildMatches(q);
       currentIdx2 = 0;
       if (matches2.length === 0) {
         ui.toast(`No match for "${q}"`);
         clearHighlightApi();
-        clearFallback();
         updateStatus();
         return;
       }
@@ -5717,8 +6389,55 @@
     updateStatus();
     ui.toast(`${currentIdx2 + 1}/${len}`);
   }
+  var FIND_TOGGLE_COMMANDS = {
+    toggleFindRegex: "regex",
+    toggleFindWholeWord: "wholeWord",
+    toggleFindCase: "findCase"
+  };
+  function findToggleCommandFor(keymap, combo) {
+    try {
+      const cmd = keymap ? keymap[combo] : null;
+      if (cmd && Object.prototype.hasOwnProperty.call(FIND_TOGGLE_COMMANDS, cmd)) {
+        return cmd;
+      }
+    } catch {
+    }
+    return null;
+  }
+  function enableFindFlag(name) {
+    if (name === "regex") findRegex = true;
+    else if (name === "wholeWord") findWholeWord = true;
+    else findCase = true;
+  }
+  function toggleOrOpen(name) {
+    if (isActive5()) {
+      toggleFindFlag(name);
+      try {
+        if (inputEl2) inputEl2.focus();
+      } catch {
+      }
+      return;
+    }
+    open3();
+    if (!inputEl2) return;
+    enableFindFlag(name);
+    refreshToggles();
+    updateStatus();
+  }
   function onKeyDown5(event) {
     if (!active5) return false;
+    const combo = canonicalKey(event);
+    const toggleCmd = findToggleCommandFor(settings.getKeymap(), combo);
+    if (toggleCmd && (combo.includes("+") || document.activeElement !== inputEl2)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      toggleFindFlag(FIND_TOGGLE_COMMANDS[toggleCmd]);
+      try {
+        if (inputEl2) inputEl2.focus();
+      } catch {
+      }
+      return true;
+    }
     const inInput = document.activeElement === inputEl2;
     if (inInput) {
       if (event.key === "Escape") {
@@ -5735,6 +6454,7 @@
           closeAndClear();
         } else {
           lastQuery = q;
+          pushFindHistory(q);
           closeBar();
         }
         return true;
@@ -5782,6 +6502,7 @@
     close: closeBar,
     clearHighlights,
     next,
+    toggleOrOpen,
     isActive: isActive5,
     hasHighlights,
     handleGlobalEsc,
@@ -5799,6 +6520,12 @@
     lastQuery = "";
     pendingQuery = "";
     useHighlights = false;
+    findRegex = false;
+    findWholeWord = false;
+    findCase = false;
+    findHistory = [];
+    historyIdx = -1;
+    historyDraft = "";
   }
 
   // content/commands.js
@@ -6042,11 +6769,17 @@ ${location.href}`;
     hintClick: { ...COMMAND_CATALOG.hintClick, run: () => Hints.open("click") },
     hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
     hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
+    hintOpenCurrent: { ...COMMAND_CATALOG.hintOpenCurrent, run: () => Hints.open("openCurrent") },
     hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
     hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
+    hintYankText: { ...COMMAND_CATALOG.hintYankText, run: () => Hints.open("yankText") },
+    hintHover: { ...COMMAND_CATALOG.hintHover, run: () => Hints.open("hover") },
     findText: { ...COMMAND_CATALOG.findText, run: () => Find.open() },
     findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
     findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
+    toggleFindRegex: { ...COMMAND_CATALOG.toggleFindRegex, run: () => Find.toggleOrOpen("regex") },
+    toggleFindWholeWord: { ...COMMAND_CATALOG.toggleFindWholeWord, run: () => Find.toggleOrOpen("wholeWord") },
+    toggleFindCase: { ...COMMAND_CATALOG.toggleFindCase, run: () => Find.toggleOrOpen("findCase") },
     enterVisual: { ...COMMAND_CATALOG.enterVisual, run: () => Visual.enter("visual") },
     enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
@@ -6058,6 +6791,11 @@ ${location.href}`;
   var clueEl = null;
   var clueTimer = null;
   var activePrefix = null;
+  var renderPrefix = null;
+  var renderCount = "";
+  var filterText = "";
+  var listEl3 = null;
+  var titleEl = null;
   function commandLabel(commandName) {
     return COMMAND_CATALOG[commandName]?.label || commandName;
   }
@@ -6073,6 +6811,11 @@ ${location.href}`;
   function hide() {
     clearTimer();
     activePrefix = null;
+    renderPrefix = null;
+    renderCount = "";
+    filterText = "";
+    listEl3 = null;
+    titleEl = null;
     if (clueEl) {
       try {
         clueEl.remove();
@@ -6080,6 +6823,51 @@ ${location.href}`;
       }
       clueEl = null;
     }
+  }
+  function displaySuffix(suffix) {
+    return suffix.length > 1 ? `${suffix[0]} \u25B8 ${suffix.slice(1)}` : suffix;
+  }
+  function filteredEntries() {
+    const all = getPrefixEntries(settings.getKeymap(), renderPrefix);
+    if (!filterText) return { all, rows: all };
+    const rows = all.filter(
+      (entry) => `${entry.suffix} ${commandLabel(entry.command)}`.toLowerCase().includes(filterText)
+    );
+    return { all, rows };
+  }
+  function paint() {
+    if (!clueEl || !listEl3 || !titleEl) return;
+    const { all, rows } = filteredEntries();
+    titleEl.textContent = `${renderCount || ""}${renderPrefix} \u2014 ${rows.length}/${all.length} bindings` + (filterText ? ` \xB7 "${filterText}"` : "");
+    listEl3.textContent = "";
+    for (const { suffix, command } of rows) {
+      const row = document.createElement("div");
+      row.className = "jari-clue-row";
+      const key = document.createElement("span");
+      key.className = "jari-clue-key";
+      key.textContent = displaySuffix(suffix);
+      const label = document.createElement("span");
+      label.className = "jari-clue-label";
+      label.textContent = commandLabel(command);
+      row.appendChild(key);
+      row.appendChild(label);
+      listEl3.appendChild(row);
+    }
+  }
+  function hasFilter() {
+    return filterText !== "";
+  }
+  function refilter(ch) {
+    if (!clueEl || !activePrefix) return false;
+    filterText += String(ch).toLowerCase();
+    paint();
+    return true;
+  }
+  function backspaceFilter() {
+    if (!filterText) return false;
+    filterText = filterText.slice(0, -1);
+    paint();
+    return true;
   }
   function render4(prefix2, countStr) {
     const keymap = settings.getKeymap();
@@ -6092,27 +6880,19 @@ ${location.href}`;
       root.className = "jari-clue";
       const title = document.createElement("div");
       title.className = "jari-clue-title";
-      title.textContent = `${countStr || ""}${prefix2} \u2014 ${entries2.length} bindings`;
       root.appendChild(title);
       const list = document.createElement("div");
       list.className = "jari-clue-list";
-      for (const { suffix, command } of entries2) {
-        const row = document.createElement("div");
-        row.className = "jari-clue-row";
-        const key = document.createElement("span");
-        key.className = "jari-clue-key";
-        key.textContent = suffix;
-        const label = document.createElement("span");
-        label.className = "jari-clue-label";
-        label.textContent = commandLabel(command);
-        row.appendChild(key);
-        row.appendChild(label);
-        list.appendChild(row);
-      }
       root.appendChild(list);
       (document.body || document.documentElement).appendChild(root);
       clueEl = root;
+      titleEl = title;
+      listEl3 = list;
       activePrefix = prefix2;
+      renderPrefix = prefix2;
+      renderCount = countStr || "";
+      filterText = "";
+      paint();
     } catch {
     }
   }
@@ -6135,7 +6915,15 @@ ${location.href}`;
   function getActivePrefix() {
     return activePrefix;
   }
-  var Clue = { schedule, hide, isVisible, getActivePrefix };
+  var Clue = {
+    schedule,
+    hide,
+    isVisible,
+    getActivePrefix,
+    hasFilter,
+    refilter,
+    backspaceFilter
+  };
   function __resetClueState() {
     hide();
   }
@@ -6170,7 +6958,8 @@ ${location.href}`;
     if (!cmd) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    cmd.run({ count, event });
+    Clue.hide();
+    cmd.run({ count: cmd.repeatable ? count : 1, event });
   }
   function setIgnore(on) {
     ignoreMode = on;
@@ -6276,9 +7065,10 @@ ${location.href}`;
     let commandName = null;
     if (prefixWasPending) {
       commandName = settings.getKeymap()[prefixKey + key] || null;
-      pendingPrefix = null;
-      ui.showcmd(null);
-      Clue.hide();
+      if (commandName) {
+        pendingPrefix = null;
+        ui.showcmd(null);
+      }
     }
     const activeEl = deepActiveElement();
     if (isEditable(activeEl)) {
@@ -6293,6 +7083,15 @@ ${location.href}`;
     if (prefixWasPending && !commandName) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (event.key === "Backspace" && Clue.hasFilter()) {
+        Clue.backspaceFilter();
+        restartTimer();
+        return;
+      }
+      if (!event.ctrlKey && !event.altKey && !event.metaKey && event.key.length === 1 && Clue.refilter(event.key)) {
+        restartTimer();
+        return;
+      }
       clearPending();
       return;
     }

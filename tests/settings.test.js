@@ -79,6 +79,29 @@ test("load reads back the local fallback", async () => {
   assert.equal(settings.isPersistedLocally(), true);
 });
 
+test("persisted settings carry the current schema version", async () => {
+  const writes = [];
+  stubStorage({
+    syncSet: async (data) => {
+      writes.push(data);
+    },
+  });
+  await settings.update({ scrollStep: 123 });
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].settings.schemaVersion, 4);
+});
+
+test("unbinding a backfilled combo sticks", async () => {
+  const map = { ...settings.getKeymap() };
+  assert.ok("t" in map);
+  delete map["t"];
+  stubStorage({
+    syncSet: async () => {},
+  });
+  await settings.update({ keymap: map });
+  assert.equal(settings.getKeymap()["t"], undefined);
+});
+
 test("isDisabled matches wildcards and the file sentinel", () => {
   settings.set({ disabledSites: ["*.example.com", "file://"] });
   globalThis.location = { hostname: "sub.example.com", protocol: "https:" };

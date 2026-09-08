@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { register } from "./overlays.js";
+import { register, touch } from "./overlays.js";
 import { ui } from "./ui.js";
 import {
   normalizeCharset,
@@ -1860,6 +1860,7 @@ function enterCaretAtFocus() {
 function enter(newMode) {
   if (hintActive) closeHints();
   if (active) close(false);
+  touch("visual");
   pendingVisualMode = newMode || "visual";
   showVisualHints(pendingVisualMode);
 }

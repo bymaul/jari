@@ -48,7 +48,8 @@ function run(commandName, count, event) {
   if (!cmd) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  cmd.run({ count, event });
+  Clue.hide();
+  cmd.run({ count: cmd.repeatable ? count : 1, event });
 }
 
 function setIgnore(on) {
@@ -176,9 +177,10 @@ function handleKeydown(event) {
   let commandName = null;
   if (prefixWasPending) {
     commandName = settings.getKeymap()[prefixKey + key] || null;
-    pendingPrefix = null;
-    ui.showcmd(null);
-    Clue.hide();
+    if (commandName) {
+      pendingPrefix = null;
+      ui.showcmd(null);
+    }
   }
 
   const activeEl = deepActiveElement();
@@ -195,6 +197,21 @@ function handleKeydown(event) {
   if (prefixWasPending && !commandName) {
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (event.key === "Backspace" && Clue.hasFilter()) {
+      Clue.backspaceFilter();
+      restartTimer();
+      return;
+    }
+    if (
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      event.key.length === 1 &&
+      Clue.refilter(event.key)
+    ) {
+      restartTimer();
+      return;
+    }
     clearPending();
     return;
   }

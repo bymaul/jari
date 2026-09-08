@@ -53,12 +53,18 @@ export const COMMAND_CATALOG = {
   hintClick: { category: "hints", label: "Click link" },
   hintOpen: { category: "hints", label: "Open link in new tab" },
   hintOpenBackground: { category: "hints", label: "Open link in background tab" },
+  hintOpenCurrent: { category: "hints", label: "Open link in this tab" },
   hintInput: { category: "hints", label: "Focus input" },
   hintYank: { category: "hints", label: "Copy link URL" },
+  hintYankText: { category: "hints", label: "Copy link text" },
+  hintHover: { category: "hints", label: "Hover element" },
 
   findText: { category: "find", label: "Find in page" },
   findNext: { category: "find", label: "Next match", repeatable: true },
   findPrev: { category: "find", label: "Previous match", repeatable: true },
+  toggleFindRegex: { category: "find", label: "Toggle regex search" },
+  toggleFindWholeWord: { category: "find", label: "Toggle whole-word search" },
+  toggleFindCase: { category: "find", label: "Toggle case-sensitive search" },
 
   enterVisual: { category: "visual", label: "Visual mode" },
   enterVisualLine: { category: "visual", label: "Visual line mode" },

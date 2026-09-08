@@ -1,7 +1,7 @@
 import { clampMaxResults, maxResultsDefault, suggestionSources } from "../shared/constants.js";
 import { normalizeSitePattern } from "../shared/url.js";
 
-export const SETTINGS_SCHEMA_VERSION = 1;
+export const SETTINGS_SCHEMA_VERSION = 4;
 
 export const Events = {
   listeners: {},
@@ -57,6 +57,9 @@ export const keymapDefaults = {
   "/": "findText",
   n: "findNext",
   N: "findPrev",
+  "alt+r": "toggleFindRegex",
+  "alt+w": "toggleFindWholeWord",
+  "alt+c": "toggleFindCase",
   v: "enterVisual",
   V: "enterVisualLine",
 
@@ -97,6 +100,12 @@ export const categories = [
 
 export const HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
 
+export const HINT_THEMES = ["yellow", "cyan", "dark"];
+export const HINT_THEME_DEFAULT = "yellow";
+export const HINT_FONT_SIZE_DEFAULT = 10;
+export const HINT_FONT_SIZE_MIN = 8;
+export const HINT_FONT_SIZE_MAX = 20;
+
 export const settingsDefaults = {
   scrollStep: 120,
   smoothScroll: false,
@@ -116,6 +125,11 @@ export const settingsDefaults = {
   copyFormat: "plain",
 
   hintChars: HINT_CHARSET_DEFAULT,
+
+  clickableSelector: "",
+
+  hintTheme: HINT_THEME_DEFAULT,
+  hintFontSize: HINT_FONT_SIZE_DEFAULT,
 };
 
 export const prefixKeys = new Set(Object.keys(prefixes));
@@ -258,6 +272,21 @@ export function queryAll(selector, onShadowRoot) {
   return out;
 }
 
+export function normalizeClickableSelector(raw) {
+  if (typeof raw !== "string") return settingsDefaults.clickableSelector;
+  return raw.trim().slice(0, 500);
+}
+
+export function normalizeHintTheme(raw) {
+  return HINT_THEMES.includes(raw) ? raw : HINT_THEME_DEFAULT;
+}
+
+export function normalizeHintFontSize(raw) {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n)) return settingsDefaults.hintFontSize;
+  return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, n));
+}
+
 export function normalizeHintChars(raw) {
   if (typeof raw !== "string") return settingsDefaults.hintChars;
   const chars = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -276,8 +305,43 @@ export function migrateSettings(data) {
   // falls back to defaults in normalizeSettings. Add per-version fixups here
   // as the schema evolves.
   if (version < 1) version = 1;
+  // v1 -> v2: new clickableSelector field, empty by default.
+  if (version < 2) {
+    if (d.clickableSelector === undefined) d.clickableSelector = "";
+    version = 2;
+  }
+  // v2 -> v3: new hintTheme/hintFontSize fields with defaults.
+  if (version < 3) {
+    if (d.hintTheme === undefined) d.hintTheme = HINT_THEME_DEFAULT;
+    if (d.hintFontSize === undefined) d.hintFontSize = HINT_FONT_SIZE_DEFAULT;
+    version = 3;
+  }
+  // v3 -> v4: backfill bindings for commands added since the stored
+  // keymap was written. Only combos that are still free are added and
+  // only for commands the user has bound nowhere, so custom rebinds
+  // are never clobbered and intentional unbinds of existing commands
+  // are not resurrected.
+  if (version < 4) {
+    d.keymap = backfillNewBindings(d.keymap);
+    version = 4;
+  }
   d.schemaVersion = version;
   return d;
+}
+
+export function backfillNewBindings(keymap) {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap;
+  }
+  const used = new Set(Object.values(keymap));
+  const out = { ...keymap };
+  for (const [combo, command] of Object.entries(keymapDefaults)) {
+    if (!(combo in out) && !used.has(command)) {
+      out[combo] = command;
+      used.add(command);
+    }
+  }
+  return out;
 }
 
 export function normalizeSettings(data) {
@@ -323,6 +387,9 @@ export function normalizeSettings(data) {
     copyFormat:
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
     hintChars: normalizeHintChars(d.hintChars),
+    clickableSelector: normalizeClickableSelector(d.clickableSelector),
+    hintTheme: normalizeHintTheme(d.hintTheme),
+    hintFontSize: normalizeHintFontSize(d.hintFontSize),
     clueEnabled:
       typeof d.clueEnabled === "boolean"
         ? d.clueEnabled

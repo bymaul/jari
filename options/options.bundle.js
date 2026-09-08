@@ -56,7 +56,7 @@
   }
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 1;
+  var SETTINGS_SCHEMA_VERSION = 4;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -102,6 +102,9 @@
     "/": "findText",
     n: "findNext",
     N: "findPrev",
+    "alt+r": "toggleFindRegex",
+    "alt+w": "toggleFindWholeWord",
+    "alt+c": "toggleFindCase",
     v: "enterVisual",
     V: "enterVisualLine",
     gg: "scrollToTop",
@@ -136,6 +139,11 @@
     { id: "help", label: "Help" }
   ];
   var HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+  var HINT_THEMES = ["yellow", "cyan", "dark"];
+  var HINT_THEME_DEFAULT = "yellow";
+  var HINT_FONT_SIZE_DEFAULT = 10;
+  var HINT_FONT_SIZE_MIN = 8;
+  var HINT_FONT_SIZE_MAX = 20;
   var settingsDefaults = {
     scrollStep: 120,
     smoothScroll: false,
@@ -147,7 +155,10 @@
     suggestionSources: suggestionSources.slice(),
     maxResults: maxResultsDefault,
     copyFormat: "plain",
-    hintChars: HINT_CHARSET_DEFAULT
+    hintChars: HINT_CHARSET_DEFAULT,
+    clickableSelector: "",
+    hintTheme: HINT_THEME_DEFAULT,
+    hintFontSize: HINT_FONT_SIZE_DEFAULT
   };
   var prefixKeys = new Set(Object.keys(prefixes));
   var modifierKeys = /* @__PURE__ */ new Set([
@@ -205,6 +216,18 @@
     parts.push(event.key);
     return parts.join("+");
   }
+  function normalizeClickableSelector(raw) {
+    if (typeof raw !== "string") return settingsDefaults.clickableSelector;
+    return raw.trim().slice(0, 500);
+  }
+  function normalizeHintTheme(raw) {
+    return HINT_THEMES.includes(raw) ? raw : HINT_THEME_DEFAULT;
+  }
+  function normalizeHintFontSize(raw) {
+    const n = Math.round(Number(raw));
+    if (!Number.isFinite(n)) return settingsDefaults.hintFontSize;
+    return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, n));
+  }
   function normalizeHintChars(raw) {
     if (typeof raw !== "string") return settingsDefaults.hintChars;
     const chars = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -216,8 +239,35 @@
     const d = { ...data || {} };
     let version = Number.isInteger(d.schemaVersion) && d.schemaVersion > 0 ? d.schemaVersion : 0;
     if (version < 1) version = 1;
+    if (version < 2) {
+      if (d.clickableSelector === void 0) d.clickableSelector = "";
+      version = 2;
+    }
+    if (version < 3) {
+      if (d.hintTheme === void 0) d.hintTheme = HINT_THEME_DEFAULT;
+      if (d.hintFontSize === void 0) d.hintFontSize = HINT_FONT_SIZE_DEFAULT;
+      version = 3;
+    }
+    if (version < 4) {
+      d.keymap = backfillNewBindings(d.keymap);
+      version = 4;
+    }
     d.schemaVersion = version;
     return d;
+  }
+  function backfillNewBindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const used = new Set(Object.values(keymap));
+    const out = { ...keymap };
+    for (const [combo, command] of Object.entries(keymapDefaults)) {
+      if (!(combo in out) && !used.has(command)) {
+        out[combo] = command;
+        used.add(command);
+      }
+    }
+    return out;
   }
   function normalizeSettings(data) {
     const d = migrateSettings(data);
@@ -240,6 +290,9 @@
       maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
+      clickableSelector: normalizeClickableSelector(d.clickableSelector),
+      hintTheme: normalizeHintTheme(d.hintTheme),
+      hintFontSize: normalizeHintFontSize(d.hintFontSize),
       clueEnabled: typeof d.clueEnabled === "boolean" ? d.clueEnabled : settingsDefaults.clueEnabled,
       clueDelayMs: Number.isFinite(d.clueDelayMs) && d.clueDelayMs >= 0 ? Math.min(5e3, d.clueDelayMs) : settingsDefaults.clueDelayMs
     };
@@ -334,11 +387,17 @@
     hintClick: { category: "hints", label: "Click link" },
     hintOpen: { category: "hints", label: "Open link in new tab" },
     hintOpenBackground: { category: "hints", label: "Open link in background tab" },
+    hintOpenCurrent: { category: "hints", label: "Open link in this tab" },
     hintInput: { category: "hints", label: "Focus input" },
     hintYank: { category: "hints", label: "Copy link URL" },
+    hintYankText: { category: "hints", label: "Copy link text" },
+    hintHover: { category: "hints", label: "Hover element" },
     findText: { category: "find", label: "Find in page" },
     findNext: { category: "find", label: "Next match", repeatable: true },
     findPrev: { category: "find", label: "Previous match", repeatable: true },
+    toggleFindRegex: { category: "find", label: "Toggle regex search" },
+    toggleFindWholeWord: { category: "find", label: "Toggle whole-word search" },
+    toggleFindCase: { category: "find", label: "Toggle case-sensitive search" },
     enterVisual: { category: "visual", label: "Visual mode" },
     enterVisualLine: { category: "visual", label: "Visual line mode" },
     showHelp: { category: "help", label: "Show this help" },
@@ -350,6 +409,7 @@
   var STORAGE_KEY = "settings";
   var persistedLocal = false;
   var state = {
+    schemaVersion: SETTINGS_SCHEMA_VERSION,
     keymap: { ...keymapDefaults },
     disabledSites: [],
     scrollStep: settingsDefaults.scrollStep,
@@ -361,11 +421,15 @@
     maxResults: settingsDefaults.maxResults,
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
+    clickableSelector: settingsDefaults.clickableSelector,
+    hintTheme: settingsDefaults.hintTheme,
+    hintFontSize: settingsDefaults.hintFontSize,
     clueEnabled: settingsDefaults.clueEnabled,
     clueDelayMs: settingsDefaults.clueDelayMs
   };
   function merge(data) {
     const s = normalizeSettings(data);
+    state.schemaVersion = s.schemaVersion;
     state.keymap = s.keymap;
     state.disabledSites = s.disabledSites;
     state.scrollStep = s.scrollStep;
@@ -377,6 +441,9 @@
     state.maxResults = s.maxResults;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
+    state.clickableSelector = s.clickableSelector;
+    state.hintTheme = s.hintTheme;
+    state.hintFontSize = s.hintFontSize;
     state.clueEnabled = s.clueEnabled;
     state.clueDelayMs = s.clueDelayMs;
   }
@@ -404,7 +471,7 @@
   }
   function snapshot() {
     return {
-      schemaVersion: SETTINGS_SCHEMA_VERSION,
+      schemaVersion: state.schemaVersion,
       keymap: { ...state.keymap },
       disabledSites: state.disabledSites.slice(),
       scrollStep: state.scrollStep,
@@ -416,6 +483,9 @@
       maxResults: state.maxResults,
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
+      clickableSelector: state.clickableSelector,
+      hintTheme: state.hintTheme,
+      hintFontSize: state.hintFontSize,
       clueEnabled: state.clueEnabled,
       clueDelayMs: state.clueDelayMs
     };
@@ -484,6 +554,15 @@
   function getHintChars() {
     return state.hintChars;
   }
+  function getClickableSelector() {
+    return state.clickableSelector;
+  }
+  function getHintTheme() {
+    return state.hintTheme;
+  }
+  function getHintFontSize() {
+    return state.hintFontSize;
+  }
   function isClueEnabled() {
     return state.clueEnabled;
   }
@@ -522,6 +601,9 @@
     getMaxResults,
     getCopyFormat,
     getHintChars,
+    getClickableSelector,
+    getHintTheme,
+    getHintFontSize,
     isClueEnabled,
     getClueDelayMs,
     toggleSiteEnabled
@@ -611,17 +693,28 @@
       }
     }
   }
+  var CLICK_EVENTS = [
+    "mouseover",
+    "pointerdown",
+    "mousedown",
+    "pointerup",
+    "mouseup",
+    "click",
+    "focus",
+    "focusin"
+  ];
   function dispatchClick(el) {
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
     } catch {
     }
-    for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
+    for (const type of CLICK_EVENTS) {
       try {
         el.dispatchEvent(
           new MouseEvent(type, {
             bubbles: true,
             cancelable: true,
+            composed: true,
             view: window,
             button: 0,
             buttons: type === "mousedown" ? 1 : 0
@@ -631,6 +724,23 @@
       }
     }
     safeFocus(el, { preventScroll: true });
+  }
+  var HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
+  function dispatchHover(el) {
+    for (const type of HOVER_EVENTS) {
+      try {
+        el.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: type !== "mouseenter" && type !== "pointerenter",
+            cancelable: true,
+            composed: true,
+            view: window,
+            button: 0
+          })
+        );
+      } catch {
+      }
+    }
   }
   function focusFrameElement(el) {
     try {
@@ -691,6 +801,7 @@
     consume,
     safeFocus,
     dispatchClick,
+    dispatchHover,
     focusFrameElement
   };
 
@@ -715,6 +826,9 @@
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
   var hintCharsMetaEl = document.querySelector("#hint-chars-meta");
+  var clickableSelectorEl = document.querySelector("#clickable-selector");
+  var hintThemeEl = document.querySelector("#hint-theme");
+  var hintFontSizeEl = document.querySelector("#hint-font-size");
   var keymapFilterEl = document.querySelector("#keymap-filter");
   var keymapUnboundEl = document.querySelector("#keymap-unbound");
   var keymapCountEl = document.querySelector("#keymap-count");
@@ -828,7 +942,8 @@
     }
     if (summaries.hints) {
       const chars = settings.getHintChars();
-      summaries.hints.textContent = `${chars} (${chars.length})`;
+      const custom = settings.getClickableSelector();
+      summaries.hints.textContent = `${chars} (${chars.length}) \xB7 ${settings.getHintTheme()} ${settings.getHintFontSize()}px` + (custom ? " \xB7 custom selector" : "");
     }
     if (summaries.keybindings) {
       const total = Object.keys(COMMAND_CATALOG).length;
@@ -885,6 +1000,10 @@
     maxResultsEl.value = settings.getMaxResults();
     copyFormatEl.value = settings.getCopyFormat();
     hintCharsEl.value = settings.getHintChars();
+    if (clickableSelectorEl)
+      clickableSelectorEl.value = settings.getClickableSelector();
+    if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
+    if (hintFontSizeEl) hintFontSizeEl.value = settings.getHintFontSize();
     for (const el of [
       scrollStepEl,
       maxResultsEl,
@@ -892,6 +1011,8 @@
       passthroughEl,
       clueDelayEl,
       hintCharsEl,
+      clickableSelectorEl,
+      hintFontSizeEl,
       siteInputEl
     ]) {
       markInvalid(el, false);
@@ -902,7 +1023,9 @@
       "error-timeout",
       "error-passthrough-timeout",
       "error-clue-delay",
-      "error-hint-chars"
+      "error-hint-chars",
+      "error-clickable-selector",
+      "error-hint-font-size"
     ]) {
       clearFieldError(id);
     }
@@ -987,7 +1110,9 @@
             const bindings = keysFor(name);
             const overlaps = rowOverlaps(name);
             for (const combo of bindings) {
-              inline.appendChild(buildChip(name, cmd, combo, overlaps.mine.has(combo)));
+              inline.appendChild(
+                buildChip(name, cmd, combo, overlaps.mine.has(combo))
+              );
             }
             const addBtn = document.createElement("button");
             addBtn.type = "button";
@@ -1452,6 +1577,32 @@
       if (ok && cleaned) status(`Cleaned up hint characters: ${deduped}`);
     });
   }
+  function isValidSelector(sel) {
+    try {
+      document.createDocumentFragment().querySelector(sel);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function commitClickableSelector() {
+    if (!clickableSelectorEl) return;
+    const raw = clickableSelectorEl.value.trim();
+    if (raw && !isValidSelector(raw)) {
+      clickableSelectorEl.value = settings.getClickableSelector();
+      markInvalid(clickableSelectorEl, true);
+      showFieldError(
+        "error-clickable-selector",
+        "Not a valid CSS selector (reset to previous)"
+      );
+      status("Clickable selector: not valid CSS");
+      return;
+    }
+    markInvalid(clickableSelectorEl, false);
+    clearFieldError("error-clickable-selector");
+    clickableSelectorEl.value = raw;
+    savePatch({ clickableSelector: raw });
+  }
   function collectSources() {
     const sources = [];
     if (sourceTabEl.checked) sources.push("tab");
@@ -1503,7 +1654,8 @@
   }
   async function resetKeys() {
     cancelRecordingSilent();
-    if (!await confirmDialog("Reset all keybindings to defaults?", "Reset keys")) return;
+    if (!await confirmDialog("Reset all keybindings to defaults?", "Reset keys"))
+      return;
     savePatch({ keymap: { ...keymapDefaults } }).then((ok) => {
       if (!ok) return;
       renderKeymap();
@@ -1532,6 +1684,9 @@
       maxResults: settingsDefaults.maxResults,
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,
+      clickableSelector: settingsDefaults.clickableSelector,
+      hintTheme: settingsDefaults.hintTheme,
+      hintFontSize: settingsDefaults.hintFontSize,
       disabledSites: []
     }).then(() => load2()).then(() => status("Reset everything to defaults")).catch(() => {
       setSaveState("failed");
@@ -1718,6 +1873,26 @@
     updateHintMeta();
   });
   hintCharsEl.addEventListener("change", commitHintChars);
+  hintThemeEl?.addEventListener(
+    "change",
+    () => savePatch({ hintTheme: hintThemeEl.value })
+  );
+  hintFontSizeEl.addEventListener(
+    "change",
+    () => commitNumber(hintFontSizeEl, "error-hint-font-size", {
+      min: 8,
+      max: 20,
+      fallback: "getHintFontSize",
+      settingKey: "hintFontSize",
+      label: "Hint font size",
+      unit: "px"
+    })
+  );
+  clickableSelectorEl?.addEventListener("input", () => {
+    clearFieldError("error-clickable-selector");
+    markInvalid(clickableSelectorEl, false);
+  });
+  clickableSelectorEl?.addEventListener("change", commitClickableSelector);
   for (const card of Object.values(cards)) {
     card?.addEventListener("toggle", persistOpenState);
   }

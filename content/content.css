@@ -225,6 +225,13 @@
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
 }
 
+.jari-help td.jari-help-key.jari-unbound {
+  font-weight: normal !important;
+  font-style: italic;
+  color: var(--jari-muted);
+  text-shadow: none;
+}
+
 .jari-help-footer {
   display: flex;
   align-items: center;
@@ -370,6 +377,15 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
+.jari-flash {
+  position: fixed;
+  z-index: 2147483646 !important;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 2px solid #e0a363;
+  box-shadow: 0 0 4px 2px rgba(224, 163, 99, 0.6);
+}
+
 .jari-scroll-highlight-label {
   font-family: var(--jari-font-family) !important;
   font-size: var(--jari-font-size) !important;
@@ -471,6 +487,24 @@
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
+}
+
+.jari-find-toggle {
+  flex: 0 0 auto;
+  font-family: var(--jari-cmdl-font-family) !important;
+  font-size: var(--jari-cmdl-font-size) !important;
+  line-height: 1 !important;
+  color: #878787;
+  background: transparent;
+  border: 1px solid #333738;
+  border-radius: 2px;
+  padding: 0 0.5ex;
+  cursor: pointer;
+}
+
+.jari-find-toggle-on {
+  color: #e0a363;
+  border-color: #c38a22;
 }
 
 .jari-find-status {

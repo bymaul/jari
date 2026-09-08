@@ -1,5 +1,10 @@
 import { overlaySelectors, queryAll } from "./keymap.js";
 import { blockedUrlSchemes } from "../shared/url.js";
+import { settings } from "./settings.js";
+
+// NodeFilter.SHOW_ELEMENT is 1 by spec; spelled out so this module also
+// loads where NodeFilter is undefined (unit tests).
+const SHOW_ELEMENT = 1;
 
 export const CLICKABLE_SELECTOR =
   "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
@@ -49,25 +54,52 @@ export function isElementPartiallyInViewport(el, ignoreSize) {
   );
 }
 
-export function getVisibleElements(filter) {
-  const all = Array.from(document.documentElement.getElementsByTagName("*"));
-  const visibleElements = [];
-  for (let i = 0; i < all.length; i++) {
-    const e = all[i];
-    if (e.shadowRoot) {
-      const cc = e.shadowRoot.querySelectorAll("*");
-      for (let j = 0; j < cc.length; j++) all.push(cc[j]);
+export function listElements(root, whatToShow, filter) {
+  const out = [];
+  try {
+    const walker = document.createTreeWalker(root, whatToShow, null);
+    let node = walker.nextNode();
+    while (node) {
+      try {
+        if (filter(node)) out.push(node);
+      } catch {}
+      if (node.shadowRoot) {
+        try {
+          out.push(...listElements(node.shadowRoot, whatToShow, filter));
+        } catch {}
+      }
+      node = walker.nextNode();
     }
-    const rect = e.getBoundingClientRect();
+  } catch {}
+  return out;
+}
+
+export function getVisibleElements(filter) {
+  const visibleElements = [];
+  for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
+    let rect;
+    try {
+      rect = e.getBoundingClientRect();
+    } catch {
+      continue;
+    }
+    let hidden;
+    try {
+      hidden = window.getComputedStyle(e).visibility === "hidden";
+    } catch {
+      hidden = true;
+    }
     if (
       rect.top <= window.innerHeight &&
       rect.bottom >= 0 &&
       rect.left <= window.innerWidth &&
       rect.right >= 0 &&
       rect.height > 0 &&
-      window.getComputedStyle(e).visibility !== "hidden"
+      !hidden
     ) {
-      filter(e, visibleElements);
+      try {
+        filter(e, visibleElements);
+      } catch {}
     }
   }
   return visibleElements;
@@ -106,10 +138,53 @@ export function getRealRect(elm) {
   }
 }
 
+export function isExplicitlyRequested(e) {
+  let selector;
+  try {
+    selector = settings.getClickableSelector() || "";
+  } catch {
+    return false;
+  }
+  if (!selector) return false;
+  try {
+    return !!e.matches && e.matches(selector);
+  } catch {
+    return false;
+  }
+}
+
+export function viewportScore(el) {
+  let rect;
+  try {
+    rect = getHintRect(el);
+  } catch {
+    return Infinity;
+  }
+  if (!rect || rect.width <= 0 || rect.height <= 0) return Infinity;
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
+  if (vw <= 0 || vh <= 0) return 0;
+  const visW = Math.max(0, Math.min(rect.right, vw) - Math.max(rect.left, 0));
+  const visH = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
+  if (visW <= 0 || visH <= 0) return Infinity;
+  const coverage = (visW * visH) / (rect.width * rect.height);
+  const cx = rect.left + rect.width / 2 - vw / 2;
+  const cy = rect.top + rect.height / 2 - vh / 2;
+  return (coverage >= 0.99 ? 0 : 1e9) + Math.hypot(cx, cy);
+}
+
+export function prioritizeForViewport(elements) {
+  return elements
+    .map((el, i) => ({ el, i, score: viewportScore(el) }))
+    .sort((a, b) => a.score - b.score || a.i - b.i)
+    .map(({ el }) => el);
+}
+
 export function isElementClickable(e) {
   try {
     if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
   } catch {}
+  if (isExplicitlyRequested(e)) return true;
   try {
     const style = window.getComputedStyle(e);
     if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
@@ -131,6 +206,10 @@ export function filterAncestors(elements) {
   if (elements.length === 0) return elements;
   const result = [];
   elements.forEach((e) => {
+    if (isExplicitlyRequested(e)) {
+      result.push(e);
+      return;
+    }
     for (let j = 0; j < result.length; j++) {
       if (result[j].contains(e)) {
         if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
@@ -151,9 +230,10 @@ export function filterOverlapElements(elements) {
     const be = getRealRect(e);
     if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
     if (
-      e.matches &&
-      (e.matches("input, textarea, select, form") ||
-        e.contentEditable === "true")
+      (e.matches &&
+        e.matches("input, textarea, select, form")) ||
+      e.contentEditable === "true" ||
+      isExplicitlyRequested(e)
     )
       return true;
     try {
@@ -173,11 +253,32 @@ export function filterOverlapElements(elements) {
   return filterAncestors(elements);
 }
 
-export function getClickableElements() {
+function matchesHintSelector(e, selectorString, pattern) {
+  if (!selectorString && !pattern) return true;
+  try {
+    if (selectorString && e.matches && e.matches(selectorString)) return true;
+  } catch {}
+  if (pattern) {
+    try {
+      pattern.lastIndex = 0;
+      const text = e.innerText || "";
+      if (pattern.test(text)) return true;
+      const label = e.getAttribute ? e.getAttribute("aria-label") : "";
+      if (label) {
+        pattern.lastIndex = 0;
+        if (pattern.test(label)) return true;
+      }
+    } catch {}
+  }
+  return false;
+}
+
+export function getClickableElements(selectorString = "", pattern = null) {
   let elements = getVisibleElements((e, v) => {
     try {
       if (e.closest && e.closest(overlaySelectors)) return;
     } catch {}
+    if (!matchesHintSelector(e, selectorString, pattern)) return;
     if (isElementClickable(e)) v.push(e);
   });
   for (const frame of getFrameElements()) {
@@ -201,7 +302,7 @@ export function getFrameElements() {
   return elements;
 }
 
-export function getHref(el) {
+export function getHref(el, base) {
   try {
     if (el.href) return el.href;
   } catch {}
@@ -211,15 +312,15 @@ export function getHref(el) {
   if (!raw) return null;
   if (raw.startsWith("#") || raw.trim() === "") return null;
   try {
-    const url = new URL(raw, location.href);
+    const url = new URL(raw, base || location.href);
     return url.href;
   } catch {
     return null;
   }
 }
 
-export function isOpenableLink(el) {
-  const href = getHref(el);
+export function isOpenableLink(el, base) {
+  const href = getHref(el, base);
   if (!href) return false;
   try {
     const url = new URL(href);
@@ -295,9 +396,168 @@ export function collectElements(requestedMode) {
   else if (
     requestedMode === "open" ||
     requestedMode === "openBackground" ||
+    requestedMode === "openCurrent" ||
     requestedMode === "yank"
   )
     raw = getLinkElements();
   else if (requestedMode === "input") raw = getInputElements();
+  else if (requestedMode === "yankText" || requestedMode === "hover")
+    raw = getClickableElements();
+  try {
+    for (const el of collectIframeElements(requestedMode)) {
+      if (!raw.includes(el)) raw.push(el);
+    }
+  } catch {}
   return raw;
+}
+
+export function translateRect(rect, dx, dy) {
+  return {
+    left: rect.left + dx,
+    top: rect.top + dy,
+    right: rect.right + dx,
+    bottom: rect.bottom + dy,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+export function getHintRect(el) {
+  try {
+    if (el && el._jariViewportRect) return el._jariViewportRect;
+  } catch {}
+  return getRealRect(el);
+}
+
+function getAccessibleFrameDocs() {
+  const out = [];
+  let frames;
+  try {
+    frames = queryAll(FRAME_SELECTOR);
+  } catch {
+    return out;
+  }
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
+  for (const frame of frames) {
+    try {
+      if (frame.closest && frame.closest(overlaySelectors)) continue;
+    } catch {}
+    let doc;
+    try {
+      doc = frame.contentDocument;
+    } catch {
+      continue;
+    }
+    if (!doc || !doc.body) continue;
+    let rect;
+    try {
+      rect = frame.getBoundingClientRect();
+    } catch {
+      continue;
+    }
+    if (!rect) continue;
+    if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
+      continue;
+    out.push({ frame, doc, rect });
+  }
+  return out;
+}
+
+function eachInnerElement(doc, fn) {
+  const visit = (root) => {
+    let nodes;
+    try {
+      nodes = root.querySelectorAll("*");
+    } catch {
+      return;
+    }
+    for (const el of nodes) {
+      try {
+        fn(el);
+      } catch {}
+      if (el.shadowRoot) visit(el.shadowRoot);
+    }
+  };
+  try {
+    if (doc.body) visit(doc.body);
+  } catch {}
+}
+
+function innerPointVisible(el, be) {
+  try {
+    const doc = el.ownerDocument;
+    if (!doc || typeof doc.elementFromPoint !== "function") return true;
+    const hit = doc.elementFromPoint(
+      be.left + be.width / 2,
+      be.top + be.height / 2,
+    );
+    return !hit || hit.contains(el) || el.contains(hit);
+  } catch {
+    return true;
+  }
+}
+
+function matchesInnerInput(el) {
+  try {
+    if (!el.matches || !el.matches(INPUT_SELECTOR)) return false;
+  } catch {
+    return false;
+  }
+  const type = el.getAttribute
+    ? (el.getAttribute("type") || "").toLowerCase()
+    : "";
+  return type !== "hidden" && !el.disabled;
+}
+
+function matchesInnerLink(el, base) {
+  try {
+    if (!el.matches || !el.matches("[href]")) return false;
+  } catch {
+    return false;
+  }
+  return !el.disabled && !el.readOnly && isOpenableLink(el, base);
+}
+
+export function collectIframeElements(requestedMode) {
+  const out = [];
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
+  for (const { frame, doc, rect } of getAccessibleFrameDocs()) {
+    const dx = rect.left + (frame.clientLeft || 0);
+    const dy = rect.top + (frame.clientTop || 0);
+    let base = location.href;
+    try {
+      base = doc.URL || doc.baseURI || location.href;
+    } catch {}
+    eachInnerElement(doc, (el) => {
+      if (requestedMode === "click" || requestedMode === "yankText" || requestedMode === "hover") {
+        if (!isElementClickable(el)) return;
+      } else if (requestedMode === "input") {
+        if (!matchesInnerInput(el)) return;
+      } else {
+        if (!matchesInnerLink(el, base)) return;
+      }
+      let be;
+      try {
+        be = el.getBoundingClientRect();
+      } catch {
+        return;
+      }
+      if (!be || be.width <= 0 || be.height <= 0) return;
+      if (!isElementDrawn(el, be)) return;
+      const t = translateRect(be, dx, dy);
+      if (t.bottom <= 0 || t.right <= 0 || t.top >= vh || t.left >= vw) return;
+      try {
+        if (el.closest && el.closest(overlaySelectors)) return;
+      } catch {}
+      if (el.disabled || el.readOnly) return;
+      if (!innerPointVisible(el, be)) return;
+      try {
+        el._jariViewportRect = t;
+      } catch {}
+      out.push(el);
+    });
+  }
+  return out;
 }

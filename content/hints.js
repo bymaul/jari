@@ -1,5 +1,6 @@
 import { sendMessage, ui } from "./ui.js";
-import { register } from "./overlays.js";
+import { register, touch } from "./overlays.js";
+import { settings } from "./settings.js";
 import {
   normalizeCharset,
   genLabels,
@@ -14,13 +15,21 @@ import {
   getVisibleElements,
   filterInvisibleElements,
   getRealRect,
+  getHintRect,
+  translateRect,
   isElementClickable,
+  isExplicitlyRequested,
   isFrameElement,
   filterAncestors,
   filterOverlapElements,
   getHref,
   isOpenableLink,
   collectElements,
+  collectIframeElements,
+  getClickableElements,
+  listElements,
+  prioritizeForViewport,
+  viewportScore,
 } from "./hints-elements.js";
 
 const MAX_HINTS = 800;
@@ -71,7 +80,10 @@ function scheduleRegenerate() {
       ui.toast("No hints");
       return;
     }
-    const capped = fresh.length > MAX_HINTS ? fresh.slice(0, MAX_HINTS) : fresh;
+    const capped =
+      fresh.length > MAX_HINTS
+        ? prioritizeForViewport(fresh).slice(0, MAX_HINTS)
+        : fresh;
     if (capped.length !== fresh.length) {
       ui.toast(`Too many hints (${capped.length} shown)`);
     }
@@ -170,7 +182,10 @@ function render() {
     holder = null;
   }
 
-  const created = createHintsHost("yellow");
+  const created = createHintsHost(
+    settings.getHintTheme(),
+    settings.getHintFontSize(),
+  );
   hintsHost = created.host;
   holder = created.holder;
 
@@ -178,7 +193,12 @@ function render() {
   const labels = genLabels(elements.length, charset);
   hints = [];
 
-  const links = layoutHints(holder, elements, labels);
+  const links = layoutHints(
+    holder,
+    elements,
+    labels,
+    settings.getHintFontSize(),
+  );
 
   hints = links.map((link) => ({
     el: link.link,
@@ -186,6 +206,25 @@ function render() {
     hintEl: link,
   }));
   refresh();
+}
+
+function flashElement(el) {
+  try {
+    const r = getHintRect(el);
+    if (!r || r.width <= 0 || r.height <= 0) return;
+    const d = document.createElement("div");
+    d.className = "jari-flash";
+    d.style.left = `${r.left}px`;
+    d.style.top = `${r.top}px`;
+    d.style.width = `${r.width}px`;
+    d.style.height = `${r.height}px`;
+    (document.body || document.documentElement).appendChild(d);
+    setTimeout(() => {
+      try {
+        d.remove();
+      } catch {}
+    }, 150);
+  } catch {}
 }
 
 let scrollLockPrevent = null;
@@ -297,14 +336,17 @@ const VALID_HINT_MODES = new Set([
   "click",
   "open",
   "openBackground",
+  "openCurrent",
   "input",
   "yank",
+  "yankText",
+  "hover",
 ]);
 
 function open(requestedMode) {
   if (active) close();
   mode = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
-  multipleHits = mode === "openBackground";
+  multipleHits = mode === "openBackground" || mode === "hover";
 
   let candidates = collectElements(mode);
 
@@ -325,13 +367,14 @@ function open(requestedMode) {
   }
 
   if (candidates.length > MAX_HINTS) {
-    candidates = candidates.slice(0, MAX_HINTS);
+    candidates = prioritizeForViewport(candidates).slice(0, MAX_HINTS);
     ui.toast(`Too many hints (${candidates.length} shown)`);
   }
 
   elements = candidates;
   prefix = "";
   active = true;
+  touch("hints");
 
   render();
   startTracking();
@@ -346,6 +389,7 @@ function handleActivationEnd() {
 }
 
 function activate(el) {
+  flashElement(el);
   if (mode === "click") {
     if (isFrameElement(el)) focusFrame(el);
     else if (isEditable(el)) focusInput(el);
@@ -362,6 +406,18 @@ function activate(el) {
     if (url) sendMessage("openInBackgroundTab", { url });
     else if (isFrameElement(el)) focusFrame(el);
     handleActivationEnd();
+  } else if (mode === "openCurrent") {
+    const url = getHref(el);
+    if (url) {
+      sendMessage("navigate", { url });
+      close();
+    } else if (isFrameElement(el)) {
+      focusFrame(el);
+      close();
+    } else {
+      ui.dispatchClick(el);
+      close();
+    }
   } else if (mode === "input") {
     focusInput(el);
     close();
@@ -374,6 +430,18 @@ function activate(el) {
       ui.toast("No link");
     }
     close();
+  } else if (mode === "yankText") {
+    const text = ((el.innerText || el.textContent) || "").trim();
+    if (text) {
+      ui.copyText(text);
+      ui.toast("Yanked text");
+    } else {
+      ui.toast("No text");
+    }
+    close();
+  } else if (mode === "hover") {
+    ui.dispatchHover(el);
+    handleActivationEnd();
   }
 }
 
@@ -454,12 +522,20 @@ export const __testHelpers = {
   getHref,
   isOpenableLink,
   isElementClickable,
+  isExplicitlyRequested,
   getRealRect,
+  getHintRect,
+  translateRect,
   collectElements,
+  collectIframeElements,
+  getClickableElements,
+  listElements,
   isElementDrawn,
   isElementPartiallyInViewport,
   getVisibleElements,
   filterInvisibleElements,
   filterOverlapElements,
   filterAncestors,
+  prioritizeForViewport,
+  viewportScore,
 };

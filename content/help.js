@@ -1,7 +1,7 @@
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { COMMAND_CATALOG } from "./catalog.js";
-import { register } from "./overlays.js";
+import { register, touch } from "./overlays.js";
 
 const STEP = 50;
 const COLUMNS = 3;
@@ -26,6 +26,7 @@ function isActive() {
 function open() {
   if (active) return;
   active = true;
+  touch("help");
   render();
 
   overlay.tabIndex = -1;
@@ -55,8 +56,7 @@ function render() {
 
   const byCategory = new Map();
   for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
-    const keys = byCommand.get(commandName);
-    if (!keys) continue;
+    const keys = byCommand.get(commandName) || [];
     const id = meta.category || "other";
     if (!byCategory.has(id)) byCategory.set(id, []);
     byCategory.get(id).push({ keys, label: meta.label, commandName });
@@ -75,7 +75,12 @@ function render() {
           const tr = document.createElement('tr');
           const keyTd = document.createElement('td');
           keyTd.className = 'jari-help-key';
-          keyTd.textContent = keys.join(', ');
+          if (keys.length === 0) {
+            keyTd.textContent = 'unbound';
+            keyTd.classList.add('jari-unbound');
+          } else {
+            keyTd.textContent = keys.join(', ');
+          }
           const labelTd = document.createElement('td');
           labelTd.className = 'jari-help-label';
           labelTd.textContent = label;

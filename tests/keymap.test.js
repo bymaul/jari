@@ -22,7 +22,7 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
   assert.equal(s.scrollStep, 100);
   assert.equal(s.smoothScroll, true);
   assert.equal(s.keymap.j, "scrollToTop");
-  assert.equal(s.keymap.t, undefined);
+  assert.equal(s.keymap.t, "openOmnibar");
   assert.equal(s.timeoutMs, Jari.settingsDefaults.timeoutMs);
   assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
   assert.equal(s.copyFormat, "plain");
@@ -159,10 +159,76 @@ test(";w resets the scroll target without conflicting with ;e/;x", () => {
 test("normalizeSettings stamps the schema version and migrates v0 data", () => {
   assert.equal(Jari.normalizeSettings({}).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   const migrated = Jari.normalizeSettings({ keymap: { j: "scrollDown" } });
-  assert.equal(migrated.schemaVersion, 1);
+  assert.equal(migrated.schemaVersion, 4);
   assert.equal(migrated.keymap.j, "scrollDown");
-  assert.deepEqual(Jari.migrateSettings(null).schemaVersion, 1);
-  assert.equal(Jari.migrateSettings({ schemaVersion: 1 }).schemaVersion, 1);
+  assert.deepEqual(Jari.migrateSettings(null).schemaVersion, 4);
+  assert.equal(Jari.migrateSettings({ schemaVersion: 1 }).schemaVersion, 4);
+});
+
+test("v1 settings migrate forward keeping data and gaining clickableSelector", () => {
+  const v1 = { schemaVersion: 1, keymap: { j: "scrollDown" }, scrollStep: 200 };
+  const migrated = Jari.normalizeSettings(v1);
+  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.keymap.j, "scrollDown");
+  assert.equal(migrated.scrollStep, 200);
+  assert.equal(migrated.clickableSelector, "");
+  const custom = Jari.normalizeSettings({ clickableSelector: "div.card" });
+  assert.equal(custom.clickableSelector, "div.card");
+});
+
+test("v2 settings migrate forward gaining hint theme and size", () => {
+  const v2 = { schemaVersion: 2, hintTheme: "cyan", hintFontSize: 14 };
+  const migrated = Jari.normalizeSettings(v2);
+  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.hintTheme, "cyan");
+  assert.equal(migrated.hintFontSize, 14);
+  const bare = Jari.normalizeSettings({ schemaVersion: 2 });
+  assert.equal(bare.hintTheme, "yellow");
+  assert.equal(bare.hintFontSize, 10);
+});
+
+test("v3 keymaps gain new default bindings without clobbering customs", () => {
+  const old = {
+    schemaVersion: 3,
+    keymap: { j: "scrollToTop", x: "closeTab", gf: "hintYank" },
+  };
+  const s = Jari.normalizeSettings(old);
+  assert.equal(s.schemaVersion, 4);
+  assert.equal(s.keymap.j, "scrollToTop");
+  assert.equal(s.keymap.x, "closeTab");
+  assert.equal(s.keymap.gf, "hintYank");
+  assert.equal(s.keymap[";w"], "resetScrollTarget");
+});
+
+test("backfillNewBindings only fills free combos for unused commands", () => {
+  assert.equal(Jari.backfillNewBindings(null), null);
+  const filled = Jari.backfillNewBindings({});
+  assert.equal(filled[";w"], "resetScrollTarget");
+  assert.equal(filled.j, "scrollDown");
+  const full = { ...Jari.keymapDefaults };
+  assert.deepEqual(Jari.backfillNewBindings(full), full);
+});
+
+test("normalizeHintTheme falls back to yellow for unknown themes", () => {
+  assert.equal(Jari.normalizeHintTheme("dark"), "dark");
+  assert.equal(Jari.normalizeHintTheme("cyan"), "cyan");
+  assert.equal(Jari.normalizeHintTheme("neon"), "yellow");
+  assert.equal(Jari.normalizeHintTheme(null), "yellow");
+});
+
+test("normalizeHintFontSize clamps to 8-20px", () => {
+  assert.equal(Jari.normalizeHintFontSize(14), 14);
+  assert.equal(Jari.normalizeHintFontSize(4), 8);
+  assert.equal(Jari.normalizeHintFontSize(99), 20);
+  assert.equal(Jari.normalizeHintFontSize(12.6), 13);
+  assert.equal(Jari.normalizeHintFontSize("big"), 10);
+});
+
+test("normalizeClickableSelector trims and caps the selector", () => {
+  assert.equal(Jari.normalizeClickableSelector("  div.card  "), "div.card");
+  assert.equal(Jari.normalizeClickableSelector(""), "");
+  assert.equal(Jari.normalizeClickableSelector(null), "");
+  assert.equal(Jari.normalizeClickableSelector("x".repeat(600)).length, 500);
 });
 
 test("normalizeSettings cleans disabled site patterns", () => {
@@ -180,4 +246,15 @@ test("isBrowserTrapped flags combos the page may never see", () => {
   assert.equal(Jari.isBrowserTrapped("j"), false);
   assert.equal(Jari.isBrowserTrapped("gg"), false);
   assert.equal(Jari.isBrowserTrapped("ctrl+f"), false);
+});
+
+test("find toggles default to Alt chords without conflicts", () => {
+  assert.equal(Jari.keymapDefaults["alt+r"], "toggleFindRegex");
+  assert.equal(Jari.keymapDefaults["alt+w"], "toggleFindWholeWord");
+  assert.equal(Jari.keymapDefaults["alt+c"], "toggleFindCase");
+  assert.equal(COMMAND_CATALOG.toggleFindRegex.category, "find");
+  assert.equal(
+    Jari.findBindingConflict(Jari.keymapDefaults, "alt+r", "toggleFindRegex"),
+    null,
+  );
 });

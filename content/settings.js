@@ -12,6 +12,7 @@ const STORAGE_KEY = "settings";
 let persistedLocal = false;
 
 const state = {
+  schemaVersion: SETTINGS_SCHEMA_VERSION,
   keymap: { ...keymapDefaults },
   disabledSites: [],
   scrollStep: settingsDefaults.scrollStep,
@@ -23,12 +24,16 @@ const state = {
   maxResults: settingsDefaults.maxResults,
   copyFormat: settingsDefaults.copyFormat,
   hintChars: settingsDefaults.hintChars,
+  clickableSelector: settingsDefaults.clickableSelector,
+  hintTheme: settingsDefaults.hintTheme,
+  hintFontSize: settingsDefaults.hintFontSize,
   clueEnabled: settingsDefaults.clueEnabled,
   clueDelayMs: settingsDefaults.clueDelayMs,
 };
 
 function merge(data) {
   const s = normalizeSettings(data);
+  state.schemaVersion = s.schemaVersion;
   state.keymap = s.keymap;
   state.disabledSites = s.disabledSites;
   state.scrollStep = s.scrollStep;
@@ -40,6 +45,9 @@ function merge(data) {
   state.maxResults = s.maxResults;
   state.copyFormat = s.copyFormat;
   state.hintChars = s.hintChars;
+  state.clickableSelector = s.clickableSelector;
+  state.hintTheme = s.hintTheme;
+  state.hintFontSize = s.hintFontSize;
   state.clueEnabled = s.clueEnabled;
   state.clueDelayMs = s.clueDelayMs;
 }
@@ -67,7 +75,7 @@ async function load() {
 
 function snapshot() {
   return {
-    schemaVersion: SETTINGS_SCHEMA_VERSION,
+    schemaVersion: state.schemaVersion,
     keymap: { ...state.keymap },
     disabledSites: state.disabledSites.slice(),
     scrollStep: state.scrollStep,
@@ -79,6 +87,9 @@ function snapshot() {
     maxResults: state.maxResults,
     copyFormat: state.copyFormat,
     hintChars: state.hintChars,
+    clickableSelector: state.clickableSelector,
+    hintTheme: state.hintTheme,
+    hintFontSize: state.hintFontSize,
     clueEnabled: state.clueEnabled,
     clueDelayMs: state.clueDelayMs,
   };
@@ -165,6 +176,18 @@ function getHintChars() {
   return state.hintChars;
 }
 
+function getClickableSelector() {
+  return state.clickableSelector;
+}
+
+function getHintTheme() {
+  return state.hintTheme;
+}
+
+function getHintFontSize() {
+  return state.hintFontSize;
+}
+
 function isClueEnabled() {
   return state.clueEnabled;
 }
@@ -206,6 +229,9 @@ export const settings = {
   getMaxResults,
   getCopyFormat,
   getHintChars,
+  getClickableSelector,
+  getHintTheme,
+  getHintFontSize,
   isClueEnabled,
   getClueDelayMs,
   toggleSiteEnabled,

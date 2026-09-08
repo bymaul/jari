@@ -1,6 +1,6 @@
 import { settings } from "./settings.js";
-import { HINT_CHARSET_DEFAULT } from "./keymap.js";
-import { getRealRect } from "./hints-elements.js";
+import { HINT_CHARSET_DEFAULT, HINT_FONT_SIZE_DEFAULT, HINT_FONT_SIZE_MAX, HINT_FONT_SIZE_MIN } from "./keymap.js";
+import { getHintRect, getRealRect } from "./hints-elements.js";
 
 export function normalizeCharset() {
   const s = settings.getHintChars();
@@ -119,10 +119,23 @@ const HINT_THEMES = {
     color: "#0a2e3a",
     matched: "#3a6a7a",
   },
+  dark: {
+    border: "#e0a363",
+    background: "linear-gradient(#2b2b38, #1c1c24)",
+    color: "#f5f0e6",
+    matched: "#8a8a99",
+  },
 };
 
-function hintCss(theme) {
+function hintFontSize(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return HINT_FONT_SIZE_DEFAULT;
+  return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, Math.round(n)));
+}
+
+function hintCss(theme, fontSize) {
   const t = HINT_THEMES[theme] || HINT_THEMES.yellow;
+  const size = hintFontSize(fontSize);
   return `
     .jari-hints { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
     .jari-hint {
@@ -130,7 +143,7 @@ function hintCss(theme) {
       display: inline-block;
       box-sizing: border-box;
       font-family: monospace !important;
-      font-size: 10px !important;
+      font-size: ${size}px !important;
       font-weight: bold !important;
       line-height: 1 !important;
       letter-spacing: 0.02em !important;
@@ -150,7 +163,7 @@ function hintCss(theme) {
   `;
 }
 
-export function createHintsHost(theme = "yellow") {
+export function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFAULT) {
   const host = document.createElement("div");
   host.className = "jari-hints-host";
   host.style.position = "fixed";
@@ -169,7 +182,7 @@ export function createHintsHost(theme = "yellow") {
 
   const shadow = host.shadowRoot;
   const style = document.createElement("style");
-  style.textContent = hintCss(theme);
+  style.textContent = hintCss(theme, fontSize);
   shadow.appendChild(style);
   const holder = document.createElement("section");
   holder.className = "jari-hints";
@@ -180,7 +193,53 @@ export function createHintsHost(theme = "yellow") {
   return { host, holder };
 }
 
-export function layoutHints(holder, elements, labels) {
+function estimateLabelBox(label, fontSize) {
+  const size = hintFontSize(fontSize);
+  return {
+    w: Math.ceil(String(label).length * size * 0.62 + 10),
+    h: Math.ceil(size + 8),
+  };
+}
+
+function boxesOverlap(a, b) {
+  return (
+    a.left < b.left + b.w &&
+    b.left < a.left + a.w &&
+    a.top < b.top + b.h &&
+    b.top < a.top + a.h
+  );
+}
+
+const LABEL_SHIFTS = [
+  [0, 0],
+  [12, 0],
+  [0, 18],
+  [12, 18],
+  [-12, 0],
+  [0, 36],
+];
+
+function resolveLabelBox(home, w, h, placed) {
+  for (const [dx, dy] of LABEL_SHIFTS) {
+    const box = {
+      left: Math.max(0, home.left + dx),
+      top: Math.max(0, home.top + dy),
+      w,
+      h,
+    };
+    let hit = false;
+    for (const p of placed) {
+      if (boxesOverlap(box, p)) {
+        hit = true;
+        break;
+      }
+    }
+    if (!hit) return box;
+  }
+  return { left: Math.max(0, home.left), top: Math.max(0, home.top), w, h };
+}
+
+export function layoutHints(holder, elements, labels, fontSize = HINT_FONT_SIZE_DEFAULT) {
   const bof = (() => {
     try {
       return coordinate(holder);
@@ -189,34 +248,31 @@ export function layoutHints(holder, elements, labels) {
     }
   })();
 
-  let lastTop = -1;
-  let lastLeft = -1;
+  // Estimated boxes are close enough for de-collision (monospace labels);
+  // the measured second pass below corrects any residual overlap.
+  const placed = [];
   const links = elements.map((elm, i) => {
-    const r = getRealRect(elm);
+    const r = getHintRect(elm);
     const z = getZIndex(elm);
-    const left = window.pageXOffset + r.left - bof.left;
+    const home = {
+      left: window.pageXOffset + r.left - bof.left,
+      top: Math.max(r.top + window.pageYOffset - bof.top, 0),
+    };
+    const est = estimateLabelBox(labels[i], fontSize);
+    const box = resolveLabelBox(home, est.w, est.h, placed);
+    placed.push(box);
     const link = document.createElement("div");
     link.className = "jari-hint";
     link.textContent = labels[i];
     link.dataset.label = labels[i];
-    let lTop = Math.max(r.top + window.pageYOffset - bof.top, 0);
-    if (lTop === lastTop && Math.abs(left - lastLeft) < 20) {
-      link.style.left = `${left + 20 - Math.abs(left - lastLeft)}px`;
-    } else if (left === lastLeft && Math.abs(lTop - lastTop) < 20) {
-      lTop += 20 - Math.abs(lTop - lastTop);
-      link.style.left = `${left}px`;
-    } else {
-      link.style.left = `${left}px`;
-    }
-    link.style.top = `${lTop}px`;
+    link.style.left = `${box.left}px`;
+    link.style.top = `${box.top}px`;
     link.style.zIndex = String(z + 9999);
     link.zIndex = link.style.zIndex;
     link.label = labels[i];
     link.link = elm;
     link.targetEl = elm;
     updateHintText(link, labels[i], "");
-    lastTop = lTop;
-    lastLeft = parseInt(link.style.left, 10);
     return link;
   });
 

@@ -38,6 +38,9 @@ const maxResultsEl = document.querySelector("#max-results");
 const copyFormatEl = document.querySelector("#copy-format");
 const hintCharsEl = document.querySelector("#hint-chars");
 const hintCharsMetaEl = document.querySelector("#hint-chars-meta");
+const clickableSelectorEl = document.querySelector("#clickable-selector");
+const hintThemeEl = document.querySelector("#hint-theme");
+const hintFontSizeEl = document.querySelector("#hint-font-size");
 const keymapFilterEl = document.querySelector("#keymap-filter");
 const keymapUnboundEl = document.querySelector("#keymap-unbound");
 const keymapCountEl = document.querySelector("#keymap-count");
@@ -173,7 +176,10 @@ function updateSummaries() {
   }
   if (summaries.hints) {
     const chars = settings.getHintChars();
-    summaries.hints.textContent = `${chars} (${chars.length})`;
+    const custom = settings.getClickableSelector();
+    summaries.hints.textContent =
+      `${chars} (${chars.length}) · ${settings.getHintTheme()} ${settings.getHintFontSize()}px` +
+      (custom ? " · custom selector" : "");
   }
   if (summaries.keybindings) {
     const total = Object.keys(COMMAND_CATALOG).length;
@@ -241,6 +247,10 @@ async function load() {
   maxResultsEl.value = settings.getMaxResults();
   copyFormatEl.value = settings.getCopyFormat();
   hintCharsEl.value = settings.getHintChars();
+  if (clickableSelectorEl)
+    clickableSelectorEl.value = settings.getClickableSelector();
+  if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
+  if (hintFontSizeEl) hintFontSizeEl.value = settings.getHintFontSize();
   for (const el of [
     scrollStepEl,
     maxResultsEl,
@@ -248,6 +258,8 @@ async function load() {
     passthroughEl,
     clueDelayEl,
     hintCharsEl,
+    clickableSelectorEl,
+    hintFontSizeEl,
     siteInputEl,
   ]) {
     markInvalid(el, false);
@@ -259,6 +271,8 @@ async function load() {
     "error-passthrough-timeout",
     "error-clue-delay",
     "error-hint-chars",
+    "error-clickable-selector",
+    "error-hint-font-size",
   ]) {
     clearFieldError(id);
   }
@@ -358,7 +372,9 @@ function renderKeymap() {
           const bindings = keysFor(name);
           const overlaps = rowOverlaps(name);
           for (const combo of bindings) {
-            inline.appendChild(buildChip(name, cmd, combo, overlaps.mine.has(combo)));
+            inline.appendChild(
+              buildChip(name, cmd, combo, overlaps.mine.has(combo)),
+            );
           }
 
           const addBtn = document.createElement("button");
@@ -887,6 +903,34 @@ function commitHintChars() {
   });
 }
 
+function isValidSelector(sel) {
+  try {
+    document.createDocumentFragment().querySelector(sel);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function commitClickableSelector() {
+  if (!clickableSelectorEl) return;
+  const raw = clickableSelectorEl.value.trim();
+  if (raw && !isValidSelector(raw)) {
+    clickableSelectorEl.value = settings.getClickableSelector();
+    markInvalid(clickableSelectorEl, true);
+    showFieldError(
+      "error-clickable-selector",
+      "Not a valid CSS selector (reset to previous)",
+    );
+    status("Clickable selector: not valid CSS");
+    return;
+  }
+  markInvalid(clickableSelectorEl, false);
+  clearFieldError("error-clickable-selector");
+  clickableSelectorEl.value = raw;
+  savePatch({ clickableSelector: raw });
+}
+
 function collectSources() {
   const sources = [];
   if (sourceTabEl.checked) sources.push("tab");
@@ -941,7 +985,10 @@ function confirmDialog(message, confirmLabel) {
 
 async function resetKeys() {
   cancelRecordingSilent();
-  if (!(await confirmDialog("Reset all keybindings to defaults?", "Reset keys"))) return;
+  if (
+    !(await confirmDialog("Reset all keybindings to defaults?", "Reset keys"))
+  )
+    return;
   savePatch({ keymap: { ...keymapDefaults } }).then((ok) => {
     if (!ok) return;
     renderKeymap();
@@ -974,6 +1021,9 @@ async function reset() {
       maxResults: settingsDefaults.maxResults,
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,
+      clickableSelector: settingsDefaults.clickableSelector,
+      hintTheme: settingsDefaults.hintTheme,
+      hintFontSize: settingsDefaults.hintFontSize,
       disabledSites: [],
     })
     .then(() => load())
@@ -1161,6 +1211,24 @@ hintCharsEl.addEventListener("input", () => {
   updateHintMeta();
 });
 hintCharsEl.addEventListener("change", commitHintChars);
+hintThemeEl?.addEventListener("change", () =>
+  savePatch({ hintTheme: hintThemeEl.value }),
+);
+hintFontSizeEl.addEventListener("change", () =>
+  commitNumber(hintFontSizeEl, "error-hint-font-size", {
+    min: 8,
+    max: 20,
+    fallback: "getHintFontSize",
+    settingKey: "hintFontSize",
+    label: "Hint font size",
+    unit: "px",
+  }),
+);
+clickableSelectorEl?.addEventListener("input", () => {
+  clearFieldError("error-clickable-selector");
+  markInvalid(clickableSelectorEl, false);
+});
+clickableSelectorEl?.addEventListener("change", commitClickableSelector);
 for (const card of Object.values(cards)) {
   card?.addEventListener("toggle", persistOpenState);
 }

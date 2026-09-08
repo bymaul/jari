@@ -2,7 +2,7 @@ import { Url } from "../shared/url.js";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
-import { register } from "./overlays.js";
+import { register, touch } from "./overlays.js";
 
 const SEARCH_ENGINES = {
   g: "https://www.google.com/search?q=%s",
@@ -194,6 +194,7 @@ function rankTabs(q, list) {
 }
 
 function render(title, placeholder) {
+  touch("prompt");
   overlay = document.createElement("div");
   overlay.className = "jari-overlay jari-prompt";
 

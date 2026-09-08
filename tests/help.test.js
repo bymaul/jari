@@ -56,6 +56,13 @@ function makeEl(tag, doc) {
       contains(cls) {
         return el._className.split(/\s+/).includes(cls);
       },
+      add(...classes) {
+        const current = el._className.split(/\s+/).filter(Boolean);
+        for (const cls of classes) {
+          if (cls && !current.includes(cls)) current.push(cls);
+        }
+        el._className = current.join(" ");
+      },
     },
     setAttribute(name, value) {
       el.attrs[name] = value;
@@ -208,6 +215,20 @@ test("help opens with no search box and the default footer", async () => {
     );
     assert.ok(entryRows(doc).length > 0, "expected help rows");
     assert.equal(footerText(doc), "j/k scroll | / search | esc close");
+  });
+});
+
+test("unbound commands are listed as unbound", async () => {
+  await withDocument((doc) => {
+    Help.open();
+    const unbound = entryRows(doc).filter(
+      (tr) => tr.children[0].textContent === "unbound",
+    );
+    assert.ok(unbound.length > 0, "expected unbound rows");
+    assert.ok(
+      unbound.some((tr) => tr.children[1].textContent === "Duplicate tab"),
+      "expected Duplicate tab to be unbound by default",
+    );
   });
 });
 

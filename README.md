@@ -16,22 +16,28 @@ see [PRIVACY.md](PRIVACY.md).
 Commands take a repeat count (`3j`, `2x`); `0-9` are reserved for it.
 Bindings chain into sequences of any length.
 
-- Scroll `j`/`k`/`h`/`l`, top/bottom `gg`/`G`, scroll areas `w`/`;w`
-- Zoom `+`/`-`
-- Tabs `t` URL/search, `T` incognito, `x`/`X` close/reopen, `J`/`K` prev/next,
-  `g0`/`g$` first/last, `<<`/`>>` move, `W` to window, `gp`/`gP` from clipboard
-- History `H`/`L`, reload `r`/`R`, `gu`/`gU` parent/root, `ge` edit URL,
-  `yy`/`Y` copy URL / title + URL
-- Hints `f` click, `F` new tab, `gf` background, `i` input, `yf` yank link
-- Find `/`, next/prev `n`/`N` (smartcase; toggles `Alt+R/W/C`, history `Up`/`Down`)
-- Visual `v`/`V` (`h`/`j`/`k`/`l` `w`/`b`/`e` `0`/`^`/`$` `G`/`gg` `f`/`F`/`t`/`T` `o` `y`)
-- Modes `I` ignore, `p` passthrough, `ctrl+alt+v` per-site disable
-- Help `?` cheatsheet, `;e` settings, `;x` extensions page
+- Scroll: `j`/`k`/`h`/`l`, `gg`/`G` top/bottom, `w` cycle scroll area,
+  `;w` reset scroll area
+- Zoom: `+`/`-`
+- Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
+  `J`/`K` prev/next, `g0`/`g$` first/last, `<<`/`>>` move, `W` move to window,
+  `gp`/`gP` open clipboard here/background
+- History: `H`/`L` back/forward
+- Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
+  `yy` copy URL, `Y` copy title + URL
+- Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input,
+  `yf` copy link URL
+- Find: `/` find, `n`/`N` next/prev (smart case, `Esc` clears, `Enter` follows;
+  rebindable toggles `Alt+R` regex, `Alt+W` whole word, `Alt+C` case;
+  `Up`/`Down` history)
+- Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,
+  `G`/`gg`, `f`/`F`/`t`/`T` + char, `o` swap; `y` yank)
+- Modes: `I` ignore, `p` passthrough, `ctrl+alt+v` disable on site
+- Help: `?` cheatsheet, `;e` settings, `;x` extensions page
 
-`t ` alone lists open tabs; `t ` + text searches them.
-
-Unbound by default (bind in settings): scrollPageDown/Up, scrollHalfPageDown/Up,
-newTab, duplicateTab, togglePin, toggleMute, hintHover, hintYankText, hintOpenCurrent.
+Unbound by default (bind them in settings): scrollPageDown/Up,
+scrollHalfPageDown/Up, newTab, duplicateTab, togglePin, toggleMute,
+hintHover, hintYankText, hintOpenCurrent.
 
 ## Settings (`;e`)
 

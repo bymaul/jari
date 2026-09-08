@@ -23,6 +23,7 @@ function makeElement(tag) {
     _text: "",
     set textContent(value) {
       this._text = value;
+      this.children.length = 0;
     },
     get textContent() {
       return this._text;
@@ -217,5 +218,52 @@ test("a custom z prefix triggers the clue dynamically", async () => {
     assert.equal(Clue.isVisible(), true);
     const root = doc.bodyChildren.find((el) => el.className === "jari-clue");
     assert.ok(root);
+  });
+});
+
+function clueRows(doc) {
+  const root = doc.bodyChildren.find((el) => el.className === "jari-clue");
+  return root.children[1].children;
+}
+
+test("refilter narrows the visible clue and backspace restores it", async () => {
+  const doc = makeDocument();
+  await withDocument(doc, async () => {
+    Clue.schedule("g", "");
+    const full = clueRows(doc).length;
+    assert.ok(full > 1);
+    assert.equal(Clue.hasFilter(), false);
+
+    assert.equal(Clue.refilter("o"), true);
+    assert.equal(Clue.hasFilter(), true);
+    const narrowed = clueRows(doc).length;
+    assert.ok(narrowed > 0 && narrowed < full);
+
+    assert.equal(Clue.backspaceFilter(), true);
+    assert.equal(Clue.hasFilter(), false);
+    assert.equal(clueRows(doc).length, full);
+  });
+});
+
+test("refilter returns false while the clue is hidden", async () => {
+  const doc = makeDocument();
+  await withDocument(doc, async () => {
+    assert.equal(Clue.isVisible(), false);
+    assert.equal(Clue.refilter("a"), false);
+    assert.equal(Clue.backspaceFilter(), false);
+  });
+});
+
+test("multi-char suffixes render as nested chains", async () => {
+  settings.set({
+    keymap: { gfk: "hintYank", gu: "goToParent" },
+    clueEnabled: true,
+    clueDelayMs: 0,
+  });
+  const doc = makeDocument();
+  await withDocument(doc, async () => {
+    Clue.schedule("g", "");
+    const keys = clueRows(doc).map((row) => row.children[0].textContent);
+    assert.ok(keys.some((k) => k.includes("▸")), keys.join(","));
   });
 });

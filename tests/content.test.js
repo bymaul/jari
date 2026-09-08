@@ -5,6 +5,7 @@ import assert from "node:assert";
 const { settings } = await import("../content/settings.js");
 const { commands } = await import("../content/commands.js");
 const { keymapDefaults } = await import("../content/keymap.js");
+const { Clue } = await import("../content/clue.js");
 const { ui } = await import("../content/ui.js");
 const { handleKeydown, __resetState } = await import("../content/content.js");
 
@@ -38,7 +39,11 @@ const spiedCalls = {};
 function spyOn(commandName) {
   if (!(commandName in originals)) originals[commandName] = commands[commandName];
   spiedCalls[commandName] = [];
-  commands[commandName] = { run: (c) => spiedCalls[commandName].push(c) };
+  const original = originals[commandName] || {};
+  commands[commandName] = {
+    ...original,
+    run: (c) => spiedCalls[commandName].push(c),
+  };
 }
 function restoreSpies() {
   for (const [name, original] of Object.entries(originals)) commands[name] = original;
@@ -168,7 +173,8 @@ test("the showcmd readout echoes counts and prefixes", () => {
   assert.deepEqual(showcmdCalls, [["2"], ["2g"]]);
   handleKeydown(key({ key: "u" }));
   assert.deepEqual(flashCalls, [["2gu"]]);
-  assert.equal(spiedCalls.goToParent[0].count, 2);
+  // goToParent is not repeatable, so the count is dropped on delivery.
+  assert.equal(spiedCalls.goToParent[0].count, 1);
 });
 
 test("ignore mode passes every key through except its toggle and Escape", () => {
@@ -297,4 +303,78 @@ test("keys typed into a form field reach the page, Escape blurs", () => {
   handleKeydown(esc);
   assertClaimed(esc);
   assert.deepEqual(calls, ["blur"]);
+});
+
+test("counts are dropped for non-repeatable commands", () => {
+  const seen = [];
+  commands.__tmpProbe = { run: (c) => seen.push(c.count) };
+  const saved = { ...settings.getKeymap() };
+  settings.set({ keymap: { ...saved, Z: "__tmpProbe" } });
+  try {
+    handleKeydown(key({ key: "3" }));
+    handleKeydown(key({ key: "Z" }));
+    assert.deepEqual(seen, [1]);
+  } finally {
+    delete commands.__tmpProbe;
+    settings.set({ keymap: saved });
+  }
+});
+
+test("counts reach repeatable commands", () => {
+  const seen = [];
+  commands.__tmpProbe = { repeatable: true, run: (c) => seen.push(c.count) };
+  const saved = { ...settings.getKeymap() };
+  settings.set({ keymap: { ...saved, Z: "__tmpProbe" } });
+  try {
+    handleKeydown(key({ key: "3" }));
+    handleKeydown(key({ key: "Z" }));
+    assert.deepEqual(seen, [3]);
+  } finally {
+    delete commands.__tmpProbe;
+    settings.set({ keymap: saved });
+  }
+});
+
+test("a dead key filters the visible clue instead of cancelling", () => {
+  settings.set({ clueDelayMs: 0 });
+  const original = commands.goToParent;
+  let calls = 0;
+  commands.goToParent = { run: () => calls++ };
+  try {
+    handleKeydown(key({ key: "g" }));
+    assert.equal(Clue.isVisible(), true);
+    const ev = key({ key: "x" });
+    handleKeydown(ev);
+    assertClaimed(ev);
+    assert.equal(calls, 0);
+    assert.equal(Clue.isVisible(), true);
+    assert.equal(Clue.hasFilter(), true);
+    handleKeydown(key({ key: "u" }));
+    assert.equal(calls, 1);
+    assert.equal(Clue.isVisible(), false);
+  } finally {
+    commands.goToParent = original;
+    settings.set({ clueDelayMs: 300 });
+  }
+});
+
+test("Backspace pops the clue filter and keeps the prefix", () => {  settings.set({ clueDelayMs: 0 });
+  const original = commands.goToParent;
+  let calls = 0;
+  commands.goToParent = { run: () => calls++ };
+  try {
+    handleKeydown(key({ key: "g" }));
+    handleKeydown(key({ key: "x" }));
+    assert.equal(Clue.hasFilter(), true);
+    const ev = key({ key: "Backspace" });
+    handleKeydown(ev);
+    assertClaimed(ev);
+    assert.equal(Clue.hasFilter(), false);
+    assert.equal(Clue.isVisible(), true);
+    handleKeydown(key({ key: "u" }));
+    assert.equal(calls, 1);
+  } finally {
+    commands.goToParent = original;
+    settings.set({ clueDelayMs: 300 });
+  }
 });
