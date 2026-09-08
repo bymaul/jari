@@ -129,11 +129,11 @@ function hintCss(theme) {
       position: absolute;
       display: inline-block;
       box-sizing: border-box;
-      font-family: monospace;
-      font-size: 10px;
-      font-weight: bold;
-      line-height: 1;
-      letter-spacing: 0.02em;
+      font-family: monospace !important;
+      font-size: 10px !important;
+      font-weight: bold !important;
+      line-height: 1 !important;
+      letter-spacing: 0.02em !important;
       padding: 1px 3px;
       border: 1px solid ${t.border};
       border-radius: 3px;

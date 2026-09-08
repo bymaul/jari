@@ -70,17 +70,17 @@
 .jari-prompt {
   background: #1c1c24 !important;
   color: #cdcdcd !important;
-  font-size: var(--jari-cmplt-font-size);
-  font-family: var(--jari-cmplt-font-family);
+  font-size: var(--jari-cmplt-font-size) !important;
+  font-family: var(--jari-cmplt-font-family) !important;
   outline: none !important;
 }
 
 .jari-prompt input {
   width: 100%;
   box-sizing: border-box;
-  font-family: var(--jari-cmdl-font-family);
-  font-size: var(--jari-cmdl-font-size);
-  line-height: var(--jari-cmdl-line-height);
+  font-family: var(--jari-cmdl-font-family) !important;
+  font-size: var(--jari-cmdl-font-size) !important;
+  line-height: var(--jari-cmdl-line-height) !important;
   color: #cdcdcd;
   background: #1c1c24;
   border: none !important;
@@ -101,8 +101,8 @@
 .jari-prompt-header {
   background: #252530;
   color: #cdcdcd;
-  font-size: var(--jari-header-font-size);
-  font-weight: var(--jari-header-font-weight);
+  font-size: var(--jari-header-font-size) !important;
+  font-weight: var(--jari-header-font-weight) !important;
   border-bottom: 1px solid #333738;
   padding: 0 0.5ex;
   white-space: nowrap;
@@ -112,8 +112,8 @@
 .jari-help-title {
   background: var(--jari-header-bg);
   color: var(--jari-fg);
-  font-size: var(--jari-header-font-size);
-  font-weight: var(--jari-header-font-weight);
+  font-size: var(--jari-header-font-size) !important;
+  font-weight: var(--jari-header-font-weight) !important;
   border-bottom: var(--jari-header-border-bottom);
   padding: 0 0.5ex;
   white-space: nowrap;
@@ -131,7 +131,7 @@
 
 .jari-prompt-list li {
   height: var(--jari-cmplt-option-height);
-  line-height: var(--jari-cmplt-option-height);
+  line-height: var(--jari-cmplt-option-height) !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -160,14 +160,14 @@
 .jari-prompt-list li .jari-match,
 .jari-prompt-list li.selected .jari-match {
   color: #e0a363;
-  font-weight: bold;
+  font-weight: bold !important;
 }
 
 .jari-help {
   background: var(--jari-cmplt-bg);
   color: var(--jari-cmplt-fg);
-  font-size: var(--jari-cmplt-font-size);
-  font-family: var(--jari-cmplt-font-family);
+  font-size: var(--jari-cmplt-font-size) !important;
+  font-family: var(--jari-cmplt-font-family) !important;
   border-top: var(--jari-cmplt-border-top);
   outline: none;
 }
@@ -201,8 +201,8 @@
 
 .jari-help tr.jari-help-cat-header th {
   background: var(--jari-header-bg);
-  font-size: var(--jari-header-font-size);
-  font-weight: var(--jari-header-font-weight);
+  font-size: var(--jari-header-font-size) !important;
+  font-weight: var(--jari-header-font-weight) !important;
   color: var(--jari-fg);
   text-align: left;
   border-bottom: var(--jari-cmplt-border-top);
@@ -215,12 +215,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   height: var(--jari-cmplt-option-height);
-  line-height: var(--jari-cmplt-option-height);
+  line-height: var(--jari-cmplt-option-height) !important;
 }
 
 .jari-help td.jari-help-key {
   width: 40%;
-  font-weight: bold;
+  font-weight: bold !important;
   color: var(--jari-fg);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
 }
@@ -235,8 +235,8 @@
 }
 
 .jari-help-footer button {
-  font-family: inherit;
-  font-size: inherit;
+  font-family: inherit !important;
+  font-size: inherit !important;
   color: var(--jari-cmplt-fg);
   background: var(--jari-cmplt-bg);
   border: 1px solid var(--jari-cmplt-fg);
@@ -267,8 +267,8 @@
   order: 0;
   box-sizing: border-box;
   max-width: 60vw;
-  font-family: var(--jari-status-font-family);
-  font-size: var(--jari-status-font-size);
+  font-family: var(--jari-status-font-family) !important;
+  font-size: var(--jari-status-font-size) !important;
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: var(--jari-status-border);
@@ -278,8 +278,8 @@
 
 .jari-pill {
   order: 1;
-  font-family: var(--jari-status-font-family);
-  font-size: var(--jari-status-font-size);
+  font-family: var(--jari-status-font-family) !important;
+  font-size: var(--jari-status-font-size) !important;
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: var(--jari-status-border);
@@ -289,9 +289,9 @@
 
 .jari-showcmd {
   order: 2;
-  font-family: var(--jari-cmdl-font-family);
-  font-size: var(--jari-cmdl-font-size);
-  line-height: 1.4;
+  font-family: var(--jari-cmdl-font-family) !important;
+  font-size: var(--jari-cmdl-font-size) !important;
+  line-height: 1.4 !important;
   background: var(--jari-cmdl-bg);
   color: var(--jari-cmdl-fg);
   border: var(--jari-status-border);
@@ -309,8 +309,8 @@
   max-height: 50vh;
   overflow: auto;
   box-sizing: border-box;
-  font-family: var(--jari-status-font-family);
-  font-size: var(--jari-status-font-size);
+  font-family: var(--jari-status-font-family) !important;
+  font-size: var(--jari-status-font-size) !important;
   background: var(--jari-status-bg);
   color: var(--jari-status-fg);
   border: var(--jari-status-border);
@@ -320,7 +320,7 @@
 }
 
 .jari-clue-title {
-  font-weight: bold;
+  font-weight: bold !important;
   padding: 0 1ex 0.5ex;
   border-bottom: var(--jari-status-border);
   margin-bottom: 0.5ex;
@@ -338,7 +338,7 @@
   display: flex;
   gap: 1ex;
   padding: 0 1ex;
-  line-height: 1.5;
+  line-height: 1.5 !important;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -346,7 +346,7 @@
 .jari-clue-key {
   flex: 0 0 auto;
   min-width: 3ex;
-  font-weight: bold;
+  font-weight: bold !important;
 }
 
 .jari-clue-label {
@@ -371,11 +371,11 @@
 }
 
 .jari-scroll-highlight-label {
-  font-family: var(--jari-font-family);
-  font-size: var(--jari-font-size);
-  font-weight: bold;
+  font-family: var(--jari-font-family) !important;
+  font-size: var(--jari-font-size) !important;
+  font-weight: bold !important;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.1em !important;
   color: #e0a363;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   padding: 0.25ex 0.5ex;
@@ -429,8 +429,8 @@
 .jari-find {
   background: #1c1c24 !important;
   color: #cdcdcd !important;
-  font-size: var(--jari-cmplt-font-size);
-  font-family: var(--jari-cmplt-font-family);
+  font-size: var(--jari-cmplt-font-size) !important;
+  font-family: var(--jari-cmplt-font-family) !important;
   outline: none !important;
   border-top: 1px solid #333738;
 }
@@ -440,12 +440,12 @@
   align-items: center;
   gap: 0.5ex;
   padding: 0.25ex 0.5ex;
-  line-height: var(--jari-cmdl-line-height);
+  line-height: var(--jari-cmdl-line-height) !important;
 }
 
 .jari-find-label {
   color: #e0a363;
-  font-weight: bold;
+  font-weight: bold !important;
   flex: 0 0 auto;
 }
 
@@ -453,9 +453,9 @@
   flex: 1 1 auto;
   min-width: 0;
   box-sizing: border-box;
-  font-family: var(--jari-cmdl-font-family);
-  font-size: var(--jari-cmdl-font-size);
-  line-height: var(--jari-cmdl-line-height);
+  font-family: var(--jari-cmdl-font-family) !important;
+  font-size: var(--jari-cmdl-font-size) !important;
+  line-height: var(--jari-cmdl-line-height) !important;
   color: #cdcdcd;
   background: #1c1c24;
   border: none !important;
@@ -475,7 +475,7 @@
 
 .jari-find-status {
   flex: 0 0 auto;
-  font-size: var(--jari-cmdl-font-size);
+  font-size: var(--jari-cmdl-font-size) !important;
   color: #878787;
   white-space: nowrap;
 }

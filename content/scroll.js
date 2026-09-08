@@ -374,7 +374,18 @@ function showHighlight() {
   }, HIGHLIGHT_MS);
 }
 
-export const Scroll = { getTarget, cycle, showHighlight };
+function reset() {
+  if (!isTopFrame()) {
+    forwardCycleToTop();
+  }
+  target = null;
+  autoPicked = false;
+  resolved = false;
+  releaseFrameFocus();
+  showHighlight();
+}
+
+export const Scroll = { getTarget, cycle, reset, showHighlight };
 
 function handleCycleMessage(event) {
   if (!isTopFrame()) return;

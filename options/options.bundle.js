@@ -68,6 +68,7 @@
     g$: "goToLastTab",
     ";e": "openSettings",
     ";x": "openExtensions",
+    ";w": "resetScrollTarget",
     yy: "copyUrl",
     yf: "hintYank"
   };
@@ -243,6 +244,7 @@
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
     cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
+    resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
     zoomIn: { category: "zoom", label: "Zoom in" },
     zoomOut: { category: "zoom", label: "Zoom out" },
     newTab: { category: "tabs", label: "New tab" },

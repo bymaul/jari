@@ -69,6 +69,7 @@
     g$: "goToLastTab",
     ";e": "openSettings",
     ";x": "openExtensions",
+    ";w": "resetScrollTarget",
     yy: "copyUrl",
     yf: "hintYank"
   };
@@ -129,21 +130,21 @@
     return false;
   }
   function getPrefixEntries(keymap, prefix2) {
-    const entries = [];
-    if (!prefix2 || typeof prefix2 !== "string") return entries;
-    if (prefix2.includes("+")) return entries;
+    const entries2 = [];
+    if (!prefix2 || typeof prefix2 !== "string") return entries2;
+    if (prefix2.includes("+")) return entries2;
     for (const [combo, command] of Object.entries(keymap || {})) {
       if (combo.includes("+")) continue;
       if (!combo.startsWith(prefix2)) continue;
       if (combo === prefix2) continue;
       const suffix = combo.slice(prefix2.length);
       if (!suffix) continue;
-      entries.push({ suffix, full: combo, command });
+      entries2.push({ suffix, full: combo, command });
     }
-    entries.sort(
+    entries2.sort(
       (a, b) => a.suffix < b.suffix ? -1 : a.suffix > b.suffix ? 1 : 0
     );
-    return entries;
+    return entries2;
   }
   function canonicalKey(event) {
     const parts = [];
@@ -525,13 +526,13 @@
       const col = document.createElement("div");
       col.className = columnClass;
       for (const cat of cats) {
-        const entries = byCategory.get(cat.id);
-        if (!entries || entries.length === 0) continue;
+        const entries2 = byCategory.get(cat.id);
+        if (!entries2 || entries2.length === 0) continue;
         col.appendChild(
           buildCategoryTable(
             cat,
             headerClass,
-            (tbody) => renderEntries(tbody, entries)
+            (tbody) => renderEntries(tbody, entries2)
           )
         );
       }
@@ -738,10 +739,10 @@
         return false;
       }
     },
-    suggestionTerm(query2) {
-      const idx = query2.search(/\s/);
-      if (idx === -1) return query2;
-      return Url.looksLikeUrl(query2.slice(0, idx)) ? query2.slice(idx).trim() : query2;
+    suggestionTerm(query3) {
+      const idx = query3.search(/\s/);
+      if (idx === -1) return query3;
+      return Url.looksLikeUrl(query3.slice(0, idx)) ? query3.slice(idx).trim() : query3;
     }
   };
 
@@ -1300,7 +1301,17 @@
       }
     }, HIGHLIGHT_MS);
   }
-  var Scroll = { getTarget, cycle, showHighlight };
+  function reset() {
+    if (!isTopFrame()) {
+      forwardCycleToTop();
+    }
+    target = null;
+    autoPicked = false;
+    resolved = false;
+    releaseFrameFocus();
+    showHighlight();
+  }
+  var Scroll = { getTarget, cycle, reset, showHighlight };
   function handleCycleMessage(event) {
     if (!isTopFrame()) return;
     const data = event && event.data;
@@ -1328,8 +1339,8 @@
       return String(s).toLowerCase();
     }
   }
-  function parseQuery(query2) {
-    const normalized = normalizeForMatch(query2);
+  function parseQuery(query3) {
+    const normalized = normalizeForMatch(query3);
     const phrases = [];
     const withoutPhrases = normalized.replace(/"([^"]+)"/g, (_, p) => {
       const t = p.trim();
@@ -1416,8 +1427,8 @@
     }
     return best;
   }
-  function matchPreamble(query2, text) {
-    const { include, exclude, phrases } = parseQuery(query2);
+  function matchPreamble(query3, text) {
+    const { include, exclude, phrases } = parseQuery(query3);
     const t = normalizeForMatch(text);
     if (exclude.some((ex) => t.includes(ex))) return null;
     return { include, phrases, t };
@@ -1433,8 +1444,8 @@
     }
     return true;
   }
-  function fuzzyMatch(query2, text) {
-    const pre = matchPreamble(query2, text);
+  function fuzzyMatch(query3, text) {
+    const pre = matchPreamble(query3, text);
     if (!pre) return null;
     const { include, phrases, t } = pre;
     if (include.length === 0 && phrases.length === 0) return null;
@@ -1457,8 +1468,8 @@
     indices.sort((a, b) => a - b);
     return { score: total, indices };
   }
-  function fuzzyIndices(query2, text) {
-    const pre = matchPreamble(query2, text);
+  function fuzzyIndices(query3, text) {
+    const pre = matchPreamble(query3, text);
     if (!pre) return [];
     const { include, phrases, t } = pre;
     const indices = [];
@@ -1467,16 +1478,16 @@
     for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
   }
-  function substringMatch(query2, text) {
-    const pre = matchPreamble(query2, text);
+  function substringMatch(query3, text) {
+    const pre = matchPreamble(query3, text);
     if (!pre) return false;
     const { include, phrases, t } = pre;
     if (include.length === 0 && phrases.length === 0) return false;
     if (phrases.some((ph) => !t.includes(ph))) return false;
     return include.every((term) => t.includes(term));
   }
-  function substringIndices(query2, text) {
-    const pre = matchPreamble(query2, text);
+  function substringIndices(query3, text) {
+    const pre = matchPreamble(query3, text);
     if (!pre) return [];
     const { include, phrases, t } = pre;
     if (include.length === 0 && phrases.length === 0) return [];
@@ -1492,16 +1503,16 @@
     }
     return [...new Set(indices)].sort((a, b) => a - b);
   }
-  function fieldBoost(query2, field, base, weight) {
+  function fieldBoost(query3, field, base, weight) {
     if (!field) return 0;
-    const m = fuzzyMatch(query2, field);
+    const m = fuzzyMatch(query3, field);
     return m ? base + m.score * weight : 0;
   }
-  function titleBoost(query2, item) {
-    return fieldBoost(query2, item.title, 8, 0.15);
+  function titleBoost(query3, item) {
+    return fieldBoost(query3, item.title, 8, 0.15);
   }
-  function hostBoost(query2, item) {
-    return fieldBoost(query2, extractHost(item.url || ""), 6, 0.1);
+  function hostBoost(query3, item) {
+    return fieldBoost(query3, extractHost(item.url || ""), 6, 0.1);
   }
   function recencyScore(item) {
     const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
@@ -1520,8 +1531,8 @@
     return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
   }
   var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
-  function rankMatches(query2, list, fuzzy = true) {
-    const q = String(query2).trim();
+  function rankMatches(query3, list, fuzzy = true) {
+    const q = String(query3).trim();
     if (!q) return fuzzy ? [] : [...list];
     if (!fuzzy) {
       return list.filter(
@@ -1574,8 +1585,8 @@
     wiki: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
     chat: "https://chatgpt.com/?q=%s"
   };
-  function parseKeyword(query2) {
-    const m = query2.trim().match(/^(\w+)\s+(.*\S)/);
+  function parseKeyword(query3) {
+    const m = query3.trim().match(/^(\w+)\s+(.*\S)/);
     if (!m) return null;
     const kw = m[1].toLowerCase();
     const tmpl = SEARCH_ENGINES[kw];
@@ -1728,8 +1739,8 @@
       renderList();
     });
   }
-  function rank(list, query2) {
-    return rankMatches(query2, list, settings.isFuzzyMatching());
+  function rank(list, query3) {
+    return rankMatches(query3, list, settings.isFuzzyMatching());
   }
   function rankTabs(q, list) {
     return rank(list, q).map((x) => x.item);
@@ -2006,6 +2017,7 @@
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
     cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
+    resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
     zoomIn: { category: "zoom", label: "Zoom in" },
     zoomOut: { category: "zoom", label: "Zoom out" },
     newTab: { category: "tabs", label: "New tab" },
@@ -2059,7 +2071,14 @@
   var active2 = false;
   var overlay2 = null;
   var listEl2 = null;
+  var footerBar = null;
+  var entries = [];
+  var searching = false;
+  var query2 = "";
+  var matches = [];
+  var currentIdx = 0;
   var gPending = false;
+  var FOOTER_DEFAULT = "j/k scroll | / search | esc close";
   function isActive2() {
     return active2;
   }
@@ -2077,6 +2096,11 @@
     title.className = "jari-help-title";
     title.textContent = "Jari keybindings";
     overlay2.appendChild(title);
+    entries = [];
+    searching = false;
+    query2 = "";
+    matches = [];
+    currentIdx = 0;
     const byCommand = /* @__PURE__ */ new Map();
     for (const [key, commandName] of Object.entries(settings.getKeymap())) {
       if (!byCommand.has(commandName)) byCommand.set(commandName, []);
@@ -2088,7 +2112,7 @@
       if (!keys) continue;
       const id = meta.category || "other";
       if (!byCategory.has(id)) byCategory.set(id, []);
-      byCategory.get(id).push({ keys, label: meta.label });
+      byCategory.get(id).push({ keys, label: meta.label, commandName });
     }
     listEl2 = document.createElement("div");
     listEl2.className = "jari-help-list";
@@ -2098,8 +2122,8 @@
         gridClass: "jari-help-columns",
         columnClass: "jari-help-column",
         headerClass: "jari-help-cat-header",
-        renderEntries(tbody, entries) {
-          for (const { keys, label } of entries) {
+        renderEntries(tbody, rowEntries) {
+          for (const { keys, label, commandName } of rowEntries) {
             const tr = document.createElement("tr");
             const keyTd = document.createElement("td");
             keyTd.className = "jari-help-key";
@@ -2110,6 +2134,12 @@
             tr.appendChild(keyTd);
             tr.appendChild(labelTd);
             tbody.appendChild(tr);
+            entries.push({
+              tr,
+              keyTd,
+              labelTd,
+              haystack: `${keys.join(" ")} ${label} ${commandName}`.toLowerCase()
+            });
           }
         }
       })
@@ -2117,18 +2147,167 @@
     overlay2.appendChild(listEl2);
     const footer = document.createElement("div");
     footer.className = "jari-help-footer";
-    const footerBar = document.createElement("span");
-    footerBar.textContent = "j/k scroll | 0-9 count | esc close";
+    footerBar = document.createElement("span");
+    footerBar.textContent = FOOTER_DEFAULT;
     footer.appendChild(footerBar);
     overlay2.appendChild(footer);
     document.body.appendChild(overlay2);
   }
+  function updateFooter() {
+    if (!footerBar) return;
+    if (searching) {
+      footerBar.textContent = matches.length === 0 ? `/${query2} \u2014 No match` : `/${query2} ${currentIdx + 1}/${matches.length} (Enter done)`;
+    } else if (matches.length > 0) {
+      footerBar.textContent = `${currentIdx + 1}/${matches.length} (n/N jump) | / search | esc close`;
+    } else {
+      footerBar.textContent = FOOTER_DEFAULT;
+    }
+  }
+  function saveOriginal(td) {
+    if (td._jariOrig === void 0) td._jariOrig = td.textContent;
+    return td._jariOrig;
+  }
+  function restoreCell(td) {
+    if (td._jariOrig !== void 0) {
+      try {
+        td.textContent = td._jariOrig;
+      } catch {
+      }
+      td._jariOrig = void 0;
+    }
+  }
+  function clearSearchHighlights() {
+    for (const entry of entries) {
+      restoreCell(entry.keyTd);
+      restoreCell(entry.labelTd);
+    }
+    matches = [];
+    currentIdx = 0;
+  }
+  function highlightCell(td, q) {
+    const orig = saveOriginal(td);
+    const lower = orig.toLowerCase();
+    const parts = [];
+    let pos = 0;
+    let found = false;
+    while (true) {
+      const idx = lower.indexOf(q, pos);
+      if (idx === -1) break;
+      found = true;
+      parts.push({ text: orig.slice(pos, idx), match: false });
+      parts.push({ text: orig.slice(idx, idx + q.length), match: true });
+      pos = idx + q.length;
+    }
+    if (!found) return [];
+    parts.push({ text: orig.slice(pos), match: false });
+    try {
+      td.textContent = "";
+    } catch {
+      return [];
+    }
+    const spans = [];
+    for (const part of parts) {
+      if (!part.text) continue;
+      if (part.match) {
+        const span = document.createElement("span");
+        span.className = "jari-find-hit";
+        span.textContent = part.text;
+        td.appendChild(span);
+        spans.push(span);
+      } else {
+        td.appendChild(document.createTextNode(part.text));
+      }
+    }
+    return spans;
+  }
+  function markCurrent() {
+    for (const m of matches) m.span.className = "jari-find-hit";
+    if (matches.length > 0) matches[currentIdx].span.className = "jari-find-current";
+  }
+  function scrollMatchIntoView() {
+    if (matches.length === 0) return;
+    try {
+      matches[currentIdx].entry.tr.scrollIntoView({ block: "nearest" });
+    } catch {
+    }
+  }
+  function applySearch() {
+    clearSearchHighlights();
+    const q = query2.toLowerCase();
+    if (q) {
+      for (const entry of entries) {
+        for (const td of [entry.keyTd, entry.labelTd]) {
+          try {
+            for (const span of highlightCell(td, q)) {
+              matches.push({ entry, span });
+            }
+          } catch {
+          }
+        }
+      }
+    }
+    currentIdx = 0;
+    markCurrent();
+    updateFooter();
+    scrollMatchIntoView();
+  }
+  function stepMatch(delta) {
+    if (matches.length === 0) return;
+    const len = matches.length;
+    currentIdx = ((currentIdx + delta) % len + len) % len;
+    markCurrent();
+    updateFooter();
+    scrollMatchIntoView();
+  }
   function onKeyDown2(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (event.key === "Escape") {
-      close2();
-      return;
+    const key = event.key;
+    const hasMod = event.ctrlKey || event.altKey || event.metaKey;
+    if (searching) {
+      if (key === "Escape") {
+        searching = false;
+        query2 = "";
+        clearSearchHighlights();
+        updateFooter();
+        return;
+      }
+      if (key === "Enter") {
+        searching = false;
+        updateFooter();
+        return;
+      }
+      if (key === "Backspace") {
+        query2 = query2.slice(0, -1);
+        applySearch();
+        return;
+      }
+      if (key.length === 1 && !hasMod) {
+        query2 += key;
+        applySearch();
+        return;
+      }
+    } else {
+      if (key === "Escape") {
+        if (matches.length > 0) {
+          clearSearchHighlights();
+          updateFooter();
+          return;
+        }
+        close2();
+        return;
+      }
+      if (key === "/" && !hasMod) {
+        searching = true;
+        query2 = "";
+        clearSearchHighlights();
+        updateFooter();
+        return;
+      }
+      if ((key === "n" || key === "N") && !hasMod && matches.length > 0) {
+        stepMatch(key === "n" ? 1 : -1);
+        return;
+      }
     }
     if (event.key === "g") {
       gPending = true;
@@ -2161,11 +2340,21 @@
     }
   }
   function close2() {
+    try {
+      clearSearchHighlights();
+    } catch {
+    }
     if (overlay2) {
       overlay2.remove();
       overlay2 = null;
     }
     listEl2 = null;
+    footerBar = null;
+    entries = [];
+    searching = false;
+    query2 = "";
+    matches = [];
+    currentIdx = 0;
     gPending = false;
     active2 = false;
   }
@@ -2283,11 +2472,11 @@
       position: absolute;
       display: inline-block;
       box-sizing: border-box;
-      font-family: monospace;
-      font-size: 10px;
-      font-weight: bold;
-      line-height: 1;
-      letter-spacing: 0.02em;
+      font-family: monospace !important;
+      font-size: 10px !important;
+      font-weight: bold !important;
+      line-height: 1 !important;
+      letter-spacing: 0.02em !important;
       padding: 1px 3px;
       border: 1px solid ${t.border};
       border-radius: 3px;
@@ -4930,8 +5119,8 @@
   var inputEl2 = null;
   var statusEl = null;
   var restoreFocus2 = null;
-  var matches = [];
-  var currentIdx = 0;
+  var matches2 = [];
+  var currentIdx2 = 0;
   var lastQuery = "";
   var pendingQuery = "";
   var useHighlights = false;
@@ -4940,7 +5129,7 @@
   var findObserver = null;
   var findObserverTimer = null;
   function hasHighlights() {
-    return matches.length > 0;
+    return matches2.length > 0;
   }
   function isActive5() {
     return active5;
@@ -4986,12 +5175,12 @@
       if (!q) return;
       try {
         const rebuilt = buildMatches(q);
-        if (rebuilt.length !== matches.length || rebuilt.some((r, i) => r.startContainer !== matches[i]?.startContainer)) {
-          matches = rebuilt;
-          currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
+        if (rebuilt.length !== matches2.length || rebuilt.some((r, i) => r.startContainer !== matches2[i]?.startContainer)) {
+          matches2 = rebuilt;
+          currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
           applyHighlights();
           updateStatus();
-          if (matches.length > 0) scrollToCurrent();
+          if (matches2.length > 0) scrollToCurrent();
         }
       } catch {
       }
@@ -5103,10 +5292,10 @@
     }
     return out;
   }
-  function buildMatches(query2) {
-    if (!query2) return [];
-    const caseSensitive = hasUpperCase(query2);
-    const needle = caseSensitive ? query2 : query2.toLowerCase();
+  function buildMatches(query3) {
+    if (!query3) return [];
+    const caseSensitive = hasUpperCase(query3);
+    const needle = caseSensitive ? query3 : query3.toLowerCase();
     const nodes = collectTextNodes();
     const out = [];
     for (const node of nodes) {
@@ -5119,11 +5308,11 @@
         try {
           const range = document.createRange();
           range.setStart(node, idx);
-          range.setEnd(node, idx + query2.length);
+          range.setEnd(node, idx + query3.length);
           out.push(range);
         } catch {
         }
-        pos = idx + query2.length;
+        pos = idx + query3.length;
         if (out.length >= MAX_MATCHES) break;
       }
       if (out.length >= MAX_MATCHES) break;
@@ -5137,15 +5326,15 @@
     unwrapSpans(fallbackSpans);
   }
   function clearHighlights() {
-    matches = [];
-    currentIdx = 0;
+    matches2 = [];
+    currentIdx2 = 0;
     clearHighlightApi();
     clearFallback();
     updateStatus();
   }
   function getCurrentLinkElement() {
-    if (matches.length === 0) return null;
-    const r = matches[currentIdx];
+    if (matches2.length === 0) return null;
+    const r = matches2[currentIdx2];
     if (!r || !r.startContainer) return null;
     return getLinkAncestor(r.startContainer.parentElement);
   }
@@ -5161,26 +5350,26 @@
   function applyHighlights() {
     clearHighlightApi();
     clearFallback();
-    if (matches.length === 0) return;
-    const valid = matches.filter((r) => {
+    if (matches2.length === 0) return;
+    const valid = matches2.filter((r) => {
       try {
         return r.startContainer && r.startContainer.isConnected !== false && r.endContainer && r.endContainer.isConnected !== false;
       } catch {
         return false;
       }
     });
-    if (valid.length !== matches.length) {
-      matches = valid;
-      if (currentIdx >= matches.length) currentIdx = Math.max(0, matches.length - 1);
-      if (matches.length === 0) {
+    if (valid.length !== matches2.length) {
+      matches2 = valid;
+      if (currentIdx2 >= matches2.length) currentIdx2 = Math.max(0, matches2.length - 1);
+      if (matches2.length === 0) {
         updateStatus();
         return;
       }
     }
-    const cur = matches[currentIdx];
+    const cur = matches2[currentIdx2];
     if (useHighlights) {
       try {
-        const others = valid.filter((_, i) => i !== currentIdx);
+        const others = valid.filter((_, i) => i !== currentIdx2);
         if (others.length > 0) {
           CSS.highlights.set("jari-find", new Highlight(...others));
         } else {
@@ -5216,7 +5405,7 @@
         try {
           if (!range.startContainer.isConnected) continue;
           const span = document.createElement("span");
-          span.className = idx === currentIdx ? "jari-find-current" : "jari-find-hit";
+          span.className = idx === currentIdx2 ? "jari-find-current" : "jari-find-hit";
           range.surroundContents(span);
           fallbackSpans.push(span);
         } catch {
@@ -5225,8 +5414,8 @@
     }
   }
   function scrollToCurrent() {
-    if (matches.length === 0) return;
-    const r = matches[currentIdx];
+    if (matches2.length === 0) return;
+    const r = matches2[currentIdx2];
     if (!r) return;
     try {
       if (r.startContainer && r.startContainer.isConnected === false) return;
@@ -5257,7 +5446,7 @@
   }
   function updateStatus() {
     if (!statusEl) return;
-    if (!pendingQuery && matches.length === 0 && !lastQuery) {
+    if (!pendingQuery && matches2.length === 0 && !lastQuery) {
       statusEl.textContent = "";
       statusEl.classList.remove("jari-find-no-match");
       return;
@@ -5267,11 +5456,11 @@
       statusEl.textContent = "";
       return;
     }
-    if (matches.length === 0) {
+    if (matches2.length === 0) {
       statusEl.textContent = `No match for "${q}"`;
       statusEl.classList.add("jari-find-no-match");
     } else {
-      statusEl.textContent = `${currentIdx + 1}/${matches.length}`;
+      statusEl.textContent = `${currentIdx2 + 1}/${matches2.length}`;
       statusEl.classList.remove("jari-find-no-match");
     }
   }
@@ -5301,8 +5490,8 @@
       const q = pendingQuery.trim();
       clearTimeout(inputDebounce);
       if (!q) {
-        matches = [];
-        currentIdx = 0;
+        matches2 = [];
+        currentIdx2 = 0;
         clearHighlightApi();
         clearFallback();
         updateStatus();
@@ -5312,11 +5501,11 @@
         try {
           const latest = inputEl2 && inputEl2.value.trim() || q;
           if (latest !== q) return;
-          matches = buildMatches(latest);
-          currentIdx = 0;
-          if (matches.length > 0) lastQuery = latest;
+          matches2 = buildMatches(latest);
+          currentIdx2 = 0;
+          if (matches2.length > 0) lastQuery = latest;
           applyHighlights();
-          if (matches.length > 0) scrollToCurrent();
+          if (matches2.length > 0) scrollToCurrent();
           updateStatus();
         } catch {
         }
@@ -5374,9 +5563,9 @@
   }
   function next(count = 1, reverse = false) {
     const c = Math.max(1, Math.floor(count) || 1);
-    if (matches.length > 0) {
+    if (matches2.length > 0) {
       try {
-        const stale = matches.some((r) => !r.startContainer || r.startContainer.isConnected === false);
+        const stale = matches2.some((r) => !r.startContainer || r.startContainer.isConnected === false);
         if (stale) {
           const q = (lastQuery || pendingQuery || "").trim();
           if (q) {
@@ -5387,8 +5576,8 @@
               ui.toast(`No match for "${q}"`);
               return;
             }
-            matches = rebuilt;
-            if (currentIdx >= matches.length) currentIdx = 0;
+            matches2 = rebuilt;
+            if (currentIdx2 >= matches2.length) currentIdx2 = 0;
             useHighlights = detectHighlightSupport();
             applyHighlights();
             updateStatus();
@@ -5400,7 +5589,7 @@
       } catch {
       }
     }
-    if (matches.length === 0) {
+    if (matches2.length === 0) {
       const q = pendingQuery && pendingQuery.trim() || lastQuery;
       if (!q) {
         ui.toast("No search");
@@ -5408,9 +5597,9 @@
       }
       pendingQuery = q;
       lastQuery = q;
-      matches = buildMatches(q);
-      currentIdx = 0;
-      if (matches.length === 0) {
+      matches2 = buildMatches(q);
+      currentIdx2 = 0;
+      if (matches2.length === 0) {
         ui.toast(`No match for "${q}"`);
         clearHighlightApi();
         clearFallback();
@@ -5422,22 +5611,22 @@
       updateStatus();
       if (c > 1) {
         const delta2 = reverse ? -c : c;
-        const len2 = matches.length;
-        currentIdx = ((currentIdx + (delta2 > 0 ? delta2 - 1 : delta2)) % len2 + len2) % len2;
+        const len2 = matches2.length;
+        currentIdx2 = ((currentIdx2 + (delta2 > 0 ? delta2 - 1 : delta2)) % len2 + len2) % len2;
         applyHighlights();
         updateStatus();
       }
       scrollToCurrent();
-      ui.toast(`${currentIdx + 1}/${matches.length}`);
+      ui.toast(`${currentIdx2 + 1}/${matches2.length}`);
       return;
     }
-    const len = matches.length;
+    const len = matches2.length;
     const delta = reverse ? -c : c;
-    currentIdx = ((currentIdx + delta) % len + len) % len;
+    currentIdx2 = ((currentIdx2 + delta) % len + len) % len;
     applyHighlights();
     scrollToCurrent();
     updateStatus();
-    ui.toast(`${currentIdx + 1}/${len}`);
+    ui.toast(`${currentIdx2 + 1}/${len}`);
   }
   function onKeyDown5(event) {
     if (!active5) return false;
@@ -5708,6 +5897,7 @@ ${location.href}`;
     scrollHalfPageDown: { ...COMMAND_CATALOG.scrollHalfPageDown, run: scrollPageBy(HALF_RATIO, 1) },
     scrollHalfPageUp: { ...COMMAND_CATALOG.scrollHalfPageUp, run: scrollPageBy(HALF_RATIO, -1) },
     cycleScrollFrame: { ...COMMAND_CATALOG.cycleScrollFrame, run: () => Scroll.cycle() },
+    resetScrollTarget: { ...COMMAND_CATALOG.resetScrollTarget, run: () => Scroll.reset() },
     zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
     newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
@@ -5804,8 +5994,8 @@ ${location.href}`;
   }
   function render4(prefix2, countStr) {
     const keymap = settings.getKeymap();
-    const entries = getPrefixEntries(keymap, prefix2);
-    if (entries.length === 0) return;
+    const entries2 = getPrefixEntries(keymap, prefix2);
+    if (entries2.length === 0) return;
     if (clueEl) hide();
     try {
       if (document.fullscreenElement) return;
@@ -5813,11 +6003,11 @@ ${location.href}`;
       root.className = "jari-clue";
       const title = document.createElement("div");
       title.className = "jari-clue-title";
-      title.textContent = `${countStr || ""}${prefix2} \u2014 ${entries.length} bindings`;
+      title.textContent = `${countStr || ""}${prefix2} \u2014 ${entries2.length} bindings`;
       root.appendChild(title);
       const list = document.createElement("div");
       list.className = "jari-clue-list";
-      for (const { suffix, command } of entries) {
+      for (const { suffix, command } of entries2) {
         const row = document.createElement("div");
         row.className = "jari-clue-row";
         const key = document.createElement("span");
@@ -5840,8 +6030,8 @@ ${location.href}`;
   function schedule(prefix2, countStr = "") {
     hide();
     if (!settings.isClueEnabled()) return;
-    const entries = getPrefixEntries(settings.getKeymap(), prefix2);
-    if (entries.length === 0) return;
+    const entries2 = getPrefixEntries(settings.getKeymap(), prefix2);
+    if (entries2.length === 0) return;
     const delay = settings.getClueDelayMs();
     if (!Number.isFinite(delay) || delay <= 0) {
       render4(prefix2, countStr);

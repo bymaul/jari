@@ -4,41 +4,40 @@
   <h1>Jari</h1>
 </div>
 
-**Jari** _/ja·ri/_ - simple keyboard-driven navigation for modern browsers.
-Scroll, manage tabs and history, follow links, find in page, and select text
+**Jari** _/ja·ri/_ - keyboard-driven browsing for modern browsers.
+Scroll, tabs, history, link hints, find in page, and text selection
 without leaving the home row.
 
-Works on Chrome, Edge, and Firefox (Manifest V3). No data collection -
+Chrome, Edge, and Firefox (Manifest V3). No data collection -
 see [PRIVACY.md](PRIVACY.md).
 
 ## Keys
 
-Most commands take a repeat count (`3j`, `2x`). `0-9` are reserved for it.
+Commands take a repeat count (`3j`, `2x`); `0-9` are reserved for it.
+Bindings chain into sequences of any length.
 
-- Scroll: `j`/`k`/`h`/`l`, `gg`/`G` top/bottom, `w` cycle scroll area
-- Zoom: `+`/`-`
-- Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
-  `J`/`K` prev/next, `g0`/`g$` first/last, `<<`/`>>` move, `W` move to window,
-  `gp`/`gP` open clipboard here/background
-- History: `H`/`L` back/forward
-- Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
-  `yy` copy URL, `Y` copy title + URL
-- Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input,
-  `yf` copy link URL
-- Find: `/` find, `n`/`N` next/prev (smart case, `Esc` clears, `Enter` follows)
-- Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,
-  `G`/`gg`, `f`/`F`/`t`/`T` + char, `o` swap; `y` yank)
-- Modes: `I` ignore, `p` passthrough, `ctrl+alt+v` disable on site
-- Help: `?` cheatsheet, `;e` settings, `;x` extensions page
+- Scroll `j`/`k`/`h`/`l`, top/bottom `gg`/`G`, scroll areas `w`/`;w`
+- Zoom `+`/`-`
+- Tabs `t` URL/search, `T` incognito, `x`/`X` close/reopen, `J`/`K` prev/next,
+  `g0`/`g$` first/last, `<<`/`>>` move, `W` to window, `gp`/`gP` from clipboard
+- History `H`/`L`, reload `r`/`R`, `gu`/`gU` parent/root, `ge` edit URL,
+  `yy`/`Y` copy URL / title + URL
+- Hints `f` click, `F` new tab, `gf` background, `i` input, `yf` yank link
+- Find `/`, next/prev `n`/`N` (smartcase; toggles `Alt+R/W/C`, history `Up`/`Down`)
+- Visual `v`/`V` (`h`/`j`/`k`/`l` `w`/`b`/`e` `0`/`^`/`$` `G`/`gg` `f`/`F`/`t`/`T` `o` `y`)
+- Modes `I` ignore, `p` passthrough, `ctrl+alt+v` per-site disable
+- Help `?` cheatsheet, `;e` settings, `;x` extensions page
 
-Unbound by default (bind them in settings): scrollPageDown/Up,
-scrollHalfPageDown/Up, newTab, duplicateTab, togglePin, toggleMute.
+`t ` alone lists open tabs; `t ` + text searches them.
 
-## Settings
+Unbound by default (bind in settings): scrollPageDown/Up, scrollHalfPageDown/Up,
+newTab, duplicateTab, togglePin, toggleMute, hintHover, hintYankText, hintOpenCurrent.
 
-Open with `;e`. Everything above is rebindable: each command holds several
-bindings, and any key can start a two-key prefix (`Enter` keeps it single).
-Overlapping bindings are allowed but flagged - the single key fires first.
+## Settings (`;e`)
+
+Everything is rebindable with several bindings per command. Hints offers
+themes, label size, and an extra clickable selector; disabled sites accept
+`*.example.com` wildcards.
 
 ## Install
 
@@ -88,13 +87,12 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 ## Support & contributing
 
 - Bug reports and feature requests:
-  [GitHub Issues](https://github.com/bymaul/jari/issues). Please include your
-  browser + version, the Jari version, the page URL (if public), and the keys
-  you pressed.
-- Security issues: please open a private
+  [GitHub Issues](https://github.com/bymaul/jari/issues). Include browser +
+  version, Jari version, page URL (if public), and keys pressed.
+- Security issues: open a private
   [security advisory](https://github.com/bymaul/jari/security/advisories/new)
   instead of a public issue.
-- Pull requests are welcome. Keep changes small, run `npm run lint` and
+- Pull requests welcome. Keep changes small, run `npm run lint` and
   `npm test`, and rebuild the bundles before committing.
 
 ## License

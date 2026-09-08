@@ -65,6 +65,7 @@ export const keymapDefaults = {
   g$: "goToLastTab",
   ";e": "openSettings",
   ";x": "openExtensions",
+  ";w": "resetScrollTarget",
 
   yy: "copyUrl",
   yf: "hintYank",

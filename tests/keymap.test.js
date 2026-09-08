@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import * as Jari from "../content/keymap.js";
+import { COMMAND_CATALOG } from "../content/catalog.js";
 
 test("canonicalKey orders modifiers and keeps the bare key", () => {
   assert.equal(Jari.canonicalKey({ key: "g" }), "g");
@@ -142,4 +143,15 @@ test("normalizeSettings keeps bare prefix bindings so custom prefixes survive", 
   const s = Jari.normalizeSettings({ keymap: { z: "closeTab", zf: "hintYank" } });
   assert.equal(s.keymap.z, "closeTab");
   assert.equal(s.keymap.zf, "hintYank");
+});
+
+test(";w resets the scroll target without conflicting with ;e/;x", () => {
+  assert.equal(Jari.keymapDefaults[";w"], "resetScrollTarget");
+  assert.equal(COMMAND_CATALOG.resetScrollTarget.category, "scrolling");
+  assert.equal(Jari.findBindingConflict(Jari.keymapDefaults, ";w", "resetScrollTarget"), null);
+  assert.ok(Jari.isPrefixKey(Jari.keymapDefaults, ";"));
+  assert.deepEqual(
+    Jari.findOverlapConflicts(Jari.keymapDefaults, ";w").filter((o) => o.key === ";"),
+    [],
+  );
 });

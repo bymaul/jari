@@ -187,6 +187,28 @@ test("the top frame advances its cycle on a subframe request", () => {
   assert.equal(Scroll.getTarget(), globalThis.window);
 });
 
+test("reset returns to the page after cycling onto an area", () => {
+  rotateTo(area);
+  assert.equal(Scroll.getTarget(), area);
+
+  Scroll.reset();
+
+  assert.equal(Scroll.getTarget(), globalThis.window);
+});
+
+test("reset releases frame focus and returns to the page", () => {
+  rotateTo(frame);
+  assert.equal(Scroll.getTarget(), frame);
+  globalThis.document.activeElement = frame;
+  resetCalls();
+
+  Scroll.reset();
+
+  assert.equal(Scroll.getTarget(), globalThis.window);
+  assert.ok(frame.blurCalls > 0, "expected the frame to be blurred");
+  assert.ok(windowCalls.focus > 0, "expected focus to return to the page");
+});
+
 test("the top frame ignores unrelated messages", () => {
   assert.ok(messageHandlers.length > 0, "expected a message listener");
   const onMessage = messageHandlers[messageHandlers.length - 1];
