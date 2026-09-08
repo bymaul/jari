@@ -71,6 +71,10 @@ h1 {
   color: var(--danger);
 }
 
+#save-state.warn {
+  color: var(--warning, #b7791f);
+}
+
 main {
   max-width: var(--page-width);
   margin: 0 auto;

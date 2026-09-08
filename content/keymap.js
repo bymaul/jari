@@ -1,4 +1,7 @@
 import { clampMaxResults, maxResultsDefault, suggestionSources } from "../shared/constants.js";
+import { normalizeSitePattern } from "../shared/url.js";
+
+export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const Events = {
   listeners: {},
@@ -263,16 +266,34 @@ export function normalizeHintChars(raw) {
   return deduped;
 }
 
+export function migrateSettings(data) {
+  const d = { ...(data || {}) };
+  let version =
+    Number.isInteger(d.schemaVersion) && d.schemaVersion > 0
+      ? d.schemaVersion
+      : 0;
+  // v0 (pre-versioned): the stored keymap is authoritative, everything else
+  // falls back to defaults in normalizeSettings. Add per-version fixups here
+  // as the schema evolves.
+  if (version < 1) version = 1;
+  d.schemaVersion = version;
+  return d;
+}
+
 export function normalizeSettings(data) {
-  const d = data || {};
+  const d = migrateSettings(data);
   const storedKeymap = {};
   for (const [key, command] of Object.entries(d.keymap || {})) {
     storedKeymap[key] = command;
   }
   const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
+  const disabledSites = Array.isArray(d.disabledSites)
+    ? [...new Set(d.disabledSites.map(normalizeSitePattern).filter(Boolean))]
+    : [];
   return {
+    schemaVersion: SETTINGS_SCHEMA_VERSION,
     keymap,
-    disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
+    disabledSites,
     scrollStep: Number.isFinite(d.scrollStep)
       ? d.scrollStep
       : settingsDefaults.scrollStep,
@@ -311,6 +332,26 @@ export function normalizeSettings(data) {
         ? Math.min(5000, d.clueDelayMs)
         : settingsDefaults.clueDelayMs,
   };
+}
+
+export const browserTrappedCombos = new Set([
+  "ctrl+t",
+  "ctrl+w",
+  "ctrl+n",
+  "ctrl+Tab",
+  "ctrl+shift+Tab",
+  "ctrl+l",
+  "alt+ArrowLeft",
+  "alt+ArrowRight",
+  "F5",
+  "F11",
+  "ctrl+shift+i",
+  "ctrl+shift+j",
+  "ctrl+shift+c",
+]);
+
+export function isBrowserTrapped(combo) {
+  return browserTrappedCombos.has(combo);
 }
 
 export function balanceCategories(byCategory, columnCount = 3) {

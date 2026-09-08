@@ -13,7 +13,240 @@
   }
   var MIN_SCROLL_AREA_SIZE = 16;
 
+  // shared/url.js
+  var urlSchemes = /* @__PURE__ */ new Set([
+    "http",
+    "https",
+    "file",
+    "about",
+    "chrome",
+    "helium"
+  ]);
+  var blockedUrlSchemes = /* @__PURE__ */ new Set([
+    "javascript",
+    "data",
+    "vbscript",
+    "chrome-extension",
+    "edge",
+    "moz-extension",
+    "view-source"
+  ]);
+  var fileExtensionDenylist = /* @__PURE__ */ new Set([
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "mjs",
+    "cjs",
+    "json",
+    "css",
+    "scss",
+    "less",
+    "html",
+    "htm",
+    "md",
+    "markdown",
+    "txt",
+    "csv",
+    "xml",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "conf",
+    "config",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "py",
+    "rb",
+    "php",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "cs",
+    "go",
+    "rs",
+    "swift",
+    "kt",
+    "kts",
+    "dart",
+    "vue",
+    "svelte",
+    "astro",
+    "lua",
+    "pl",
+    "pm",
+    "r",
+    "sql",
+    "db",
+    "sqlite",
+    "log",
+    "lock",
+    "env",
+    "gitignore",
+    "dockerignore",
+    "gradle",
+    "makefile",
+    "cmake"
+  ]);
+  function isValidHostname(host) {
+    if (!host) return false;
+    let lower = host.toLowerCase();
+    if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
+    if (lower === "localhost") return true;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
+      return lower.split(".").every((o) => {
+        const n = parseInt(o, 10);
+        return n >= 0 && n <= 255 && String(n) === o;
+      });
+    }
+    if (/^[0-9a-f:]+$/i.test(lower) && lower.includes(":")) {
+      try {
+        if (typeof URL !== "undefined") new URL(`http://[${lower}]/`);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    const labels = lower.split(".");
+    if (labels.length < 2) return false;
+    for (const label of labels) {
+      if (!label || label.length > 63) return false;
+      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return false;
+    }
+    const tld = labels[labels.length - 1];
+    if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
+    if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
+    if (/^\d+$/.test(tld)) return false;
+    return true;
+  }
+  var Url = {
+    parentUrlOf(href) {
+      try {
+        const url = new URL(href);
+        let path = url.pathname;
+        if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+        const idx = path.lastIndexOf("/");
+        path = idx > 0 ? path.slice(0, idx) : "/";
+        url.pathname = path;
+        url.search = "";
+        url.hash = "";
+        return url.href;
+      } catch {
+        return href;
+      }
+    },
+    rootUrlOf(href) {
+      try {
+        const url = new URL(href);
+        url.pathname = "/";
+        url.search = "";
+        url.hash = "";
+        return url.href;
+      } catch {
+        return href;
+      }
+    },
+    isSamePath(a, b) {
+      try {
+        return new URL(a).pathname === new URL(b).pathname;
+      } catch {
+        return a === b;
+      }
+    },
+    looksLikeUrl(text) {
+      const s = text.trim();
+      if (!s || /\s/.test(s)) return false;
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
+        try {
+          const u = new URL(s);
+          const scheme = u.protocol.slice(0, -1).toLowerCase();
+          if (blockedUrlSchemes.has(scheme)) return false;
+          if (urlSchemes.has(scheme)) return true;
+          const host = u.hostname;
+          if (!host) return false;
+          if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return isValidHostname(host);
+          return isValidHostname(host);
+        } catch {
+          return false;
+        }
+      }
+      if (s.startsWith("//")) {
+        try {
+          const u = new URL("https:" + s);
+          return isValidHostname(u.hostname);
+        } catch {
+          return false;
+        }
+      }
+      if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
+      if (/^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(s)) return true;
+      const hostPart = s.split(/[:/?#]/)[0];
+      if (!isValidHostname(hostPart)) return false;
+      const tld = hostPart.toLowerCase().split(".").pop();
+      if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
+      try {
+        const u = new URL("https://" + s);
+        return isValidHostname(u.hostname);
+      } catch {
+        return false;
+      }
+    },
+    suggestionTerm(query3) {
+      const idx = query3.search(/\s/);
+      if (idx === -1) return query3;
+      return Url.looksLikeUrl(query3.slice(0, idx)) ? query3.slice(idx).trim() : query3;
+    }
+  };
+  function normalizeHost(raw) {
+    let host = raw.trim().toLowerCase();
+    if (!host) return "";
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
+      try {
+        host = new URL(host).hostname;
+      } catch {
+        return "";
+      }
+    }
+    host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
+      host
+    ) ? host : "";
+  }
+  function normalizeSitePattern(raw) {
+    if (typeof raw !== "string") return "";
+    const pattern = raw.trim().toLowerCase();
+    if (!pattern) return "";
+    if (pattern === "file://") return pattern;
+    if (pattern.startsWith("*.")) {
+      const base = normalizeHost(pattern.slice(2));
+      return base ? `*.${base}` : "";
+    }
+    return normalizeHost(pattern);
+  }
+  function matchesSitePattern(hostname, pattern, protocol = "") {
+    if (!pattern) return false;
+    const host = (hostname || "").toLowerCase();
+    if (pattern === "file://") return protocol === "file:";
+    if (pattern.startsWith("*.")) {
+      const base = pattern.slice(2);
+      return host === base || host.endsWith(`.${base}`);
+    }
+    return host === pattern.toLowerCase();
+  }
+  function pageSiteKey(hostname, protocol = "") {
+    const host = hostname || "";
+    if (!host && protocol === "file:") return "file://";
+    return host;
+  }
+
   // content/keymap.js
+  var SETTINGS_SCHEMA_VERSION = 1;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -187,16 +420,25 @@
     if (deduped.length < 2) return settingsDefaults.hintChars;
     return deduped;
   }
+  function migrateSettings(data) {
+    const d = { ...data || {} };
+    let version = Number.isInteger(d.schemaVersion) && d.schemaVersion > 0 ? d.schemaVersion : 0;
+    if (version < 1) version = 1;
+    d.schemaVersion = version;
+    return d;
+  }
   function normalizeSettings(data) {
-    const d = data || {};
+    const d = migrateSettings(data);
     const storedKeymap = {};
     for (const [key, command] of Object.entries(d.keymap || {})) {
       storedKeymap[key] = command;
     }
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
+    const disabledSites = Array.isArray(d.disabledSites) ? [...new Set(d.disabledSites.map(normalizeSitePattern).filter(Boolean))] : [];
     return {
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap,
-      disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
+      disabledSites,
       scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : settingsDefaults.scrollStep,
       smoothScroll: typeof d.smoothScroll === "boolean" ? d.smoothScroll : settingsDefaults.smoothScroll,
       fuzzyMatching: typeof d.fuzzyMatching === "boolean" ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
@@ -235,6 +477,7 @@
 
   // content/settings.js
   var STORAGE_KEY = "settings";
+  var persistedLocal = false;
   var state = {
     keymap: { ...keymapDefaults },
     disabledSites: [],
@@ -269,29 +512,59 @@
   async function load() {
     try {
       const stored = await chrome.storage.sync.get(STORAGE_KEY);
-      merge(stored[STORAGE_KEY] || {});
+      if (stored && stored[STORAGE_KEY]) {
+        merge(stored[STORAGE_KEY]);
+        persistedLocal = false;
+        return;
+      }
     } catch {
-      merge({});
+    }
+    try {
+      const local = await chrome.storage.local.get(STORAGE_KEY);
+      if (local && local[STORAGE_KEY]) {
+        merge(local[STORAGE_KEY]);
+        persistedLocal = true;
+        return;
+      }
+    } catch {
+    }
+    merge({});
+    persistedLocal = false;
+  }
+  function snapshot() {
+    return {
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
+      keymap: { ...state.keymap },
+      disabledSites: state.disabledSites.slice(),
+      scrollStep: state.scrollStep,
+      smoothScroll: state.smoothScroll,
+      fuzzyMatching: state.fuzzyMatching,
+      timeoutMs: state.timeoutMs,
+      passthroughMs: state.passthroughMs,
+      suggestionSources: state.suggestionSources.slice(),
+      maxResults: state.maxResults,
+      copyFormat: state.copyFormat,
+      hintChars: state.hintChars,
+      clueEnabled: state.clueEnabled,
+      clueDelayMs: state.clueDelayMs
+    };
+  }
+  function isQuotaError(err) {
+    return /quota/i.test(String(err && err.message || err || ""));
+  }
+  async function persist() {
+    const data = { [STORAGE_KEY]: snapshot() };
+    try {
+      await chrome.storage.sync.set(data);
+      persistedLocal = false;
+    } catch (err) {
+      if (!isQuotaError(err)) throw err;
+      await chrome.storage.local.set(data);
+      persistedLocal = true;
     }
   }
-  function persist() {
-    return chrome.storage.sync.set({
-      [STORAGE_KEY]: {
-        keymap: state.keymap,
-        disabledSites: state.disabledSites,
-        scrollStep: state.scrollStep,
-        smoothScroll: state.smoothScroll,
-        fuzzyMatching: state.fuzzyMatching,
-        timeoutMs: state.timeoutMs,
-        passthroughMs: state.passthroughMs,
-        suggestionSources: state.suggestionSources,
-        maxResults: state.maxResults,
-        copyFormat: state.copyFormat,
-        hintChars: state.hintChars,
-        clueEnabled: state.clueEnabled,
-        clueDelayMs: state.clueDelayMs
-      }
-    });
+  function isPersistedLocally() {
+    return persistedLocal;
   }
   function set(patch) {
     merge(normalizeSettings({ ...state, ...patch }));
@@ -304,7 +577,11 @@
     return state.keymap;
   }
   function isDisabled() {
-    return state.disabledSites.includes(location.hostname);
+    const host = location.hostname || "";
+    const protocol = location.protocol || "";
+    return state.disabledSites.some(
+      (pattern) => matchesSitePattern(host, pattern, protocol)
+    );
   }
   function getDisabledSites() {
     return state.disabledSites.slice();
@@ -343,22 +620,25 @@
     return state.clueDelayMs;
   }
   function toggleSiteEnabled() {
-    const host = location.hostname;
-    const idx = state.disabledSites.indexOf(host);
+    const key = pageSiteKey(location.hostname || "", location.protocol || "");
+    const idx = state.disabledSites.indexOf(key);
     if (idx >= 0) state.disabledSites.splice(idx, 1);
-    else state.disabledSites.push(host);
+    else state.disabledSites.push(key);
     persist().catch(() => {
     });
   }
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "sync" || !changes[STORAGE_KEY]) return;
+    if (area !== "sync" && area !== "local" || !changes[STORAGE_KEY]) return;
     merge(changes[STORAGE_KEY].newValue || {});
+    persistedLocal = area === "local";
     Events.emit("settingsChanged");
   });
   var settings = {
     load,
     set,
     update,
+    snapshot,
+    isPersistedLocally,
     getKeymap,
     isDisabled,
     getDisabledSites,
@@ -553,197 +833,6 @@
     safeFocus,
     dispatchClick,
     focusFrameElement
-  };
-
-  // shared/url.js
-  var urlSchemes = /* @__PURE__ */ new Set([
-    "http",
-    "https",
-    "file",
-    "about",
-    "chrome",
-    "helium"
-  ]);
-  var blockedUrlSchemes = /* @__PURE__ */ new Set([
-    "javascript",
-    "data",
-    "vbscript",
-    "chrome-extension",
-    "edge",
-    "moz-extension",
-    "view-source"
-  ]);
-  var fileExtensionDenylist = /* @__PURE__ */ new Set([
-    "js",
-    "ts",
-    "jsx",
-    "tsx",
-    "mjs",
-    "cjs",
-    "json",
-    "css",
-    "scss",
-    "less",
-    "html",
-    "htm",
-    "md",
-    "markdown",
-    "txt",
-    "csv",
-    "xml",
-    "yaml",
-    "yml",
-    "toml",
-    "ini",
-    "conf",
-    "config",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "py",
-    "rb",
-    "php",
-    "java",
-    "c",
-    "cpp",
-    "h",
-    "hpp",
-    "cs",
-    "go",
-    "rs",
-    "swift",
-    "kt",
-    "kts",
-    "dart",
-    "vue",
-    "svelte",
-    "astro",
-    "lua",
-    "pl",
-    "pm",
-    "r",
-    "sql",
-    "db",
-    "sqlite",
-    "log",
-    "lock",
-    "env",
-    "gitignore",
-    "dockerignore",
-    "gradle",
-    "makefile",
-    "cmake"
-  ]);
-  function isValidHostname(host) {
-    if (!host) return false;
-    let lower = host.toLowerCase();
-    if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
-    if (lower === "localhost") return true;
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
-      return lower.split(".").every((o) => {
-        const n = parseInt(o, 10);
-        return n >= 0 && n <= 255 && String(n) === o;
-      });
-    }
-    if (/^[0-9a-f:]+$/i.test(lower) && lower.includes(":")) {
-      try {
-        if (typeof URL !== "undefined") new URL(`http://[${lower}]/`);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    const labels = lower.split(".");
-    if (labels.length < 2) return false;
-    for (const label of labels) {
-      if (!label || label.length > 63) return false;
-      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return false;
-    }
-    const tld = labels[labels.length - 1];
-    if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
-    if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
-    if (/^\d+$/.test(tld)) return false;
-    return true;
-  }
-  var Url = {
-    parentUrlOf(href) {
-      try {
-        const url = new URL(href);
-        let path = url.pathname;
-        if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
-        const idx = path.lastIndexOf("/");
-        path = idx > 0 ? path.slice(0, idx) : "/";
-        url.pathname = path;
-        url.search = "";
-        url.hash = "";
-        return url.href;
-      } catch {
-        return href;
-      }
-    },
-    rootUrlOf(href) {
-      try {
-        const url = new URL(href);
-        url.pathname = "/";
-        url.search = "";
-        url.hash = "";
-        return url.href;
-      } catch {
-        return href;
-      }
-    },
-    isSamePath(a, b) {
-      try {
-        return new URL(a).pathname === new URL(b).pathname;
-      } catch {
-        return a === b;
-      }
-    },
-    looksLikeUrl(text) {
-      const s = text.trim();
-      if (!s || /\s/.test(s)) return false;
-      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
-        try {
-          const u = new URL(s);
-          const scheme = u.protocol.slice(0, -1).toLowerCase();
-          if (blockedUrlSchemes.has(scheme)) return false;
-          if (urlSchemes.has(scheme)) return true;
-          const host = u.hostname;
-          if (!host) return false;
-          if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
-          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return isValidHostname(host);
-          return isValidHostname(host);
-        } catch {
-          return false;
-        }
-      }
-      if (s.startsWith("//")) {
-        try {
-          const u = new URL("https:" + s);
-          return isValidHostname(u.hostname);
-        } catch {
-          return false;
-        }
-      }
-      if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
-      if (/^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(s)) return true;
-      const hostPart = s.split(/[:/?#]/)[0];
-      if (!isValidHostname(hostPart)) return false;
-      const tld = hostPart.toLowerCase().split(".").pop();
-      if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
-      try {
-        const u = new URL("https://" + s);
-        return isValidHostname(u.hostname);
-      } catch {
-        return false;
-      }
-    },
-    suggestionTerm(query3) {
-      const idx = query3.search(/\s/);
-      if (idx === -1) return query3;
-      return Url.looksLikeUrl(query3.slice(0, idx)) ? query3.slice(idx).trim() : query3;
-    }
   };
 
   // content/hints-elements.js

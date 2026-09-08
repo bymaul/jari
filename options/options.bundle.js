@@ -12,7 +12,51 @@
     return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
   }
 
+  // shared/url.js
+  function normalizeHost(raw) {
+    let host = raw.trim().toLowerCase();
+    if (!host) return "";
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
+      try {
+        host = new URL(host).hostname;
+      } catch {
+        return "";
+      }
+    }
+    host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
+      host
+    ) ? host : "";
+  }
+  function normalizeSitePattern(raw) {
+    if (typeof raw !== "string") return "";
+    const pattern = raw.trim().toLowerCase();
+    if (!pattern) return "";
+    if (pattern === "file://") return pattern;
+    if (pattern.startsWith("*.")) {
+      const base = normalizeHost(pattern.slice(2));
+      return base ? `*.${base}` : "";
+    }
+    return normalizeHost(pattern);
+  }
+  function matchesSitePattern(hostname, pattern, protocol = "") {
+    if (!pattern) return false;
+    const host = (hostname || "").toLowerCase();
+    if (pattern === "file://") return protocol === "file:";
+    if (pattern.startsWith("*.")) {
+      const base = pattern.slice(2);
+      return host === base || host.endsWith(`.${base}`);
+    }
+    return host === pattern.toLowerCase();
+  }
+  function pageSiteKey(hostname, protocol = "") {
+    const host = hostname || "";
+    if (!host && protocol === "file:") return "file://";
+    return host;
+  }
+
   // content/keymap.js
+  var SETTINGS_SCHEMA_VERSION = 1;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -168,16 +212,25 @@
     if (deduped.length < 2) return settingsDefaults.hintChars;
     return deduped;
   }
+  function migrateSettings(data) {
+    const d = { ...data || {} };
+    let version = Number.isInteger(d.schemaVersion) && d.schemaVersion > 0 ? d.schemaVersion : 0;
+    if (version < 1) version = 1;
+    d.schemaVersion = version;
+    return d;
+  }
   function normalizeSettings(data) {
-    const d = data || {};
+    const d = migrateSettings(data);
     const storedKeymap = {};
     for (const [key, command] of Object.entries(d.keymap || {})) {
       storedKeymap[key] = command;
     }
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
+    const disabledSites = Array.isArray(d.disabledSites) ? [...new Set(d.disabledSites.map(normalizeSitePattern).filter(Boolean))] : [];
     return {
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap,
-      disabledSites: Array.isArray(d.disabledSites) ? d.disabledSites : [],
+      disabledSites,
       scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : settingsDefaults.scrollStep,
       smoothScroll: typeof d.smoothScroll === "boolean" ? d.smoothScroll : settingsDefaults.smoothScroll,
       fuzzyMatching: typeof d.fuzzyMatching === "boolean" ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
@@ -190,6 +243,24 @@
       clueEnabled: typeof d.clueEnabled === "boolean" ? d.clueEnabled : settingsDefaults.clueEnabled,
       clueDelayMs: Number.isFinite(d.clueDelayMs) && d.clueDelayMs >= 0 ? Math.min(5e3, d.clueDelayMs) : settingsDefaults.clueDelayMs
     };
+  }
+  var browserTrappedCombos = /* @__PURE__ */ new Set([
+    "ctrl+t",
+    "ctrl+w",
+    "ctrl+n",
+    "ctrl+Tab",
+    "ctrl+shift+Tab",
+    "ctrl+l",
+    "alt+ArrowLeft",
+    "alt+ArrowRight",
+    "F5",
+    "F11",
+    "ctrl+shift+i",
+    "ctrl+shift+j",
+    "ctrl+shift+c"
+  ]);
+  function isBrowserTrapped(combo) {
+    return browserTrappedCombos.has(combo);
   }
   function balanceCategories(byCategory, columnCount = 3) {
     const columns = Array.from({ length: columnCount }, () => []);
@@ -212,23 +283,6 @@
       columnRows[best] += 1 + rows.length;
     }
     return columns;
-  }
-
-  // shared/url.js
-  function normalizeHost(raw) {
-    let host = raw.trim().toLowerCase();
-    if (!host) return "";
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
-      try {
-        host = new URL(host).hostname;
-      } catch {
-        return "";
-      }
-    }
-    host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
-    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
-      host
-    ) ? host : "";
   }
 
   // content/catalog.js
@@ -294,6 +348,7 @@
 
   // content/settings.js
   var STORAGE_KEY = "settings";
+  var persistedLocal = false;
   var state = {
     keymap: { ...keymapDefaults },
     disabledSites: [],
@@ -328,29 +383,59 @@
   async function load() {
     try {
       const stored = await chrome.storage.sync.get(STORAGE_KEY);
-      merge(stored[STORAGE_KEY] || {});
+      if (stored && stored[STORAGE_KEY]) {
+        merge(stored[STORAGE_KEY]);
+        persistedLocal = false;
+        return;
+      }
     } catch {
-      merge({});
+    }
+    try {
+      const local = await chrome.storage.local.get(STORAGE_KEY);
+      if (local && local[STORAGE_KEY]) {
+        merge(local[STORAGE_KEY]);
+        persistedLocal = true;
+        return;
+      }
+    } catch {
+    }
+    merge({});
+    persistedLocal = false;
+  }
+  function snapshot() {
+    return {
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
+      keymap: { ...state.keymap },
+      disabledSites: state.disabledSites.slice(),
+      scrollStep: state.scrollStep,
+      smoothScroll: state.smoothScroll,
+      fuzzyMatching: state.fuzzyMatching,
+      timeoutMs: state.timeoutMs,
+      passthroughMs: state.passthroughMs,
+      suggestionSources: state.suggestionSources.slice(),
+      maxResults: state.maxResults,
+      copyFormat: state.copyFormat,
+      hintChars: state.hintChars,
+      clueEnabled: state.clueEnabled,
+      clueDelayMs: state.clueDelayMs
+    };
+  }
+  function isQuotaError(err) {
+    return /quota/i.test(String(err && err.message || err || ""));
+  }
+  async function persist() {
+    const data = { [STORAGE_KEY]: snapshot() };
+    try {
+      await chrome.storage.sync.set(data);
+      persistedLocal = false;
+    } catch (err) {
+      if (!isQuotaError(err)) throw err;
+      await chrome.storage.local.set(data);
+      persistedLocal = true;
     }
   }
-  function persist() {
-    return chrome.storage.sync.set({
-      [STORAGE_KEY]: {
-        keymap: state.keymap,
-        disabledSites: state.disabledSites,
-        scrollStep: state.scrollStep,
-        smoothScroll: state.smoothScroll,
-        fuzzyMatching: state.fuzzyMatching,
-        timeoutMs: state.timeoutMs,
-        passthroughMs: state.passthroughMs,
-        suggestionSources: state.suggestionSources,
-        maxResults: state.maxResults,
-        copyFormat: state.copyFormat,
-        hintChars: state.hintChars,
-        clueEnabled: state.clueEnabled,
-        clueDelayMs: state.clueDelayMs
-      }
-    });
+  function isPersistedLocally() {
+    return persistedLocal;
   }
   function set(patch) {
     merge(normalizeSettings({ ...state, ...patch }));
@@ -363,7 +448,11 @@
     return state.keymap;
   }
   function isDisabled() {
-    return state.disabledSites.includes(location.hostname);
+    const host = location.hostname || "";
+    const protocol = location.protocol || "";
+    return state.disabledSites.some(
+      (pattern) => matchesSitePattern(host, pattern, protocol)
+    );
   }
   function getDisabledSites() {
     return state.disabledSites.slice();
@@ -402,22 +491,25 @@
     return state.clueDelayMs;
   }
   function toggleSiteEnabled() {
-    const host = location.hostname;
-    const idx = state.disabledSites.indexOf(host);
+    const key = pageSiteKey(location.hostname || "", location.protocol || "");
+    const idx = state.disabledSites.indexOf(key);
     if (idx >= 0) state.disabledSites.splice(idx, 1);
-    else state.disabledSites.push(host);
+    else state.disabledSites.push(key);
     persist().catch(() => {
     });
   }
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "sync" || !changes[STORAGE_KEY]) return;
+    if (area !== "sync" && area !== "local" || !changes[STORAGE_KEY]) return;
     merge(changes[STORAGE_KEY].newValue || {});
+    persistedLocal = area === "local";
     Events.emit("settingsChanged");
   });
   var settings = {
     load,
     set,
     update,
+    snapshot,
+    isPersistedLocally,
     getKeymap,
     isDisabled,
     getDisabledSites,
@@ -652,15 +744,25 @@
   var OPEN_KEY = "jari.options.open";
   function setSaveState(mode, message) {
     if (!saveStateEl) return;
-    saveStateEl.classList.remove("saving", "failed");
+    saveStateEl.classList.remove("saving", "failed", "warn");
     if (mode === "saving") {
       saveStateEl.classList.add("saving");
       saveStateEl.textContent = message || "Saving...";
     } else if (mode === "failed") {
       saveStateEl.classList.add("failed");
       saveStateEl.textContent = message || "Save failed \u2014 will retry on next change";
+    } else if (mode === "warn") {
+      saveStateEl.classList.add("warn");
+      saveStateEl.textContent = message || "Saved locally";
     } else {
       saveStateEl.textContent = message || "All changes saved";
+    }
+  }
+  function savedState() {
+    if (settings.isPersistedLocally()) {
+      setSaveState("warn", "Saved on this device only \u2014 browser sync is full");
+    } else {
+      setSaveState("saved");
     }
   }
   async function savePatch(patch) {
@@ -671,7 +773,7 @@
       setSaveState("failed");
       return false;
     }
-    setSaveState("saved");
+    savedState();
     updateSummaries();
     return true;
   }
@@ -813,7 +915,7 @@
     renderKeymap();
     renderDisabled();
     updateSummaries();
-    setSaveState("saved");
+    savedState();
     updateAddButton();
   }
   function matchesFilter(name, cmd, filter) {
@@ -1117,6 +1219,13 @@
     attemptCommit(combo, name, button);
   }
   function attemptCommit(combo, name, button) {
+    if (isBrowserTrapped(combo)) {
+      const hint = recordingHintEl(button);
+      if (hint) {
+        hint.textContent = `${combo} may be grabbed by the browser before Jari sees it.`;
+        hint.hidden = false;
+      }
+    }
     const keymap = settings.getKeymap();
     if (keymap[combo] === name) {
       exitRecording();
@@ -1135,7 +1244,7 @@
   function persistKeymap() {
     setSaveState("saving");
     return settings.update({ keymap: { ...settings.getKeymap() } }).then(() => {
-      setSaveState("saved");
+      savedState();
       updateSummaries();
       return true;
     }).catch(() => {
@@ -1157,16 +1266,18 @@
     renderKeymap();
     if (!ok) return;
     const overlapNote = overlaps.length > 0 ? ` (note: overlaps ${overlaps.map((o) => o.key).join(", ")} \u2014 single key fires first)` : "";
+    const trappedNote = isBrowserTrapped(combo) ? ` (note: the browser may grab ${combo} before Jari sees it)` : "";
+    const notes = `${overlapNote}${trappedNote}`;
     if (swapped) {
       status(
-        `Swapped: ${combo} \u2192 ${commandLabel(name)}, ${previous} \u2192 ${commandLabel(swapWith)}${overlapNote}`
+        `Swapped: ${combo} \u2192 ${commandLabel(name)}, ${previous} \u2192 ${commandLabel(swapWith)}${notes}`
       );
     } else if (swapWith) {
       status(
-        `Saved ${combo} \u2192 ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${combo})${overlapNote}`
+        `Saved ${combo} \u2192 ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${combo})${notes}`
       );
     } else {
-      status(`Saved ${combo} \u2192 ${commandLabel(name)}${overlapNote}`);
+      status(`Saved ${combo} \u2192 ${commandLabel(name)}${notes}`);
     }
     focusChipFor(name, combo);
   }
@@ -1408,6 +1519,7 @@
       return;
     setSaveState("saving");
     settings.update({
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap: { ...keymapDefaults },
       scrollStep: settingsDefaults.scrollStep,
       smoothScroll: settingsDefaults.smoothScroll,
@@ -1438,7 +1550,7 @@
       for (const site of sites) {
         const li = document.createElement("li");
         const siteSpan = document.createElement("span");
-        siteSpan.textContent = site;
+        siteSpan.textContent = site || "(blank page)";
         const btn = document.createElement("button");
         btn.type = "button";
         btn.textContent = "Enable";
@@ -1479,24 +1591,24 @@
   }
   async function addDisabledSite() {
     const raw = siteInputEl.value;
-    const host = normalizeHost(raw);
-    if (!host) {
-      showSiteError("Enter a hostname like example.com");
+    const pattern = normalizeSitePattern(raw);
+    if (!pattern) {
+      showSiteError("Enter a hostname like example.com (or *.example.com)");
       siteInputEl.focus();
       return;
     }
     const sites = settings.getDisabledSites();
-    if (sites.includes(host)) {
-      showSiteError(`Already disabled: ${host}`);
+    if (sites.includes(pattern)) {
+      showSiteError(`Already disabled: ${pattern}`);
       siteInputEl.focus();
       return;
     }
     clearSiteError();
-    const ok = await savePatch({ disabledSites: [...sites, host] });
+    const ok = await savePatch({ disabledSites: [...sites, pattern] });
     siteInputEl.value = "";
     updateAddButton();
     renderDisabled();
-    if (ok) status(`Disabled: ${host}`);
+    if (ok) status(`Disabled: ${pattern}`);
     siteInputEl.focus();
   }
   function status(message) {

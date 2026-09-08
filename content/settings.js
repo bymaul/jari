@@ -1,11 +1,15 @@
 import {
   Events,
+  SETTINGS_SCHEMA_VERSION,
   keymapDefaults,
   normalizeSettings,
   settingsDefaults,
 } from "./keymap.js";
+import { matchesSitePattern, pageSiteKey } from "../shared/url.js";
 
 const STORAGE_KEY = "settings";
+
+let persistedLocal = false;
 
 const state = {
   keymap: { ...keymapDefaults },
@@ -43,30 +47,61 @@ function merge(data) {
 async function load() {
   try {
     const stored = await chrome.storage.sync.get(STORAGE_KEY);
-    merge(stored[STORAGE_KEY] || {});
-  } catch {
-    merge({});
+    if (stored && stored[STORAGE_KEY]) {
+      merge(stored[STORAGE_KEY]);
+      persistedLocal = false;
+      return;
+    }
+  } catch {}
+  try {
+    const local = await chrome.storage.local.get(STORAGE_KEY);
+    if (local && local[STORAGE_KEY]) {
+      merge(local[STORAGE_KEY]);
+      persistedLocal = true;
+      return;
+    }
+  } catch {}
+  merge({});
+  persistedLocal = false;
+}
+
+function snapshot() {
+  return {
+    schemaVersion: SETTINGS_SCHEMA_VERSION,
+    keymap: { ...state.keymap },
+    disabledSites: state.disabledSites.slice(),
+    scrollStep: state.scrollStep,
+    smoothScroll: state.smoothScroll,
+    fuzzyMatching: state.fuzzyMatching,
+    timeoutMs: state.timeoutMs,
+    passthroughMs: state.passthroughMs,
+    suggestionSources: state.suggestionSources.slice(),
+    maxResults: state.maxResults,
+    copyFormat: state.copyFormat,
+    hintChars: state.hintChars,
+    clueEnabled: state.clueEnabled,
+    clueDelayMs: state.clueDelayMs,
+  };
+}
+
+function isQuotaError(err) {
+  return /quota/i.test(String((err && err.message) || err || ""));
+}
+
+async function persist() {
+  const data = { [STORAGE_KEY]: snapshot() };
+  try {
+    await chrome.storage.sync.set(data);
+    persistedLocal = false;
+  } catch (err) {
+    if (!isQuotaError(err)) throw err;
+    await chrome.storage.local.set(data);
+    persistedLocal = true;
   }
 }
 
-function persist() {
-  return chrome.storage.sync.set({
-    [STORAGE_KEY]: {
-      keymap: state.keymap,
-      disabledSites: state.disabledSites,
-      scrollStep: state.scrollStep,
-      smoothScroll: state.smoothScroll,
-      fuzzyMatching: state.fuzzyMatching,
-      timeoutMs: state.timeoutMs,
-      passthroughMs: state.passthroughMs,
-      suggestionSources: state.suggestionSources,
-      maxResults: state.maxResults,
-      copyFormat: state.copyFormat,
-      hintChars: state.hintChars,
-      clueEnabled: state.clueEnabled,
-      clueDelayMs: state.clueDelayMs,
-    },
-  });
+function isPersistedLocally() {
+  return persistedLocal;
 }
 
 function set(patch) {
@@ -83,7 +118,11 @@ function getKeymap() {
 }
 
 function isDisabled() {
-  return state.disabledSites.includes(location.hostname);
+  const host = location.hostname || "";
+  const protocol = location.protocol || "";
+  return state.disabledSites.some((pattern) =>
+    matchesSitePattern(host, pattern, protocol),
+  );
 }
 
 function getDisabledSites() {
@@ -135,16 +174,17 @@ function getClueDelayMs() {
 }
 
 function toggleSiteEnabled() {
-  const host = location.hostname;
-  const idx = state.disabledSites.indexOf(host);
+  const key = pageSiteKey(location.hostname || "", location.protocol || "");
+  const idx = state.disabledSites.indexOf(key);
   if (idx >= 0) state.disabledSites.splice(idx, 1);
-  else state.disabledSites.push(host);
+  else state.disabledSites.push(key);
   persist().catch(() => {});
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "sync" || !changes[STORAGE_KEY]) return;
+  if ((area !== "sync" && area !== "local") || !changes[STORAGE_KEY]) return;
   merge(changes[STORAGE_KEY].newValue || {});
+  persistedLocal = area === "local";
   Events.emit("settingsChanged");
 });
 
@@ -152,6 +192,8 @@ export const settings = {
   load,
   set,
   update,
+  snapshot,
+  isPersistedLocally,
   getKeymap,
   isDisabled,
   getDisabledSites,

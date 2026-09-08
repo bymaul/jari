@@ -111,26 +111,33 @@
     const n = Math.floor(count);
     return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : 1;
   }
-  async function getSuggestionSources() {
+  async function getStoredSettings() {
     try {
       const stored = await chrome.storage.sync.get("settings");
-      const sources = stored.settings && stored.settings.suggestionSources;
-      if (Array.isArray(sources)) {
-        return sources.filter((s) => suggestionSources.includes(s));
-      }
+      if (stored && stored.settings) return stored.settings;
     } catch (err) {
-      console.debug("[jari] Failed to get suggestion sources:", err);
+      console.debug("[jari] Failed to get synced settings:", err);
+    }
+    try {
+      const local = await chrome.storage.local.get("settings");
+      if (local && local.settings) return local.settings;
+    } catch (err) {
+      console.debug("[jari] Failed to get local settings:", err);
+    }
+    return {};
+  }
+  async function getSuggestionSources() {
+    const settings = await getStoredSettings();
+    const sources = settings && settings.suggestionSources;
+    if (Array.isArray(sources)) {
+      return sources.filter((s) => suggestionSources.includes(s));
     }
     return suggestionSources.slice();
   }
   async function getMaxResults() {
-    try {
-      const stored = await chrome.storage.sync.get("settings");
-      if (stored.settings && stored.settings.maxResults !== void 0) {
-        return clampMaxResults(stored.settings.maxResults);
-      }
-    } catch (err) {
-      console.debug("[jari] Failed to get max results:", err);
+    const settings = await getStoredSettings();
+    if (settings && settings.maxResults !== void 0) {
+      return clampMaxResults(settings.maxResults);
     }
     return clampMaxResults();
   }

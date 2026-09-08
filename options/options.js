@@ -1,9 +1,11 @@
 import {
+  SETTINGS_SCHEMA_VERSION,
   canonicalKey,
   clearingKeys,
   findBindingConflict,
   findOverlapConflicts,
   isBindablePrefixStarter,
+  isBrowserTrapped,
   isReservedCombo,
   keymapDefaults,
   keysForCommand,
@@ -11,7 +13,7 @@ import {
   normalizeHintChars,
   settingsDefaults,
 } from "../content/keymap.js";
-import { normalizeHost } from "../shared/url.js";
+import { normalizeSitePattern } from "../shared/url.js";
 import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
 import { ui } from "../content/ui.js";
@@ -69,7 +71,7 @@ const OPEN_KEY = "jari.options.open";
 
 function setSaveState(mode, message) {
   if (!saveStateEl) return;
-  saveStateEl.classList.remove("saving", "failed");
+  saveStateEl.classList.remove("saving", "failed", "warn");
   if (mode === "saving") {
     saveStateEl.classList.add("saving");
     saveStateEl.textContent = message || "Saving...";
@@ -77,8 +79,19 @@ function setSaveState(mode, message) {
     saveStateEl.classList.add("failed");
     saveStateEl.textContent =
       message || "Save failed — will retry on next change";
+  } else if (mode === "warn") {
+    saveStateEl.classList.add("warn");
+    saveStateEl.textContent = message || "Saved locally";
   } else {
     saveStateEl.textContent = message || "All changes saved";
+  }
+}
+
+function savedState() {
+  if (settings.isPersistedLocally()) {
+    setSaveState("warn", "Saved on this device only — browser sync is full");
+  } else {
+    setSaveState("saved");
   }
 }
 
@@ -90,7 +103,7 @@ async function savePatch(patch) {
     setSaveState("failed");
     return false;
   }
-  setSaveState("saved");
+  savedState();
   updateSummaries();
   return true;
 }
@@ -258,7 +271,7 @@ async function load() {
   renderKeymap();
   renderDisabled();
   updateSummaries();
-  setSaveState("saved");
+  savedState();
   updateAddButton();
 }
 
@@ -608,6 +621,13 @@ function onAddKeydown(event, button, name) {
 }
 
 function attemptCommit(combo, name, button) {
+  if (isBrowserTrapped(combo)) {
+    const hint = recordingHintEl(button);
+    if (hint) {
+      hint.textContent = `${combo} may be grabbed by the browser before Jari sees it.`;
+      hint.hidden = false;
+    }
+  }
   const keymap = settings.getKeymap();
   if (keymap[combo] === name) {
     exitRecording();
@@ -629,7 +649,7 @@ function persistKeymap() {
   return settings
     .update({ keymap: { ...settings.getKeymap() } })
     .then(() => {
-      setSaveState("saved");
+      savedState();
       updateSummaries();
       return true;
     })
@@ -657,16 +677,20 @@ async function commitCombo(combo, name, swapWith, doSwap = false) {
     overlaps.length > 0
       ? ` (note: overlaps ${overlaps.map((o) => o.key).join(", ")} — single key fires first)`
       : "";
+  const trappedNote = isBrowserTrapped(combo)
+    ? ` (note: the browser may grab ${combo} before Jari sees it)`
+    : "";
+  const notes = `${overlapNote}${trappedNote}`;
   if (swapped) {
     status(
-      `Swapped: ${combo} → ${commandLabel(name)}, ${previous} → ${commandLabel(swapWith)}${overlapNote}`,
+      `Swapped: ${combo} → ${commandLabel(name)}, ${previous} → ${commandLabel(swapWith)}${notes}`,
     );
   } else if (swapWith) {
     status(
-      `Saved ${combo} → ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${combo})${overlapNote}`,
+      `Saved ${combo} → ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${combo})${notes}`,
     );
   } else {
-    status(`Saved ${combo} → ${commandLabel(name)}${overlapNote}`);
+    status(`Saved ${combo} → ${commandLabel(name)}${notes}`);
   }
   focusChipFor(name, combo);
 }
@@ -937,6 +961,7 @@ async function reset() {
   setSaveState("saving");
   settings
     .update({
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap: { ...keymapDefaults },
       scrollStep: settingsDefaults.scrollStep,
       smoothScroll: settingsDefaults.smoothScroll,
@@ -971,7 +996,7 @@ function renderDisabled() {
     for (const site of sites) {
       const li = document.createElement("li");
       const siteSpan = document.createElement("span");
-      siteSpan.textContent = site;
+      siteSpan.textContent = site || "(blank page)";
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = "Enable";
@@ -1016,24 +1041,24 @@ function updateAddButton() {
 
 async function addDisabledSite() {
   const raw = siteInputEl.value;
-  const host = normalizeHost(raw);
-  if (!host) {
-    showSiteError("Enter a hostname like example.com");
+  const pattern = normalizeSitePattern(raw);
+  if (!pattern) {
+    showSiteError("Enter a hostname like example.com (or *.example.com)");
     siteInputEl.focus();
     return;
   }
   const sites = settings.getDisabledSites();
-  if (sites.includes(host)) {
-    showSiteError(`Already disabled: ${host}`);
+  if (sites.includes(pattern)) {
+    showSiteError(`Already disabled: ${pattern}`);
     siteInputEl.focus();
     return;
   }
   clearSiteError();
-  const ok = await savePatch({ disabledSites: [...sites, host] });
+  const ok = await savePatch({ disabledSites: [...sites, pattern] });
   siteInputEl.value = "";
   updateAddButton();
   renderDisabled();
-  if (ok) status(`Disabled: ${host}`);
+  if (ok) status(`Disabled: ${pattern}`);
   siteInputEl.focus();
 }
 

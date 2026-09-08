@@ -213,3 +213,34 @@ test("suggest caps results at the maxResults setting", async () => {
     restore();
   }
 });
+
+test("suggest reads settings from local storage when sync is empty", async () => {
+  const saved = {
+    query: globalThis.chrome.tabs.query,
+    syncGet: globalThis.chrome.storage.sync.get,
+    localGet: globalThis.chrome.storage.local.get,
+    localSet: globalThis.chrome.storage.local.set,
+  };
+  globalThis.chrome.storage.sync.get = async () => ({});
+  globalThis.chrome.storage.local.get = async () => ({
+    settings: { maxResults: 7 },
+  });
+  globalThis.chrome.tabs.query = async () =>
+    Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      windowId: 1,
+      title: `Tab ${i}`,
+      url: `https://example.com/${i}`,
+      lastAccessed: i,
+    }));
+  try {
+    const res = await handlers.suggest({}, { query: "" });
+    assert.equal(res.length, 7);
+  } finally {
+    if (saved.query === undefined) delete globalThis.chrome.tabs.query;
+    else globalThis.chrome.tabs.query = saved.query;
+    globalThis.chrome.storage.sync.get = saved.syncGet;
+    globalThis.chrome.storage.local.get = saved.localGet;
+    globalThis.chrome.storage.local.set = saved.localSet;
+  }
+});

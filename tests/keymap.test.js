@@ -155,3 +155,29 @@ test(";w resets the scroll target without conflicting with ;e/;x", () => {
     [],
   );
 });
+
+test("normalizeSettings stamps the schema version and migrates v0 data", () => {
+  assert.equal(Jari.normalizeSettings({}).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  const migrated = Jari.normalizeSettings({ keymap: { j: "scrollDown" } });
+  assert.equal(migrated.schemaVersion, 1);
+  assert.equal(migrated.keymap.j, "scrollDown");
+  assert.deepEqual(Jari.migrateSettings(null).schemaVersion, 1);
+  assert.equal(Jari.migrateSettings({ schemaVersion: 1 }).schemaVersion, 1);
+});
+
+test("normalizeSettings cleans disabled site patterns", () => {
+  const s = Jari.normalizeSettings({
+    disabledSites: ["Example.COM", "*.example.com", "bogus host", "", "file://"],
+  });
+  assert.deepEqual(s.disabledSites, ["example.com", "*.example.com", "file://"]);
+  assert.deepEqual(Jari.normalizeSettings({}).disabledSites, []);
+});
+
+test("isBrowserTrapped flags combos the page may never see", () => {
+  assert.equal(Jari.isBrowserTrapped("ctrl+t"), true);
+  assert.equal(Jari.isBrowserTrapped("ctrl+Tab"), true);
+  assert.equal(Jari.isBrowserTrapped("F5"), true);
+  assert.equal(Jari.isBrowserTrapped("j"), false);
+  assert.equal(Jari.isBrowserTrapped("gg"), false);
+  assert.equal(Jari.isBrowserTrapped("ctrl+f"), false);
+});

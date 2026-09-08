@@ -36,5 +36,9 @@ globalThis.chrome = {
       get: async () => ({}),
       set: async () => {},
     },
+    local: {
+      get: async () => ({}),
+      set: async () => {},
+    },
   },
 };

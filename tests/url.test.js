@@ -2,8 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert";
 import {
   blockedUrlSchemes,
+  matchesSitePattern,
   normalizeHost,
+  normalizeSitePattern,
   normalizeUrl,
+  pageSiteKey,
   urlSchemes,
   Url,
 } from "../shared/url.js";
@@ -108,4 +111,34 @@ test("URL schemes are the single shared source", () => {
   assert.ok(urlSchemes.has("https"));
   assert.ok(!urlSchemes.has("javascript"));
   assert.ok(blockedUrlSchemes.has("data"));
+});
+
+test("normalizeSitePattern keeps hosts and *. wildcards", () => {
+  assert.equal(normalizeSitePattern("example.com"), "example.com");
+  assert.equal(normalizeSitePattern("*.Example.COM"), "*.example.com");
+  assert.equal(normalizeSitePattern(" https://sub.example.com:8080/a "), "sub.example.com");
+  assert.equal(normalizeSitePattern("file://"), "file://");
+  assert.equal(normalizeSitePattern(""), "");
+  assert.equal(normalizeSitePattern("not a host"), "");
+  assert.equal(normalizeSitePattern("*."), "");
+  assert.equal(normalizeSitePattern("*"), "");
+});
+
+test("matchesSitePattern matches exact, wildcard and file entries", () => {
+  assert.equal(matchesSitePattern("example.com", "example.com"), true);
+  assert.equal(matchesSitePattern("other.com", "example.com"), false);
+  assert.equal(matchesSitePattern("sub.example.com", "*.example.com"), true);
+  assert.equal(matchesSitePattern("example.com", "*.example.com"), true);
+  assert.equal(matchesSitePattern("deep.sub.example.com", "*.example.com"), true);
+  assert.equal(matchesSitePattern("notexample.com", "*.example.com"), false);
+  assert.equal(matchesSitePattern("example.com.evil.com", "*.example.com"), false);
+  assert.equal(matchesSitePattern("", "file://", "file:"), true);
+  assert.equal(matchesSitePattern("example.com", "file://", "https:"), false);
+  assert.equal(matchesSitePattern("a.com", ""), false);
+});
+
+test("pageSiteKey maps local files to the file sentinel", () => {
+  assert.equal(pageSiteKey("", "file:"), "file://");
+  assert.equal(pageSiteKey("example.com", "https:"), "example.com");
+  assert.equal(pageSiteKey("", "about:"), "");
 });

@@ -192,3 +192,32 @@ export function normalizeHost(raw) {
     ? host
     : "";
 }
+
+export function normalizeSitePattern(raw) {
+  if (typeof raw !== "string") return "";
+  const pattern = raw.trim().toLowerCase();
+  if (!pattern) return "";
+  if (pattern === "file://") return pattern;
+  if (pattern.startsWith("*.")) {
+    const base = normalizeHost(pattern.slice(2));
+    return base ? `*.${base}` : "";
+  }
+  return normalizeHost(pattern);
+}
+
+export function matchesSitePattern(hostname, pattern, protocol = "") {
+  if (!pattern) return false;
+  const host = (hostname || "").toLowerCase();
+  if (pattern === "file://") return protocol === "file:";
+  if (pattern.startsWith("*.")) {
+    const base = pattern.slice(2);
+    return host === base || host.endsWith(`.${base}`);
+  }
+  return host === pattern.toLowerCase();
+}
+
+export function pageSiteKey(hostname, protocol = "") {
+  const host = hostname || "";
+  if (!host && protocol === "file:") return "file://";
+  return host;
+}
