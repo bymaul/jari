@@ -41,9 +41,13 @@ hintHover, hintYankText, hintOpenCurrent.
 
 ## Settings (`;e`)
 
-Everything is rebindable with several bindings per command. Hints offers
-themes, label size, and an extra clickable selector; disabled sites accept
-`*.example.com` wildcards.
+Open with `;e`. Everything above is rebindable: each command holds several
+bindings, and keys chain into sequences of any length - keep typing, then
+`Enter` to save when binding. Overlapping bindings are allowed but flagged -
+the single key fires first.
+
+Hints offers themes, label size, and an extra clickable selector; disabled
+sites accept `*.example.com` wildcards.
 
 ## Install
 

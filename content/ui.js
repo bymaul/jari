@@ -1,4 +1,4 @@
-import { balanceCategories } from "./keymap.js";
+import { balanceCategories, displayCombo } from "./keymap.js";
 
 export function sendMessage(action, payload = {}) {
   return new Promise((resolve) => {
@@ -82,7 +82,7 @@ function showcmd(text) {
     showcmdEl.className = "jari-showcmd";
     statusContainer().appendChild(showcmdEl);
   }
-  showcmdEl.textContent = text;
+  showcmdEl.textContent = displayCombo(text);
 }
 
 function flash(text, ms = 600) {

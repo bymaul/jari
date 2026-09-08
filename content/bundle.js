@@ -363,6 +363,11 @@
     "Fn",
     "AltGraph"
   ]);
+  function displayCombo(combo) {
+    if (typeof combo !== "string" || combo === "") return combo;
+    if (combo === " ") return "<Space>";
+    return combo.replaceAll(" ", " <Space>");
+  }
   function keysForCommand(keymap, commandName) {
     return Object.entries(keymap).filter(([, cmd]) => cmd === commandName).map(([key]) => key);
   }
@@ -810,7 +815,7 @@
       showcmdEl.className = "jari-showcmd";
       statusContainer().appendChild(showcmdEl);
     }
-    showcmdEl.textContent = text;
+    showcmdEl.textContent = displayCombo(text);
   }
   function flash(text, ms = 600) {
     showcmd(text);
@@ -2607,7 +2612,7 @@
               keyTd.textContent = "unbound";
               keyTd.classList.add("jari-unbound");
             } else {
-              keyTd.textContent = keys.join(", ");
+              keyTd.textContent = keys.map(displayCombo).join(", ");
             }
             const labelTd = document.createElement("td");
             labelTd.className = "jari-help-label";
@@ -6825,6 +6830,7 @@ ${location.href}`;
     }
   }
   function displaySuffix(suffix) {
+    if (suffix === " ") return "<Space>";
     return suffix.length > 1 ? `${suffix[0]} \u25B8 ${suffix.slice(1)}` : suffix;
   }
   function filteredEntries() {
@@ -6838,7 +6844,7 @@ ${location.href}`;
   function paint() {
     if (!clueEl || !listEl3 || !titleEl) return;
     const { all, rows } = filteredEntries();
-    titleEl.textContent = `${renderCount || ""}${renderPrefix} \u2014 ${rows.length}/${all.length} bindings` + (filterText ? ` \xB7 "${filterText}"` : "");
+    titleEl.textContent = `${renderCount || ""}${displayCombo(renderPrefix)} \u2014 ${rows.length}/${all.length} bindings` + (filterText ? ` \xB7 "${filterText}"` : "");
     listEl3.textContent = "";
     for (const { suffix, command } of rows) {
       const row = document.createElement("div");
@@ -6912,11 +6918,23 @@ ${location.href}`;
       render4(prefix2, countStr);
     }, delay);
   }
+  function refresh2(prefix2, countStr = "") {
+    if (!settings.isClueEnabled()) return;
+    if (!isVisible()) {
+      schedule(prefix2, countStr);
+      return;
+    }
+    renderPrefix = prefix2;
+    renderCount = countStr || "";
+    filterText = "";
+    paint();
+  }
   function getActivePrefix() {
     return activePrefix;
   }
   var Clue = {
     schedule,
+    refresh: refresh2,
     hide,
     isVisible,
     getActivePrefix,
@@ -6930,7 +6948,7 @@ ${location.href}`;
 
   // content/content.js
   var pendingCount2 = "";
-  var pendingPrefix = null;
+  var pendingKeys = "";
   var timer = null;
   var ignoreMode = false;
   var passthroughMode = false;
@@ -6942,7 +6960,7 @@ ${location.href}`;
   }
   function clearPending() {
     pendingCount2 = "";
-    pendingPrefix = null;
+    pendingKeys = "";
     ui.showcmd(null);
     Clue.hide();
   }
@@ -7060,13 +7078,13 @@ ${location.href}`;
       return;
     }
     const key = canonicalKey(event);
-    const prefixKey = pendingPrefix;
-    const prefixWasPending = prefixKey !== null;
+    const buffer = pendingKeys;
+    const bufferWasPending = buffer !== "";
     let commandName = null;
-    if (prefixWasPending) {
-      commandName = settings.getKeymap()[prefixKey + key] || null;
+    if (bufferWasPending) {
+      commandName = settings.getKeymap()[buffer + key] || null;
       if (commandName) {
-        pendingPrefix = null;
+        pendingKeys = "";
         ui.showcmd(null);
       }
     }
@@ -7080,11 +7098,18 @@ ${location.href}`;
       }
       return;
     }
-    if (prefixWasPending && !commandName) {
+    if (bufferWasPending && !commandName) {
       event.preventDefault();
       event.stopImmediatePropagation();
       if (event.key === "Backspace" && Clue.hasFilter()) {
         Clue.backspaceFilter();
+        restartTimer();
+        return;
+      }
+      if (!event.ctrlKey && !event.altKey && !event.metaKey && isPrefixKey(settings.getKeymap(), buffer + key)) {
+        pendingKeys = buffer + key;
+        ui.showcmd(pendingCount2 + pendingKeys);
+        Clue.refresh(pendingKeys, pendingCount2);
         restartTimer();
         return;
       }
@@ -7122,7 +7147,7 @@ ${location.href}`;
       return;
     }
     if (!commandName && isPrefixKey(settings.getKeymap(), key)) {
-      pendingPrefix = key;
+      pendingKeys = key;
       ui.showcmd(pendingCount2 + key);
       Clue.schedule(key, pendingCount2);
       event.preventDefault();
@@ -7139,8 +7164,8 @@ ${location.href}`;
     const count = parseRepeatCount(pendingCount2);
     const hadCount = countStr !== "";
     pendingCount2 = "";
-    if (hadCount || prefixWasPending)
-      ui.flash(countStr + (prefixKey || "") + key);
+    if (hadCount || bufferWasPending)
+      ui.flash(countStr + buffer + key);
     restartTimer();
     run(commandName, count, event);
   }
@@ -7165,7 +7190,7 @@ ${location.href}`;
     timer = null;
     passthroughTimer = null;
     pendingCount2 = "";
-    pendingPrefix = null;
+    pendingKeys = "";
     ignoreMode = false;
     passthroughMode = false;
     if (pills.ignore) hidePill2("ignore");

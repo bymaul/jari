@@ -153,6 +153,12 @@ export function isReservedCombo(combo) {
   return /^[0-9]$/.test(combo);
 }
 
+export function displayCombo(combo) {
+  if (typeof combo !== "string" || combo === "") return combo;
+  if (combo === " ") return "<Space>";
+  return combo.replaceAll(" ", " <Space>");
+}
+
 export function findBindingConflict(keymap, combo, commandName) {
   const existing = keymap[combo];
   if (existing && existing !== commandName) return existing;

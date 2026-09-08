@@ -772,7 +772,6 @@ function showVisualHints(requestedMode) {
   hintActive = true;
   enableSelectOverride();
   renderHints();
-  // pill for hinting
   if (!pillEl) {
     try {
       pillEl = document.createElement("div");
@@ -801,7 +800,6 @@ function closeHints() {
     hintHolder = null;
   }
   if (!active && !hintActive) disableSelectOverride();
-  // restore pill if visual active, else hide
   if (!active && pillEl) {
     try {
       pillEl.remove();
@@ -817,7 +815,6 @@ function activateHintByLabel(label) {
   if (!entry) return false;
   const el = entry.el;
   closeHints();
-  // Now enter visual at this element
   enterAtElement(el, pendingVisualMode);
   return true;
 }
@@ -827,7 +824,6 @@ function enterAtElement(el, newMode) {
   mode = newMode || "visual";
   let range = null;
   try {
-    // Find first text node in element
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         if (!node.nodeValue || !node.nodeValue.trim())
@@ -840,7 +836,6 @@ function enterAtElement(el, newMode) {
       range = document.createRange();
       range.setStart(first, 0);
       range.collapse(true);
-      // For line mode, we want to select the whole element's line, but start collapsed then extend
     } else {
       range = document.createRange();
       range.selectNodeContents(el);
@@ -857,7 +852,6 @@ function enterAtElement(el, newMode) {
     sel.removeAllRanges();
     sel.addRange(range);
   } catch {}
-  // For visual, extend by one char to show selection
   if (mode !== "line" && sel.isCollapsed) {
     if (hasModify()) {
       try {
@@ -866,16 +860,10 @@ function enterAtElement(el, newMode) {
     }
   }
   if (mode === "line") {
-    // Expand to line: select whole element's text as line
     try {
-      // Try to expand to line boundaries
       if (hasModify()) {
         sel.modify("extend", "forward", "lineboundary");
-        // For line mode, we want full line, so also extend backward to start
-        // But selection is at start, extending forward to line end gives one line
-        // That's okay for single line element
       } else {
-        // fallback: select element contents
         const r2 = document.createRange();
         r2.selectNodeContents(el);
         sel.removeAllRanges();

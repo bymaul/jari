@@ -21,6 +21,8 @@ versioned for the extension manifest (`manifest.base.json`).
 - White focus borders on the options page.
 - Stored keymaps gain bindings for newly added commands (existing
   custom binds are never clobbered).
+- Multi-key bindings: key sequences of any length (`gfp`…) with nested
+  which-key clues; the options recorder saves chains on `Enter`.
 - The hint status pill shows the pending prefix.
 
 ### Fixed

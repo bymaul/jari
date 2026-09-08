@@ -357,8 +357,8 @@ test("a dead key filters the visible clue instead of cancelling", () => {
     settings.set({ clueDelayMs: 300 });
   }
 });
-
-test("Backspace pops the clue filter and keeps the prefix", () => {  settings.set({ clueDelayMs: 0 });
+test("Backspace pops the clue filter and keeps the prefix", () => {
+  settings.set({ clueDelayMs: 0 });
   const original = commands.goToParent;
   let calls = 0;
   commands.goToParent = { run: () => calls++ };
@@ -376,5 +376,42 @@ test("Backspace pops the clue filter and keeps the prefix", () => {  settings.se
   } finally {
     commands.goToParent = original;
     settings.set({ clueDelayMs: 300 });
+  }
+});
+
+test("a three-key sequence composes a binding and takes a count", () => {
+  const saved = { ...settings.getKeymap() };
+  settings.set({ keymap: { ...saved, qfk: "__tmpTriple" } });
+  const seen = [];
+  commands.__tmpTriple = { repeatable: true, run: (c) => seen.push(c.count) };
+  try {
+    handleKeydown(key({ key: "2" }));
+    handleKeydown(key({ key: "q" }));
+    handleKeydown(key({ key: "f" }));
+    assert.equal(seen.length, 0);
+    handleKeydown(key({ key: "k" }));
+    assert.deepEqual(seen, [2]);
+  } finally {
+    delete commands.__tmpTriple;
+    settings.set({ keymap: saved });
+  }
+});
+
+test("a dead key mid-sequence cancels the whole buffer", () => {
+  const saved = { ...settings.getKeymap() };
+  settings.set({ keymap: { ...saved, qfk: "__tmpTriple" } });
+  const seen = [];
+  commands.__tmpTriple = { run: (c) => seen.push(c.count) };
+  spyOn("scrollUp");
+  try {
+    handleKeydown(key({ key: "q" }));
+    handleKeydown(key({ key: "z" }));
+    assert.deepEqual(seen, []);
+    handleKeydown(key({ key: "k" }));
+    assert.deepEqual(seen, []);
+    assert.equal(spiedCalls.scrollUp.length, 1);
+  } finally {
+    delete commands.__tmpTriple;
+    settings.set({ keymap: saved });
   }
 });

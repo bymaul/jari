@@ -16,7 +16,7 @@ import { __resetVisualState } from "./visual.js";
 import { Clue, __resetClueState } from "./clue.js";
 
 let pendingCount = "";
-let pendingPrefix = null;
+let pendingKeys = "";
 let timer = null;
 let ignoreMode = false;
 let passthroughMode = false;
@@ -30,7 +30,7 @@ function pillPassthroughText() {
 
 function clearPending() {
   pendingCount = "";
-  pendingPrefix = null;
+  pendingKeys = "";
   ui.showcmd(null);
   Clue.hide();
 }
@@ -172,13 +172,13 @@ function handleKeydown(event) {
 
   const key = canonicalKey(event);
 
-  const prefixKey = pendingPrefix;
-  const prefixWasPending = prefixKey !== null;
+  const buffer = pendingKeys;
+  const bufferWasPending = buffer !== "";
   let commandName = null;
-  if (prefixWasPending) {
-    commandName = settings.getKeymap()[prefixKey + key] || null;
+  if (bufferWasPending) {
+    commandName = settings.getKeymap()[buffer + key] || null;
     if (commandName) {
-      pendingPrefix = null;
+      pendingKeys = "";
       ui.showcmd(null);
     }
   }
@@ -194,11 +194,23 @@ function handleKeydown(event) {
     return;
   }
 
-  if (prefixWasPending && !commandName) {
+  if (bufferWasPending && !commandName) {
     event.preventDefault();
     event.stopImmediatePropagation();
     if (event.key === "Backspace" && Clue.hasFilter()) {
       Clue.backspaceFilter();
+      restartTimer();
+      return;
+    }
+    if (
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      isPrefixKey(settings.getKeymap(), buffer + key)
+    ) {
+      pendingKeys = buffer + key;
+      ui.showcmd(pendingCount + pendingKeys);
+      Clue.refresh(pendingKeys, pendingCount);
       restartTimer();
       return;
     }
@@ -246,7 +258,7 @@ function handleKeydown(event) {
   }
 
   if (!commandName && isPrefixKey(settings.getKeymap(), key)) {
-    pendingPrefix = key;
+    pendingKeys = key;
     ui.showcmd(pendingCount + key);
     Clue.schedule(key, pendingCount);
     event.preventDefault();
@@ -266,8 +278,8 @@ function handleKeydown(event) {
   const hadCount = countStr !== "";
   pendingCount = "";
 
-  if (hadCount || prefixWasPending)
-    ui.flash(countStr + (prefixKey || "") + key);
+  if (hadCount || bufferWasPending)
+    ui.flash(countStr + buffer + key);
   restartTimer();
 
   run(commandName, count, event);
@@ -301,7 +313,7 @@ export function __resetState() {
   timer = null;
   passthroughTimer = null;
   pendingCount = "";
-  pendingPrefix = null;
+  pendingKeys = "";
   ignoreMode = false;
   passthroughMode = false;
   if (pills.ignore) hidePill("ignore");

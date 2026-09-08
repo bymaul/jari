@@ -258,3 +258,31 @@ test("find toggles default to Alt chords without conflicts", () => {
     null,
   );
 });
+
+test("prefix helpers work for multi-key sequences", () => {
+  const keymap = { gfk: "hintYank", gu: "goToParent" };
+  assert.equal(Jari.isPrefixKey(keymap, "g"), true);
+  assert.equal(Jari.isPrefixKey(keymap, "gf"), true);
+  assert.equal(Jari.isPrefixKey(keymap, "gfk"), false);
+  assert.equal(Jari.isPrefixKey(keymap, "x"), false);
+  assert.deepEqual(
+    Jari.getPrefixEntries(keymap, "gf").map((e) => e.suffix),
+    ["k"],
+  );
+  assert.deepEqual(
+    Jari.getPrefixEntries(keymap, "g")
+      .map((e) => e.suffix)
+      .sort(),
+    ["fk", "u"],
+  );
+});
+
+test("displayCombo names the space key", () => {
+  assert.equal(Jari.displayCombo(" "), "<Space>");
+  assert.equal(Jari.displayCombo("g "), "g <Space>");
+  assert.equal(Jari.displayCombo("ctrl+ "), "ctrl+ <Space>");
+  assert.equal(Jari.displayCombo("gf"), "gf");
+  assert.equal(Jari.displayCombo("ctrl+t"), "ctrl+t");
+  assert.equal(Jari.displayCombo(""), "");
+  assert.equal(Jari.displayCombo(null), null);
+});

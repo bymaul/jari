@@ -267,3 +267,21 @@ test("multi-char suffixes render as nested chains", async () => {
     assert.ok(keys.some((k) => k.includes("▸")), keys.join(","));
   });
 });
+
+test("refresh renders a nested prefix level", async () => {
+  settings.set({
+    keymap: { gfk: "hintYank", gu: "goToParent", gf: "hintOpenBackground" },
+    clueEnabled: true,
+    clueDelayMs: 0,
+  });
+  const doc = makeDocument();
+  await withDocument(doc, async () => {
+    Clue.schedule("g", "");
+    assert.equal(Clue.isVisible(), true);
+    Clue.refresh("gf", "");
+    const keys = clueRows(doc).map((row) => row.children[0].textContent);
+    assert.deepEqual(keys, ["k"]);
+    const root = doc.bodyChildren.find((el) => el.className === "jari-clue");
+    assert.match(root.children[0].textContent, /gf/);
+  });
+});

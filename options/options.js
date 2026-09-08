@@ -2,6 +2,7 @@ import {
   SETTINGS_SCHEMA_VERSION,
   canonicalKey,
   clearingKeys,
+  displayCombo,
   findBindingConflict,
   findOverlapConflicts,
   isBindablePrefixStarter,
@@ -68,7 +69,7 @@ const cards = {
 
 const ADD_LABEL = "+";
 const RECORDING_TITLE =
-  "Press a key to bind. Esc cancels. Any letter can start a prefix — press Enter to keep it single.";
+  "Press a key to bind. Esc cancels. Any letter can start a multi-key sequence — keep typing keys, then Enter to save.";
 
 const OPEN_KEY = "jari.options.open";
 
@@ -415,7 +416,8 @@ function renderKeymap() {
 function refreshKeyLabels() {
   for (const el of document.querySelectorAll("code[data-key]")) {
     const keys = keysFor(el.dataset.key);
-    el.textContent = keys.length > 0 ? keys.join(", ") : "unbound";
+    el.textContent =
+      keys.length > 0 ? keys.map(displayCombo).join(", ") : "unbound";
   }
 }
 
@@ -434,29 +436,30 @@ function keysFor(commandName) {
 }
 
 function buildChip(name, cmd, combo, overlapped) {
+  const shown = displayCombo(combo);
   const chip = document.createElement("span");
   chip.className = overlapped ? "chip overlap" : "chip";
   chip.tabIndex = 0;
   chip.dataset.command = name;
   chip.dataset.binding = combo;
   chip.title = overlapped
-    ? `${combo} → ${cmd.label}. Overlaps another binding — single key fires first. Backspace removes.`
-    : `${combo} → ${cmd.label}. Backspace removes.`;
+    ? `${shown} → ${cmd.label}. Overlaps another binding — single key fires first. Backspace removes.`
+    : `${shown} → ${cmd.label}. Backspace removes.`;
   chip.setAttribute(
     "aria-label",
     overlapped
-      ? `${combo}, ${cmd.label}, overlaps another binding. Press Delete to remove.`
-      : `${combo}, ${cmd.label}. Press Delete to remove.`,
+      ? `${shown}, ${cmd.label}, overlaps another binding. Press Delete to remove.`
+      : `${shown}, ${cmd.label}. Press Delete to remove.`,
   );
   const keySpan = document.createElement("span");
   keySpan.className = "chip-key";
-  keySpan.textContent = combo;
+  keySpan.textContent = shown;
   const rm = document.createElement("button");
   rm.type = "button";
   rm.className = "chip-remove";
   rm.textContent = "×";
-  rm.title = `Remove ${combo} from ${cmd.label}`;
-  rm.setAttribute("aria-label", `Remove ${combo} from ${cmd.label}`);
+  rm.title = `Remove ${shown} from ${cmd.label}`;
+  rm.setAttribute("aria-label", `Remove ${shown} from ${cmd.label}`);
   rm.addEventListener("click", (event) => {
     event.stopPropagation();
     clearBinding(name, combo);
@@ -490,7 +493,7 @@ function buildOverlapNote(overlaps) {
   if (!overlaps || overlaps.others.length === 0) return null;
   const warn = document.createElement("div");
   warn.className = "key-overlap-warn";
-  warn.textContent = `Overlaps ${overlaps.others.join(", ")} — single key fires first`;
+  warn.textContent = `Overlaps ${overlaps.others.map(displayCombo).join(", ")} — single key fires first`;
   return warn;
 }
 
@@ -516,7 +519,7 @@ function startRecording(button, name) {
   cancelRecordingSilent();
   dismissConflict(button);
   const hint = recordingHintEl(button);
-  activeRecording = { button, name, waitingPrefix: null };
+  activeRecording = { button, name, waitingKeys: [] };
   setRecordingFlag(true);
   button.classList.add("recording");
   button.title = RECORDING_TITLE;
@@ -576,11 +579,11 @@ function onAddKeydown(event, button, name) {
   if (modifierKeys.has(event.key)) return;
 
   if (event.key === "Escape") {
-    if (activeRecording.waitingPrefix) {
-      activeRecording.waitingPrefix = null;
+    if (activeRecording.waitingKeys.length > 0) {
+      activeRecording.waitingKeys = [];
       const hint = recordingHintEl(button);
       if (hint) hint.textContent = "Press a key… Esc cancels.";
-      status("Prefix cancelled — press a key, or Esc again to stop");
+      status("Sequence cancelled — press a key, or Esc again to stop");
       return;
     }
     cancelRecording();
@@ -588,9 +591,19 @@ function onAddKeydown(event, button, name) {
   }
 
   if (clearingKeys.has(event.key)) {
-    if (activeRecording.waitingPrefix) {
-      activeRecording.waitingPrefix = null;
-      status("Prefix cancelled — press a key");
+    if (activeRecording.waitingKeys.length > 0) {
+      activeRecording.waitingKeys.pop();
+      const keys = activeRecording.waitingKeys.join("");
+      const shown = displayCombo(keys);
+      const hint = recordingHintEl(button);
+      if (hint) {
+        hint.textContent = keys
+          ? `Next key for ${shown}… or Enter to save ${shown}`
+          : "Press a key… Esc cancels.";
+      }
+      status(
+        keys ? `Sequence ${shown} — press the next key, or Enter to save` : "Press a key",
+      );
       return;
     }
     cancelRecordingSilent();
@@ -599,29 +612,32 @@ function onAddKeydown(event, button, name) {
     return;
   }
 
-  if (event.key === "Enter" && activeRecording.waitingPrefix) {
-    const single = activeRecording.waitingPrefix;
-    activeRecording.waitingPrefix = null;
-    attemptCommit(single, name, button);
+  if (event.key === "Enter" && activeRecording.waitingKeys.length > 0) {
+    const combo = activeRecording.waitingKeys.join("");
+    activeRecording.waitingKeys = [];
+    attemptCommit(combo, name, button);
     return;
   }
 
   const combo = canonicalKey(event);
 
-  if (activeRecording.waitingPrefix) {
-    const full = activeRecording.waitingPrefix + combo;
-    activeRecording.waitingPrefix = null;
-    attemptCommit(full, name, button);
+  if (activeRecording.waitingKeys.length > 0) {
+    activeRecording.waitingKeys.push(combo);
+    const shown = displayCombo(activeRecording.waitingKeys.join(""));
+    const hint = recordingHintEl(button);
+    if (hint) hint.textContent = `Next key for ${shown}… or Enter to save ${shown}`;
+    status(`Sequence ${shown} — press the next key, or Enter to save`);
     return;
   }
 
   if (isBindablePrefixStarter(combo)) {
-    activeRecording.waitingPrefix = combo;
+    activeRecording.waitingKeys = [combo];
+    const shown = displayCombo(combo);
     const hint = recordingHintEl(button);
     if (hint)
-      hint.textContent = `Next key for ${combo}… or Enter for ${combo} alone`;
+      hint.textContent = `Next key for ${shown}… or Enter to save ${shown} alone`;
     status(
-      `Prefix ${combo} — press the next key, or Enter to bind ${combo} alone`,
+      `Sequence ${shown} — press the next key, or Enter to save ${shown} alone`,
     );
     return;
   }
@@ -637,10 +653,11 @@ function onAddKeydown(event, button, name) {
 }
 
 function attemptCommit(combo, name, button) {
+  const shown = displayCombo(combo);
   if (isBrowserTrapped(combo)) {
     const hint = recordingHintEl(button);
     if (hint) {
-      hint.textContent = `${combo} may be grabbed by the browser before Jari sees it.`;
+      hint.textContent = `${shown} may be grabbed by the browser before Jari sees it.`;
       hint.hidden = false;
     }
   }
@@ -648,7 +665,7 @@ function attemptCommit(combo, name, button) {
   if (keymap[combo] === name) {
     exitRecording();
     renderKeymap();
-    status(`${combo} is already bound to ${commandLabel(name)}`);
+    status(`${shown} is already bound to ${commandLabel(name)}`);
     focusChipFor(name, combo);
     return;
   }
@@ -691,22 +708,24 @@ async function commitCombo(combo, name, swapWith, doSwap = false) {
   if (!ok) return;
   const overlapNote =
     overlaps.length > 0
-      ? ` (note: overlaps ${overlaps.map((o) => o.key).join(", ")} — single key fires first)`
+      ? ` (note: overlaps ${overlaps.map((o) => displayCombo(o.key)).join(", ")} — single key fires first)`
       : "";
   const trappedNote = isBrowserTrapped(combo)
-    ? ` (note: the browser may grab ${combo} before Jari sees it)`
+    ? ` (note: the browser may grab ${displayCombo(combo)} before Jari sees it)`
     : "";
   const notes = `${overlapNote}${trappedNote}`;
+  const shown = displayCombo(combo);
+  const shownPrevious = previous ? displayCombo(previous) : "";
   if (swapped) {
     status(
-      `Swapped: ${combo} → ${commandLabel(name)}, ${previous} → ${commandLabel(swapWith)}${notes}`,
+      `Swapped: ${shown} → ${commandLabel(name)}, ${shownPrevious} → ${commandLabel(swapWith)}${notes}`,
     );
   } else if (swapWith) {
     status(
-      `Saved ${combo} → ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${combo})${notes}`,
+      `Saved ${shown} → ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${shown})${notes}`,
     );
   } else {
-    status(`Saved ${combo} → ${commandLabel(name)}${notes}`);
+    status(`Saved ${shown} → ${commandLabel(name)}${notes}`);
   }
   focusChipFor(name, combo);
 }
@@ -785,16 +804,17 @@ function showConflict(button, name, combo, conflictingCommand) {
     return;
   }
   dismissConflict(button);
+  const shown = displayCombo(combo);
   const hint = recordingHintEl(button);
   if (hint) {
-    hint.textContent = `${combo} is taken — choose below, or Esc to keep recording`;
+    hint.textContent = `${shown} is taken — choose below, or Esc to keep recording`;
     hint.hidden = false;
   }
   const box = document.createElement("div");
   box.className = "key-conflict";
   const msg = document.createElement("div");
   msg.className = "key-conflict-msg";
-  msg.textContent = `${combo} is already ${commandLabel(conflictingCommand)}.`;
+  msg.textContent = `${shown} is already ${commandLabel(conflictingCommand)}.`;
   const actions = document.createElement("div");
   actions.className = "key-conflict-actions";
 
@@ -802,7 +822,7 @@ function showConflict(button, name, combo, conflictingCommand) {
   reassign.type = "button";
   reassign.className = "primary";
   reassign.textContent = "Reassign";
-  reassign.title = `Move ${combo} here from ${commandLabel(conflictingCommand)} (keeps your other bindings)`;
+  reassign.title = `Move ${shown} here from ${commandLabel(conflictingCommand)} (keeps your other bindings)`;
   reassign.addEventListener("click", () =>
     commitCombo(combo, name, conflictingCommand, false),
   );
@@ -828,7 +848,7 @@ function showConflict(button, name, combo, conflictingCommand) {
     const swap = document.createElement("button");
     swap.type = "button";
     swap.textContent = "Swap";
-    swap.title = `Use ${combo} here and move ${commandLabel(conflictingCommand)} to ${previous}`;
+    swap.title = `Use ${shown} here and move ${commandLabel(conflictingCommand)} to ${displayCombo(previous)}`;
     swap.addEventListener("click", () =>
       commitCombo(combo, name, conflictingCommand, true),
     );
@@ -845,7 +865,7 @@ function showConflict(button, name, combo, conflictingCommand) {
     }
   });
   cell.appendChild(box);
-  status(`${combo} is already bound — choose Reassign or Keep both`);
+  status(`${shown} is already bound — choose Reassign or Keep both`);
   cancel.focus();
 }
 

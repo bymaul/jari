@@ -1,4 +1,4 @@
-import { getPrefixEntries } from "./keymap.js";
+import { displayCombo, getPrefixEntries } from "./keymap.js";
 import { settings } from "./settings.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
@@ -43,6 +43,7 @@ function hide() {
 }
 
 function displaySuffix(suffix) {
+  if (suffix === " ") return "<Space>";
   return suffix.length > 1
     ? `${suffix[0]} ▸ ${suffix.slice(1)}`
     : suffix;
@@ -63,7 +64,7 @@ function paint() {
   if (!clueEl || !listEl || !titleEl) return;
   const { all, rows } = filteredEntries();
   titleEl.textContent =
-    `${renderCount || ""}${renderPrefix} — ${rows.length}/${all.length} bindings` +
+    `${renderCount || ""}${displayCombo(renderPrefix)} — ${rows.length}/${all.length} bindings` +
     (filterText ? ` · "${filterText}"` : "");
   listEl.textContent = "";
   for (const { suffix, command } of rows) {
@@ -151,12 +152,25 @@ function schedule(prefix, countStr = "") {
   }, delay);
 }
 
+function refresh(prefix, countStr = "") {
+  if (!settings.isClueEnabled()) return;
+  if (!isVisible()) {
+    schedule(prefix, countStr);
+    return;
+  }
+  renderPrefix = prefix;
+  renderCount = countStr || "";
+  filterText = "";
+  paint();
+}
+
 function getActivePrefix() {
   return activePrefix;
 }
 
 export const Clue = {
   schedule,
+  refresh,
   hide,
   isVisible,
   getActivePrefix,

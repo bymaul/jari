@@ -1,6 +1,7 @@
 import { settings } from "./settings.js";
 import { ui } from "./ui.js";
 import { COMMAND_CATALOG } from "./catalog.js";
+import { displayCombo } from "./keymap.js";
 import { register, touch } from "./overlays.js";
 
 const STEP = 50;
@@ -79,7 +80,7 @@ function render() {
             keyTd.textContent = 'unbound';
             keyTd.classList.add('jari-unbound');
           } else {
-            keyTd.textContent = keys.join(', ');
+            keyTd.textContent = keys.map(displayCombo).join(', ');
           }
           const labelTd = document.createElement('td');
           labelTd.className = 'jari-help-label';
