@@ -88,7 +88,7 @@ test("persisted settings carry the current schema version", async () => {
   });
   await settings.update({ scrollStep: 123 });
   assert.equal(writes.length, 1);
-  assert.equal(writes[0].settings.schemaVersion, 4);
+  assert.equal(writes[0].settings.schemaVersion, 5);
 });
 
 test("unbinding a backfilled combo sticks", async () => {

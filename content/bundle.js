@@ -13,6 +13,77 @@
   }
   var MIN_SCROLL_AREA_SIZE = 16;
 
+  // shared/search-engines.js
+  var SEARCH_ENGINE_DEFAULTS = [
+    { keyword: "g", url: "https://www.google.com/search?q=%s" },
+    { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
+    { keyword: "gh", url: "https://github.com/search?q=%s" },
+    { keyword: "wiki", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
+    { keyword: "chat", url: "https://chatgpt.com/?q=%s" }
+  ];
+  var DEFAULT_SEARCH_ENGINE = "g";
+  var MAX_SEARCH_ENGINES = 20;
+  var SEARCH_KEYWORD_RE = /^[a-z0-9_]{1,16}$/;
+  var SEARCH_ENGINE_URL_MAX = 500;
+  var RESERVED_ENGINE_KEYWORDS = ["t"];
+  function searchEngineDefaults() {
+    return SEARCH_ENGINE_DEFAULTS.map((e) => ({ ...e }));
+  }
+  function validateSearchEngine(entry) {
+    if (!entry || typeof entry !== "object") return "Engine must have a keyword and URL.";
+    const keyword = String(entry.keyword || "").toLowerCase();
+    if (!SEARCH_KEYWORD_RE.test(keyword)) {
+      return "Keyword must be 1-16 letters, digits, or underscores.";
+    }
+    if (RESERVED_ENGINE_KEYWORDS.includes(keyword)) {
+      return `Keyword "${keyword}" is reserved for tab search.`;
+    }
+    const url = String(entry.url || "").trim();
+    if (!/^https?:\/\//i.test(url)) {
+      return "URL must start with http:// or https://.";
+    }
+    if (url.length > SEARCH_ENGINE_URL_MAX) {
+      return `URL must be ${SEARCH_ENGINE_URL_MAX} characters or fewer.`;
+    }
+    if (!url.includes("%s")) {
+      return "URL must contain %s where the query goes.";
+    }
+    return null;
+  }
+  function normalizeSearchEngines(raw) {
+    if (!Array.isArray(raw)) return searchEngineDefaults();
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const entry of raw) {
+      if (out.length >= MAX_SEARCH_ENGINES) break;
+      if (validateSearchEngine(entry)) continue;
+      const keyword = String(entry.keyword).toLowerCase();
+      if (seen.has(keyword)) continue;
+      seen.add(keyword);
+      out.push({ keyword, url: String(entry.url).trim() });
+    }
+    return out.length > 0 ? out : searchEngineDefaults();
+  }
+  function normalizeDefaultEngine(raw, engines) {
+    const list = Array.isArray(engines) && engines.length > 0 ? engines : searchEngineDefaults();
+    const keyword = String(raw || "").toLowerCase();
+    if (list.some((e) => e && e.keyword === keyword)) return keyword;
+    return list[0].keyword;
+  }
+  function parseEngineKeyword(query3, engines) {
+    const m = String(query3 || "").trim().match(/^(\w+)\s+(.*\S)/);
+    if (!m) return null;
+    const url = buildEngineUrl(engines, m[1], m[2]);
+    if (!url) return null;
+    return { keyword: m[1].toLowerCase(), rest: m[2], url };
+  }
+  function buildEngineUrl(engines, keyword, query3) {
+    const kw = String(keyword || "").toLowerCase();
+    const engine = (engines || []).find((e) => e && e.keyword === kw);
+    if (!engine) return null;
+    return String(engine.url).replaceAll("%s", encodeURIComponent(query3));
+  }
+
   // shared/url.js
   var urlSchemes = /* @__PURE__ */ new Set([
     "http",
@@ -246,7 +317,7 @@
   }
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 4;
+  var SETTINGS_SCHEMA_VERSION = 5;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -346,6 +417,8 @@
     clueDelayMs: 300,
     suggestionSources: suggestionSources.slice(),
     maxResults: maxResultsDefault,
+    searchEngines: searchEngineDefaults(),
+    defaultEngine: DEFAULT_SEARCH_ENGINE,
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT,
     clickableSelector: "",
@@ -470,6 +543,14 @@
       d.keymap = backfillNewBindings(d.keymap);
       version = 4;
     }
+    if (version < 5) {
+      if (d.searchEngines === void 0)
+        d.searchEngines = searchEngineDefaults();
+      const engines = normalizeSearchEngines(d.searchEngines);
+      d.searchEngines = engines;
+      d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
+      version = 5;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -495,6 +576,7 @@
     }
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
     const disabledSites = Array.isArray(d.disabledSites) ? [...new Set(d.disabledSites.map(normalizeSitePattern).filter(Boolean))] : [];
+    const searchEngines = Array.isArray(d.searchEngines) ? normalizeSearchEngines(d.searchEngines) : settingsDefaults.searchEngines.map((e) => ({ ...e }));
     return {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap,
@@ -506,6 +588,8 @@
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
+      searchEngines,
+      defaultEngine: normalizeDefaultEngine(d.defaultEngine, searchEngines),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
       clickableSelector: normalizeClickableSelector(d.clickableSelector),
@@ -552,6 +636,8 @@
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     maxResults: settingsDefaults.maxResults,
+    searchEngines: settingsDefaults.searchEngines.map((e) => ({ ...e })),
+    defaultEngine: settingsDefaults.defaultEngine,
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
     clickableSelector: settingsDefaults.clickableSelector,
@@ -572,6 +658,8 @@
     state.passthroughMs = s.passthroughMs;
     state.suggestionSources = s.suggestionSources;
     state.maxResults = s.maxResults;
+    state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
+    state.defaultEngine = s.defaultEngine;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
     state.clickableSelector = s.clickableSelector;
@@ -614,6 +702,8 @@
       passthroughMs: state.passthroughMs,
       suggestionSources: state.suggestionSources.slice(),
       maxResults: state.maxResults,
+      searchEngines: state.searchEngines.map((e) => ({ ...e })),
+      defaultEngine: state.defaultEngine,
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
       clickableSelector: state.clickableSelector,
@@ -681,6 +771,12 @@
   function getMaxResults() {
     return state.maxResults;
   }
+  function getSearchEngines() {
+    return state.searchEngines.map((e) => ({ ...e }));
+  }
+  function getDefaultEngine() {
+    return state.defaultEngine;
+  }
   function getCopyFormat() {
     return state.copyFormat;
   }
@@ -732,6 +828,8 @@
     getPassthroughMs,
     getSuggestionSources,
     getMaxResults,
+    getSearchEngines,
+    getDefaultEngine,
     getCopyFormat,
     getHintChars,
     getClickableSelector,
@@ -2054,24 +2152,8 @@
   };
 
   // content/prompt.js
-  var SEARCH_ENGINES = {
-    g: "https://www.google.com/search?q=%s",
-    yt: "https://www.youtube.com/results?search_query=%s",
-    gh: "https://github.com/search?q=%s",
-    wiki: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
-    chat: "https://chatgpt.com/?q=%s"
-  };
   function parseKeyword(query3) {
-    const m = query3.trim().match(/^(\w+)\s+(.*\S)/);
-    if (!m) return null;
-    const kw = m[1].toLowerCase();
-    const tmpl = SEARCH_ENGINES[kw];
-    if (!tmpl) return null;
-    return {
-      keyword: kw,
-      rest: m[2],
-      url: tmpl.replace("%s", encodeURIComponent(m[2]))
-    };
+    return parseEngineKeyword(query3, settings.getSearchEngines());
   }
   var active = false;
   var overlay = null;

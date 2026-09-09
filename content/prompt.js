@@ -1,27 +1,12 @@
 import { Url } from "../shared/url.js";
+import { parseEngineKeyword } from "../shared/search-engines.js";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
 import { sendMessage } from "./ui.js";
 import { register, touch } from "./overlays.js";
 
-const SEARCH_ENGINES = {
-  g: "https://www.google.com/search?q=%s",
-  yt: "https://www.youtube.com/results?search_query=%s",
-  gh: "https://github.com/search?q=%s",
-  wiki: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
-  chat: "https://chatgpt.com/?q=%s",
-};
 function parseKeyword(query) {
-  const m = query.trim().match(/^(\w+)\s+(.*\S)/);
-  if (!m) return null;
-  const kw = m[1].toLowerCase();
-  const tmpl = SEARCH_ENGINES[kw];
-  if (!tmpl) return null;
-  return {
-    keyword: kw,
-    rest: m[2],
-    url: tmpl.replace("%s", encodeURIComponent(m[2])),
-  };
+  return parseEngineKeyword(query, settings.getSearchEngines());
 }
 
 let active = false;

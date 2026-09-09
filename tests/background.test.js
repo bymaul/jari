@@ -113,6 +113,40 @@ test("search with incognito opens the search URL in an incognito window", async 
   ]);
 });
 
+test("search uses the configured default engine", async () => {
+  const createdWindows = [];
+  const savedGet = globalThis.chrome.storage.sync.get;
+  globalThis.chrome.storage.sync.get = async () => ({
+    settings: {
+      searchEngines: [
+        { keyword: "ddg", url: "https://duckduckgo.com/?q=%s" },
+        { keyword: "g", url: "https://www.google.com/search?q=%s" },
+      ],
+      defaultEngine: "ddg",
+    },
+  });
+  stubChrome({
+    windows: [{ id: 1, incognito: false }],
+    onCreateWindow: (opts) => createdWindows.push(opts),
+  });
+  try {
+    const res = await handlers.search(
+      {},
+      { query: "hello world", newTab: true, incognito: true },
+    );
+    assert.deepEqual(res, { ok: true, id: 30 });
+    assert.deepEqual(createdWindows, [
+      {
+        url: "https://duckduckgo.com/?q=hello%20world",
+        incognito: true,
+        state: "maximized",
+      },
+    ]);
+  } finally {
+    globalThis.chrome.storage.sync.get = savedGet;
+  }
+});
+
 function stubSuggestChrome(maxResults) {
   const saved = {
     query: globalThis.chrome.tabs.query,

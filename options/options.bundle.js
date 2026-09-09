@@ -12,6 +12,64 @@
     return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
   }
 
+  // shared/search-engines.js
+  var SEARCH_ENGINE_DEFAULTS = [
+    { keyword: "g", url: "https://www.google.com/search?q=%s" },
+    { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
+    { keyword: "gh", url: "https://github.com/search?q=%s" },
+    { keyword: "wiki", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
+    { keyword: "chat", url: "https://chatgpt.com/?q=%s" }
+  ];
+  var DEFAULT_SEARCH_ENGINE = "g";
+  var MAX_SEARCH_ENGINES = 20;
+  var SEARCH_KEYWORD_RE = /^[a-z0-9_]{1,16}$/;
+  var SEARCH_ENGINE_URL_MAX = 500;
+  var RESERVED_ENGINE_KEYWORDS = ["t"];
+  function searchEngineDefaults() {
+    return SEARCH_ENGINE_DEFAULTS.map((e) => ({ ...e }));
+  }
+  function validateSearchEngine(entry) {
+    if (!entry || typeof entry !== "object") return "Engine must have a keyword and URL.";
+    const keyword = String(entry.keyword || "").toLowerCase();
+    if (!SEARCH_KEYWORD_RE.test(keyword)) {
+      return "Keyword must be 1-16 letters, digits, or underscores.";
+    }
+    if (RESERVED_ENGINE_KEYWORDS.includes(keyword)) {
+      return `Keyword "${keyword}" is reserved for tab search.`;
+    }
+    const url = String(entry.url || "").trim();
+    if (!/^https?:\/\//i.test(url)) {
+      return "URL must start with http:// or https://.";
+    }
+    if (url.length > SEARCH_ENGINE_URL_MAX) {
+      return `URL must be ${SEARCH_ENGINE_URL_MAX} characters or fewer.`;
+    }
+    if (!url.includes("%s")) {
+      return "URL must contain %s where the query goes.";
+    }
+    return null;
+  }
+  function normalizeSearchEngines(raw) {
+    if (!Array.isArray(raw)) return searchEngineDefaults();
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const entry of raw) {
+      if (out.length >= MAX_SEARCH_ENGINES) break;
+      if (validateSearchEngine(entry)) continue;
+      const keyword = String(entry.keyword).toLowerCase();
+      if (seen.has(keyword)) continue;
+      seen.add(keyword);
+      out.push({ keyword, url: String(entry.url).trim() });
+    }
+    return out.length > 0 ? out : searchEngineDefaults();
+  }
+  function normalizeDefaultEngine(raw, engines) {
+    const list = Array.isArray(engines) && engines.length > 0 ? engines : searchEngineDefaults();
+    const keyword = String(raw || "").toLowerCase();
+    if (list.some((e) => e && e.keyword === keyword)) return keyword;
+    return list[0].keyword;
+  }
+
   // shared/url.js
   function normalizeHost(raw) {
     let host = raw.trim().toLowerCase();
@@ -56,7 +114,7 @@
   }
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 4;
+  var SETTINGS_SCHEMA_VERSION = 5;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -156,6 +214,8 @@
     clueDelayMs: 300,
     suggestionSources: suggestionSources.slice(),
     maxResults: maxResultsDefault,
+    searchEngines: searchEngineDefaults(),
+    defaultEngine: DEFAULT_SEARCH_ENGINE,
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT,
     clickableSelector: "",
@@ -259,6 +319,14 @@
       d.keymap = backfillNewBindings(d.keymap);
       version = 4;
     }
+    if (version < 5) {
+      if (d.searchEngines === void 0)
+        d.searchEngines = searchEngineDefaults();
+      const engines = normalizeSearchEngines(d.searchEngines);
+      d.searchEngines = engines;
+      d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
+      version = 5;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -284,6 +352,7 @@
     }
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
     const disabledSites = Array.isArray(d.disabledSites) ? [...new Set(d.disabledSites.map(normalizeSitePattern).filter(Boolean))] : [];
+    const searchEngines = Array.isArray(d.searchEngines) ? normalizeSearchEngines(d.searchEngines) : settingsDefaults.searchEngines.map((e) => ({ ...e }));
     return {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap,
@@ -295,6 +364,8 @@
       passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
+      searchEngines,
+      defaultEngine: normalizeDefaultEngine(d.defaultEngine, searchEngines),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
       clickableSelector: normalizeClickableSelector(d.clickableSelector),
@@ -426,6 +497,8 @@
     passthroughMs: settingsDefaults.passthroughMs,
     suggestionSources: settingsDefaults.suggestionSources.slice(),
     maxResults: settingsDefaults.maxResults,
+    searchEngines: settingsDefaults.searchEngines.map((e) => ({ ...e })),
+    defaultEngine: settingsDefaults.defaultEngine,
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
     clickableSelector: settingsDefaults.clickableSelector,
@@ -446,6 +519,8 @@
     state.passthroughMs = s.passthroughMs;
     state.suggestionSources = s.suggestionSources;
     state.maxResults = s.maxResults;
+    state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
+    state.defaultEngine = s.defaultEngine;
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
     state.clickableSelector = s.clickableSelector;
@@ -488,6 +563,8 @@
       passthroughMs: state.passthroughMs,
       suggestionSources: state.suggestionSources.slice(),
       maxResults: state.maxResults,
+      searchEngines: state.searchEngines.map((e) => ({ ...e })),
+      defaultEngine: state.defaultEngine,
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
       clickableSelector: state.clickableSelector,
@@ -555,6 +632,12 @@
   function getMaxResults() {
     return state.maxResults;
   }
+  function getSearchEngines() {
+    return state.searchEngines.map((e) => ({ ...e }));
+  }
+  function getDefaultEngine() {
+    return state.defaultEngine;
+  }
   function getCopyFormat() {
     return state.copyFormat;
   }
@@ -606,6 +689,8 @@
     getPassthroughMs,
     getSuggestionSources,
     getMaxResults,
+    getSearchEngines,
+    getDefaultEngine,
     getCopyFormat,
     getHintChars,
     getClickableSelector,
@@ -830,6 +915,10 @@
   var sourceHistoryEl = document.querySelector("#source-history");
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
   var maxResultsEl = document.querySelector("#max-results");
+  var defaultEngineEl = document.querySelector("#default-engine");
+  var engineListEl = document.querySelector("#engine-list");
+  var addEngineBtn = document.querySelector("#add-engine");
+  var resetEnginesBtn = document.querySelector("#reset-engines");
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
   var hintCharsMetaEl = document.querySelector("#hint-chars-meta");
@@ -938,7 +1027,8 @@
     }
     if (summaries.search) {
       const n = settings.getSuggestionSources().length;
-      summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} \xB7 ${n} source${n === 1 ? "" : "s"} \xB7 max ${settings.getMaxResults()}`;
+      const engines = settings.getSearchEngines();
+      summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} \xB7 ${n} source${n === 1 ? "" : "s"} \xB7 max ${settings.getMaxResults()} \xB7 ${engines.length} engine${engines.length === 1 ? "" : "s"} \xB7 default ${settings.getDefaultEngine()}`;
     }
     if (summaries.clipboard) {
       summaries.clipboard.textContent = settings.getCopyFormat() === "markdown" ? "Markdown link" : "Plain (title + URL)";
@@ -1005,6 +1095,7 @@
     sourceHistoryEl.checked = sources.includes("history");
     sourceBookmarkEl.checked = sources.includes("bookmark");
     maxResultsEl.value = settings.getMaxResults();
+    renderEngines();
     copyFormatEl.value = settings.getCopyFormat();
     hintCharsEl.value = settings.getHintChars();
     if (clickableSelectorEl)
@@ -1027,6 +1118,7 @@
     for (const id of [
       "error-scroll-step",
       "error-max-results",
+      "error-engines",
       "error-timeout",
       "error-passthrough-timeout",
       "error-clue-delay",
@@ -1633,6 +1725,165 @@
     if (sourceBookmarkEl.checked) sources.push("bookmark");
     return sources;
   }
+  function engineRow(keyword, url) {
+    const li = document.createElement("li");
+    const kwEl = document.createElement("input");
+    kwEl.type = "text";
+    kwEl.className = "engine-keyword";
+    kwEl.value = keyword;
+    kwEl.placeholder = "kw";
+    kwEl.setAttribute("aria-label", "Search engine keyword");
+    kwEl.setAttribute("autocomplete", "off");
+    kwEl.setAttribute("spellcheck", "false");
+    kwEl.addEventListener("change", commitEngines);
+    const urlEl = document.createElement("input");
+    urlEl.type = "text";
+    urlEl.className = "engine-url";
+    urlEl.value = url;
+    urlEl.placeholder = "https://example.com/search?q=%s";
+    urlEl.setAttribute(
+      "aria-label",
+      "Search engine URL (%s is replaced by the query)"
+    );
+    urlEl.setAttribute("autocomplete", "off");
+    urlEl.setAttribute("spellcheck", "false");
+    urlEl.addEventListener("change", commitEngines);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${keyword || "engine"}`);
+    remove.addEventListener("click", () => removeEngine(li));
+    li.appendChild(kwEl);
+    li.appendChild(urlEl);
+    li.appendChild(remove);
+    return li;
+  }
+  function readEngineRows() {
+    const rows = [];
+    if (!engineListEl) return rows;
+    for (const li of engineListEl.children) {
+      const kwEl = li.querySelector(".engine-keyword");
+      const urlEl = li.querySelector(".engine-url");
+      if (!kwEl || !urlEl) continue;
+      rows.push({
+        kwEl,
+        urlEl,
+        keyword: kwEl.value.trim(),
+        url: urlEl.value.trim()
+      });
+    }
+    return rows;
+  }
+  function renderEngines() {
+    if (!engineListEl) return;
+    engineListEl.textContent = "";
+    clearFieldError("error-engines");
+    for (const engine of settings.getSearchEngines()) {
+      engineListEl.appendChild(engineRow(engine.keyword, engine.url));
+    }
+    syncDefaultEngineOptions();
+  }
+  function syncDefaultEngineOptions() {
+    if (!defaultEngineEl) return;
+    const engines = settings.getSearchEngines();
+    defaultEngineEl.textContent = "";
+    for (const engine of engines) {
+      const opt = document.createElement("option");
+      opt.value = engine.keyword;
+      opt.textContent = engine.keyword;
+      defaultEngineEl.appendChild(opt);
+    }
+    defaultEngineEl.value = settings.getDefaultEngine();
+  }
+  function failEngines(message, badEls) {
+    for (const el of badEls || []) markInvalid(el, true);
+    showFieldError("error-engines", `${message} (not saved)`);
+    status(`Search engines: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+  }
+  function commitEngines() {
+    const rows = readEngineRows();
+    for (const row of rows) {
+      markInvalid(row.kwEl, false);
+      markInvalid(row.urlEl, false);
+    }
+    clearFieldError("error-engines");
+    const complete = rows.filter((r) => r.keyword !== "" && r.url !== "");
+    const seen = /* @__PURE__ */ new Set();
+    const list = [];
+    for (const row of complete) {
+      const problem = validateSearchEngine({
+        keyword: row.keyword,
+        url: row.url
+      });
+      if (problem) {
+        failEngines(problem, [row.kwEl, row.urlEl]);
+        return;
+      }
+      const keyword = row.keyword.toLowerCase();
+      if (seen.has(keyword)) {
+        failEngines(`Duplicate keyword "${keyword}"`, [row.kwEl]);
+        return;
+      }
+      seen.add(keyword);
+      list.push({ keyword, url: row.url });
+    }
+    if (list.length === 0) {
+      if (rows.length === 0) {
+        failEngines("At least one search engine is required", []);
+        renderEngines();
+      }
+      return;
+    }
+    if (list.length > MAX_SEARCH_ENGINES) {
+      failEngines(`At most ${MAX_SEARCH_ENGINES} search engines`, []);
+      return;
+    }
+    const current = settings.getDefaultEngine();
+    const def = list.some((e) => e.keyword === current) ? current : list[0].keyword;
+    savePatch({ searchEngines: list, defaultEngine: def }).then((ok) => {
+      if (!ok) return;
+      for (let i = 0; i < list.length; i++) {
+        const row = complete[i];
+        if (!row) break;
+        row.kwEl.value = list[i].keyword;
+        row.urlEl.value = list[i].url;
+      }
+      syncDefaultEngineOptions();
+    });
+  }
+  function removeEngine(li) {
+    if (readEngineRows().length <= 1) {
+      failEngines("At least one search engine is required", []);
+      return;
+    }
+    li.remove();
+    commitEngines();
+  }
+  function addEngine() {
+    if (!engineListEl) return;
+    clearFieldError("error-engines");
+    if (engineListEl.children.length >= MAX_SEARCH_ENGINES) {
+      showFieldError(
+        "error-engines",
+        `At most ${MAX_SEARCH_ENGINES} search engines (not saved)`
+      );
+      return;
+    }
+    const li = engineRow("", "");
+    engineListEl.appendChild(li);
+    li.querySelector(".engine-keyword").focus();
+  }
+  function resetEngines() {
+    savePatch({
+      searchEngines: searchEngineDefaults(),
+      defaultEngine: settingsDefaults.defaultEngine
+    }).then((ok) => {
+      if (ok) {
+        renderEngines();
+        status("Search engines restored to defaults");
+      }
+    });
+  }
   var confirmCount = 0;
   function confirmDialog(message, confirmLabel) {
     const previousFocus = document.activeElement;
@@ -1705,6 +1956,8 @@
       clueDelayMs: settingsDefaults.clueDelayMs,
       suggestionSources: settingsDefaults.suggestionSources.slice(),
       maxResults: settingsDefaults.maxResults,
+      searchEngines: searchEngineDefaults(),
+      defaultEngine: settingsDefaults.defaultEngine,
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,
       clickableSelector: settingsDefaults.clickableSelector,
@@ -1890,6 +2143,12 @@
       () => savePatch({ suggestionSources: collectSources() })
     );
   }
+  defaultEngineEl?.addEventListener(
+    "change",
+    () => savePatch({ defaultEngine: defaultEngineEl.value })
+  );
+  addEngineBtn?.addEventListener("click", addEngine);
+  resetEnginesBtn?.addEventListener("click", resetEngines);
   hintCharsEl.addEventListener("input", () => {
     clearFieldError("error-hint-chars");
     markInvalid(hintCharsEl, false);

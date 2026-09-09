@@ -657,6 +657,56 @@ dialog.jari-confirm-box::backdrop {
   font-size: 11px;
 }
 
+#engine-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+}
+
+#engine-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+#engine-list input {
+  padding: 3px 8px;
+  background: #1e1e26;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+#engine-list input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+#engine-list .engine-keyword {
+  flex: 0 0 90px;
+  min-width: 0;
+}
+
+#engine-list .engine-url {
+  flex: 1;
+  min-width: 0;
+}
+
+#engine-list button {
+  padding: 1px 8px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.engine-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 footer {
   max-width: var(--page-width);
   margin: 0 auto;

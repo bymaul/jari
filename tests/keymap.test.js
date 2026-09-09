@@ -159,16 +159,16 @@ test(";w resets the scroll target without conflicting with ;e/;x", () => {
 test("normalizeSettings stamps the schema version and migrates v0 data", () => {
   assert.equal(Jari.normalizeSettings({}).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   const migrated = Jari.normalizeSettings({ keymap: { j: "scrollDown" } });
-  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.equal(migrated.keymap.j, "scrollDown");
-  assert.deepEqual(Jari.migrateSettings(null).schemaVersion, 4);
-  assert.equal(Jari.migrateSettings({ schemaVersion: 1 }).schemaVersion, 4);
+  assert.deepEqual(Jari.migrateSettings(null).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(Jari.migrateSettings({ schemaVersion: 1 }).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
 });
 
 test("v1 settings migrate forward keeping data and gaining clickableSelector", () => {
   const v1 = { schemaVersion: 1, keymap: { j: "scrollDown" }, scrollStep: 200 };
   const migrated = Jari.normalizeSettings(v1);
-  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.equal(migrated.keymap.j, "scrollDown");
   assert.equal(migrated.scrollStep, 200);
   assert.equal(migrated.clickableSelector, "");
@@ -179,7 +179,7 @@ test("v1 settings migrate forward keeping data and gaining clickableSelector", (
 test("v2 settings migrate forward gaining hint theme and size", () => {
   const v2 = { schemaVersion: 2, hintTheme: "cyan", hintFontSize: 14 };
   const migrated = Jari.normalizeSettings(v2);
-  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.equal(migrated.hintTheme, "cyan");
   assert.equal(migrated.hintFontSize, 14);
   const bare = Jari.normalizeSettings({ schemaVersion: 2 });
@@ -193,11 +193,41 @@ test("v3 keymaps gain new default bindings without clobbering customs", () => {
     keymap: { j: "scrollToTop", x: "closeTab", gf: "hintYank" },
   };
   const s = Jari.normalizeSettings(old);
-  assert.equal(s.schemaVersion, 4);
+  assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.equal(s.keymap.j, "scrollToTop");
   assert.equal(s.keymap.x, "closeTab");
   assert.equal(s.keymap.gf, "hintYank");
   assert.equal(s.keymap[";w"], "resetScrollTarget");
+});
+
+test("v4 settings migrate forward gaining seeded search engines", () => {
+  const v4 = { schemaVersion: 4, keymap: { j: "scrollDown" } };
+  const s = Jari.normalizeSettings(v4);
+  assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.deepEqual(
+    s.searchEngines.map((e) => e.keyword),
+    ["g", "yt", "gh", "wiki", "chat"],
+  );
+  assert.equal(s.defaultEngine, "g");
+  const custom = Jari.normalizeSettings({
+    schemaVersion: 4,
+    searchEngines: [
+      { keyword: "ddg", url: "https://duckduckgo.com/?q=%s" },
+      { keyword: "g", url: "https://www.google.com/search?q=%s" },
+    ],
+    defaultEngine: "ddg",
+  });
+  assert.deepEqual(
+    custom.searchEngines.map((e) => e.keyword),
+    ["ddg", "g"],
+  );
+  assert.equal(custom.defaultEngine, "ddg");
+  const dangling = Jari.normalizeSettings({
+    schemaVersion: 4,
+    searchEngines: [{ keyword: "ddg", url: "https://duckduckgo.com/?q=%s" }],
+    defaultEngine: "g",
+  });
+  assert.equal(dangling.defaultEngine, "ddg");
 });
 
 test("backfillNewBindings only fills free combos for unused commands", () => {

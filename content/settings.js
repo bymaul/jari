@@ -22,6 +22,8 @@ const state = {
   passthroughMs: settingsDefaults.passthroughMs,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   maxResults: settingsDefaults.maxResults,
+  searchEngines: settingsDefaults.searchEngines.map((e) => ({ ...e })),
+  defaultEngine: settingsDefaults.defaultEngine,
   copyFormat: settingsDefaults.copyFormat,
   hintChars: settingsDefaults.hintChars,
   clickableSelector: settingsDefaults.clickableSelector,
@@ -43,6 +45,8 @@ function merge(data) {
   state.passthroughMs = s.passthroughMs;
   state.suggestionSources = s.suggestionSources;
   state.maxResults = s.maxResults;
+  state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
+  state.defaultEngine = s.defaultEngine;
   state.copyFormat = s.copyFormat;
   state.hintChars = s.hintChars;
   state.clickableSelector = s.clickableSelector;
@@ -85,6 +89,8 @@ function snapshot() {
     passthroughMs: state.passthroughMs,
     suggestionSources: state.suggestionSources.slice(),
     maxResults: state.maxResults,
+    searchEngines: state.searchEngines.map((e) => ({ ...e })),
+    defaultEngine: state.defaultEngine,
     copyFormat: state.copyFormat,
     hintChars: state.hintChars,
     clickableSelector: state.clickableSelector,
@@ -168,6 +174,14 @@ function getMaxResults() {
   return state.maxResults;
 }
 
+function getSearchEngines() {
+  return state.searchEngines.map((e) => ({ ...e }));
+}
+
+function getDefaultEngine() {
+  return state.defaultEngine;
+}
+
 function getCopyFormat() {
   return state.copyFormat;
 }
@@ -227,6 +241,8 @@ export const settings = {
   getPassthroughMs,
   getSuggestionSources,
   getMaxResults,
+  getSearchEngines,
+  getDefaultEngine,
   getCopyFormat,
   getHintChars,
   getClickableSelector,

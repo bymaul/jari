@@ -116,6 +116,40 @@
             <input id="max-results" type="number" min="5" max="100" step="1" />
           </div>
         </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="default-engine">Default search engine</label>
+            <p class="helper">
+              Used for bare queries in
+              <code data-key="openOmnibar"></code> when no keyword matches.
+            </p>
+          </div>
+          <div class="setting-control">
+            <select id="default-engine"></select>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <span class="setting-label" id="engines-label">Search engines</span>
+            <p class="helper">
+              <code>keyword query</code> in
+              <code data-key="openOmnibar"></code> opens the URL with
+              <code>%s</code> replaced by the query.
+              <code>t</code> is reserved for tab search.
+            </p>
+            <p
+              class="field-error"
+              id="error-engines"
+              aria-live="polite"
+              hidden
+            ></p>
+          </div>
+        </div>
+        <ul id="engine-list" aria-labelledby="engines-label"></ul>
+        <div class="engine-actions">
+          <button id="add-engine" type="button">Add engine</button>
+          <button id="reset-engines" type="button">Restore defaults</button>
+        </div>
       </details>
 
       <details class="card" id="card-clipboard">

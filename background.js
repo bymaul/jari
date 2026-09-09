@@ -12,6 +12,69 @@
     return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
   }
 
+  // shared/search-engines.js
+  var SEARCH_ENGINE_DEFAULTS = [
+    { keyword: "g", url: "https://www.google.com/search?q=%s" },
+    { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
+    { keyword: "gh", url: "https://github.com/search?q=%s" },
+    { keyword: "wiki", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
+    { keyword: "chat", url: "https://chatgpt.com/?q=%s" }
+  ];
+  var MAX_SEARCH_ENGINES = 20;
+  var SEARCH_KEYWORD_RE = /^[a-z0-9_]{1,16}$/;
+  var SEARCH_ENGINE_URL_MAX = 500;
+  var RESERVED_ENGINE_KEYWORDS = ["t"];
+  function searchEngineDefaults() {
+    return SEARCH_ENGINE_DEFAULTS.map((e) => ({ ...e }));
+  }
+  function validateSearchEngine(entry) {
+    if (!entry || typeof entry !== "object") return "Engine must have a keyword and URL.";
+    const keyword = String(entry.keyword || "").toLowerCase();
+    if (!SEARCH_KEYWORD_RE.test(keyword)) {
+      return "Keyword must be 1-16 letters, digits, or underscores.";
+    }
+    if (RESERVED_ENGINE_KEYWORDS.includes(keyword)) {
+      return `Keyword "${keyword}" is reserved for tab search.`;
+    }
+    const url = String(entry.url || "").trim();
+    if (!/^https?:\/\//i.test(url)) {
+      return "URL must start with http:// or https://.";
+    }
+    if (url.length > SEARCH_ENGINE_URL_MAX) {
+      return `URL must be ${SEARCH_ENGINE_URL_MAX} characters or fewer.`;
+    }
+    if (!url.includes("%s")) {
+      return "URL must contain %s where the query goes.";
+    }
+    return null;
+  }
+  function normalizeSearchEngines(raw) {
+    if (!Array.isArray(raw)) return searchEngineDefaults();
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const entry of raw) {
+      if (out.length >= MAX_SEARCH_ENGINES) break;
+      if (validateSearchEngine(entry)) continue;
+      const keyword = String(entry.keyword).toLowerCase();
+      if (seen.has(keyword)) continue;
+      seen.add(keyword);
+      out.push({ keyword, url: String(entry.url).trim() });
+    }
+    return out.length > 0 ? out : searchEngineDefaults();
+  }
+  function normalizeDefaultEngine(raw, engines) {
+    const list = Array.isArray(engines) && engines.length > 0 ? engines : searchEngineDefaults();
+    const keyword = String(raw || "").toLowerCase();
+    if (list.some((e) => e && e.keyword === keyword)) return keyword;
+    return list[0].keyword;
+  }
+  function buildEngineUrl(engines, keyword, query) {
+    const kw = String(keyword || "").toLowerCase();
+    const engine = (engines || []).find((e) => e && e.keyword === kw);
+    if (!engine) return null;
+    return String(engine.url).replaceAll("%s", encodeURIComponent(query));
+  }
+
   // shared/url.js
   var urlSchemes = /* @__PURE__ */ new Set([
     "http",
@@ -140,6 +203,15 @@
       return clampMaxResults(settings.maxResults);
     }
     return clampMaxResults();
+  }
+  async function getDefaultSearchUrl(text) {
+    const settings = await getStoredSettings();
+    const engines = normalizeSearchEngines(settings && settings.searchEngines);
+    const keyword = normalizeDefaultEngine(
+      settings && settings.defaultEngine,
+      engines
+    );
+    return buildEngineUrl(engines, keyword, text) || "https://www.google.com/search?q=" + encodeURIComponent(text);
   }
   var handlers = {
     createTab: async (_, { url } = {}) => {
@@ -395,9 +467,7 @@
       const text = query.trim();
       if (!text) return { ok: false };
       if (incognito) {
-        return openInIncognito(
-          "https://www.google.com/search?q=" + encodeURIComponent(text)
-        );
+        return openInIncognito(await getDefaultSearchUrl(text));
       }
       if (typeof chrome.search?.query === "function") {
         await chrome.search.query({
@@ -406,7 +476,7 @@
         });
         return { ok: true };
       }
-      const url = "https://www.google.com/search?q=" + encodeURIComponent(text);
+      const url = await getDefaultSearchUrl(text);
       if (newTab) {
         await chrome.tabs.create({ url });
       } else if (sender.tab && sender.tab.id) {

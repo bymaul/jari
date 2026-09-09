@@ -1,4 +1,9 @@
 import { clampMaxResults, suggestionSources } from "../shared/constants.js";
+import {
+  buildEngineUrl,
+  normalizeDefaultEngine,
+  normalizeSearchEngines,
+} from "../shared/search-engines.js";
 import { normalizeUrl } from "../shared/url.js";
 
 export function clampCount(count, max = 20) {
@@ -37,6 +42,19 @@ async function getMaxResults() {
     return clampMaxResults(settings.maxResults);
   }
   return clampMaxResults();
+}
+
+async function getDefaultSearchUrl(text) {
+  const settings = await getStoredSettings();
+  const engines = normalizeSearchEngines(settings && settings.searchEngines);
+  const keyword = normalizeDefaultEngine(
+    settings && settings.defaultEngine,
+    engines,
+  );
+  return (
+    buildEngineUrl(engines, keyword, text) ||
+    "https://www.google.com/search?q=" + encodeURIComponent(text)
+  );
 }
 
 export const handlers = {
@@ -320,9 +338,7 @@ export const handlers = {
     if (!text) return { ok: false };
     if (incognito) {
       // chrome.search.query cannot target an incognito window.
-      return openInIncognito(
-        "https://www.google.com/search?q=" + encodeURIComponent(text),
-      );
+      return openInIncognito(await getDefaultSearchUrl(text));
     }
     if (typeof chrome.search?.query === "function") {
       await chrome.search.query({
@@ -331,7 +347,7 @@ export const handlers = {
       });
       return { ok: true };
     }
-    const url = "https://www.google.com/search?q=" + encodeURIComponent(text);
+    const url = await getDefaultSearchUrl(text);
     if (newTab) {
       await chrome.tabs.create({ url });
     } else if (sender.tab && sender.tab.id) {

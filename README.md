@@ -46,7 +46,8 @@ bindings, and keys chain into sequences of any length - keep typing, then
 the single key fires first.
 
 Hints offers themes, label size, and an extra clickable selector; disabled
-sites accept `*.example.com` wildcards.
+sites accept `*.example.com` wildcards. Search offers a default engine plus
+custom `keyword query` engines (`g`, `yt`, `gh`, `wiki`, `chat` built in).
 
 ## Install
 

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { Prompt, isTabListAll, parseTabPrefix } from "../content/prompt.js";
 import { settings } from "../content/settings.js";
+import { searchEngineDefaults } from "../shared/search-engines.js";
 
 function makeElement(tag) {
   return {
@@ -270,6 +271,45 @@ test("incognito omnibar submits a search with the incognito flag", async () => {
         incognito: true,
       },
     );
+  });
+});
+
+test("omnibar keyword search uses a custom engine from settings", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const original = chrome.runtime.sendMessage;
+    chrome.runtime.sendMessage = (message, callback) => {
+      sent.push(message);
+      callback([]);
+    };
+    settings.set({
+      searchEngines: [
+        { keyword: "ddg", url: "https://duckduckgo.com/?q=%s" },
+        { keyword: "g", url: "https://www.google.com/search?q=%s" },
+      ],
+      defaultEngine: "ddg",
+    });
+    try {
+      const input = openOmnibarPrompt(document);
+      input.value = "ddg hello world";
+      input.dispatch("input", {});
+      Prompt.onKeyDown(keyEvent("Enter"));
+      assert.deepEqual(
+        sent.find((m) => m.action === "createTab"),
+        {
+          action: "createTab",
+          url: "https://duckduckgo.com/?q=hello%20world",
+        },
+      );
+    } finally {
+      chrome.runtime.sendMessage = original;
+      settings.set({
+        searchEngines: searchEngineDefaults(),
+        defaultEngine: "g",
+      });
+      Prompt.close();
+    }
   });
 });
 

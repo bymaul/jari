@@ -8,6 +8,9 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Added
 
+- Customizable search engines: the Search settings hold an editable
+  keyword engine list (seeded with `g`, `yt`, `gh`, `wiki`, `chat`) plus
+  a default engine for bare queries, including incognito search.
 - Hover, yank-text and open-in-this-tab hint actions (unbound by default).
 - Same-origin iframe links get their own hints; crowded pages keep
   on-screen hints first when the 800-hint cap applies.
@@ -24,6 +27,11 @@ versioned for the extension manifest (`manifest.base.json`).
 - Multi-key bindings: key sequences of any length (`gfp`…) with nested
   which-key clues; the options recorder saves chains on `Enter`.
 - The hint status pill shows the pending prefix.
+
+### Changed
+
+- Find `Esc` hides highlights instead of clearing them; `n`/`N` resumes
+  the kept search.
 
 ### Fixed
 

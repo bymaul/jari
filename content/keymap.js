@@ -3,9 +3,15 @@ import {
   maxResultsDefault,
   suggestionSources,
 } from "../shared/constants.js";
+import {
+  DEFAULT_SEARCH_ENGINE,
+  normalizeDefaultEngine,
+  normalizeSearchEngines,
+  searchEngineDefaults,
+} from "../shared/search-engines.js";
 import { normalizeSitePattern } from "../shared/url.js";
 
-export const SETTINGS_SCHEMA_VERSION = 4;
+export const SETTINGS_SCHEMA_VERSION = 5;
 
 export const Events = {
   listeners: {},
@@ -127,6 +133,9 @@ export const settingsDefaults = {
   suggestionSources: suggestionSources.slice(),
 
   maxResults: maxResultsDefault,
+
+  searchEngines: searchEngineDefaults(),
+  defaultEngine: DEFAULT_SEARCH_ENGINE,
 
   copyFormat: "plain",
 
@@ -337,6 +346,16 @@ export function migrateSettings(data) {
     d.keymap = backfillNewBindings(d.keymap);
     version = 4;
   }
+  // v4 -> v5: customizable search engines seeded from the previous
+  // hardcoded list, with the default engine for bare queries.
+  if (version < 5) {
+    if (d.searchEngines === undefined)
+      d.searchEngines = searchEngineDefaults();
+    const engines = normalizeSearchEngines(d.searchEngines);
+    d.searchEngines = engines;
+    d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
+    version = 5;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -366,6 +385,9 @@ export function normalizeSettings(data) {
   const disabledSites = Array.isArray(d.disabledSites)
     ? [...new Set(d.disabledSites.map(normalizeSitePattern).filter(Boolean))]
     : [];
+  const searchEngines = Array.isArray(d.searchEngines)
+    ? normalizeSearchEngines(d.searchEngines)
+    : settingsDefaults.searchEngines.map((e) => ({ ...e }));
   return {
     schemaVersion: SETTINGS_SCHEMA_VERSION,
     keymap,
@@ -396,6 +418,8 @@ export function normalizeSettings(data) {
       d.maxResults === undefined
         ? settingsDefaults.maxResults
         : clampMaxResults(d.maxResults),
+    searchEngines,
+    defaultEngine: normalizeDefaultEngine(d.defaultEngine, searchEngines),
     copyFormat:
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
     hintChars: normalizeHintChars(d.hintChars),
