@@ -4,7 +4,7 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
-## [Unreleased]
+## [0.4.0] - 2026-09-09
 
 ### Added
 
@@ -32,6 +32,8 @@ versioned for the extension manifest (`manifest.base.json`).
 
 - Find `Esc` hides highlights instead of clearing them; `n`/`N` resumes
   the kept search.
+- Link yank bindings split into `yfa` (copy link URL) and `yft`
+  (copy link text); `=` also zooms in.
 
 ### Fixed
 
