@@ -1,4 +1,8 @@
-import { clampMaxResults, maxResultsDefault, suggestionSources } from "../shared/constants.js";
+import {
+  clampMaxResults,
+  maxResultsDefault,
+  suggestionSources,
+} from "../shared/constants.js";
 import { normalizeSitePattern } from "../shared/url.js";
 
 export const SETTINGS_SCHEMA_VERSION = 4;
@@ -21,6 +25,7 @@ export const keymapDefaults = {
   G: "scrollToBottom",
   w: "cycleScrollFrame",
   "+": "zoomIn",
+  "=": "zoomIn",
   "-": "zoomOut",
 
   t: "openOmnibar",
@@ -74,7 +79,8 @@ export const keymapDefaults = {
   ";w": "resetScrollTarget",
 
   yy: "copyUrl",
-  yf: "hintYank",
+  yfa: "hintYank",
+  yft: "hintYankText",
 };
 
 export const prefixes = {

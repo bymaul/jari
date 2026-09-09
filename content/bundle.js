@@ -264,6 +264,7 @@
     G: "scrollToBottom",
     w: "cycleScrollFrame",
     "+": "zoomIn",
+    "=": "zoomIn",
     "-": "zoomOut",
     t: "openOmnibar",
     T: "openOmnibarIncognito",
@@ -307,7 +308,8 @@
     ";x": "openExtensions",
     ";w": "resetScrollTarget",
     yy: "copyUrl",
-    yf: "hintYank"
+    yfa: "hintYank",
+    yft: "hintYankText"
   };
   var prefixes = {
     g: {},
