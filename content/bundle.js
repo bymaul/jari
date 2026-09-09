@@ -5723,11 +5723,12 @@
   var historyIdx = -1;
   var historyDraft = "";
   var useHighlights = false;
+  var highlightsHidden = false;
   var inputDebounce = null;
   var findObserver = null;
   var findObserverTimer = null;
   function hasHighlights() {
-    return matches2.length > 0;
+    return matches2.length > 0 && !highlightsHidden;
   }
   function isActive5() {
     return active5;
@@ -5939,8 +5940,13 @@
   function clearHighlights() {
     matches2 = [];
     currentIdx2 = 0;
+    highlightsHidden = false;
     clearHighlightApi();
     updateStatus();
+  }
+  function hideHighlights() {
+    highlightsHidden = true;
+    clearHighlightApi();
   }
   function getCurrentLinkElement() {
     if (matches2.length === 0) return null;
@@ -5960,6 +5966,7 @@
   function applyHighlights() {
     clearHighlightApi();
     if (matches2.length === 0) return;
+    if (highlightsHidden) return;
     const valid = matches2.filter((r) => {
       try {
         return r.startContainer && r.startContainer.isConnected !== false && r.endContainer && r.endContainer.isConnected !== false;
@@ -6105,6 +6112,7 @@
     }
   }
   function executeQuery(q) {
+    highlightsHidden = false;
     pendingQuery = q;
     const query3 = (q || "").trim();
     clearTimeout(inputDebounce);
@@ -6120,6 +6128,7 @@
     }, 80);
   }
   function runQuery(query3) {
+    highlightsHidden = false;
     try {
       matches2 = buildMatches(query3);
       currentIdx2 = 0;
@@ -6329,8 +6338,32 @@
     closeBar();
     lastQuery = "";
   }
+  function closeDiscardPending() {
+    closeBar();
+    const q = (lastQuery || "").trim();
+    if (!q) {
+      clearHighlights();
+      lastQuery = "";
+      return;
+    }
+    try {
+      matches2 = buildMatches(q);
+      currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
+    } catch {
+      matches2 = [];
+      currentIdx2 = 0;
+    }
+    highlightsHidden = false;
+    useHighlights = detectHighlightSupport();
+    applyHighlights();
+    updateStatus();
+  }
   function next(count = 1, reverse = false) {
     const c = Math.max(1, Math.floor(count) || 1);
+    if (highlightsHidden && matches2.length > 0) {
+      highlightsHidden = false;
+      useHighlights = detectHighlightSupport();
+    }
     if (matches2.length > 0) {
       try {
         const stale = matches2.some((r) => !r.startContainer || r.startContainer.isConnected === false);
@@ -6450,7 +6483,7 @@
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        closeAndClear();
+        closeDiscardPending();
         return true;
       }
       if (event.key === "Enter") {
@@ -6458,7 +6491,7 @@
         event.stopImmediatePropagation();
         const q = inputEl2.value.trim();
         if (!q) {
-          closeAndClear();
+          closeDiscardPending();
         } else {
           lastQuery = q;
           pushFindHistory(q);
@@ -6471,7 +6504,7 @@
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      closeAndClear();
+      closeDiscardPending();
       return true;
     }
     if (event.key === "Enter") {
@@ -6486,9 +6519,7 @@
     if (hasHighlights()) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      clearHighlights();
-      lastQuery = "";
-      ui.toast("Cleared");
+      hideHighlights();
       return true;
     }
     return false;
@@ -6524,6 +6555,7 @@
   }
   function __resetFindState() {
     closeAndClear();
+    highlightsHidden = false;
     lastQuery = "";
     pendingQuery = "";
     useHighlights = false;

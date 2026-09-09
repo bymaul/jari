@@ -35,12 +35,13 @@ let historyIdx = -1;
 let historyDraft = "";
 
 let useHighlights = false;
+let highlightsHidden = false;
 let inputDebounce = null;
 let findObserver = null;
 let findObserverTimer = null;
 
 function hasHighlights() {
-  return matches.length > 0;
+  return matches.length > 0 && !highlightsHidden;
 }
 
 function isActive() {
@@ -247,8 +248,14 @@ function clearHighlightApi() {
 function clearHighlights() {
   matches = [];
   currentIdx = 0;
+  highlightsHidden = false;
   clearHighlightApi();
   updateStatus();
+}
+
+function hideHighlights() {
+  highlightsHidden = true;
+  clearHighlightApi();
 }
 
 function getCurrentLinkElement() {
@@ -270,6 +277,7 @@ function activateCurrentLink() {
 function applyHighlights() {
   clearHighlightApi();
   if (matches.length === 0) return;
+  if (highlightsHidden) return;
   const valid = matches.filter(r => {
     try {
       return r.startContainer && r.startContainer.isConnected !== false && r.endContainer && r.endContainer.isConnected !== false;
@@ -407,6 +415,7 @@ function scrollFixedMatchIntoView(el, fixed, rect) {
 }
 
 function executeQuery(q) {
+  highlightsHidden = false;
   pendingQuery = q;
   const query = (q || "").trim();
   clearTimeout(inputDebounce);
@@ -423,6 +432,7 @@ function executeQuery(q) {
 }
 
 function runQuery(query) {
+  highlightsHidden = false;
   try {
     matches = buildMatches(query);
     currentIdx = 0;
@@ -645,8 +655,33 @@ function closeAndClear() {
   lastQuery = "";
 }
 
+function closeDiscardPending() {
+  closeBar();
+  const q = (lastQuery || "").trim();
+  if (!q) {
+    clearHighlights();
+    lastQuery = "";
+    return;
+  }
+  try {
+    matches = buildMatches(q);
+    currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
+  } catch {
+    matches = [];
+    currentIdx = 0;
+  }
+  highlightsHidden = false;
+  useHighlights = detectHighlightSupport();
+  applyHighlights();
+  updateStatus();
+}
+
 function next(count = 1, reverse = false) {
   const c = Math.max(1, Math.floor(count) || 1);
+  if (highlightsHidden && matches.length > 0) {
+    highlightsHidden = false;
+    useHighlights = detectHighlightSupport();
+  }
   if (matches.length > 0) {
     try {
       const stale = matches.some(r => !r.startContainer || r.startContainer.isConnected === false);
@@ -767,7 +802,7 @@ function onKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      closeAndClear();
+      closeDiscardPending();
       return true;
     }
     if (event.key === "Enter") {
@@ -775,7 +810,7 @@ function onKeyDown(event) {
       event.stopImmediatePropagation();
       const q = inputEl.value.trim();
       if (!q) {
-        closeAndClear();
+        closeDiscardPending();
       } else {
         lastQuery = q;
         pushFindHistory(q);
@@ -788,7 +823,7 @@ function onKeyDown(event) {
   if (event.key === "Escape") {
     event.preventDefault();
     event.stopImmediatePropagation();
-    closeAndClear();
+    closeDiscardPending();
     return true;
   }
   if (event.key === "Enter") {
@@ -804,9 +839,7 @@ function handleGlobalEsc(event) {
   if (hasHighlights()) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    clearHighlights();
-    lastQuery = "";
-    ui.toast("Cleared");
+    hideHighlights();
     return true;
   }
   return false;
@@ -855,8 +888,26 @@ export const __testHelpers = {
   scrollFixedMatchIntoView,
 };
 
+export function __setFindTestState({ matches: seed = [], query = "", index = 0 } = {}) {
+  matches = seed;
+  currentIdx = index;
+  lastQuery = query;
+  pendingQuery = "";
+  highlightsHidden = false;
+}
+
+export function __getFindTestState() {
+  return {
+    matchCount: matches.length,
+    currentIdx,
+    lastQuery,
+    highlightsHidden,
+  };
+}
+
 export function __resetFindState() {
   closeAndClear();
+  highlightsHidden = false;
   lastQuery = "";
   pendingQuery = "";
   useHighlights = false;

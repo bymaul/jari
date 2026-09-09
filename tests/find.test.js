@@ -1,7 +1,13 @@
 import "./setup.mjs";
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
-import { __testHelpers } from "../content/find.js";
+import {
+  Find,
+  __testHelpers,
+  __getFindTestState,
+  __resetFindState,
+  __setFindTestState,
+} from "../content/find.js";
 
 const {
   rectIntersectsViewport,
@@ -237,4 +243,80 @@ test("findToggleCommandFor resolves only toggle commands", () => {
     findToggleCommandFor({ "F2": "toggleFindRegex" }, "F2"),
     "toggleFindRegex",
   );
+});
+
+function escEvent() {
+  return {
+    key: "Escape",
+    preventDefault() {},
+    stopImmediatePropagation() {},
+  };
+}
+
+function fakeMatch() {
+  const parent = {
+    isConnected: true,
+    getBoundingClientRect: () => ({ top: 10, bottom: 20, left: 10, right: 20 }),
+  };
+  return {
+    startContainer: { isConnected: true, parentElement: parent },
+    endContainer: { isConnected: true },
+  };
+}
+
+test("Esc hides find highlights without forgetting the query", () => {
+  __resetFindState();
+  try {
+    __setFindTestState({ matches: [fakeMatch(), fakeMatch()], query: "foo" });
+    assert.equal(Find.hasHighlights(), true);
+    assert.equal(Find.handleGlobalEsc(escEvent()), true);
+    assert.equal(Find.hasHighlights(), false);
+    assert.deepEqual(__getFindTestState(), {
+      matchCount: 2,
+      currentIdx: 0,
+      lastQuery: "foo",
+      highlightsHidden: true,
+    });
+    // A second Esc is a no-op so the key reaches the page.
+    assert.equal(Find.handleGlobalEsc(escEvent()), false);
+    assert.equal(__getFindTestState().lastQuery, "foo");
+  } finally {
+    __resetFindState();
+  }
+});
+
+test("n resumes hidden find highlights and steps to the next match", () => {
+  __resetFindState();
+  try {
+    __setFindTestState({ matches: [fakeMatch(), fakeMatch()], query: "foo" });
+    Find.handleGlobalEsc(escEvent());
+    assert.equal(Find.hasHighlights(), false);
+    Find.next(1, false);
+    assert.equal(Find.hasHighlights(), true);
+    assert.deepEqual(__getFindTestState(), {
+      matchCount: 2,
+      currentIdx: 1,
+      lastQuery: "foo",
+      highlightsHidden: false,
+    });
+  } finally {
+    __resetFindState();
+  }
+});
+
+test("clearing find highlights resets the hidden flag", () => {
+  __resetFindState();
+  try {
+    __setFindTestState({ matches: [fakeMatch()], query: "foo" });
+    Find.handleGlobalEsc(escEvent());
+    Find.clearHighlights();
+    assert.deepEqual(__getFindTestState(), {
+      matchCount: 0,
+      currentIdx: 0,
+      lastQuery: "foo",
+      highlightsHidden: false,
+    });
+  } finally {
+    __resetFindState();
+  }
 });

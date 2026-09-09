@@ -26,7 +26,7 @@ Bindings chain into sequences of any length.
 - Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
   `yy` copy URL, `Y` copy title + URL
 - Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yfa` copy link URL, `yft` copy link text
-- Find: `/` find, `n`/`N` next/prev (smart case, `Esc` clears, `Enter` follows;
+- Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
   rebindable toggles `Alt+R` regex, `Alt+W` whole word, `Alt+C` case;
   `Up`/`Down` history)
 - Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,
