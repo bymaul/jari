@@ -1,6 +1,6 @@
 # Privacy Policy for Jari
 
-Jari is a keyboard-driven browser navigation extension. It does not collect,
+Jari is a simple keyboard-driven navigation extension. It does not collect,
 transmit, sell, or share any personal data. Everything it reads stays on your
 device.
 
