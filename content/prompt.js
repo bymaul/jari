@@ -1,4 +1,4 @@
-import { Url } from "../shared/url.js";
+import { Url, normalizeUrl } from "../shared/url.js";
 import { parseEngineKeyword } from "../shared/search-engines.js";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
@@ -77,9 +77,10 @@ function requestSuggestions(suggestQuery, onResults) {
     if (!active || seq !== suggestSeq) return;
     const res = (await sendMessage("suggest", { query: suggestQuery })) || [];
     if (!active || seq !== suggestSeq) return;
+    const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
     tabUrlMap.clear();
-    for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-    onResults(res);
+    for (const it of items) if (it.url) tabUrlMap.set(it.url, it);
+    onResults(items);
   }, 130);
 }
 
@@ -95,7 +96,7 @@ function toSuggestionRow(item, match) {
 }
 
 function handleOpenInput(queryText) {
-  if (isTabListAll(queryText)) {
+  if (mode !== "incognito" && isTabListAll(queryText)) {
     handleTabListAll();
     return;
   }
@@ -131,7 +132,7 @@ function handleOpenInput(queryText) {
     const isUrl = Url.looksLikeUrl(effective);
     row = isUrl
       ? { kind: "url", title: effective, url: effective }
-      : { kind: "search", title: effective, url: null };
+      : { kind: "search", title: term, url: null };
   }
   filtered = [row];
   selected = 0;
@@ -142,7 +143,8 @@ function handleOpenInput(queryText) {
     const suggestions = rank(pool, term).map(({ item, match }) =>
       toSuggestionRow(item, match),
     );
-    filtered = tabQuery != null ? suggestions : [row, ...suggestions];
+    const max = settings.getMaxResults();
+    filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
     selected = 0;
     renderList();
   });
@@ -151,12 +153,13 @@ function handleOpenInput(queryText) {
 function handleTabListAll() {
   clearTimeout(suggestTimer);
   suggestSeq++;
+  const seq = suggestSeq;
   query = "";
   filtered = [];
   selected = 0;
   renderList();
   sendMessage("listTabs").then((res) => {
-    if (!active || !inputEl || !isTabListAll(inputEl.value)) return;
+    if (!active || seq !== suggestSeq || !inputEl || !isTabListAll(inputEl.value)) return;
     tabUrlMap.clear();
     filtered = (res || [])
       .map((item) => {
@@ -414,19 +417,25 @@ function searchQuery(text) {
 
 function activate() {
   const item = filtered[selected];
-  const rawInput = inputEl ? inputEl.value.trim() : "";
+  const rawValue = inputEl ? inputEl.value : "";
+  const rawInput = rawValue.trim();
   const inOmnibar =
     mode === "open" || mode === "edit" || mode === "incognito";
   const tabRest = inOmnibar ? parseTabPrefix(rawInput) : null;
   const effectiveInput = tabRest != null ? tabRest : rawInput;
-  const kwInput = parseKeyword(effectiveInput);
+  const kwInput = tabRest != null ? null : parseKeyword(effectiveInput);
+  const commitTerm = kwInput ? kwInput.rest : Url.suggestionTerm(effectiveInput);
   if (!item) {
+    if (isTabListAll(rawValue)) {
+      close();
+      return;
+    }
     if (mode === "open" && !rawInput) sendMessage("createTab");
     else if (mode === "incognito" && !rawInput) sendMessage("openIncognitoTab");
     else if (kwInput) openUrl(kwInput.url);
     else if (effectiveInput && Url.looksLikeUrl(effectiveInput)) {
-      openUrl(Url.normalizeUrl(effectiveInput) || effectiveInput);
-    } else if (effectiveInput) searchQuery(effectiveInput);
+      openUrl(normalizeUrl(effectiveInput) || effectiveInput);
+    } else if (commitTerm) searchQuery(commitTerm);
     close();
     return;
   }
@@ -436,9 +445,11 @@ function activate() {
     if (item.kind === "search") {
       if (item.keyword && item.url) openUrl(item.url);
       else if (kwInput && kwInput.url) openUrl(kwInput.url);
-      else searchQuery(rawInput);
+      else searchQuery(commitTerm);
     } else if (item.url) {
-      const match = tabUrlMap.get(item.url);
+      const match = mode === "edit"
+        ? undefined
+        : tabUrlMap.get(item.url) || tabUrlMap.get(normalizeUrl(item.url) || "");
       if (match && match.id) sendMessage("activateTab", { id: match.id });
       else openUrl(item.url);
     }

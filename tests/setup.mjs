@@ -15,7 +15,7 @@ globalThis.document = {
   querySelector: () => null,
   execCommand: () => {},
 };
-globalThis.location = { hostname: "test.example" };
+globalThis.location = { hostname: "test.example", href: "https://current.example/page" };
 globalThis.chrome = {
   runtime: {
     onMessage: {

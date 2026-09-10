@@ -349,6 +349,202 @@ test("omnibar unknown TLD submits a search instead of opening an invalid URL", a
   }
 });
 
+test("incognito omnibar never surfaces tabs and never switches to them", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const restore = mockSuggest([YT_TAB, YT_HISTORY, YT_BOOKMARK], (m) =>
+      sent.push(m),
+    );
+    try {
+      Prompt.openIncognito();
+      const input = document.created.find((el) => el.tagName === "input");
+      input.value = "lofi";
+      input.dispatch("input", {});
+      await waitSuggest();
+      assert.equal(renderedRows(document), 1);
+      Prompt.onKeyDown(keyEvent("Enter"));
+      assert.deepEqual(
+        sent.find((m) => m.action === "search"),
+        {
+          action: "search",
+          query: "lofi",
+          newTab: true,
+          incognito: true,
+        },
+      );
+      assert.ok(
+        !sent.some((m) => m.action === "activateTab"),
+        "expected no tab switch from incognito",
+      );
+    } finally {
+      restore();
+      Prompt.close();
+    }
+  });
+});
+
+test("omnibar bare t prefix with no tabs does nothing instead of searching t", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const original = chrome.runtime.sendMessage;
+    chrome.runtime.sendMessage = (message, callback) => {
+      sent.push(message);
+      if (message.action === "listTabs") callback([]);
+      else callback([]);
+    };
+    try {
+      const input = openOmnibarPrompt(document);
+      input.value = "t ";
+      input.dispatch("input", {});
+      await waitSuggest();
+      assert.equal(renderedRows(document), 0);
+      Prompt.onKeyDown(keyEvent("Enter"));
+      assert.ok(
+        !sent.some(
+          (m) =>
+            m.action === "search" ||
+            m.action === "createTab" ||
+            m.action === "navigate",
+        ),
+        "expected no action for an empty tab list",
+      );
+    } finally {
+      chrome.runtime.sendMessage = original;
+      Prompt.close();
+    }
+  });
+});
+
+test("omnibar t prefix with no match searches the stripped query, not an engine URL", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const restore = mockSuggest([], (m) => sent.push(m));
+    try {
+      const input = openOmnibarPrompt(document);
+      input.value = "t g foo";
+      input.dispatch("input", {});
+      await waitSuggest();
+      assert.equal(renderedRows(document), 0);
+      Prompt.onKeyDown(keyEvent("Enter"));
+      assert.deepEqual(
+        sent.find((m) => m.action === "search"),
+        {
+          action: "search",
+          query: "g foo",
+          newTab: true,
+          incognito: false,
+        },
+      );
+      assert.ok(
+        !sent.some((m) => m.action === "createTab"),
+        "expected no engine navigation under the t prefix",
+      );
+    } finally {
+      restore();
+      Prompt.close();
+    }
+  });
+});
+
+test("omnibar t prefix with a URL and no match opens it instead of crashing", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const restore = mockSuggest([], (m) => sent.push(m));
+    try {
+      const input = openOmnibarPrompt(document);
+      input.value = "t example.com";
+      input.dispatch("input", {});
+      await waitSuggest();
+      Prompt.onKeyDown(keyEvent("Enter"));
+      assert.deepEqual(
+        sent.find((m) => m.action === "createTab"),
+        { action: "createTab", url: "https://example.com" },
+      );
+      assert.ok(
+        !sent.some((m) => m.action === "search"),
+        "expected a URL open, not a search",
+      );
+    } finally {
+      restore();
+      Prompt.close();
+    }
+  });
+});
+
+test("omnibar leading URL token searches the stripped term", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const original = chrome.runtime.sendMessage;
+    chrome.runtime.sendMessage = (message, callback) => {
+      sent.push(message);
+      callback([]);
+    };
+    try {
+      const input = openOmnibarPrompt(document);
+      input.value = "youtube.com foo";
+      input.dispatch("input", {});
+      Prompt.onKeyDown(keyEvent("Enter"));
+      assert.deepEqual(
+        sent.find((m) => m.action === "search"),
+        {
+          action: "search",
+          query: "foo",
+          newTab: true,
+          incognito: false,
+        },
+      );
+      assert.ok(
+        !sent.some(
+          (m) => m.action === "createTab" || m.action === "navigate",
+        ),
+        "expected a search, not a navigation",
+      );
+    } finally {
+      chrome.runtime.sendMessage = original;
+      Prompt.close();
+    }
+  });
+});
+
+test("edit URL navigates even when the URL is already open in a tab", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const restore = mockSuggest(
+      [
+        {
+          id: 9,
+          title: "Current",
+          url: "https://current.example/page",
+          source: "tab",
+        },
+      ],
+      (m) => sent.push(m),
+    );
+    try {
+      Prompt.openEditUrl();
+      await waitSuggest();
+      Prompt.onKeyDown(keyEvent("Enter"));
+      assert.deepEqual(
+        sent.find((m) => m.action === "navigate"),
+        { action: "navigate", url: "https://current.example/page" },
+      );
+      assert.ok(
+        !sent.some((m) => m.action === "activateTab"),
+        "expected navigation, not a tab switch",
+      );
+    } finally {
+      restore();
+      Prompt.close();
+    }
+  });
+});
+
 test("parseTabPrefix detects the t tab-only prefix", () => {
   assert.equal(parseTabPrefix("t ytb"), "ytb");
   assert.equal(parseTabPrefix("t   lofi hip hop  "), "lofi hip hop");

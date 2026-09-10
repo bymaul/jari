@@ -147,6 +147,47 @@ test("search uses the configured default engine", async () => {
   }
 });
 
+test("search without incognito uses the configured default engine, not chrome.search", async () => {
+  const createdTabs = [];
+  let searchCalls = 0;
+  const savedGet = globalThis.chrome.storage.sync.get;
+  const savedSearch = globalThis.chrome.search;
+  globalThis.chrome.storage.sync.get = async () => ({
+    settings: {
+      searchEngines: [
+        { keyword: "ddg", url: "https://duckduckgo.com/?q=%s" },
+        { keyword: "g", url: "https://www.google.com/search?q=%s" },
+      ],
+      defaultEngine: "ddg",
+    },
+  });
+  globalThis.chrome.search = {
+    query: async () => {
+      searchCalls++;
+      return {};
+    },
+  };
+  stubChrome({
+    windows: [{ id: 1, incognito: false }],
+    onCreateTab: (opts) => createdTabs.push(opts),
+  });
+  try {
+    const res = await handlers.search(
+      {},
+      { query: "hello world", newTab: true, incognito: false },
+    );
+    assert.deepEqual(res, { ok: true });
+    assert.equal(searchCalls, 0);
+    assert.deepEqual(createdTabs, [
+      { url: "https://duckduckgo.com/?q=hello%20world" },
+    ]);
+  } finally {
+    globalThis.chrome.storage.sync.get = savedGet;
+    if (savedSearch === undefined) delete globalThis.chrome.search;
+    else globalThis.chrome.search = savedSearch;
+  }
+});
+
 function stubSuggestChrome(maxResults) {
   const saved = {
     query: globalThis.chrome.tabs.query,

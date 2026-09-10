@@ -678,17 +678,10 @@
     search: async (sender, { query = "", newTab = true, incognito = false } = {}) => {
       const text = query.trim();
       if (!text) return { ok: false };
-      if (incognito) {
-        return openInIncognito(await getDefaultSearchUrl(text));
-      }
-      if (typeof chrome.search?.query === "function") {
-        await chrome.search.query({
-          text,
-          disposition: newTab ? "NEW_TAB" : "CURRENT_TAB"
-        });
-        return { ok: true };
-      }
       const url = await getDefaultSearchUrl(text);
+      if (incognito) {
+        return openInIncognito(url);
+      }
       if (newTab) {
         await chrome.tabs.create({ url });
       } else if (sender.tab && sender.tab.id) {

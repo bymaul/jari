@@ -69,7 +69,6 @@ Or build from source (below) and load this folder the same way. The checked-in
 | --------------------------- | ------------------------------------------------------------------------------------- |
 | `tabs`, `sessions`          | Switch, close, reopen, move, duplicate tabs                                           |
 | `history`, `bookmarks`      | Omnibox (`t`) suggestions from your history and bookmarks                             |
-| `search`                    | Open a search in a maximized incognito window (`T`)                                   |
 | `storage`                   | Persist your settings via the browser's synced storage                                |
 | `clipboardRead`             | Open a URL from your clipboard (`gp`/`gP`)                                            |
 | `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yfa`) - Firefox only; Chrome uses the page clipboard API|

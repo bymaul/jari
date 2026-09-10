@@ -330,6 +330,65 @@
     if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
     return knownTlds.has(tld);
   }
+  function normalizeUrl(raw) {
+    if (typeof raw !== "string") return null;
+    const url = raw.trim();
+    if (!url || /\s/.test(url)) return null;
+    if (/^localhost(:\d+)?([/?#].*)?$/i.test(url) || /^127\.0\.0\.1(:\d+)?([/?#].*)?$/i.test(url) || /^0\.0\.0\.0(:\d+)?([/?#].*)?$/i.test(url))
+      return "http://" + url;
+    if (url.startsWith("//")) {
+      const section = url.slice(2).split(/[/?#]/)[0];
+      if (section.includes(":") && !/:\d+$/.test(section)) return null;
+      try {
+        const u = new URL("https:" + url);
+        if (!isBareNavigableHostname(u.hostname)) return null;
+        return "https:" + url;
+      } catch {
+        return null;
+      }
+    }
+    const m = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+    if (!m) {
+      const hostPart = url.split(/[:/?#]/)[0];
+      if (!isBareNavigableHostname(hostPart)) return null;
+      const hostPort = url.split(/[/?#]/)[0];
+      if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return null;
+      const bareTld = hostPart.toLowerCase().split(".").pop();
+      if (!url.includes("/") && !url.includes(":") && !url.includes("?") && !url.includes("#") && fileExtensionDenylist.has(bareTld)) return null;
+      try {
+        const u = new URL("https://" + url);
+        if (!isBareNavigableHostname(u.hostname)) return null;
+      } catch {
+        return null;
+      }
+      return "https://" + url;
+    }
+    const scheme = m[1].toLowerCase();
+    if (urlSchemes.has(scheme)) {
+      if (scheme === "http" || scheme === "https") {
+        try {
+          const u = new URL(url);
+          if (u.hostname && !isValidHostname(u.hostname)) return null;
+        } catch {
+          return null;
+        }
+      }
+      return url;
+    }
+    if (blockedUrlSchemes.has(scheme)) return null;
+    const rest = url.slice(m[0].length);
+    if (/^(\d+)([/?#].*)?$/.test(rest)) {
+      if (!isBareNavigableHostname(m[1])) return null;
+      try {
+        const u = new URL("https://" + url);
+        if (!isBareNavigableHostname(u.hostname)) return null;
+      } catch {
+        return null;
+      }
+      return "https://" + url;
+    }
+    return null;
+  }
   var Url = {
     parentUrlOf(href) {
       try {
@@ -2366,9 +2425,10 @@
       if (!active || seq !== suggestSeq) return;
       const res = await sendMessage("suggest", { query: suggestQuery }) || [];
       if (!active || seq !== suggestSeq) return;
+      const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
       tabUrlMap.clear();
-      for (const it of res) if (it.url) tabUrlMap.set(it.url, it);
-      onResults(res);
+      for (const it of items) if (it.url) tabUrlMap.set(it.url, it);
+      onResults(items);
     }, 130);
   }
   function toSuggestionRow(item, match) {
@@ -2382,7 +2442,7 @@
     };
   }
   function handleOpenInput(queryText) {
-    if (isTabListAll(queryText)) {
+    if (mode !== "incognito" && isTabListAll(queryText)) {
       handleTabListAll();
       return;
     }
@@ -2414,7 +2474,7 @@
       };
     } else {
       const isUrl = Url.looksLikeUrl(effective);
-      row = isUrl ? { kind: "url", title: effective, url: effective } : { kind: "search", title: effective, url: null };
+      row = isUrl ? { kind: "url", title: effective, url: effective } : { kind: "search", title: term, url: null };
     }
     filtered = [row];
     selected = 0;
@@ -2424,7 +2484,8 @@
       const suggestions = rank(pool, term).map(
         ({ item, match }) => toSuggestionRow(item, match)
       );
-      filtered = tabQuery != null ? suggestions : [row, ...suggestions];
+      const max = settings.getMaxResults();
+      filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
       selected = 0;
       renderList();
     });
@@ -2432,12 +2493,13 @@
   function handleTabListAll() {
     clearTimeout(suggestTimer);
     suggestSeq++;
+    const seq = suggestSeq;
     query = "";
     filtered = [];
     selected = 0;
     renderList();
     sendMessage("listTabs").then((res) => {
-      if (!active || !inputEl || !isTabListAll(inputEl.value)) return;
+      if (!active || seq !== suggestSeq || !inputEl || !isTabListAll(inputEl.value)) return;
       tabUrlMap.clear();
       filtered = (res || []).map((item) => {
         const tab = { ...item, source: "tab" };
@@ -2651,18 +2713,24 @@
   }
   function activate() {
     const item = filtered[selected];
-    const rawInput = inputEl ? inputEl.value.trim() : "";
+    const rawValue = inputEl ? inputEl.value : "";
+    const rawInput = rawValue.trim();
     const inOmnibar = mode === "open" || mode === "edit" || mode === "incognito";
     const tabRest = inOmnibar ? parseTabPrefix(rawInput) : null;
     const effectiveInput = tabRest != null ? tabRest : rawInput;
-    const kwInput = parseKeyword(effectiveInput);
+    const kwInput = tabRest != null ? null : parseKeyword(effectiveInput);
+    const commitTerm = kwInput ? kwInput.rest : Url.suggestionTerm(effectiveInput);
     if (!item) {
+      if (isTabListAll(rawValue)) {
+        close();
+        return;
+      }
       if (mode === "open" && !rawInput) sendMessage("createTab");
       else if (mode === "incognito" && !rawInput) sendMessage("openIncognitoTab");
       else if (kwInput) openUrl(kwInput.url);
       else if (effectiveInput && Url.looksLikeUrl(effectiveInput)) {
-        openUrl(Url.normalizeUrl(effectiveInput) || effectiveInput);
-      } else if (effectiveInput) searchQuery(effectiveInput);
+        openUrl(normalizeUrl(effectiveInput) || effectiveInput);
+      } else if (commitTerm) searchQuery(commitTerm);
       close();
       return;
     }
@@ -2672,9 +2740,9 @@
       if (item.kind === "search") {
         if (item.keyword && item.url) openUrl(item.url);
         else if (kwInput && kwInput.url) openUrl(kwInput.url);
-        else searchQuery(rawInput);
+        else searchQuery(commitTerm);
       } else if (item.url) {
-        const match = tabUrlMap.get(item.url);
+        const match = mode === "edit" ? void 0 : tabUrlMap.get(item.url) || tabUrlMap.get(normalizeUrl(item.url) || "");
         if (match && match.id) sendMessage("activateTab", { id: match.id });
         else openUrl(item.url);
       }

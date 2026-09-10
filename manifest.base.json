@@ -32,8 +32,7 @@
     "sessions",
     "clipboardRead",
     "history",
-    "bookmarks",
-    "search"
+    "bookmarks"
   ],
   "options_ui": {
     "page": "options/options.html",

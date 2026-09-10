@@ -24,8 +24,9 @@ sent to the developer or any third party.
 
 Jari makes no network requests of its own. The only network activity it can
 trigger is navigation or search you explicitly request (opening a URL,
-`chrome.search.query` for the `T` command), which goes to the site or search
-engine you chose - same as typing in the address bar.
+including a search in a maximized incognito window for the `T` command),
+which goes to the site or search engine you chose - same as typing in the
+address bar.
 
 ## Contact
 
