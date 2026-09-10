@@ -15,7 +15,11 @@ const {
   nearestScrollableAncestor,
   scrollFixedMatchIntoView,
   buildMatcher,
+  buildMatches,
   findToggleCommandFor,
+  hasUpperCase,
+  matchesChanged,
+  syncObserver,
 } = __testHelpers;
 
 const hadInnerWidth = "innerWidth" in globalThis.window;
@@ -217,13 +221,27 @@ test("buildMatcher compiles substring, regex and whole-word patterns", () => {
   assert.ok(word.test("a cat sat"));
   assert.ok(!word.test("concatenate"));
 
+  const accented = buildMatcher("café", { wholeWord: true });
+  assert.ok(accented.test("un café"));
+  assert.ok(!accented.test("caféx"));
+
+  const symbols = buildMatcher("c++", { wholeWord: true });
+  assert.ok(symbols.test("c++ rocks"));
+  assert.ok(!symbols.test("sc++"));
+
   const rx = buildMatcher("a+c", { regex: true });
   assert.ok(rx.test("aaac"));
   assert.ok(!rx.test("abc"));
 
+  const rxWord = buildMatcher("a+c", { regex: true, wholeWord: true });
+  assert.ok(rxWord.test("aaac"));
+  assert.ok(!rxWord.test("aaacd"));
+
+  const multiline = buildMatcher("^foo", { regex: true });
+  assert.ok(multiline.test("bar\nfoo"));
+
   assert.equal(buildMatcher(""), null);
   assert.equal(buildMatcher("(unclosed", { regex: true }), null);
-  assert.equal(buildMatcher("x", { regex: true, wholeWord: true }).source, "x");
 });
 
 test("findToggleCommandFor resolves only toggle commands", () => {
@@ -381,6 +399,106 @@ test("Esc in bar discards live text but keeps prior history for n", () => {
     assert.equal(state.committedQuery, "foo");
     assert.equal(state.pendingQuery, "");
   } finally {
+    __resetFindState();
+  }
+});
+
+test("hasUpperCase sees non-ASCII uppercase for smart case", () => {
+  assert.equal(hasUpperCase("abc"), false);
+  assert.equal(hasUpperCase("aBc"), true);
+  assert.equal(hasUpperCase("Äpfel"), true);
+  assert.equal(hasUpperCase("приВЕт"), true);
+});
+
+test("matchesChanged notices in-place edits, not just node swaps", () => {
+  const node = {};
+  const same = { startContainer: node, startOffset: 1, endOffset: 4 };
+  const sameCopy = { startContainer: node, startOffset: 1, endOffset: 4 };
+  const edited = { startContainer: node, startOffset: 1, endOffset: 5 };
+  const moved = { startContainer: {}, startOffset: 1, endOffset: 4 };
+  assert.equal(matchesChanged([same], [sameCopy]), false);
+  assert.equal(matchesChanged([same], [edited]), true);
+  assert.equal(matchesChanged([same], [moved]), true);
+  assert.equal(matchesChanged([same], []), true);
+  assert.equal(matchesChanged([], []), false);
+});
+
+test("syncObserver tracks committed highlights without the bar", () => {
+  const hadMO = "MutationObserver" in globalThis;
+  const savedMO = globalThis.MutationObserver;
+  let disconnected = 0;
+  globalThis.MutationObserver = class {
+    observe() {}
+    disconnect() {
+      disconnected++;
+    }
+  };
+  __resetFindState();
+  try {
+    __setFindTestState({ matches: [], query: "" });
+    syncObserver();
+    __setFindTestState({ matches: [fakeMatch()], query: "foo" });
+    syncObserver();
+    __setFindTestState({ matches: [], query: "foo" });
+    syncObserver();
+    assert.equal(disconnected, 1);
+  } finally {
+    __resetFindState();
+    if (hadMO) globalThis.MutationObserver = savedMO;
+    else delete globalThis.MutationObserver;
+  }
+});
+
+test("buildMatches creates iframe ranges on the owning document", () => {
+  __resetFindState();
+  const savedQS = globalThis.document.querySelectorAll;
+  const savedNF = globalThis.NodeFilter;
+  const ranges = [];
+  const ownerDoc = {
+    createRange: () => {
+      const range = {
+        owner: "iframe",
+        setStart(node, offset) {
+          range.start = [node, offset];
+        },
+        setEnd(node, offset) {
+          range.end = [node, offset];
+        },
+      };
+      ranges.push(range);
+      return range;
+    },
+  };
+  const textNode = { nodeValue: "hello iframe text", ownerDocument: ownerDoc };
+  const fakeDoc = {
+    body: {},
+    createTreeWalker: () => {
+      let done = false;
+      return {
+        nextNode: () => {
+          if (done) return null;
+          done = true;
+          return textNode;
+        },
+      };
+    },
+  };
+  globalThis.NodeFilter = { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 3 };
+  globalThis.document.querySelectorAll = () => [
+    { tagName: "IFRAME", contentDocument: fakeDoc },
+  ];
+  try {
+    const found = buildMatches("iframe");
+    assert.equal(found.length, 1);
+    assert.equal(ranges.length, 1);
+    assert.equal(ranges[0].owner, "iframe");
+    assert.deepEqual(ranges[0].start, [textNode, 6]);
+    assert.deepEqual(ranges[0].end, [textNode, 12]);
+  } finally {
+    if (savedQS === undefined) delete globalThis.document.querySelectorAll;
+    else globalThis.document.querySelectorAll = savedQS;
+    if (savedNF === undefined) delete globalThis.NodeFilter;
+    else globalThis.NodeFilter = savedNF;
     __resetFindState();
   }
 });

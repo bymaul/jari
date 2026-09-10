@@ -6201,6 +6201,9 @@
   var committedQuery = "";
   var committedIdx = 0;
   var committedHidden = false;
+  var committedRegex = false;
+  var committedWholeWord = false;
+  var committedCase = false;
   var findRegex = false;
   var findWholeWord = false;
   var findCase = false;
@@ -6222,7 +6225,7 @@
     return active5;
   }
   function hasUpperCase(s) {
-    return /[A-Z]/.test(s);
+    return /\p{Lu}/u.test(s);
   }
   function isOverlayElement(el) {
     try {
@@ -6254,20 +6257,37 @@
     }
     return false;
   }
+  function matchesChanged(a, b) {
+    if (a.length !== b.length) return true;
+    return a.some((r, i) => {
+      const o = b[i];
+      return !o || r.startContainer !== o.startContainer || r.startOffset !== o.startOffset || r.endOffset !== o.endOffset;
+    });
+  }
   function scheduleFindRebuild() {
     clearTimeout(findObserverTimer);
     findObserverTimer = setTimeout(() => {
-      if (!active5 || !pendingQuery) return;
-      const q = pendingQuery.trim();
-      if (!q) return;
       try {
-        const rebuilt = buildMatches(q);
-        if (rebuilt.length !== matches2.length || rebuilt.some((r, i) => r.startContainer !== matches2[i]?.startContainer)) {
-          matches2 = rebuilt;
-          currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
-          applyHighlights();
-          updateStatus();
-          if (matches2.length > 0) scrollToCurrent();
+        if (active5 && pendingQuery) {
+          const q = pendingQuery.trim();
+          if (!q) return;
+          const rebuilt = buildMatches(q);
+          if (matchesChanged(rebuilt, matches2)) {
+            matches2 = rebuilt;
+            currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
+            applyHighlights();
+            updateStatus();
+            if (matches2.length > 0) scrollToCurrent();
+          }
+          return;
+        }
+        if (!active5 && hasHighlights() && (lastQuery || "").trim()) {
+          const rebuilt = buildMatches(lastQuery.trim());
+          if (matchesChanged(rebuilt, matches2)) {
+            matches2 = rebuilt;
+            currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
+            applyHighlights();
+          }
         }
       } catch {
       }
@@ -6290,6 +6310,13 @@
       } catch {
       }
       findObserver = null;
+    }
+  }
+  function syncObserver() {
+    if (active5 || hasHighlights()) {
+      if (!findObserver) startFindObserver();
+    } else {
+      stopFindObserver();
     }
   }
   function collectTextNodes() {
@@ -6381,11 +6408,12 @@
   }
   function buildMatcher(query3, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
     if (!query3) return null;
+    const flags = (caseSensitive ? "g" : "gi") + "mu";
+    const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
     try {
-      if (regex) return new RegExp(query3, caseSensitive ? "g" : "gi");
-      let src = query3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (wholeWord) src = `\\b${src}\\b`;
-      return new RegExp(src, caseSensitive ? "g" : "gi");
+      if (regex) return new RegExp(wholeWord ? bounds(query3) : query3, flags);
+      const src = query3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(wholeWord ? bounds(src) : src, flags);
     } catch {
       return null;
     }
@@ -6410,7 +6438,8 @@
           continue;
         }
         try {
-          const range = document.createRange();
+          const rangeDoc = node.ownerDocument && typeof node.ownerDocument.createRange === "function" && node.ownerDocument || document;
+          const range = rangeDoc.createRange();
           range.setStart(node, m.index);
           range.setEnd(node, m.index + m[0].length);
           out.push(range);
@@ -6677,6 +6706,7 @@
   }
   function stepHistory(delta) {
     if (!inputEl2 || findHistory.length === 0) return;
+    if (historyIdx === -1 && delta < 0) return;
     if (historyIdx === -1 && delta > 0) historyDraft = inputEl2.value;
     historyIdx = Math.min(
       findHistory.length - 1,
@@ -6794,7 +6824,6 @@
     if (!active5) return;
     clearTimeout(inputDebounce);
     inputDebounce = null;
-    stopFindObserver();
     const wasInput = inputEl2;
     active5 = false;
     pendingQuery = "";
@@ -6818,10 +6847,15 @@
       } catch {
       }
       if (document.activeElement === wasInput) {
-        document.activeElement = document.body || null;
+        try {
+          const body = document.body || null;
+          if (body && typeof body.focus === "function") body.focus();
+        } catch {
+        }
       }
     }
     restoreFocus2 = null;
+    syncObserver();
   }
   function closeAndClear() {
     clearHighlights();
@@ -6840,21 +6874,33 @@
       committedQuery = "";
       committedIdx = 0;
       committedHidden = false;
+      syncObserver();
       return;
     }
     lastQuery = committedQuery;
     pendingQuery = "";
+    const keepRegex = findRegex;
+    const keepWholeWord = findWholeWord;
+    const keepCase = findCase;
+    findRegex = committedRegex;
+    findWholeWord = committedWholeWord;
+    findCase = committedCase;
     try {
       matches2 = buildMatches(q);
       currentIdx2 = Math.min(committedIdx, Math.max(0, matches2.length - 1));
     } catch {
       matches2 = [];
       currentIdx2 = 0;
+    } finally {
+      findRegex = keepRegex;
+      findWholeWord = keepWholeWord;
+      findCase = keepCase;
     }
     highlightsHidden = committedHidden;
     useHighlights = detectHighlightSupport();
     applyHighlights();
     updateStatus();
+    syncObserver();
   }
   function commitQuery(q) {
     clearTimeout(inputDebounce);
@@ -6875,6 +6921,9 @@
     committedQuery = query3;
     committedIdx = 0;
     committedHidden = false;
+    committedRegex = findRegex;
+    committedWholeWord = findWholeWord;
+    committedCase = findCase;
     pendingQuery = "";
     highlightsHidden = false;
     useHighlights = detectHighlightSupport();
@@ -6883,12 +6932,14 @@
     applyHighlights();
     if (matches2.length > 0) scrollToCurrent();
     updateStatus();
+    syncObserver();
   }
   function next(count = 1, reverse = false) {
     const c = Math.max(1, Math.floor(count) || 1);
     if (highlightsHidden && matches2.length > 0) {
       highlightsHidden = false;
       useHighlights = detectHighlightSupport();
+      syncObserver();
     }
     if (matches2.length > 0) {
       try {
@@ -7039,6 +7090,7 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       hideHighlights();
+      syncObserver();
       return true;
     }
     return false;
@@ -7076,6 +7128,10 @@
   } catch {
   }
   function __resetFindState() {
+    try {
+      stopFindObserver();
+    } catch {
+    }
     closeAndClear();
     highlightsHidden = false;
     lastQuery = "";
@@ -7083,6 +7139,9 @@
     committedQuery = "";
     committedIdx = 0;
     committedHidden = false;
+    committedRegex = false;
+    committedWholeWord = false;
+    committedCase = false;
     useHighlights = false;
     findRegex = false;
     findWholeWord = false;

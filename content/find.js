@@ -25,6 +25,9 @@ let pendingQuery = "";
 let committedQuery = "";
 let committedIdx = 0;
 let committedHidden = false;
+let committedRegex = false;
+let committedWholeWord = false;
+let committedCase = false;
 
 let findRegex = false;
 let findWholeWord = false;
@@ -52,7 +55,7 @@ function isActive() {
 }
 
 function hasUpperCase(s) {
-  return /[A-Z]/.test(s);
+  return /\p{Lu}/u.test(s);
 }
 
 function isOverlayElement(el) {
@@ -84,20 +87,42 @@ function shouldSkipNode(node) {
   } catch {}
   return false;
 }
+function matchesChanged(a, b) {
+  if (a.length !== b.length) return true;
+  return a.some((r, i) => {
+    const o = b[i];
+    return (
+      !o ||
+      r.startContainer !== o.startContainer ||
+      r.startOffset !== o.startOffset ||
+      r.endOffset !== o.endOffset
+    );
+  });
+}
 function scheduleFindRebuild() {
   clearTimeout(findObserverTimer);
   findObserverTimer = setTimeout(() => {
-    if (!active || !pendingQuery) return;
-    const q = pendingQuery.trim();
-    if (!q) return;
     try {
-      const rebuilt = buildMatches(q);
-      if (rebuilt.length !== matches.length || rebuilt.some((r, i) => r.startContainer !== matches[i]?.startContainer)) {
-        matches = rebuilt;
-        currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
-        applyHighlights();
-        updateStatus();
-        if (matches.length > 0) scrollToCurrent();
+      if (active && pendingQuery) {
+        const q = pendingQuery.trim();
+        if (!q) return;
+        const rebuilt = buildMatches(q);
+        if (matchesChanged(rebuilt, matches)) {
+          matches = rebuilt;
+          currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
+          applyHighlights();
+          updateStatus();
+          if (matches.length > 0) scrollToCurrent();
+        }
+        return;
+      }
+      if (!active && hasHighlights() && (lastQuery || "").trim()) {
+        const rebuilt = buildMatches(lastQuery.trim());
+        if (matchesChanged(rebuilt, matches)) {
+          matches = rebuilt;
+          currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
+          applyHighlights();
+        }
       }
     } catch {}
   }, 150);
@@ -115,6 +140,14 @@ function stopFindObserver() {
   if (findObserver) {
     try { findObserver.disconnect(); } catch {}
     findObserver = null;
+  }
+}
+
+function syncObserver() {
+  if (active || hasHighlights()) {
+    if (!findObserver) startFindObserver();
+  } else {
+    stopFindObserver();
   }
 }
 
@@ -202,11 +235,12 @@ function collectTextNodes() {
 
 export function buildMatcher(query, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
   if (!query) return null;
+  const flags = (caseSensitive ? "g" : "gi") + "mu";
+  const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
   try {
-    if (regex) return new RegExp(query, caseSensitive ? "g" : "gi");
-    let src = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (wholeWord) src = `\\b${src}\\b`;
-    return new RegExp(src, caseSensitive ? "g" : "gi");
+    if (regex) return new RegExp(wholeWord ? bounds(query) : query, flags);
+    const src = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(wholeWord ? bounds(src) : src, flags);
   } catch {
     return null;
   }
@@ -232,7 +266,12 @@ function buildMatches(query) {
         continue;
       }
       try {
-        const range = document.createRange();
+        const rangeDoc =
+          (node.ownerDocument &&
+            typeof node.ownerDocument.createRange === "function" &&
+            node.ownerDocument) ||
+          document;
+        const range = rangeDoc.createRange();
         range.setStart(node, m.index);
         range.setEnd(node, m.index + m[0].length);
         out.push(range);
@@ -499,6 +538,7 @@ async function pushFindHistory(q) {
 
 function stepHistory(delta) {
   if (!inputEl || findHistory.length === 0) return;
+  if (historyIdx === -1 && delta < 0) return;
   if (historyIdx === -1 && delta > 0) historyDraft = inputEl.value;
   historyIdx = Math.min(
     findHistory.length - 1,
@@ -627,7 +667,6 @@ function closeBar() {
   if (!active) return;
   clearTimeout(inputDebounce);
   inputDebounce = null;
-  stopFindObserver();
   const wasInput = inputEl;
   active = false;
   pendingQuery = "";
@@ -648,10 +687,14 @@ function closeBar() {
       wasInput.blur();
     } catch {}
     if (document.activeElement === wasInput) {
-      document.activeElement = document.body || null;
+      try {
+        const body = document.body || null;
+        if (body && typeof body.focus === "function") body.focus();
+      } catch {}
     }
   }
   restoreFocus = null;
+  syncObserver();
 }
 
 function closeAndClear() {
@@ -672,21 +715,33 @@ function closeDiscardPending() {
     committedQuery = "";
     committedIdx = 0;
     committedHidden = false;
+    syncObserver();
     return;
   }
   lastQuery = committedQuery;
   pendingQuery = "";
+  const keepRegex = findRegex;
+  const keepWholeWord = findWholeWord;
+  const keepCase = findCase;
+  findRegex = committedRegex;
+  findWholeWord = committedWholeWord;
+  findCase = committedCase;
   try {
     matches = buildMatches(q);
     currentIdx = Math.min(committedIdx, Math.max(0, matches.length - 1));
   } catch {
     matches = [];
     currentIdx = 0;
+  } finally {
+    findRegex = keepRegex;
+    findWholeWord = keepWholeWord;
+    findCase = keepCase;
   }
   highlightsHidden = committedHidden;
   useHighlights = detectHighlightSupport();
   applyHighlights();
   updateStatus();
+  syncObserver();
 }
 
 function commitQuery(q) {
@@ -708,6 +763,9 @@ function commitQuery(q) {
   committedQuery = query;
   committedIdx = 0;
   committedHidden = false;
+  committedRegex = findRegex;
+  committedWholeWord = findWholeWord;
+  committedCase = findCase;
   pendingQuery = "";
   highlightsHidden = false;
   useHighlights = detectHighlightSupport();
@@ -716,6 +774,7 @@ function commitQuery(q) {
   applyHighlights();
   if (matches.length > 0) scrollToCurrent();
   updateStatus();
+  syncObserver();
 }
 
 function next(count = 1, reverse = false) {
@@ -723,6 +782,7 @@ function next(count = 1, reverse = false) {
   if (highlightsHidden && matches.length > 0) {
     highlightsHidden = false;
     useHighlights = detectHighlightSupport();
+    syncObserver();
   }
   if (matches.length > 0) {
     try {
@@ -875,6 +935,7 @@ function handleGlobalEsc(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     hideHighlights();
+    syncObserver();
     return true;
   }
   return false;
@@ -920,6 +981,8 @@ export const __testHelpers = {
   buildMatcher,
   findToggleCommandFor,
   hasUpperCase,
+  matchesChanged,
+  syncObserver,
   rectIntersectsViewport,
   findFixedAncestor,
   nearestScrollableAncestor,
@@ -953,6 +1016,7 @@ export function __getFindTestState() {
 }
 
 export function __resetFindState() {
+  try { stopFindObserver(); } catch {}
   closeAndClear();
   highlightsHidden = false;
   lastQuery = "";
@@ -960,6 +1024,9 @@ export function __resetFindState() {
   committedQuery = "";
   committedIdx = 0;
   committedHidden = false;
+  committedRegex = false;
+  committedWholeWord = false;
+  committedCase = false;
   useHighlights = false;
   findRegex = false;
   findWholeWord = false;
