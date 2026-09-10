@@ -14,6 +14,9 @@ const {
   translateRect,
   getHintRect,
   collectIframeElements,
+  getHref,
+  isOpenableLink,
+  isOwnMutation,
 } = __testHelpers;
 
 function assertPrefixFree(labels) {
@@ -240,4 +243,83 @@ test("dispatchHover emits hover events without focusing or scrolling", () => {
     if (hadMouseEvent) globalThis.MouseEvent = savedMouseEvent;
     else delete globalThis.MouseEvent;
   }
+});
+
+function fakeAnchor(rawHref, resolvedHref, extra = {}) {
+  return {
+    getAttribute: (name) => (name === "href" ? rawHref : null),
+    href: resolvedHref,
+    ...extra,
+  };
+}
+
+test("getHref drops fragment-only and empty links", () => {
+  assert.equal(getHref(fakeAnchor("#", "https://current.example/page#")), null);
+  assert.equal(getHref(fakeAnchor("", "https://current.example/page")), null);
+  assert.equal(getHref(fakeAnchor("   ", "https://current.example/page")), null);
+});
+
+test("getHref keeps resolved URLs and honors the iframe base", () => {
+  assert.equal(
+    getHref(fakeAnchor("/docs/a", "https://current.example/docs/a")),
+    "https://current.example/docs/a",
+  );
+  const svgLike = {
+    getAttribute: (name) => (name === "href" ? "/sub/inner" : null),
+    href: {},
+    _jariBase: "https://inner.example/base/",
+  };
+  assert.equal(getHref(svgLike), "https://inner.example/sub/inner");
+  const noBase = {
+    getAttribute: (name) => (name === "href" ? "/sub/inner" : null),
+    href: {},
+  };
+  assert.equal(getHref(noBase), "https://current.example/sub/inner");
+});
+
+test("isOpenableLink rejects fragment-only links", () => {
+  assert.equal(
+    isOpenableLink(fakeAnchor("#", "https://current.example/page#")),
+    false,
+  );
+  assert.equal(
+    isOpenableLink(fakeAnchor("/docs/a", "https://current.example/docs/a")),
+    true,
+  );
+});
+
+function fakeMutNode(classes) {
+  return { nodeType: 1, classList: classes, closest: () => null };
+}
+
+test("isOwnMutation ignores our own UI churn but keeps page mutations", () => {
+  const body = fakeMutNode([]);
+  assert.equal(
+    isOwnMutation({ target: body, addedNodes: [fakeMutNode(["jari-flash"])], removedNodes: [] }),
+    true,
+  );
+  assert.equal(
+    isOwnMutation({ target: fakeMutNode(["jari-hints-host"]), addedNodes: [], removedNodes: [] }),
+    true,
+  );
+  assert.equal(
+    isOwnMutation({ target: fakeMutNode(["jari-hint"]), addedNodes: [], removedNodes: [] }),
+    true,
+  );
+  assert.equal(
+    isOwnMutation({ target: body, addedNodes: [fakeMutNode(["ad-slot"])], removedNodes: [] }),
+    false,
+  );
+  assert.equal(
+    isOwnMutation({ target: fakeMutNode(["content"]), addedNodes: [], removedNodes: [] }),
+    false,
+  );
+  assert.equal(
+    isOwnMutation({
+      target: body,
+      addedNodes: [fakeMutNode(["ad-slot"])],
+      removedNodes: [fakeMutNode(["jari-flash"])],
+    }),
+    false,
+  );
 });

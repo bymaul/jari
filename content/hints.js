@@ -47,6 +47,7 @@ let resizeHandler = null;
 let mutationObserver = null;
 let regenerateTimer = null;
 let hintPill = null;
+let spaceHeld = false;
 
 export { normalizeCharset, genLabels };
 
@@ -66,6 +67,38 @@ function hideHintPill() {
     hintPill.remove();
   } catch {}
   hintPill = null;
+}
+
+function hasJariClass(node) {
+  try {
+    if (!node || node.nodeType !== 1) return false;
+    const classes = node.classList;
+    if (classes) {
+      for (const c of classes) {
+        if (typeof c === "string" && c.startsWith("jari-")) return true;
+      }
+    }
+    if (node.closest) {
+      return !!node.closest("[class^='jari-'], [class*=' jari-']");
+    }
+  } catch {}
+  return false;
+}
+
+function isOwnMutation(mutation) {
+  try {
+    const nodes = [
+      ...(mutation.addedNodes || []),
+      ...(mutation.removedNodes || []),
+    ];
+    const allOwn = (list) =>
+      list.every((n) => n.nodeType !== 1 || hasJariClass(n));
+    if (mutation.target && mutation.target.nodeType === 1 && hasJariClass(mutation.target)) {
+      return allOwn(nodes);
+    }
+    return nodes.length > 0 && allOwn(nodes);
+  } catch {}
+  return false;
 }
 
 function scheduleRegenerate() {
@@ -89,7 +122,7 @@ function scheduleRegenerate() {
     }
     elements = capped;
     render();
-    if (holder) holder.style.display = "";
+    if (holder && !spaceHeld) holder.style.display = "";
     prefix = savedPrefix;
     if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
       prefix = "";
@@ -173,6 +206,39 @@ function flip() {
   });
 }
 
+function assignLabels(nextElements, charset) {
+  const oldByEl = new Map(hints.map((h) => [h.el, h.label]));
+  const assigned = new Map();
+  const taken = [];
+  const newcomers = [];
+  for (const el of nextElements) {
+    const old = oldByEl.get(el);
+    if (old) {
+      assigned.set(el, old);
+      taken.push(old);
+    } else {
+      newcomers.push(el);
+    }
+  }
+  if (newcomers.length > 0) {
+    if (taken.length === 0) return genLabels(nextElements.length, charset);
+    const pool = genLabels(nextElements.length + newcomers.length, charset).filter(
+      (label) => taken.every((t) => t !== label && !t.startsWith(label) && !label.startsWith(t)),
+    );
+    newcomers.forEach((el, i) => {
+      if (i < pool.length) {
+        assigned.set(el, pool[i]);
+        taken.push(pool[i]);
+      }
+    });
+    if (assigned.size !== nextElements.length) {
+      prefix = "";
+      return genLabels(nextElements.length, charset);
+    }
+  }
+  return nextElements.map((el) => assigned.get(el));
+}
+
 function render() {
   if (hintsHost) {
     try {
@@ -190,7 +256,7 @@ function render() {
   holder = created.holder;
 
   const charset = normalizeCharset();
-  const labels = genLabels(elements.length, charset);
+  const labels = assignLabels(elements, charset);
   hints = [];
 
   const links = layoutHints(
@@ -294,7 +360,12 @@ function startTracking() {
     ui.toast(`Hints: ${elements.length} targets (${mode})`);
   } catch {}
   try {
-    mutationObserver = new MutationObserver(scheduleRegenerate);
+    mutationObserver = new MutationObserver((mutations) => {
+      try {
+        if (mutations.every(isOwnMutation)) return;
+      } catch {}
+      scheduleRegenerate();
+    });
     const target = document.body || document.documentElement;
     mutationObserver.observe(target, {
       childList: true,
@@ -320,6 +391,13 @@ function close() {
   if (!active) return;
   active = false;
   prefix = "";
+  spaceHeld = false;
+  for (const el of elements) {
+    try {
+      delete el._jariViewportRect;
+      delete el._jariBase;
+    } catch {}
+  }
   elements = [];
   hints = [];
   if (hintsHost) {
@@ -468,6 +546,7 @@ function onKeyDown(event) {
   }
   if (key === " " || event.code === "Space") {
     ui.consume(event);
+    spaceHeld = true;
     if (holder) holder.style.display = "none";
     return true;
   }
@@ -485,6 +564,7 @@ function onKeyDown(event) {
     ui.consume(event);
     return true;
   }
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
   if (key.length === 1) {
     const charset = normalizeCharset();
     const lower = key.toLowerCase();
@@ -506,6 +586,7 @@ function onKeyUp(event) {
   if (!active) return false;
   if (event.key === " " || event.code === "Space") {
     ui.consume(event);
+    spaceHeld = false;
     if (holder) holder.style.display = "";
     return true;
   }
@@ -523,6 +604,7 @@ export function __testReset() {
 export const __testHelpers = {
   getHref,
   isOpenableLink,
+  isOwnMutation,
   isElementClickable,
   isExplicitlyRequested,
   getRealRect,

@@ -1168,37 +1168,87 @@
       }
     }
   }
-  var CLICK_EVENTS = [
-    "mouseover",
-    "pointerdown",
-    "mousedown",
-    "pointerup",
-    "mouseup",
-    "click",
-    "focus",
-    "focusin"
-  ];
+  function eventView(el) {
+    try {
+      const doc = el.ownerDocument;
+      if (doc && doc.defaultView) return doc.defaultView;
+    } catch {
+    }
+    return window;
+  }
+  function pointerEvent(el, type, x, y, buttons) {
+    const view = eventView(el);
+    try {
+      if (typeof PointerEvent === "function") {
+        return new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view,
+          button: 0,
+          buttons,
+          clientX: x,
+          clientY: y,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true
+        });
+      }
+    } catch {
+    }
+    return new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view,
+      button: 0,
+      buttons,
+      clientX: x,
+      clientY: y
+    });
+  }
+  function mouseEvent(el, type, x, y, buttons) {
+    return new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: eventView(el),
+      button: 0,
+      buttons,
+      clientX: x,
+      clientY: y
+    });
+  }
   function dispatchClick(el) {
+    let x = 0;
+    let y = 0;
+    try {
+      const r = el.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) {
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+      }
+    } catch {
+    }
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
     } catch {
     }
-    for (const type of CLICK_EVENTS) {
+    const steps = [
+      () => el.dispatchEvent(mouseEvent(el, "mouseover", x, y, 0)),
+      () => el.dispatchEvent(pointerEvent(el, "pointerdown", x, y, 1)),
+      () => el.dispatchEvent(mouseEvent(el, "mousedown", x, y, 1)),
+      () => safeFocus(el, { preventScroll: true }),
+      () => el.dispatchEvent(pointerEvent(el, "pointerup", x, y, 0)),
+      () => el.dispatchEvent(mouseEvent(el, "mouseup", x, y, 0)),
+      () => el.dispatchEvent(mouseEvent(el, "click", x, y, 0))
+    ];
+    for (const step of steps) {
       try {
-        el.dispatchEvent(
-          new MouseEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            view: window,
-            button: 0,
-            buttons: type === "mousedown" ? 1 : 0
-          })
-        );
+        step();
       } catch {
       }
     }
-    safeFocus(el, { preventScroll: true });
   }
   var HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
   function dispatchHover(el) {
@@ -1311,10 +1361,29 @@
     const windowWidth = window.innerWidth || document.documentElement.clientWidth;
     return (ignoreSize || isElementDrawn(el, rect)) && rect.top < windowHeight && rect.bottom > 0 && rect.left < windowWidth && rect.right > 0;
   }
+  var NON_RENDERED_TAGS = /* @__PURE__ */ new Set([
+    "HEAD",
+    "SCRIPT",
+    "STYLE",
+    "META",
+    "LINK",
+    "TITLE",
+    "BASE",
+    "NOSCRIPT",
+    "TEMPLATE"
+  ]);
   function listElements(root, whatToShow, filter) {
     const out = [];
     try {
-      const walker = document.createTreeWalker(root, whatToShow, null);
+      const walker = document.createTreeWalker(root, whatToShow, {
+        acceptNode(node2) {
+          try {
+            if (node2.tagName && NON_RENDERED_TAGS.has(node2.tagName)) return 3;
+          } catch {
+          }
+          return 1;
+        }
+      });
       let node = walker.nextNode();
       while (node) {
         try {
@@ -1342,17 +1411,21 @@
       } catch {
         continue;
       }
+      if (!Number.isFinite(
+        rect.top + rect.bottom + rect.left + rect.right + rect.height
+      ) || rect.top > window.innerHeight || rect.bottom < 0 || rect.left > window.innerWidth || rect.right < 0 || rect.height <= 0) {
+        continue;
+      }
       let hidden;
       try {
         hidden = window.getComputedStyle(e).visibility === "hidden";
       } catch {
         hidden = true;
       }
-      if (rect.top <= window.innerHeight && rect.bottom >= 0 && rect.left <= window.innerWidth && rect.right >= 0 && rect.height > 0 && !hidden) {
-        try {
-          filter(e, visibleElements);
-        } catch {
-        }
+      if (hidden) continue;
+      try {
+        filter(e, visibleElements);
+      } catch {
       }
     }
     return visibleElements;
@@ -1524,15 +1597,15 @@
     return elements2;
   }
   function getHref(el, base) {
+    const raw = el.getAttribute ? el.getAttribute("href") ?? el.getAttribute("xlink:href") : null;
+    if (raw != null && (raw.startsWith("#") || raw.trim() === "")) return null;
     try {
-      if (el.href) return el.href;
+      if (typeof el.href === "string" && el.href) return el.href;
     } catch {
     }
-    const raw = el.getAttribute ? el.getAttribute("href") || el.getAttribute("xlink:href") : null;
     if (!raw) return null;
-    if (raw.startsWith("#") || raw.trim() === "") return null;
     try {
-      const url = new URL(raw, base || location.href);
+      const url = new URL(raw, base || el._jariBase || location.href);
       return url.href;
     } catch {
       return null;
@@ -1550,21 +1623,22 @@
       return false;
     }
   }
-  function getLinkAncestor(el) {
+  function getLinkAncestor(el, base) {
     if (!el) return null;
+    const docBase = base || el._jariBase;
     if (el.closest) {
       try {
         const a = el.closest("a");
-        if (a && isOpenableLink(a)) return a;
+        if (a && isOpenableLink(a, docBase)) return a;
         const hrefEl = el.closest("[href]");
-        if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
+        if (hrefEl && isOpenableLink(hrefEl, docBase)) return hrefEl;
       } catch {
       }
     }
     let cur = el;
     while (cur) {
-      if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
-      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
+      if (cur.tagName === "A" && isOpenableLink(cur, docBase)) return cur;
+      if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur, docBase))
         return cur;
       const parent = cur.parentElement;
       if (parent) {
@@ -1761,6 +1835,7 @@
         if (!innerPointVisible(el, be)) return;
         try {
           el._jariViewportRect = t;
+          el._jariBase = base;
         } catch {
         }
         out.push(el);
@@ -3443,6 +3518,7 @@
   var mutationObserver = null;
   var regenerateTimer = null;
   var hintPill = null;
+  var spaceHeld = false;
   function showHintPill() {
     if (hintPill) return;
     try {
@@ -3460,6 +3536,37 @@
     } catch {
     }
     hintPill = null;
+  }
+  function hasJariClass(node) {
+    try {
+      if (!node || node.nodeType !== 1) return false;
+      const classes = node.classList;
+      if (classes) {
+        for (const c of classes) {
+          if (typeof c === "string" && c.startsWith("jari-")) return true;
+        }
+      }
+      if (node.closest) {
+        return !!node.closest("[class^='jari-'], [class*=' jari-']");
+      }
+    } catch {
+    }
+    return false;
+  }
+  function isOwnMutation(mutation) {
+    try {
+      const nodes = [
+        ...mutation.addedNodes || [],
+        ...mutation.removedNodes || []
+      ];
+      const allOwn = (list) => list.every((n) => n.nodeType !== 1 || hasJariClass(n));
+      if (mutation.target && mutation.target.nodeType === 1 && hasJariClass(mutation.target)) {
+        return allOwn(nodes);
+      }
+      return nodes.length > 0 && allOwn(nodes);
+    } catch {
+    }
+    return false;
   }
   function scheduleRegenerate() {
     if (regenerateTimer) return;
@@ -3479,7 +3586,7 @@
       }
       elements = capped;
       render3();
-      if (holder) holder.style.display = "";
+      if (holder && !spaceHeld) holder.style.display = "";
       prefix = savedPrefix;
       if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
         prefix = "";
@@ -3555,6 +3662,38 @@
       el.style.zIndex = isFlipped ? String(el.zIndex) : String(hints.length - i + 2147483e3 - z);
     });
   }
+  function assignLabels(nextElements, charset) {
+    const oldByEl = new Map(hints.map((h) => [h.el, h.label]));
+    const assigned = /* @__PURE__ */ new Map();
+    const taken = [];
+    const newcomers = [];
+    for (const el of nextElements) {
+      const old = oldByEl.get(el);
+      if (old) {
+        assigned.set(el, old);
+        taken.push(old);
+      } else {
+        newcomers.push(el);
+      }
+    }
+    if (newcomers.length > 0) {
+      if (taken.length === 0) return genLabels(nextElements.length, charset);
+      const pool = genLabels(nextElements.length + newcomers.length, charset).filter(
+        (label) => taken.every((t) => t !== label && !t.startsWith(label) && !label.startsWith(t))
+      );
+      newcomers.forEach((el, i) => {
+        if (i < pool.length) {
+          assigned.set(el, pool[i]);
+          taken.push(pool[i]);
+        }
+      });
+      if (assigned.size !== nextElements.length) {
+        prefix = "";
+        return genLabels(nextElements.length, charset);
+      }
+    }
+    return nextElements.map((el) => assigned.get(el));
+  }
   function render3() {
     if (hintsHost) {
       try {
@@ -3571,7 +3710,7 @@
     hintsHost = created.host;
     holder = created.holder;
     const charset = normalizeCharset();
-    const labels = genLabels(elements.length, charset);
+    const labels = assignLabels(elements, charset);
     hints = [];
     const links = layoutHints(
       holder,
@@ -3675,7 +3814,13 @@
     } catch {
     }
     try {
-      mutationObserver = new MutationObserver(scheduleRegenerate);
+      mutationObserver = new MutationObserver((mutations) => {
+        try {
+          if (mutations.every(isOwnMutation)) return;
+        } catch {
+        }
+        scheduleRegenerate();
+      });
       const target2 = document.body || document.documentElement;
       mutationObserver.observe(target2, {
         childList: true,
@@ -3702,6 +3847,14 @@
     if (!active3) return;
     active3 = false;
     prefix = "";
+    spaceHeld = false;
+    for (const el of elements) {
+      try {
+        delete el._jariViewportRect;
+        delete el._jariBase;
+      } catch {
+      }
+    }
     elements = [];
     hints = [];
     if (hintsHost) {
@@ -3834,6 +3987,7 @@
     }
     if (key === " " || event.code === "Space") {
       ui.consume(event);
+      spaceHeld = true;
       if (holder) holder.style.display = "none";
       return true;
     }
@@ -3851,6 +4005,7 @@
       ui.consume(event);
       return true;
     }
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
     if (key.length === 1) {
       const charset = normalizeCharset();
       const lower = key.toLowerCase();
@@ -3871,6 +4026,7 @@
     if (!active3) return false;
     if (event.key === " " || event.code === "Space") {
       ui.consume(event);
+      spaceHeld = false;
       if (holder) holder.style.display = "";
       return true;
     }

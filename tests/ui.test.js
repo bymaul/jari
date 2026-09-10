@@ -79,3 +79,64 @@ test("copyText resolves false when every path fails", async () => {
   stubTextarea({ execThrows: true });
   assert.equal(await ui.copyText("hello"), false);
 });
+
+test("dispatchClick uses pointer events, element coords, and focuses before click", () => {
+  const hadMouseEvent = "MouseEvent" in globalThis;
+  const savedMouseEvent = globalThis.MouseEvent;
+  const pointerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "PointerEvent");
+  class FakeMouse {
+    constructor(type, init = {}) {
+      this.type = type;
+      this.isPointer = false;
+      Object.assign(this, init);
+    }
+  }
+  class FakePointer extends FakeMouse {
+    constructor(type, init = {}) {
+      super(type, init);
+      this.isPointer = true;
+    }
+  }
+  globalThis.MouseEvent = FakeMouse;
+  Object.defineProperty(globalThis, "PointerEvent", {
+    value: FakePointer,
+    configurable: true,
+    writable: true,
+  });
+  try {
+    const seen = [];
+    let focusedAt = -1;
+    const el = {
+      ownerDocument: null,
+      getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 40 }),
+      scrollIntoView() {},
+      dispatchEvent: (e) => seen.push(e),
+      focus() {
+        focusedAt = seen.length;
+      },
+    };
+    ui.dispatchClick(el);
+    assert.deepEqual(
+      seen.map((e) => e.type),
+      ["mouseover", "pointerdown", "mousedown", "pointerup", "mouseup", "click"],
+    );
+    assert.deepEqual(
+      seen.map((e) => e.isPointer),
+      [false, true, false, true, false, false],
+    );
+    for (const e of seen) {
+      assert.equal(e.clientX, 60);
+      assert.equal(e.clientY, 40);
+    }
+    assert.deepEqual(
+      seen.map((e) => e.buttons),
+      [0, 1, 1, 0, 0, 0],
+    );
+    assert.equal(focusedAt, 3);
+  } finally {
+    if (hadMouseEvent) globalThis.MouseEvent = savedMouseEvent;
+    else delete globalThis.MouseEvent;
+    if (!pointerDescriptor) delete globalThis.PointerEvent;
+    else Object.defineProperty(globalThis, "PointerEvent", pointerDescriptor);
+  }
+});

@@ -54,10 +54,30 @@ export function isElementPartiallyInViewport(el, ignoreSize) {
   );
 }
 
+const NON_RENDERED_TAGS = new Set([
+  "HEAD",
+  "SCRIPT",
+  "STYLE",
+  "META",
+  "LINK",
+  "TITLE",
+  "BASE",
+  "NOSCRIPT",
+  "TEMPLATE",
+]);
+
 export function listElements(root, whatToShow, filter) {
   const out = [];
   try {
-    const walker = document.createTreeWalker(root, whatToShow, null);
+    // Numeric codes: NodeFilter may be undefined in unit tests.
+    const walker = document.createTreeWalker(root, whatToShow, {
+      acceptNode(node) {
+        try {
+          if (node.tagName && NON_RENDERED_TAGS.has(node.tagName)) return 3;
+        } catch {}
+        return 1;
+      },
+    });
     let node = walker.nextNode();
     while (node) {
       try {
@@ -83,24 +103,28 @@ export function getVisibleElements(filter) {
     } catch {
       continue;
     }
+    if (
+      !Number.isFinite(
+        rect.top + rect.bottom + rect.left + rect.right + rect.height,
+      ) ||
+      rect.top > window.innerHeight ||
+      rect.bottom < 0 ||
+      rect.left > window.innerWidth ||
+      rect.right < 0 ||
+      rect.height <= 0
+    ) {
+      continue;
+    }
     let hidden;
     try {
       hidden = window.getComputedStyle(e).visibility === "hidden";
     } catch {
       hidden = true;
     }
-    if (
-      rect.top <= window.innerHeight &&
-      rect.bottom >= 0 &&
-      rect.left <= window.innerWidth &&
-      rect.right >= 0 &&
-      rect.height > 0 &&
-      !hidden
-    ) {
-      try {
-        filter(e, visibleElements);
-      } catch {}
-    }
+    if (hidden) continue;
+    try {
+      filter(e, visibleElements);
+    } catch {}
   }
   return visibleElements;
 }
@@ -303,16 +327,16 @@ export function getFrameElements() {
 }
 
 export function getHref(el, base) {
-  try {
-    if (el.href) return el.href;
-  } catch {}
   const raw = el.getAttribute
-    ? el.getAttribute("href") || el.getAttribute("xlink:href")
+    ? (el.getAttribute("href") ?? el.getAttribute("xlink:href"))
     : null;
-  if (!raw) return null;
-  if (raw.startsWith("#") || raw.trim() === "") return null;
+  if (raw != null && (raw.startsWith("#") || raw.trim() === "")) return null;
   try {
-    const url = new URL(raw, base || location.href);
+    if (typeof el.href === "string" && el.href) return el.href;
+  } catch {}
+  if (!raw) return null;
+  try {
+    const url = new URL(raw, base || el._jariBase || location.href);
     return url.href;
   } catch {
     return null;
@@ -332,20 +356,21 @@ export function isOpenableLink(el, base) {
   }
 }
 
-export function getLinkAncestor(el) {
+export function getLinkAncestor(el, base) {
   if (!el) return null;
+  const docBase = base || el._jariBase;
   if (el.closest) {
     try {
       const a = el.closest("a");
-      if (a && isOpenableLink(a)) return a;
+      if (a && isOpenableLink(a, docBase)) return a;
       const hrefEl = el.closest("[href]");
-      if (hrefEl && isOpenableLink(hrefEl)) return hrefEl;
+      if (hrefEl && isOpenableLink(hrefEl, docBase)) return hrefEl;
     } catch {}
   }
   let cur = el;
   while (cur) {
-    if (cur.tagName === "A" && isOpenableLink(cur)) return cur;
-    if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur))
+    if (cur.tagName === "A" && isOpenableLink(cur, docBase)) return cur;
+    if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur, docBase))
       return cur;
     const parent = cur.parentElement;
     if (parent) {
@@ -555,6 +580,7 @@ export function collectIframeElements(requestedMode) {
       if (!innerPointVisible(el, be)) return;
       try {
         el._jariViewportRect = t;
+        el._jariBase = base;
       } catch {}
       out.push(el);
     });

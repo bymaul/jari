@@ -931,37 +931,87 @@
       }
     }
   }
-  var CLICK_EVENTS = [
-    "mouseover",
-    "pointerdown",
-    "mousedown",
-    "pointerup",
-    "mouseup",
-    "click",
-    "focus",
-    "focusin"
-  ];
+  function eventView(el) {
+    try {
+      const doc = el.ownerDocument;
+      if (doc && doc.defaultView) return doc.defaultView;
+    } catch {
+    }
+    return window;
+  }
+  function pointerEvent(el, type, x, y, buttons) {
+    const view = eventView(el);
+    try {
+      if (typeof PointerEvent === "function") {
+        return new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view,
+          button: 0,
+          buttons,
+          clientX: x,
+          clientY: y,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true
+        });
+      }
+    } catch {
+    }
+    return new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view,
+      button: 0,
+      buttons,
+      clientX: x,
+      clientY: y
+    });
+  }
+  function mouseEvent(el, type, x, y, buttons) {
+    return new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: eventView(el),
+      button: 0,
+      buttons,
+      clientX: x,
+      clientY: y
+    });
+  }
   function dispatchClick(el) {
+    let x = 0;
+    let y = 0;
+    try {
+      const r = el.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) {
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+      }
+    } catch {
+    }
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
     } catch {
     }
-    for (const type of CLICK_EVENTS) {
+    const steps = [
+      () => el.dispatchEvent(mouseEvent(el, "mouseover", x, y, 0)),
+      () => el.dispatchEvent(pointerEvent(el, "pointerdown", x, y, 1)),
+      () => el.dispatchEvent(mouseEvent(el, "mousedown", x, y, 1)),
+      () => safeFocus(el, { preventScroll: true }),
+      () => el.dispatchEvent(pointerEvent(el, "pointerup", x, y, 0)),
+      () => el.dispatchEvent(mouseEvent(el, "mouseup", x, y, 0)),
+      () => el.dispatchEvent(mouseEvent(el, "click", x, y, 0))
+    ];
+    for (const step of steps) {
       try {
-        el.dispatchEvent(
-          new MouseEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            view: window,
-            button: 0,
-            buttons: type === "mousedown" ? 1 : 0
-          })
-        );
+        step();
       } catch {
       }
     }
-    safeFocus(el, { preventScroll: true });
   }
   var HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
   function dispatchHover(el) {
