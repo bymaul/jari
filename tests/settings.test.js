@@ -79,6 +79,55 @@ test("load reads back the local fallback", async () => {
   assert.equal(settings.isPersistedLocally(), true);
 });
 
+test("load prefers newer local settings over stale sync after quota fallback", async () => {
+  stubStorage({
+    syncGet: async () => ({ settings: { scrollStep: 100, updatedAt: 1000 } }),
+    localGet: async () => ({ settings: { scrollStep: 200, updatedAt: 2000 } }),
+  });
+  await settings.load();
+  assert.equal(settings.getScrollStep(), 200);
+  assert.equal(settings.isPersistedLocally(), true);
+});
+
+test("load prefers newer sync settings when sync is fresher", async () => {
+  stubStorage({
+    syncGet: async () => ({ settings: { scrollStep: 300, updatedAt: 3000 } }),
+    localGet: async () => ({ settings: { scrollStep: 200, updatedAt: 2000 } }),
+  });
+  await settings.load();
+  assert.equal(settings.getScrollStep(), 300);
+  assert.equal(settings.isPersistedLocally(), false);
+});
+
+test("update stamps the persisted snapshot", async () => {
+  const writes = [];
+  stubStorage({
+    syncSet: async (data) => {
+      writes.push(data);
+    },
+  });
+  await settings.update({ scrollStep: 124 });
+  assert.equal(writes.length, 1);
+  assert.ok(Number.isFinite(writes[0].settings.updatedAt));
+  assert.ok(writes[0].settings.updatedAt > 0);
+});
+
+test("stale sync changes do not clobber newer local state", async () => {
+  stubStorage({
+    syncGet: async () => ({ settings: { scrollStep: 100, updatedAt: 1000 } }),
+    localGet: async () => ({ settings: { scrollStep: 200, updatedAt: 2000 } }),
+  });
+  await settings.load();
+  assert.equal(settings.getScrollStep(), 200);
+  const fire = globalThis.chrome.storage.onChanged._listeners.at(-1);
+  fire({ settings: { newValue: { scrollStep: 150, updatedAt: 1500 } } }, "sync");
+  assert.equal(settings.getScrollStep(), 200);
+  assert.equal(settings.isPersistedLocally(), true);
+  fire({ settings: { newValue: { scrollStep: 250, updatedAt: 2500 } } }, "sync");
+  assert.equal(settings.getScrollStep(), 250);
+  assert.equal(settings.isPersistedLocally(), false);
+});
+
 test("persisted settings carry the current schema version", async () => {
   const writes = [];
   stubStorage({

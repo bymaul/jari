@@ -424,8 +424,9 @@ function activate(el) {
   } else if (mode === "yank") {
     const url = getHref(el);
     if (url) {
-      ui.copyText(url);
-      ui.toast(`Yanked ${url}`);
+      ui.copyText(url).then((ok) =>
+        ui.toast(ok ? `Yanked ${url}` : "Copy failed"),
+      );
     } else {
       ui.toast("No link");
     }
@@ -433,8 +434,9 @@ function activate(el) {
   } else if (mode === "yankText") {
     const text = ((el.innerText || el.textContent) || "").trim();
     if (text) {
-      ui.copyText(text);
-      ui.toast("Yanked text");
+      ui.copyText(text).then((ok) =>
+        ui.toast(ok ? "Yanked text" : "Copy failed"),
+      );
     } else {
       ui.toast("No text");
     }

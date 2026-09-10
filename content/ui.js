@@ -44,12 +44,18 @@ function toast(message) {
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
+  } catch {}
+  try {
+    return (
+      withHiddenTextarea((ta) => {
+        ta.value = text;
+        ta.select();
+        return document.execCommand("copy");
+      }) !== false
+    );
   } catch {
-    withHiddenTextarea((ta) => {
-      ta.value = text;
-      ta.select();
-      document.execCommand("copy");
-    });
+    return false;
   }
 }
 

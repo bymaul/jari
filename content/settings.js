@@ -13,6 +13,7 @@ let persistedLocal = false;
 
 const state = {
   schemaVersion: SETTINGS_SCHEMA_VERSION,
+  updatedAt: 0,
   keymap: { ...keymapDefaults },
   disabledSites: [],
   scrollStep: settingsDefaults.scrollStep,
@@ -54,32 +55,50 @@ function merge(data) {
   state.hintFontSize = s.hintFontSize;
   state.clueEnabled = s.clueEnabled;
   state.clueDelayMs = s.clueDelayMs;
+  state.updatedAt =
+    data && Number.isFinite(data.updatedAt) ? data.updatedAt : state.updatedAt;
+}
+
+function storedAt(data) {
+  return data && Number.isFinite(data.updatedAt) ? data.updatedAt : 0;
+}
+
+function pickNewest(synced, local) {
+  if (synced && local) {
+    return storedAt(local) > storedAt(synced)
+      ? { area: "local", data: local }
+      : { area: "sync", data: synced };
+  }
+  if (local) return { area: "local", data: local };
+  if (synced) return { area: "sync", data: synced };
+  return { area: "none", data: null };
 }
 
 async function load() {
+  let synced = null;
+  let local = null;
   try {
     const stored = await chrome.storage.sync.get(STORAGE_KEY);
-    if (stored && stored[STORAGE_KEY]) {
-      merge(stored[STORAGE_KEY]);
-      persistedLocal = false;
-      return;
-    }
+    if (stored && stored[STORAGE_KEY]) synced = stored[STORAGE_KEY];
   } catch {}
   try {
-    const local = await chrome.storage.local.get(STORAGE_KEY);
-    if (local && local[STORAGE_KEY]) {
-      merge(local[STORAGE_KEY]);
-      persistedLocal = true;
-      return;
-    }
+    const resident = await chrome.storage.local.get(STORAGE_KEY);
+    if (resident && resident[STORAGE_KEY]) local = resident[STORAGE_KEY];
   } catch {}
-  merge({});
-  persistedLocal = false;
+  const winner = pickNewest(synced, local);
+  if (winner.data) {
+    merge(winner.data);
+    persistedLocal = winner.area === "local";
+  } else {
+    merge({});
+    persistedLocal = false;
+  }
 }
 
 function snapshot() {
   return {
     schemaVersion: state.schemaVersion,
+    updatedAt: state.updatedAt,
     keymap: { ...state.keymap },
     disabledSites: state.disabledSites.slice(),
     scrollStep: state.scrollStep,
@@ -106,6 +125,7 @@ function isQuotaError(err) {
 }
 
 async function persist() {
+  state.updatedAt = Date.now();
   const data = { [STORAGE_KEY]: snapshot() };
   try {
     await chrome.storage.sync.set(data);
@@ -220,7 +240,9 @@ function toggleSiteEnabled() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if ((area !== "sync" && area !== "local") || !changes[STORAGE_KEY]) return;
-  merge(changes[STORAGE_KEY].newValue || {});
+  const incoming = changes[STORAGE_KEY].newValue;
+  if (!incoming || storedAt(incoming) < state.updatedAt) return;
+  merge(incoming);
   persistedLocal = area === "local";
   Events.emit("settingsChanged");
 });

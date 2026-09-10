@@ -188,6 +188,70 @@ test("search without incognito uses the configured default engine, not chrome.se
   }
 });
 
+function stubSettingsStorage({ syncSettings, localSettings }) {
+  const savedSync = globalThis.chrome.storage.sync.get;
+  const savedLocal = globalThis.chrome.storage.local.get;
+  globalThis.chrome.storage.sync.get = async () => ({ settings: syncSettings });
+  globalThis.chrome.storage.local.get = async () => ({ settings: localSettings });
+  return () => {
+    globalThis.chrome.storage.sync.get = savedSync;
+    globalThis.chrome.storage.local.get = savedLocal;
+  };
+}
+
+const ddgEngines = [
+  { keyword: "ddg", url: "https://duckduckgo.com/?q=%s" },
+  { keyword: "g", url: "https://www.google.com/search?q=%s" },
+];
+
+test("stored settings prefer newer local over stale sync", async () => {
+  const createdTabs = [];
+  const restoreSettings = stubSettingsStorage({
+    syncSettings: { searchEngines: ddgEngines, defaultEngine: "g", updatedAt: 1000 },
+    localSettings: { searchEngines: ddgEngines, defaultEngine: "ddg", updatedAt: 2000 },
+  });
+  stubChrome({
+    windows: [{ id: 1, incognito: false }],
+    onCreateTab: (opts) => createdTabs.push(opts),
+  });
+  try {
+    const res = await handlers.search(
+      {},
+      { query: "hello world", newTab: true, incognito: false },
+    );
+    assert.deepEqual(res, { ok: true });
+    assert.deepEqual(createdTabs, [
+      { url: "https://duckduckgo.com/?q=hello%20world" },
+    ]);
+  } finally {
+    restoreSettings();
+  }
+});
+
+test("stored settings prefer newer sync when sync is fresher", async () => {
+  const createdTabs = [];
+  const restoreSettings = stubSettingsStorage({
+    syncSettings: { searchEngines: ddgEngines, defaultEngine: "ddg", updatedAt: 3000 },
+    localSettings: { searchEngines: ddgEngines, defaultEngine: "g", updatedAt: 2000 },
+  });
+  stubChrome({
+    windows: [{ id: 1, incognito: false }],
+    onCreateTab: (opts) => createdTabs.push(opts),
+  });
+  try {
+    const res = await handlers.search(
+      {},
+      { query: "hello world", newTab: true, incognito: false },
+    );
+    assert.deepEqual(res, { ok: true });
+    assert.deepEqual(createdTabs, [
+      { url: "https://duckduckgo.com/?q=hello%20world" },
+    ]);
+  } finally {
+    restoreSettings();
+  }
+});
+
 function stubSuggestChrome(maxResults) {
   const saved = {
     query: globalThis.chrome.tabs.query,

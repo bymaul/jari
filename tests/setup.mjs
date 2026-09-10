@@ -31,7 +31,12 @@ globalThis.chrome = {
     onRemoved: { addListener() {} },
   },
   storage: {
-    onChanged: { addListener() {} },
+    onChanged: {
+      _listeners: [],
+      addListener(fn) {
+        this._listeners.push(fn);
+      },
+    },
     sync: {
       get: async () => ({}),
       set: async () => {},

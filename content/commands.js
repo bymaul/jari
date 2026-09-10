@@ -123,8 +123,8 @@ function scrollBy({ x = 0, y = 0, count = 1 }) {
 }
 
 async function copyToClipboard(text, message) {
-  await ui.copyText(text);
-  ui.toast(message);
+  const ok = await ui.copyText(text);
+  ui.toast(ok ? message : "Copy failed");
 }
 
 function copyTitleAndUrlText() {

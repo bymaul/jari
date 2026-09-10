@@ -1598,9 +1598,9 @@ function yankSelection() {
     ui.toast("No selection");
     return;
   }
-  ui.copyText(text)
-    .then(() => ui.toast(`Yanked ${text.length} chars`))
-    .catch(() => ui.toast("Yank failed"));
+  ui.copyText(text).then((ok) =>
+    ui.toast(ok ? `Yanked ${text.length} chars` : "Copy failed"),
+  );
 }
 
 function yankLineFromCaret() {
@@ -1657,9 +1657,9 @@ function yankLineFromCaret() {
     ui.toast("No line");
     return;
   }
-  ui.copyText(lineText)
-    .then(() => ui.toast(`Yanked line ${lineText.length} chars`))
-    .catch(() => ui.toast("Yank failed"));
+  ui.copyText(lineText).then((ok) =>
+    ui.toast(ok ? `Yanked line ${lineText.length} chars` : "Copy failed"),
+  );
 }
 
 function getCaretLinkElement() {

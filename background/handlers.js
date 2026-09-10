@@ -11,20 +11,27 @@ export function clampCount(count, max = 20) {
   return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : 1;
 }
 
-async function getStoredSettings() {
+async function readStoredSettings(area) {
   try {
-    const stored = await chrome.storage.sync.get("settings");
+    const stored = await chrome.storage[area].get("settings");
     if (stored && stored.settings) return stored.settings;
   } catch (err) {
-    console.debug("[jari] Failed to get synced settings:", err);
+    console.debug(`[jari] Failed to get ${area} settings:`, err);
   }
-  try {
-    const local = await chrome.storage.local.get("settings");
-    if (local && local.settings) return local.settings;
-  } catch (err) {
-    console.debug("[jari] Failed to get local settings:", err);
+  return null;
+}
+
+async function getStoredSettings() {
+  const [synced, local] = await Promise.all([
+    readStoredSettings("sync"),
+    readStoredSettings("local"),
+  ]);
+  if (synced && local) {
+    const syncAt = Number.isFinite(synced.updatedAt) ? synced.updatedAt : 0;
+    const localAt = Number.isFinite(local.updatedAt) ? local.updatedAt : 0;
+    return localAt > syncAt ? local : synced;
   }
-  return {};
+  return synced || local || {};
 }
 
 async function getSuggestionSources() {
