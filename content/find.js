@@ -22,6 +22,9 @@ let matches = [];
 let currentIdx = 0;
 let lastQuery = "";
 let pendingQuery = "";
+let committedQuery = "";
+let committedIdx = 0;
+let committedHidden = false;
 
 let findRegex = false;
 let findWholeWord = false;
@@ -436,7 +439,6 @@ function runQuery(query) {
   try {
     matches = buildMatches(query);
     currentIdx = 0;
-    if (matches.length > 0) lastQuery = query;
     applyHighlights();
     if (matches.length > 0) scrollToCurrent();
     updateStatus();
@@ -611,6 +613,9 @@ function open() {
   if (active) return;
   touch("find");
   useHighlights = detectHighlightSupport();
+  committedQuery = lastQuery;
+  committedIdx = currentIdx;
+  committedHidden = highlightsHidden;
   active = true;
   startFindObserver();
   pendingQuery = "";
@@ -653,26 +658,63 @@ function closeAndClear() {
   clearHighlights();
   closeBar();
   lastQuery = "";
+  committedQuery = "";
+  committedIdx = 0;
+  committedHidden = false;
 }
 
 function closeDiscardPending() {
   closeBar();
-  const q = (lastQuery || "").trim();
+  const q = (committedQuery || "").trim();
   if (!q) {
     clearHighlights();
     lastQuery = "";
+    committedQuery = "";
+    committedIdx = 0;
+    committedHidden = false;
     return;
   }
+  lastQuery = committedQuery;
+  pendingQuery = "";
   try {
     matches = buildMatches(q);
-    currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
+    currentIdx = Math.min(committedIdx, Math.max(0, matches.length - 1));
   } catch {
     matches = [];
     currentIdx = 0;
   }
-  highlightsHidden = false;
+  highlightsHidden = committedHidden;
   useHighlights = detectHighlightSupport();
   applyHighlights();
+  updateStatus();
+}
+
+function commitQuery(q) {
+  clearTimeout(inputDebounce);
+  inputDebounce = null;
+  const query = (q || "").trim();
+  if (!query) {
+    closeDiscardPending();
+    return;
+  }
+  try {
+    matches = buildMatches(query);
+    currentIdx = 0;
+  } catch {
+    matches = [];
+    currentIdx = 0;
+  }
+  lastQuery = query;
+  committedQuery = query;
+  committedIdx = 0;
+  committedHidden = false;
+  pendingQuery = "";
+  highlightsHidden = false;
+  useHighlights = detectHighlightSupport();
+  pushFindHistory(query);
+  closeBar();
+  applyHighlights();
+  if (matches.length > 0) scrollToCurrent();
   updateStatus();
 }
 
@@ -808,14 +850,7 @@ function onKeyDown(event) {
     if (event.key === "Enter") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      const q = inputEl.value.trim();
-      if (!q) {
-        closeDiscardPending();
-      } else {
-        lastQuery = q;
-        pushFindHistory(q);
-        closeBar();
-      }
+      commitQuery(inputEl.value);
       return true;
     }
     return false;
@@ -854,6 +889,9 @@ function handleGlobalEnter(event) {
   activateCurrentLink();
   clearHighlights();
   lastQuery = "";
+  committedQuery = "";
+  committedIdx = 0;
+  committedHidden = false;
   return true;
 }
 
@@ -886,14 +924,21 @@ export const __testHelpers = {
   findFixedAncestor,
   nearestScrollableAncestor,
   scrollFixedMatchIntoView,
+  executeQuery,
+  runQuery,
+  commitQuery,
+  closeDiscardPending,
 };
 
-export function __setFindTestState({ matches: seed = [], query = "", index = 0 } = {}) {
+export function __setFindTestState({ matches: seed = [], query = "", index = 0, pending = "", committed = null, committedIndex = null, hidden = false } = {}) {
   matches = seed;
   currentIdx = index;
   lastQuery = query;
-  pendingQuery = "";
-  highlightsHidden = false;
+  pendingQuery = pending;
+  highlightsHidden = hidden;
+  committedQuery = committed === null ? query : committed;
+  committedIdx = committedIndex === null ? index : committedIndex;
+  committedHidden = hidden;
 }
 
 export function __getFindTestState() {
@@ -901,6 +946,8 @@ export function __getFindTestState() {
     matchCount: matches.length,
     currentIdx,
     lastQuery,
+    pendingQuery,
+    committedQuery,
     highlightsHidden,
   };
 }
@@ -910,6 +957,9 @@ export function __resetFindState() {
   highlightsHidden = false;
   lastQuery = "";
   pendingQuery = "";
+  committedQuery = "";
+  committedIdx = 0;
+  committedHidden = false;
   useHighlights = false;
   findRegex = false;
   findWholeWord = false;

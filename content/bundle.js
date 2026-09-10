@@ -5795,6 +5795,9 @@
   var currentIdx2 = 0;
   var lastQuery = "";
   var pendingQuery = "";
+  var committedQuery = "";
+  var committedIdx = 0;
+  var committedHidden = false;
   var findRegex = false;
   var findWholeWord = false;
   var findCase = false;
@@ -6214,7 +6217,6 @@
     try {
       matches2 = buildMatches(query3);
       currentIdx2 = 0;
-      if (matches2.length > 0) lastQuery = query3;
       applyHighlights();
       if (matches2.length > 0) scrollToCurrent();
       updateStatus();
@@ -6376,6 +6378,9 @@
     if (active5) return;
     touch("find");
     useHighlights = detectHighlightSupport();
+    committedQuery = lastQuery;
+    committedIdx = currentIdx2;
+    committedHidden = highlightsHidden;
     active5 = true;
     startFindObserver();
     pendingQuery = "";
@@ -6419,25 +6424,61 @@
     clearHighlights();
     closeBar();
     lastQuery = "";
+    committedQuery = "";
+    committedIdx = 0;
+    committedHidden = false;
   }
   function closeDiscardPending() {
     closeBar();
-    const q = (lastQuery || "").trim();
+    const q = (committedQuery || "").trim();
     if (!q) {
       clearHighlights();
       lastQuery = "";
+      committedQuery = "";
+      committedIdx = 0;
+      committedHidden = false;
       return;
     }
+    lastQuery = committedQuery;
+    pendingQuery = "";
     try {
       matches2 = buildMatches(q);
-      currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
+      currentIdx2 = Math.min(committedIdx, Math.max(0, matches2.length - 1));
     } catch {
       matches2 = [];
       currentIdx2 = 0;
     }
-    highlightsHidden = false;
+    highlightsHidden = committedHidden;
     useHighlights = detectHighlightSupport();
     applyHighlights();
+    updateStatus();
+  }
+  function commitQuery(q) {
+    clearTimeout(inputDebounce);
+    inputDebounce = null;
+    const query3 = (q || "").trim();
+    if (!query3) {
+      closeDiscardPending();
+      return;
+    }
+    try {
+      matches2 = buildMatches(query3);
+      currentIdx2 = 0;
+    } catch {
+      matches2 = [];
+      currentIdx2 = 0;
+    }
+    lastQuery = query3;
+    committedQuery = query3;
+    committedIdx = 0;
+    committedHidden = false;
+    pendingQuery = "";
+    highlightsHidden = false;
+    useHighlights = detectHighlightSupport();
+    pushFindHistory(query3);
+    closeBar();
+    applyHighlights();
+    if (matches2.length > 0) scrollToCurrent();
     updateStatus();
   }
   function next(count = 1, reverse = false) {
@@ -6571,14 +6612,7 @@
       if (event.key === "Enter") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        const q = inputEl2.value.trim();
-        if (!q) {
-          closeDiscardPending();
-        } else {
-          lastQuery = q;
-          pushFindHistory(q);
-          closeBar();
-        }
+        commitQuery(inputEl2.value);
         return true;
       }
       return false;
@@ -6615,6 +6649,9 @@
     activateCurrentLink();
     clearHighlights();
     lastQuery = "";
+    committedQuery = "";
+    committedIdx = 0;
+    committedHidden = false;
     return true;
   }
   var Find = {
@@ -6640,6 +6677,9 @@
     highlightsHidden = false;
     lastQuery = "";
     pendingQuery = "";
+    committedQuery = "";
+    committedIdx = 0;
+    committedHidden = false;
     useHighlights = false;
     findRegex = false;
     findWholeWord = false;

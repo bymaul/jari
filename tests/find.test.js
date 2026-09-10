@@ -275,6 +275,8 @@ test("Esc hides find highlights without forgetting the query", () => {
       matchCount: 2,
       currentIdx: 0,
       lastQuery: "foo",
+      pendingQuery: "",
+      committedQuery: "foo",
       highlightsHidden: true,
     });
     // A second Esc is a no-op so the key reaches the page.
@@ -297,6 +299,8 @@ test("n resumes hidden find highlights and steps to the next match", () => {
       matchCount: 2,
       currentIdx: 1,
       lastQuery: "foo",
+      pendingQuery: "",
+      committedQuery: "foo",
       highlightsHidden: false,
     });
   } finally {
@@ -314,8 +318,68 @@ test("clearing find highlights resets the hidden flag", () => {
       matchCount: 0,
       currentIdx: 0,
       lastQuery: "foo",
+      pendingQuery: "",
+      committedQuery: "foo",
       highlightsHidden: false,
     });
+  } finally {
+    __resetFindState();
+  }
+});
+
+test("live typing does not commit the query", () => {
+  __resetFindState();
+  try {
+    __setFindTestState({ matches: [fakeMatch()], query: "foo" });
+    __testHelpers.runQuery("bar-typed-live");
+    const state = __getFindTestState();
+    assert.equal(state.lastQuery, "foo");
+    assert.equal(state.committedQuery, "foo");
+  } finally {
+    __resetFindState();
+  }
+});
+
+test("Esc in bar with no history clears live highlights", () => {
+  __resetFindState();
+  try {
+    // Simulate "/" then typing "bar" with no prior committed search.
+    // lastQuery holds the buggy live-committed value on purpose: the fix
+    // must ignore it and use committedQuery instead.
+    __setFindTestState({
+      matches: [fakeMatch()],
+      query: "bar",
+      pending: "bar",
+      committed: "",
+      hidden: false,
+    });
+    __testHelpers.closeDiscardPending();
+    const state = __getFindTestState();
+    assert.equal(state.matchCount, 0);
+    assert.equal(state.lastQuery, "");
+    assert.equal(state.committedQuery, "");
+    assert.equal(Find.hasHighlights(), false);
+  } finally {
+    __resetFindState();
+  }
+});
+
+test("Esc in bar discards live text but keeps prior history for n", () => {
+  __resetFindState();
+  try {
+    // Simulate prior "/ foo Enter" then "/" + typing "bar".
+    __setFindTestState({
+      matches: [fakeMatch()],
+      query: "bar",
+      pending: "bar",
+      committed: "foo",
+      hidden: false,
+    });
+    __testHelpers.closeDiscardPending();
+    const state = __getFindTestState();
+    assert.equal(state.lastQuery, "foo");
+    assert.equal(state.committedQuery, "foo");
+    assert.equal(state.pendingQuery, "");
   } finally {
     __resetFindState();
   }
