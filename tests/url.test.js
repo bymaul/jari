@@ -40,6 +40,19 @@ test("normalizeUrl keeps host:port but rejects unknown schemes", () => {
   assert.equal(normalizeUrl("mailto:foo@bar.com"), null);
   assert.equal(normalizeUrl("tel:+123"), null);
   assert.equal(normalizeUrl("steam:run/xyz"), null);
+  assert.equal(normalizeUrl("example.com:8080"), "https://example.com:8080");
+  assert.equal(normalizeUrl("snacks.nvim:3000"), null);
+  assert.equal(normalizeUrl("asdf.asdf:3000"), null);
+});
+
+test("normalizeUrl treats unknown bare TLDs as search, explicit scheme as URL", () => {
+  assert.equal(normalizeUrl("snacks.nvim"), null);
+  assert.equal(normalizeUrl("asdf.asdf"), null);
+  assert.equal(normalizeUrl("snacks.nvim/docs"), null);
+  assert.equal(normalizeUrl("//asdf.asdf"), null);
+  assert.equal(normalizeUrl("https://snacks.nvim"), "https://snacks.nvim");
+  assert.equal(normalizeUrl("http://asdf.asdf"), "http://asdf.asdf");
+  assert.equal(normalizeUrl("https://acme.com"), "https://acme.com");
 });
 
 test("normalizeUrl rejects junk input", () => {
@@ -83,6 +96,20 @@ test("Url.looksLikeUrl classifies bare queries", () => {
   assert.ok(!looksLikeUrl("hello world"));
   assert.ok(!looksLikeUrl("acme"));
   assert.ok(!looksLikeUrl(""));
+});
+
+test("Url.looksLikeUrl searches unknown TLDs but keeps explicit scheme as URL", () => {
+  const { looksLikeUrl } = Url;
+  assert.ok(!looksLikeUrl("snacks.nvim"));
+  assert.ok(!looksLikeUrl("asdf.asdf"));
+  assert.ok(!looksLikeUrl("snacks.nvim/docs"));
+  assert.ok(!looksLikeUrl("asdf.asdf:3000"));
+  assert.ok(!looksLikeUrl("//asdf.asdf"));
+  assert.ok(looksLikeUrl("https://snacks.nvim"));
+  assert.ok(looksLikeUrl("http://asdf.asdf"));
+  assert.ok(looksLikeUrl("example.com"));
+  assert.ok(looksLikeUrl("example.com:8080/path"));
+  assert.ok(looksLikeUrl("example.co.uk"));
 });
 
 test("Url.suggestionTerm strips a leading URL token", () => {

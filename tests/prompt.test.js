@@ -313,6 +313,42 @@ test("omnibar keyword search uses a custom engine from settings", async () => {
   });
 });
 
+test("omnibar unknown TLD submits a search instead of opening an invalid URL", async () => {
+  for (const query of ["snacks.nvim", "asdf.asdf"]) {
+    const document = makeDocument();
+    await withDocument(document, async () => {
+      const sent = [];
+      const original = chrome.runtime.sendMessage;
+      chrome.runtime.sendMessage = (message, callback) => {
+        sent.push(message);
+        callback([]);
+      };
+      try {
+        const input = openOmnibarPrompt(document);
+        input.value = query;
+        input.dispatch("input", {});
+        Prompt.onKeyDown(keyEvent("Enter"));
+        assert.deepEqual(
+          sent.find((m) => m.action === "search"),
+          {
+            action: "search",
+            query,
+            newTab: true,
+            incognito: false,
+          },
+        );
+        assert.ok(
+          !sent.some((m) => m.action === "createTab" || m.action === "navigate"),
+          `expected no navigation for ${query}`,
+        );
+      } finally {
+        chrome.runtime.sendMessage = original;
+        Prompt.close();
+      }
+    });
+  }
+});
+
 test("parseTabPrefix detects the t tab-only prefix", () => {
   assert.equal(parseTabPrefix("t ytb"), "ytb");
   assert.equal(parseTabPrefix("t   lofi hip hop  "), "lofi hip hop");
