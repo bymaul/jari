@@ -172,7 +172,6 @@ function isValidHostname(host) {
   const tld = labels[labels.length - 1];
   if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
   if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
-  if (/^\d+$/.test(tld)) return false;
   return true;
 }
 
@@ -194,12 +193,14 @@ export function normalizeUrl(raw) {
   const url = raw.trim();
   if (!url || /\s/.test(url)) return null;
   if (
-    /^localhost(:\d+)?(\/.*)?$/i.test(url) ||
-    /^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(url) ||
-    /^0\.0\.0\.0(:\d+)?(\/.*)?$/i.test(url)
+    /^localhost(:\d+)?([/?#].*)?$/i.test(url) ||
+    /^127\.0\.0\.1(:\d+)?([/?#].*)?$/i.test(url) ||
+    /^0\.0\.0\.0(:\d+)?([/?#].*)?$/i.test(url)
   )
     return "http://" + url;
   if (url.startsWith("//")) {
+    const section = url.slice(2).split(/[/?#]/)[0];
+    if (section.includes(":") && !/:\d+$/.test(section)) return null;
     try {
       const u = new URL("https:" + url);
       if (!isBareNavigableHostname(u.hostname)) return null;
@@ -210,6 +211,10 @@ export function normalizeUrl(raw) {
   if (!m) {
     const hostPart = url.split(/[:/?#]/)[0];
     if (!isBareNavigableHostname(hostPart)) return null;
+    const hostPort = url.split(/[/?#]/)[0];
+    if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return null;
+    const bareTld = hostPart.toLowerCase().split(".").pop();
+    if (!url.includes("/") && !url.includes(":") && !url.includes("?") && !url.includes("#") && fileExtensionDenylist.has(bareTld)) return null;
     try {
       const u = new URL("https://" + url);
       if (!isBareNavigableHostname(u.hostname)) return null;
@@ -229,8 +234,12 @@ export function normalizeUrl(raw) {
   if (blockedUrlSchemes.has(scheme)) return null;
 
   const rest = url.slice(m[0].length);
-  if (/^(\d+)(\/.*)?$/.test(rest)) {
+  if (/^(\d+)([/?#].*)?$/.test(rest)) {
     if (!isBareNavigableHostname(m[1])) return null;
+    try {
+      const u = new URL("https://" + url);
+      if (!isBareNavigableHostname(u.hostname)) return null;
+    } catch { return null; }
     return "https://" + url;
   }
   return null;
@@ -281,7 +290,12 @@ export const Url = {
         const u = new URL(s);
         const scheme = u.protocol.slice(0, -1).toLowerCase();
         if (blockedUrlSchemes.has(scheme)) return false;
-        if (urlSchemes.has(scheme)) return true;
+        if (urlSchemes.has(scheme)) {
+          if (scheme === "http" || scheme === "https") {
+            if (u.hostname && !isValidHostname(u.hostname)) return false;
+          }
+          return true;
+        }
         const host = u.hostname;
         if (!host) return false;
         if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
@@ -290,15 +304,26 @@ export const Url = {
       } catch { return false; }
     }
     if (s.startsWith("//")) {
+      const section = s.slice(2).split(/[/?#]/)[0];
+      if (section.includes(":") && !/:\d+$/.test(section)) return false;
       try {
         const u = new URL("https:" + s);
         return isBareNavigableHostname(u.hostname);
       } catch { return false; }
     }
-    if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
-    if (/^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(s)) return true;
+    const noslash = s.match(/^([a-z][a-z0-9+.-]*):/i);
+    if (noslash) {
+      const sc = noslash[1].toLowerCase();
+      if (blockedUrlSchemes.has(sc)) return false;
+      if (urlSchemes.has(sc)) return true;
+    }
+    if (/^localhost(:\d+)?([/?#].*)?$/i.test(s)) return true;
+    if (/^127\.0\.0\.1(:\d+)?([/?#].*)?$/i.test(s)) return true;
+    if (/^0\.0\.0\.0(:\d+)?([/?#].*)?$/i.test(s)) return true;
     const hostPart = s.split(/[:/?#]/)[0];
     if (!isBareNavigableHostname(hostPart)) return false;
+    const hostPort = s.split(/[/?#]/)[0];
+    if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return false;
     const tld = hostPart.toLowerCase().split(".").pop();
     if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
     try {

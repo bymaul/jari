@@ -41,6 +41,14 @@ test("normalizeUrl keeps host:port but rejects unknown schemes", () => {
   assert.equal(normalizeUrl("tel:+123"), null);
   assert.equal(normalizeUrl("steam:run/xyz"), null);
   assert.equal(normalizeUrl("example.com:8080"), "https://example.com:8080");
+  assert.equal(normalizeUrl("example.com:8080?x=1"), "https://example.com:8080?x=1");
+  assert.equal(normalizeUrl("example.com:8080#h"), "https://example.com:8080#h");
+  assert.equal(normalizeUrl("example.com:8080/path?x=1#y"), "https://example.com:8080/path?x=1#y");
+  assert.equal(normalizeUrl("example.com:"), null);
+  assert.equal(normalizeUrl("example.com:/path"), null);
+  assert.equal(normalizeUrl("example.com:99999"), null);
+  assert.equal(normalizeUrl("example.com:65535"), "https://example.com:65535");
+  assert.equal(normalizeUrl("//example.com:"), null);
   assert.equal(normalizeUrl("snacks.nvim:3000"), null);
   assert.equal(normalizeUrl("asdf.asdf:3000"), null);
 });
@@ -53,6 +61,23 @@ test("normalizeUrl treats unknown bare TLDs as search, explicit scheme as URL", 
   assert.equal(normalizeUrl("https://snacks.nvim"), "https://snacks.nvim");
   assert.equal(normalizeUrl("http://asdf.asdf"), "http://asdf.asdf");
   assert.equal(normalizeUrl("https://acme.com"), "https://acme.com");
+  assert.equal(normalizeUrl("http://foo"), null);
+  assert.equal(normalizeUrl("http://-bad.com/"), null);
+  assert.equal(normalizeUrl("about:blank"), "about:blank");
+});
+
+test("normalizeUrl keeps http for localhost variants with query or fragment", () => {
+  assert.equal(normalizeUrl("localhost?x=1"), "http://localhost?x=1");
+  assert.equal(normalizeUrl("localhost#frag"), "http://localhost#frag");
+  assert.equal(normalizeUrl("localhost:3000/path?q=1#h"), "http://localhost:3000/path?q=1#h");
+  assert.equal(normalizeUrl("0.0.0.0:3000"), "http://0.0.0.0:3000");
+});
+
+test("normalizeUrl treats bare file-like names as search, paths as URL", () => {
+  assert.equal(normalizeUrl("foo.sh"), null);
+  assert.equal(normalizeUrl("test.md"), null);
+  assert.equal(normalizeUrl("foo.sh/bar"), "https://foo.sh/bar");
+  assert.equal(normalizeUrl("report.zip"), "https://report.zip");
 });
 
 test("normalizeUrl rejects junk input", () => {
@@ -110,6 +135,20 @@ test("Url.looksLikeUrl searches unknown TLDs but keeps explicit scheme as URL", 
   assert.ok(looksLikeUrl("example.com"));
   assert.ok(looksLikeUrl("example.com:8080/path"));
   assert.ok(looksLikeUrl("example.co.uk"));
+  assert.ok(looksLikeUrl("example.com:8080?x=1"));
+  assert.ok(looksLikeUrl("example.com:8080#h"));
+  assert.ok(!looksLikeUrl("example.com:"));
+  assert.ok(!looksLikeUrl("example.com:/path"));
+  assert.ok(!looksLikeUrl("//example.com:"));
+  assert.ok(!looksLikeUrl("example.com:99999"));
+  assert.ok(looksLikeUrl("about:blank"));
+  assert.ok(!looksLikeUrl("http://foo"));
+  assert.ok(!looksLikeUrl("http://-bad.com/"));
+  assert.ok(!looksLikeUrl("https://a..b/"));
+  assert.ok(!looksLikeUrl("foo.sh"));
+  assert.ok(looksLikeUrl("foo.sh/bar"));
+  assert.ok(looksLikeUrl("report.zip"));
+  assert.ok(looksLikeUrl("localhost?x=1"));
 });
 
 test("Url.suggestionTerm strips a leading URL token", () => {

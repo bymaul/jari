@@ -316,7 +316,6 @@
     const tld = labels[labels.length - 1];
     if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
     if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
-    if (/^\d+$/.test(tld)) return false;
     return true;
   }
   function isBareNavigableHostname(host) {
@@ -373,7 +372,12 @@
           const u = new URL(s);
           const scheme = u.protocol.slice(0, -1).toLowerCase();
           if (blockedUrlSchemes.has(scheme)) return false;
-          if (urlSchemes.has(scheme)) return true;
+          if (urlSchemes.has(scheme)) {
+            if (scheme === "http" || scheme === "https") {
+              if (u.hostname && !isValidHostname(u.hostname)) return false;
+            }
+            return true;
+          }
           const host = u.hostname;
           if (!host) return false;
           if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
@@ -384,6 +388,8 @@
         }
       }
       if (s.startsWith("//")) {
+        const section = s.slice(2).split(/[/?#]/)[0];
+        if (section.includes(":") && !/:\d+$/.test(section)) return false;
         try {
           const u = new URL("https:" + s);
           return isBareNavigableHostname(u.hostname);
@@ -391,10 +397,19 @@
           return false;
         }
       }
-      if (/^localhost(:\d+)?(\/.*)?$/i.test(s)) return true;
-      if (/^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(s)) return true;
+      const noslash = s.match(/^([a-z][a-z0-9+.-]*):/i);
+      if (noslash) {
+        const sc = noslash[1].toLowerCase();
+        if (blockedUrlSchemes.has(sc)) return false;
+        if (urlSchemes.has(sc)) return true;
+      }
+      if (/^localhost(:\d+)?([/?#].*)?$/i.test(s)) return true;
+      if (/^127\.0\.0\.1(:\d+)?([/?#].*)?$/i.test(s)) return true;
+      if (/^0\.0\.0\.0(:\d+)?([/?#].*)?$/i.test(s)) return true;
       const hostPart = s.split(/[:/?#]/)[0];
       if (!isBareNavigableHostname(hostPart)) return false;
+      const hostPort = s.split(/[/?#]/)[0];
+      if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return false;
       const tld = hostPart.toLowerCase().split(".").pop();
       if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
       try {

@@ -93,6 +93,68 @@
     "moz-extension",
     "view-source"
   ]);
+  var fileExtensionDenylist = /* @__PURE__ */ new Set([
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "mjs",
+    "cjs",
+    "json",
+    "css",
+    "scss",
+    "less",
+    "html",
+    "htm",
+    "md",
+    "markdown",
+    "txt",
+    "csv",
+    "xml",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "conf",
+    "config",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "py",
+    "rb",
+    "php",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "cs",
+    "go",
+    "rs",
+    "swift",
+    "kt",
+    "kts",
+    "dart",
+    "vue",
+    "svelte",
+    "astro",
+    "lua",
+    "pl",
+    "pm",
+    "r",
+    "sql",
+    "db",
+    "sqlite",
+    "log",
+    "lock",
+    "env",
+    "gitignore",
+    "dockerignore",
+    "gradle",
+    "makefile",
+    "cmake"
+  ]);
   var knownTlds = new Set(
     `
   aaa aarp abb abbott abbvie abc able abogado abudhabi ac academy accenture
@@ -245,7 +307,6 @@
     const tld = labels[labels.length - 1];
     if (/^xn--[a-z0-9-]{1,59}$/.test(tld)) return true;
     if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
-    if (/^\d+$/.test(tld)) return false;
     return true;
   }
   function isBareNavigableHostname(host) {
@@ -264,9 +325,11 @@
     if (typeof raw !== "string") return null;
     const url = raw.trim();
     if (!url || /\s/.test(url)) return null;
-    if (/^localhost(:\d+)?(\/.*)?$/i.test(url) || /^127\.0\.0\.1(:\d+)?(\/.*)?$/i.test(url) || /^0\.0\.0\.0(:\d+)?(\/.*)?$/i.test(url))
+    if (/^localhost(:\d+)?([/?#].*)?$/i.test(url) || /^127\.0\.0\.1(:\d+)?([/?#].*)?$/i.test(url) || /^0\.0\.0\.0(:\d+)?([/?#].*)?$/i.test(url))
       return "http://" + url;
     if (url.startsWith("//")) {
+      const section = url.slice(2).split(/[/?#]/)[0];
+      if (section.includes(":") && !/:\d+$/.test(section)) return null;
       try {
         const u = new URL("https:" + url);
         if (!isBareNavigableHostname(u.hostname)) return null;
@@ -279,6 +342,10 @@
     if (!m) {
       const hostPart = url.split(/[:/?#]/)[0];
       if (!isBareNavigableHostname(hostPart)) return null;
+      const hostPort = url.split(/[/?#]/)[0];
+      if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return null;
+      const bareTld = hostPart.toLowerCase().split(".").pop();
+      if (!url.includes("/") && !url.includes(":") && !url.includes("?") && !url.includes("#") && fileExtensionDenylist.has(bareTld)) return null;
       try {
         const u = new URL("https://" + url);
         if (!isBareNavigableHostname(u.hostname)) return null;
@@ -301,8 +368,14 @@
     }
     if (blockedUrlSchemes.has(scheme)) return null;
     const rest = url.slice(m[0].length);
-    if (/^(\d+)(\/.*)?$/.test(rest)) {
+    if (/^(\d+)([/?#].*)?$/.test(rest)) {
       if (!isBareNavigableHostname(m[1])) return null;
+      try {
+        const u = new URL("https://" + url);
+        if (!isBareNavigableHostname(u.hostname)) return null;
+      } catch {
+        return null;
+      }
       return "https://" + url;
     }
     return null;
