@@ -33,7 +33,20 @@ let pendingG = false;
 let pendingF = null;
 let lastF = null;
 let pendingY = false;
+let pendingGTimer = null;
+let pendingYTimer = null;
 let caretRaf = null;
+
+function clearPendingKeyTimers() {
+  if (pendingGTimer !== null) {
+    clearTimeout(pendingGTimer);
+    pendingGTimer = null;
+  }
+  if (pendingYTimer !== null) {
+    clearTimeout(pendingYTimer);
+    pendingYTimer = null;
+  }
+}
 
 let caretEl = null;
 let caretHost = null;
@@ -859,6 +872,9 @@ function enterAtElement(el, newMode) {
       } catch {}
     }
   }
+  if (mode !== "line" && sel.isCollapsed) {
+    ui.toast("No text to select");
+  }
   if (mode === "line") {
     try {
       if (hasModify()) {
@@ -884,6 +900,7 @@ function enterAtElement(el, newMode) {
   pendingG = false;
   pendingF = null;
   pendingY = false;
+  clearPendingKeyTimers();
   ensureVisible();
   updateBlockCaret();
   applyVisualHighlight();
@@ -918,7 +935,7 @@ function isCaret() {
 }
 
 function isWordChar(ch) {
-  return ch && /[A-Za-z0-9_]/.test(ch);
+  return !!ch && /[\p{L}\p{N}_]/u.test(ch);
 }
 function charAtFocus() {
   const sel = getSelection();
@@ -1024,8 +1041,7 @@ function fallbackMoveChar(dir) {
       const prev = walker.previousNode();
       if (prev) {
         newNode = prev;
-        newOffset = prev.nodeValue.length - 1;
-        if (newOffset < 0) newOffset = 0;
+        newOffset = (prev.nodeValue || "").length;
       } else {
         return;
       }
@@ -1098,8 +1114,7 @@ function fallbackMoveCaret(dir) {
       const prev = walker.previousNode();
       if (prev) {
         newNode = prev;
-        newOffset = prev.nodeValue.length - 1;
-        if (newOffset < 0) newOffset = 0;
+        newOffset = (prev.nodeValue || "").length;
       } else {
         return;
       }
@@ -1235,7 +1250,17 @@ function findNextWordEnd(count) {
   if (!sel || !sel.focusNode) return null;
   const startNode = sel.focusNode;
   const startOffset = sel.focusOffset;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      const p = n.parentElement;
+      if (!p) return NodeFilter.FILTER_REJECT;
+      const tag = p.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
   let nodes = [];
   let n = walker.nextNode();
   while (n) {
@@ -1247,7 +1272,7 @@ function findNextWordEnd(count) {
   let found = 0;
   for (let i = startIdx; i < nodes.length; i++) {
     const node = nodes[i];
-    const txt = node.nodeValue;
+    const txt = node.nodeValue || "";
     let from = 0;
     if (i === startIdx) from = startOffset;
     let pos = from;
@@ -1259,7 +1284,19 @@ function findNextWordEnd(count) {
         inWord = true;
       } else {
         while (pos < txt.length && isWordChar(txt[pos])) pos++;
-        if (pos >= txt.length) break;
+        if (pos >= txt.length) {
+          const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
+          if (nextTxt && isWordChar(nextTxt[0])) break;
+          if (txt.length === 0) break;
+          inWord = false;
+          const wordEnd = txt.length - 1;
+          if (i === startIdx && wordEnd <= from) break;
+          found++;
+          if (found === count) {
+            return { node, offset: wordEnd };
+          }
+          break;
+        }
         inWord = false;
         const wordEnd = pos - 1;
         if (i === startIdx && wordEnd <= from) continue;
@@ -1603,6 +1640,63 @@ function yankSelection() {
   );
 }
 
+function stripTrailingNewlines(text) {
+  return text.replace(/[\r\n]+$/, "");
+}
+
+function yankLinesFromCaret(count) {
+  const sel = getSelection();
+  if (!sel || !sel.focusNode) {
+    ui.toast("No line");
+    return;
+  }
+  if (!hasModify()) {
+    yankLineFromCaret();
+    return;
+  }
+  const savedNode = sel.focusNode;
+  const savedOffset = sel.focusOffset;
+  const wanted = Math.max(1, count);
+  let lineText = "";
+  try {
+    moveCaret("backward", "lineboundary");
+    let extended = false;
+    for (let i = 0; i < wanted; i++) {
+      if (!extendSelection("forward", "lineboundary")) break;
+      extended = true;
+    }
+    if (extended) lineText = sel.toString();
+  } catch {}
+  try {
+    const r = document.createRange();
+    r.setStart(savedNode, savedOffset);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    updateBlockCaret();
+    ensureVisible();
+  } catch {}
+  if (!lineText) {
+    ui.toast("No line");
+    return;
+  }
+  lineText = stripTrailingNewlines(lineText);
+  if (!lineText) {
+    ui.toast("No line");
+    return;
+  }
+  const yanked = lineText.split(/\r?\n/).length;
+  ui.copyText(lineText).then((ok) =>
+    ui.toast(
+      ok
+        ? yanked > 1
+          ? `Yanked ${yanked} lines`
+          : `Yanked line ${lineText.length} chars`
+        : "Copy failed",
+    ),
+  );
+}
+
 function yankLineFromCaret() {
   const sel = getSelection();
   if (!sel || !sel.focusNode) {
@@ -1642,7 +1736,7 @@ function yankLineFromCaret() {
     } else {
       lineText = sel.toString();
     }
-    if (lineText) lineText = lineText.trim();
+    if (lineText) lineText = stripTrailingNewlines(lineText);
   } catch {}
   try {
     const r = document.createRange();
@@ -1696,6 +1790,13 @@ function handleFChar(ch) {
     {
       acceptNode(node) {
         if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+        const p = node.parentElement;
+        if (p) {
+          const tag = p.tagName;
+          if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
+            return NodeFilter.FILTER_REJECT;
+          }
+        }
         return NodeFilter.FILTER_ACCEPT;
       },
     },
@@ -1806,6 +1907,36 @@ function moveToPosition(node, offset) {
   updateBlockCaret();
 }
 
+function expandSelectionToFullLines() {
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !hasModify()) {
+    return false;
+  }
+  try {
+    const r0 = sel.getRangeAt(0);
+    const head = r0.cloneRange();
+    head.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(head);
+    sel.modify("extend", "forward", "lineboundary");
+    const lineEndNode = sel.focusNode;
+    const lineEndOffset = sel.focusOffset;
+    const tail = r0.cloneRange();
+    tail.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(tail);
+    sel.modify("extend", "backward", "lineboundary");
+    const full = document.createRange();
+    full.setStart(sel.focusNode, sel.focusOffset);
+    full.setEnd(lineEndNode, lineEndOffset);
+    sel.removeAllRanges();
+    sel.addRange(full);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getRepeatCount() {
   const n = parseInt(pendingCount || "1", 10);
   const c = Number.isNaN(n) ? 1 : Math.max(1, n);
@@ -1865,6 +1996,7 @@ function close(keepSelection = false) {
   pendingG = false;
   pendingF = null;
   pendingY = false;
+  clearPendingKeyTimers();
   if (!keepSelection) {
     const sel = getSelection();
     if (sel) {
@@ -2013,7 +2145,9 @@ function onKeyDown(event) {
       ui.consume(event);
       pendingG = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " g";
-      setTimeout(() => {
+      clearTimeout(pendingGTimer);
+      pendingGTimer = setTimeout(() => {
+        pendingGTimer = null;
         pendingG = false;
         if (pillEl && pillEl.textContent.endsWith(" g"))
           pillEl.textContent = pillText(mode);
@@ -2022,6 +2156,7 @@ function onKeyDown(event) {
     }
   }
   if (pendingG) {
+    clearPendingKeyTimers();
     pendingG = false;
     if (pillEl) pillEl.textContent = pillText(mode);
   }
@@ -2033,12 +2168,13 @@ function onKeyDown(event) {
 
   if (isCaret()) {
     if (pendingY) {
+      clearPendingKeyTimers();
       pendingY = false;
       if (pillEl && pillEl.textContent.endsWith(" y"))
         pillEl.textContent = pillText(mode);
       if (key === "y") {
         ui.consume(event);
-        for (let i = 0; i < repeat; i++) yankLineFromCaret();
+        yankLinesFromCaret(repeat);
         pendingCount = "";
         return true;
       }
@@ -2047,7 +2183,9 @@ function onKeyDown(event) {
       ui.consume(event);
       pendingY = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " y";
-      setTimeout(() => {
+      clearTimeout(pendingYTimer);
+      pendingYTimer = setTimeout(() => {
+        pendingYTimer = null;
         if (pendingY) {
           pendingY = false;
           if (pillEl && pillEl.textContent.endsWith(" y"))
@@ -2058,7 +2196,9 @@ function onKeyDown(event) {
     }
     if (key === "Y") {
       ui.consume(event);
-      for (let i = 0; i < repeat; i++) yankLineFromCaret();
+      clearPendingKeyTimers();
+      pendingY = false;
+      yankLinesFromCaret(repeat);
       pendingCount = "";
       return true;
     }
@@ -2207,6 +2347,14 @@ function onKeyDown(event) {
       break;
     case "Y":
       ui.consume(event);
+      expandSelectionToFullLines();
+      if (repeat > 1 && hasModify()) {
+        try {
+          for (let i = 1; i < repeat; i++) {
+            extendSelection("forward", "lineboundary");
+          }
+        } catch {}
+      }
       yankSelection();
       try {
         collapseToFocus();
@@ -2285,6 +2433,8 @@ export const __visualCaret = {
   firstUsableRect,
   lineHeightForElement,
   resolveCaretGeometry,
+  isWordChar,
+  findNextWordEnd,
 };
 
 register("visual", {
@@ -2303,5 +2453,6 @@ export function __resetVisualState() {
   pendingG = false;
   pendingF = null;
   pendingY = false;
+  clearPendingKeyTimers();
   clearVisualHighlight();
 }

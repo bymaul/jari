@@ -26,11 +26,28 @@ function getScrollElement() {
 let smoothState = null;
 
 function prefersReducedMotion() {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
+function flushSmoothQueue() {
+  if (!smoothState) return;
+  const { el, x, y } = smoothState;
+  smoothState = null;
+  if (x === 0 && y === 0) return;
+  try {
+    el.scrollBy({ left: x, top: y, behavior: "instant" });
+  } catch {}
 }
 
 function smoothScrollBy(el, x, y) {
-  if (smoothState === null || smoothState.el !== el) {
+  if (smoothState === null) {
+    smoothState = { el, x: 0, y: 0, rafId: null };
+  } else if (smoothState.el !== el) {
+    flushSmoothQueue();
     smoothState = { el, x: 0, y: 0, rafId: null };
   }
   smoothState.x += x;
@@ -99,14 +116,20 @@ function scrollFrame(frame, apply) {
   return false;
 }
 
+function frameScrollBehavior() {
+  return shouldSmooth() ? "smooth" : "instant";
+}
+
 function scrollFrameBy(frame, x, y) {
   return scrollFrame(frame, (t) =>
-    t.scrollBy({ left: x, top: y, behavior: "instant" }),
+    t.scrollBy({ left: x, top: y, behavior: frameScrollBehavior() }),
   );
 }
 
 function scrollFrameTo(frame, top) {
-  return scrollFrame(frame, (t) => t.scrollTo({ top, behavior: "instant" }));
+  return scrollFrame(frame, (t) =>
+    t.scrollTo({ top, behavior: frameScrollBehavior() }),
+  );
 }
 
 function scrollBy({ x = 0, y = 0, count = 1 }) {

@@ -25,8 +25,10 @@ function getTarget() {
     resolved = true;
     if (!pageCanScroll()) {
       const areas = findScrollableElements();
-      if (areas.length > 0) {
-        target = nearestArea(areas) || areas[0];
+      const frames = findFrameElements();
+      const stops = [...areas, ...frames];
+      if (stops.length > 0) {
+        target = nearestArea(stops) || stops[0];
         autoPicked = true;
       }
     }
@@ -61,7 +63,6 @@ function invalidateScrollCache() {
 }
 
 const observedRoots = new Set();
-
 function ensureObserved(root) {
   if (observedRoots.has(root)) return;
   observedRoots.add(root);
@@ -73,19 +74,6 @@ function ensureObserved(root) {
       attributeFilter: ["class", "style"],
     });
   }
-}
-
-if (typeof window.MutationObserver !== "undefined") {
-  new window.MutationObserver(() => {
-    scanEpoch++;
-
-    resolved = false;
-  }).observe(document, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["class", "style"],
-  });
 }
 
 function isScrollVisible(el) {
@@ -296,7 +284,8 @@ function cycle() {
   if (idx === -1) {
     target = pageScrolls ? null : nearestArea(stops) || stops[0];
   } else if (pageScrolls && idx === 0) {
-    target = nearestArea(areas) || areas[0] || frames[0] || null;
+    const ranked = stops.filter((s) => s !== null);
+    target = nearestArea(ranked) || areas[0] || frames[0] || null;
   } else {
     target = stops[(idx + 1) % stops.length];
   }
@@ -332,7 +321,7 @@ function showHighlight() {
     const frames = findFrameElements();
     const stops = [...areas, ...frames];
     if (stops.length === 0) return;
-    target = nearestArea(areas) || areas[0] || frames[0];
+    target = nearestArea(stops) || stops[0];
     autoPicked = false;
     area = target;
   }
