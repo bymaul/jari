@@ -2,7 +2,8 @@ import { Url, normalizeUrl } from "../shared/url.js";
 import { parseEngineKeyword } from "../shared/search-engines.js";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
-import { sendMessage } from "./ui.js";
+import { sendMessage, createShadowHost } from "./ui.js";
+import { deepActiveElement } from "./keymap.js";
 import { register, touch } from "./overlays.js";
 
 function parseKeyword(query) {
@@ -10,6 +11,7 @@ function parseKeyword(query) {
 }
 
 let active = false;
+let host = null;
 let overlay = null;
 let inputEl = null;
 let listEl = null;
@@ -181,14 +183,128 @@ function rankTabs(q, list) {
   return rank(list, q).map((x) => x.item);
 }
 
+function promptCss() {
+  return `
+    :host { all: initial !important; }
+    .jari-overlay {
+      all: initial;
+      display: block;
+      position: fixed !important;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483646 !important;
+      box-sizing: border-box;
+      background: var(--jari-cmplt-bg, #f5f5f7) !important;
+      color: var(--jari-cmplt-fg, #333738) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      max-height: 75vh;
+      overflow: hidden;
+      text-align: left !important;
+      pointer-events: auto;
+    }
+    .jari-prompt {
+      background: #1c1c24 !important;
+      color: #cdcdcd !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      outline: none !important;
+    }
+    .jari-prompt input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      color: #cdcdcd;
+      background: #1c1c24;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      text-align: left !important;
+      padding: 0 0 0 0.5ex;
+      margin: 0;
+    }
+    .jari-prompt input:focus,
+    .jari-prompt input:focus-visible,
+    .jari-prompt input:active {
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    .jari-prompt-header {
+      display: block;
+      background: #252530;
+      color: #cdcdcd;
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+      border-bottom: 1px solid #333738;
+      padding: 0 0.5ex;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-prompt-list {
+      display: block;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 50vh;
+      overflow: auto;
+      border-bottom: 1px solid #333738;
+      text-align: left !important;
+    }
+    .jari-prompt-list li {
+      display: block;
+      height: var(--jari-cmplt-option-height, 1.4em);
+      line-height: var(--jari-cmplt-option-height, 1.4em) !important;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0 0.5ex;
+      margin: 0;
+      cursor: pointer;
+      text-align: left !important;
+    }
+    .jari-prompt-list li .url {
+      color: #878787;
+      background: transparent;
+      text-decoration: none;
+      margin-left: 1em;
+    }
+    .jari-prompt-list li .jari-win-tag {
+      opacity: 0.7;
+      margin-right: 1em;
+    }
+    .jari-prompt-list li.selected,
+    .jari-prompt-list li.selected .url {
+      color: var(--jari-of-fg, #cdcdcd);
+      background: var(--jari-of-bg, #333738);
+    }
+    .jari-prompt-list li .jari-match,
+    .jari-prompt-list li.selected .jari-match {
+      color: #e0a363;
+      font-weight: bold !important;
+    }
+  `;
+}
+
 function render(title, placeholder) {
   touch("prompt");
+  const created = createShadowHost("jari-prompt-host", promptCss());
+  host = created.host;
+  const shadow = created.shadow;
   overlay = document.createElement("div");
   overlay.className = "jari-overlay jari-prompt";
 
   inputEl = document.createElement("input");
   inputEl.type = "text";
   inputEl.placeholder = placeholder;
+  inputEl.setAttribute("autocomplete", "off");
+  inputEl.setAttribute("spellcheck", "false");
   inputEl.addEventListener("input", () => {
     const raw = inputEl.value;
     query = raw.trim();
@@ -213,7 +329,7 @@ function render(title, placeholder) {
   overlay.appendChild(listEl);
   overlay.appendChild(header);
   overlay.appendChild(inputEl);
-  document.body.appendChild(overlay);
+  shadow.appendChild(overlay);
 
   filtered = tabs;
   renderList();
@@ -350,7 +466,13 @@ function move(delta) {
 }
 
 function onKeyDown(event) {
-  const inInput = document.activeElement === inputEl;
+  let focused;
+  try {
+    focused = deepActiveElement();
+  } catch {
+    focused = document.activeElement;
+  }
+  const inInput = focused === inputEl;
   if (inInput) {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -462,10 +584,13 @@ function activate() {
 function close() {
   clearTimeout(suggestTimer);
   suggestSeq++;
-  if (overlay) {
-    overlay.remove();
-    overlay = null;
+  if (host) {
+    try {
+      host.remove();
+    } catch {}
+    host = null;
   }
+  overlay = null;
   inputEl = null;
   listEl = null;
   tabs = [];

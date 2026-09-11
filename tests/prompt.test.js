@@ -6,12 +6,14 @@ import { settings } from "../content/settings.js";
 import { searchEngineDefaults } from "../shared/search-engines.js";
 
 function makeElement(tag) {
-  return {
+  const el = {
     tagName: tag,
     className: "",
     children: [],
     listeners: {},
     isConnected: true,
+    style: {},
+    attrs: {},
     _text: "",
     set textContent(value) {
       this._text = value;
@@ -30,15 +32,40 @@ function makeElement(tag) {
     },
     appendChild(child) {
       this.children.push(child);
+      return child;
     },
     remove() {
       this.isConnected = false;
     },
     focus() {
       document.activeElement = this;
+      try {
+        if (el.shadowRoot && el.shadowRoot !== el) {
+          el.shadowRoot.activeElement = this;
+        }
+      } catch {}
+    },
+    blur() {
+      if (document.activeElement === this) document.activeElement = null;
+    },
+    setAttribute(name, value) {
+      this.attrs[name] = value;
     },
     scrollIntoView() {},
   };
+  el.attachShadow = () => {
+    el.shadowRoot = {
+      children: [],
+      activeElement: null,
+      appendChild(child) {
+        this.children.push(child);
+        return child;
+      },
+    };
+    return el.shadowRoot;
+  };
+  el.shadowRoot = null;
+  return el;
 }
 
 function makeDocument() {

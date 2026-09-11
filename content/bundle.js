@@ -288,9 +288,9 @@
   yun za zappos zara zero zip zm zone zuerich zw
   `.trim().split(/\s+/)
   );
-  function isValidHostname(host) {
-    if (!host) return false;
-    let lower = host.toLowerCase();
+  function isValidHostname(host4) {
+    if (!host4) return false;
+    let lower = host4.toLowerCase();
     if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
@@ -318,9 +318,9 @@
     if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
     return true;
   }
-  function isBareNavigableHostname(host) {
-    if (!isValidHostname(host)) return false;
-    let lower = host.toLowerCase();
+  function isBareNavigableHostname(host4) {
+    if (!isValidHostname(host4)) return false;
+    let lower = host4.toLowerCase();
     if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) return true;
@@ -437,11 +437,11 @@
             }
             return true;
           }
-          const host = u.hostname;
-          if (!host) return false;
-          if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
-          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return isBareNavigableHostname(host);
-          return isBareNavigableHostname(host);
+          const host4 = u.hostname;
+          if (!host4) return false;
+          if (host4 === "localhost" || /^127\.0\.0\.1$/.test(host4) || /^0\.0\.0\.0$/.test(host4)) return true;
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host4)) return isBareNavigableHostname(host4);
+          return isBareNavigableHostname(host4);
         } catch {
           return false;
         }
@@ -485,19 +485,19 @@
     }
   };
   function normalizeHost(raw) {
-    let host = raw.trim().toLowerCase();
-    if (!host) return "";
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
+    let host4 = raw.trim().toLowerCase();
+    if (!host4) return "";
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host4)) {
       try {
-        host = new URL(host).hostname;
+        host4 = new URL(host4).hostname;
       } catch {
         return "";
       }
     }
-    host = host.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
+    host4 = host4.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
     return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
-      host
-    ) ? host : "";
+      host4
+    ) ? host4 : "";
   }
   function normalizeSitePattern(raw) {
     if (typeof raw !== "string") return "";
@@ -512,18 +512,18 @@
   }
   function matchesSitePattern(hostname, pattern, protocol = "") {
     if (!pattern) return false;
-    const host = (hostname || "").toLowerCase();
+    const host4 = (hostname || "").toLowerCase();
     if (pattern === "file://") return protocol === "file:";
     if (pattern.startsWith("*.")) {
       const base = pattern.slice(2);
-      return host === base || host.endsWith(`.${base}`);
+      return host4 === base || host4.endsWith(`.${base}`);
     }
-    return host === pattern.toLowerCase();
+    return host4 === pattern.toLowerCase();
   }
   function pageSiteKey(hostname, protocol = "") {
-    const host = hostname || "";
-    if (!host && protocol === "file:") return "file://";
-    return host;
+    const host4 = hostname || "";
+    if (!host4 && protocol === "file:") return "file://";
+    return host4;
   }
 
   // content/catalog.js
@@ -762,7 +762,7 @@
     const n = parseInt(raw, 10);
     return Number.isNaN(n) ? 1 : Math.max(1, n);
   }
-  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue";
+  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host";
   function deepActiveElement() {
     let el = document.activeElement;
     while (el && el.shadowRoot && el.shadowRoot.activeElement) {
@@ -1050,10 +1050,10 @@
     return state.keymap;
   }
   function isDisabled() {
-    const host = location.hostname || "";
+    const host4 = location.hostname || "";
     const protocol = location.protocol || "";
     return state.disabledSites.some(
-      (pattern) => matchesSitePattern(host, pattern, protocol)
+      (pattern) => matchesSitePattern(host4, pattern, protocol)
     );
   }
   function getDisabledSites() {
@@ -1373,6 +1373,35 @@
     } catch {
     }
   }
+  function createShadowHost(hostClass, cssText, zIndex = "2147483646") {
+    const host4 = document.createElement("div");
+    if (hostClass) host4.className = hostClass;
+    host4.style.position = "fixed";
+    host4.style.left = "0";
+    host4.style.top = "0";
+    host4.style.width = "0";
+    host4.style.height = "0";
+    host4.style.overflow = "visible";
+    host4.style.pointerEvents = "none";
+    host4.style.zIndex = zIndex;
+    try {
+      host4.attachShadow({ mode: "open" });
+    } catch {
+      host4.shadowRoot = host4;
+    }
+    const shadow = host4.shadowRoot || host4;
+    try {
+      const style = document.createElement("style");
+      style.textContent = cssText || "";
+      shadow.appendChild(style);
+    } catch {
+    }
+    try {
+      (document.body || document.documentElement).appendChild(host4);
+    } catch {
+    }
+    return { host: host4, shadow };
+  }
   function buildCategoryTable(cat, headerClass, renderBody) {
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
@@ -1421,7 +1450,8 @@
     safeFocus,
     dispatchClick,
     dispatchHover,
-    focusFrameElement
+    focusFrameElement,
+    createShadowHost
   };
 
   // content/hints-elements.js
@@ -2581,6 +2611,7 @@
     return parseEngineKeyword(query3, settings.getSearchEngines());
   }
   var active = false;
+  var host = null;
   var overlay = null;
   var inputEl = null;
   var listEl = null;
@@ -2731,13 +2762,126 @@
   function rankTabs(q, list) {
     return rank(list, q).map((x) => x.item);
   }
+  function promptCss() {
+    return `
+    :host { all: initial !important; }
+    .jari-overlay {
+      all: initial;
+      display: block;
+      position: fixed !important;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483646 !important;
+      box-sizing: border-box;
+      background: var(--jari-cmplt-bg, #f5f5f7) !important;
+      color: var(--jari-cmplt-fg, #333738) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      max-height: 75vh;
+      overflow: hidden;
+      text-align: left !important;
+      pointer-events: auto;
+    }
+    .jari-prompt {
+      background: #1c1c24 !important;
+      color: #cdcdcd !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      outline: none !important;
+    }
+    .jari-prompt input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      color: #cdcdcd;
+      background: #1c1c24;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      text-align: left !important;
+      padding: 0 0 0 0.5ex;
+      margin: 0;
+    }
+    .jari-prompt input:focus,
+    .jari-prompt input:focus-visible,
+    .jari-prompt input:active {
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    .jari-prompt-header {
+      display: block;
+      background: #252530;
+      color: #cdcdcd;
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+      border-bottom: 1px solid #333738;
+      padding: 0 0.5ex;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-prompt-list {
+      display: block;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 50vh;
+      overflow: auto;
+      border-bottom: 1px solid #333738;
+      text-align: left !important;
+    }
+    .jari-prompt-list li {
+      display: block;
+      height: var(--jari-cmplt-option-height, 1.4em);
+      line-height: var(--jari-cmplt-option-height, 1.4em) !important;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0 0.5ex;
+      margin: 0;
+      cursor: pointer;
+      text-align: left !important;
+    }
+    .jari-prompt-list li .url {
+      color: #878787;
+      background: transparent;
+      text-decoration: none;
+      margin-left: 1em;
+    }
+    .jari-prompt-list li .jari-win-tag {
+      opacity: 0.7;
+      margin-right: 1em;
+    }
+    .jari-prompt-list li.selected,
+    .jari-prompt-list li.selected .url {
+      color: var(--jari-of-fg, #cdcdcd);
+      background: var(--jari-of-bg, #333738);
+    }
+    .jari-prompt-list li .jari-match,
+    .jari-prompt-list li.selected .jari-match {
+      color: #e0a363;
+      font-weight: bold !important;
+    }
+  `;
+  }
   function render(title, placeholder) {
     touch("prompt");
+    const created = createShadowHost("jari-prompt-host", promptCss());
+    host = created.host;
+    const shadow = created.shadow;
     overlay = document.createElement("div");
     overlay.className = "jari-overlay jari-prompt";
     inputEl = document.createElement("input");
     inputEl.type = "text";
     inputEl.placeholder = placeholder;
+    inputEl.setAttribute("autocomplete", "off");
+    inputEl.setAttribute("spellcheck", "false");
     inputEl.addEventListener("input", () => {
       const raw = inputEl.value;
       query = raw.trim();
@@ -2758,7 +2902,7 @@
     overlay.appendChild(listEl);
     overlay.appendChild(header);
     overlay.appendChild(inputEl);
-    document.body.appendChild(overlay);
+    shadow.appendChild(overlay);
     filtered = tabs;
     renderList();
     restoreFocus = document.activeElement;
@@ -2878,7 +3022,13 @@
     highlight();
   }
   function onKeyDown(event) {
-    const inInput = document.activeElement === inputEl;
+    let focused;
+    try {
+      focused = deepActiveElement();
+    } catch {
+      focused = document.activeElement;
+    }
+    const inInput = focused === inputEl;
     if (inInput) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -2969,10 +3119,14 @@
   function close() {
     clearTimeout(suggestTimer);
     suggestSeq++;
-    if (overlay) {
-      overlay.remove();
-      overlay = null;
+    if (host) {
+      try {
+        host.remove();
+      } catch {
+      }
+      host = null;
     }
+    overlay = null;
     inputEl = null;
     listEl = null;
     tabs = [];
@@ -3001,6 +3155,7 @@
   var STEP = 50;
   var COLUMNS = 3;
   var active2 = false;
+  var host2 = null;
   var overlay2 = null;
   var listEl2 = null;
   var footerBar = null;
@@ -3022,7 +3177,112 @@
     overlay2.tabIndex = -1;
     overlay2.focus();
   }
+  function helpCss() {
+    return `
+    :host { all: initial !important; }
+    .jari-overlay {
+      all: initial;
+      display: block;
+      position: fixed !important;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483646 !important;
+      box-sizing: border-box;
+      background: var(--jari-cmplt-bg, #f5f5f7) !important;
+      color: var(--jari-cmplt-fg, #333738) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      max-height: 75vh;
+      overflow: hidden;
+      text-align: left !important;
+      pointer-events: auto;
+    }
+    .jari-help {
+      background: var(--jari-cmplt-bg, #f5f5f7);
+      color: var(--jari-cmplt-fg, #333738);
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      outline: none;
+    }
+    .jari-help:focus { outline: none; }
+    .jari-help-title {
+      display: block;
+      background: var(--jari-header-bg, #e8e8ec);
+      color: var(--jari-fg, #333738);
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+      border-bottom: var(--jari-header-border-bottom, 1px solid #c5c5cf);
+      padding: 0 0.5ex;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-help-list {
+      display: block;
+      max-height: 60vh;
+      overflow: auto;
+    }
+    .jari-help-columns {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0 3ex;
+      align-items: start;
+    }
+    .jari-help-column { min-width: 0; }
+    .jari-help table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin-bottom: 2ex;
+      margin-top: 0;
+    }
+    .jari-help tr.jari-help-cat-header th {
+      background: var(--jari-header-bg, #e8e8ec);
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+      color: var(--jari-fg, #333738);
+      text-align: left;
+      border-bottom: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      padding: 0.25ex 0.5ex;
+    }
+    .jari-help td {
+      padding: 0 0.5ex;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      height: var(--jari-cmplt-option-height, 1.4em);
+      line-height: var(--jari-cmplt-option-height, 1.4em) !important;
+      text-align: left !important;
+    }
+    .jari-help td.jari-help-key {
+      width: 40%;
+      font-weight: bold !important;
+      color: var(--jari-fg, #333738);
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
+    }
+    .jari-help td.jari-help-key.jari-unbound {
+      font-weight: normal !important;
+      font-style: italic;
+      color: var(--jari-muted, #606079);
+      text-shadow: none;
+    }
+    .jari-help-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1ex;
+      padding: 0.25ex 0.5ex;
+      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+    }
+  `;
+  }
   function render2() {
+    const created = createShadowHost("jari-help-host", helpCss());
+    host2 = created.host;
+    const shadow = created.shadow;
     overlay2 = document.createElement("div");
     overlay2.className = "jari-overlay jari-help";
     const title = document.createElement("div");
@@ -3088,7 +3348,7 @@
     footerBar.textContent = FOOTER_DEFAULT;
     footer.appendChild(footerBar);
     overlay2.appendChild(footer);
-    document.body.appendChild(overlay2);
+    shadow.appendChild(overlay2);
   }
   function updateFooter() {
     if (!footerBar) return;
@@ -3289,10 +3549,14 @@
       clearSearchHighlights();
     } catch {
     }
-    if (overlay2) {
-      overlay2.remove();
-      overlay2 = null;
+    if (host2) {
+      try {
+        host2.remove();
+      } catch {
+      }
+      host2 = null;
     }
+    overlay2 = null;
     listEl2 = null;
     footerBar = null;
     entries = [];
@@ -3344,20 +3608,20 @@
     }
     return z;
   }
-  function placeHintsHost(host) {
+  function placeHintsHost(host4) {
     try {
       const topLayer = document.querySelector("dialog[open]");
       if (topLayer) {
         const r = topLayer.getBoundingClientRect();
         const style = window.getComputedStyle(topLayer);
         if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
-          topLayer.appendChild(host);
+          topLayer.appendChild(host4);
           return;
         }
       }
     } catch {
     }
-    (document.documentElement || document.body).appendChild(host);
+    (document.documentElement || document.body).appendChild(host4);
   }
   function coordinate(holderEl) {
     const probe = document.createElement("div");
@@ -3450,22 +3714,22 @@
   `;
   }
   function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFAULT) {
-    const host = document.createElement("div");
-    host.className = "jari-hints-host";
-    host.style.position = "fixed";
-    host.style.left = "0";
-    host.style.top = "0";
-    host.style.width = "0";
-    host.style.height = "0";
-    host.style.overflow = "visible";
-    host.style.pointerEvents = "none";
-    host.style.zIndex = "2147483647";
+    const host4 = document.createElement("div");
+    host4.className = "jari-hints-host";
+    host4.style.position = "fixed";
+    host4.style.left = "0";
+    host4.style.top = "0";
+    host4.style.width = "0";
+    host4.style.height = "0";
+    host4.style.overflow = "visible";
+    host4.style.pointerEvents = "none";
+    host4.style.zIndex = "2147483647";
     try {
-      host.attachShadow({ mode: "open" });
+      host4.attachShadow({ mode: "open" });
     } catch {
-      host.shadowRoot = host;
+      host4.shadowRoot = host4;
     }
-    const shadow = host.shadowRoot;
+    const shadow = host4.shadowRoot;
     const style = document.createElement("style");
     style.textContent = hintCss(theme, fontSize);
     shadow.appendChild(style);
@@ -3474,8 +3738,8 @@
     holder2.style.display = "block";
     holder2.style.opacity = "1";
     shadow.appendChild(holder2);
-    placeHintsHost(host);
-    return { host, holder: holder2 };
+    placeHintsHost(host4);
+    return { host: host4, holder: holder2 };
   }
   function estimateLabelBox(label, fontSize) {
     const size = hintFontSize(fontSize);
@@ -6393,6 +6657,7 @@
   // content/find.js
   var MAX_MATCHES = 1500;
   var active5 = false;
+  var host3 = null;
   var overlay3 = null;
   var inputEl2 = null;
   var statusEl = null;
@@ -6949,7 +7214,105 @@
       statusEl.classList.remove("jari-find-no-match");
     }
   }
+  function findCss() {
+    return `
+    :host { all: initial !important; }
+    .jari-overlay {
+      all: initial;
+      display: block;
+      position: fixed !important;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483646 !important;
+      box-sizing: border-box;
+      background: var(--jari-cmplt-bg, #f5f5f7) !important;
+      color: var(--jari-cmplt-fg, #333738) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      max-height: 75vh;
+      overflow: hidden;
+      text-align: left !important;
+      pointer-events: auto;
+    }
+    .jari-find {
+      background: #1c1c24 !important;
+      color: #cdcdcd !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      outline: none !important;
+      border-top: 1px solid #333738;
+    }
+    .jari-find-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5ex;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      text-align: left !important;
+    }
+    .jari-find-label {
+      color: #e0a363;
+      font-weight: bold !important;
+      flex: 0 0 auto;
+    }
+    .jari-find-input {
+      display: block;
+      flex: 1 1 auto;
+      min-width: 0;
+      box-sizing: border-box;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      color: #cdcdcd;
+      background: #1c1c24;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      text-align: left !important;
+      padding: 0;
+      margin: 0;
+    }
+    .jari-find-input:focus,
+    .jari-find-input:focus-visible,
+    .jari-find-input:active {
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    .jari-find-toggle {
+      flex: 0 0 auto;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: 1 !important;
+      color: #878787;
+      background: transparent;
+      border: 1px solid #333738;
+      border-radius: 2px;
+      padding: 0 0.5ex;
+      margin: 0;
+      cursor: pointer;
+    }
+    .jari-find-toggle-on {
+      color: #e0a363;
+      border-color: #c38a22;
+    }
+    .jari-find-status {
+      flex: 0 0 auto;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      color: #878787;
+      white-space: nowrap;
+    }
+    .jari-find-status.jari-find-no-match {
+      color: #e06c75;
+    }
+  `;
+  }
   function renderBar() {
+    const created = createShadowHost("jari-find-host", findCss());
+    host3 = created.host;
+    const shadow = created.shadow;
     overlay3 = document.createElement("div");
     overlay3.className = "jari-overlay jari-find";
     const bar = document.createElement("div");
@@ -6992,7 +7355,7 @@
     }
     bar.appendChild(statusEl);
     overlay3.appendChild(bar);
-    (document.body || document.documentElement).appendChild(overlay3);
+    shadow.appendChild(overlay3);
     restoreFocus2 = document.activeElement;
     historyIdx = -1;
     historyDraft = "";
@@ -7028,28 +7391,42 @@
     clearTimeout(inputDebounce);
     inputDebounce = null;
     const wasInput = inputEl2;
+    const wasHost = host3;
     active5 = false;
     pendingQuery = "";
-    if (overlay3) {
+    if (host3) {
       try {
-        overlay3.remove();
+        host3.remove();
       } catch {
       }
-      overlay3 = null;
+      host3 = null;
     }
+    overlay3 = null;
     inputEl2 = null;
     statusEl = null;
-    if (restoreFocus2 && restoreFocus2.isConnected && document.activeElement !== restoreFocus2) {
+    let focused;
+    try {
+      focused = deepActiveElement();
+    } catch {
+      focused = document.activeElement;
+    }
+    if (restoreFocus2 && restoreFocus2.isConnected && focused !== restoreFocus2) {
       try {
         restoreFocus2.focus();
       } catch {
       }
-    } else if (wasInput && document.activeElement === wasInput) {
+    } else if (wasInput && (focused === wasInput || focused === wasHost)) {
       try {
         wasInput.blur();
       } catch {
       }
-      if (document.activeElement === wasInput) {
+      let refocused;
+      try {
+        refocused = deepActiveElement();
+      } catch {
+        refocused = document.activeElement;
+      }
+      if (refocused === wasInput) {
         try {
           const body = document.body || null;
           if (body && typeof body.focus === "function") body.focus();
@@ -7248,7 +7625,13 @@
     if (!active5) return false;
     const combo = canonicalKey(event);
     const toggleCmd = findToggleCommandFor(settings.getKeymap(), combo);
-    if (toggleCmd && (combo.includes("+") || document.activeElement !== inputEl2)) {
+    let focused;
+    try {
+      focused = deepActiveElement();
+    } catch {
+      focused = document.activeElement;
+    }
+    if (toggleCmd && (combo.includes("+") || focused !== inputEl2)) {
       event.preventDefault();
       event.stopImmediatePropagation();
       toggleFindFlag(FIND_TOGGLE_COMMANDS[toggleCmd]);
@@ -7258,7 +7641,7 @@
       }
       return true;
     }
-    const inInput = document.activeElement === inputEl2;
+    const inInput = focused === inputEl2;
     if (inInput) {
       if (event.key === "Escape") {
         event.preventDefault();

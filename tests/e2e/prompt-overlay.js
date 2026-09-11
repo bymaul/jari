@@ -34,21 +34,27 @@ await key(cdp, "t");
 await wait(1200);
 
 const state = await evalValue(cdp, `(() => {
-  const sel = (s) => document.querySelector(s);
+  const host = document.querySelector('.jari-prompt-host');
+  const root = (host && host.shadowRoot) || document;
+  const sel = (s) => root.querySelector(s);
   const cs = (el) => getComputedStyle(el);
   const overlay = sel('.jari-prompt');
   const input = sel('.jari-prompt input');
   const li = sel('.jari-prompt-list li');
-  input.focus();
+  if (input) input.focus();
   return {
     open: !!overlay && !!input,
     overlayAlign: overlay && cs(overlay).textAlign,
     headerAlign: sel('.jari-prompt-header') && cs(sel('.jari-prompt-header')).textAlign,
     rowAlign: li && cs(li).textAlign,
+    rowMargin: li && cs(li).marginBottom,
     inputAlign: input && cs(input).textAlign,
     inputBorder: input && cs(input).borderStyle + ' ' + cs(input).borderWidth,
     inputOutline: input && cs(input).outlineStyle + ' ' + cs(input).outlineWidth,
     inputShadow: input && cs(input).boxShadow,
+    inputBg: input && cs(input).backgroundColor,
+    inputWidth: input && cs(input).width,
+    overlayWidth: overlay && cs(overlay).width,
   };
 })()`);
 
@@ -62,6 +68,13 @@ assert(state.inputAlign === "left", `prompt input must be left-aligned (got ${st
 assert(state.inputBorder.split(" ")[0] === "none", `focused prompt input must not show the page's border (got ${state.inputBorder})`);
 assert(state.inputOutline.split(" ")[0] === "none", `focused prompt input must not show the page's outline (got ${state.inputOutline})`);
 assert(state.inputShadow === "none", `focused prompt input must not show the page's box-shadow (got ${state.inputShadow})`);
+assert(state.rowMargin === "0px", `prompt rows must not inherit the page's li margin (got ${state.rowMargin})`);
+assert(state.inputBg === "rgb(28, 28, 36)", `prompt input must keep its dark background, not the page's white input (got ${state.inputBg})`);
+if (state.inputWidth && state.overlayWidth) {
+  const iw = parseFloat(state.inputWidth);
+  const ow = parseFloat(state.overlayWidth);
+  assert(iw >= ow * 0.9, `prompt input must be full-width, not the page's 210px box (got input ${state.inputWidth} vs overlay ${state.overlayWidth})`);
+}
 
 console.log(process.exitCode ? "prompt-overlay: FAIL" : "prompt-overlay: PASS");
 cdp.close();

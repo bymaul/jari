@@ -1,7 +1,12 @@
 /* global CSS, Highlight, NodeFilter */
 import { register, touch } from "./overlays.js";
-import { ui } from "./ui.js";
-import { canonicalKey, keysForCommand, overlaySelectors } from "./keymap.js";
+import { ui, createShadowHost } from "./ui.js";
+import {
+  canonicalKey,
+  deepActiveElement,
+  keysForCommand,
+  overlaySelectors,
+} from "./keymap.js";
 import { settings } from "./settings.js";
 import { isElementDrawn, getLinkAncestor } from "./hints-elements.js";
 import {
@@ -13,6 +18,7 @@ import { Visual } from "./visual.js";
 const MAX_MATCHES = 1500;
 
 let active = false;
+let host = null;
 let overlay = null;
 let inputEl = null;
 let statusEl = null;
@@ -584,7 +590,106 @@ function updateStatus() {
   }
 }
 
+function findCss() {
+  return `
+    :host { all: initial !important; }
+    .jari-overlay {
+      all: initial;
+      display: block;
+      position: fixed !important;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483646 !important;
+      box-sizing: border-box;
+      background: var(--jari-cmplt-bg, #f5f5f7) !important;
+      color: var(--jari-cmplt-fg, #333738) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      max-height: 75vh;
+      overflow: hidden;
+      text-align: left !important;
+      pointer-events: auto;
+    }
+    .jari-find {
+      background: #1c1c24 !important;
+      color: #cdcdcd !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      outline: none !important;
+      border-top: 1px solid #333738;
+    }
+    .jari-find-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5ex;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      text-align: left !important;
+    }
+    .jari-find-label {
+      color: #e0a363;
+      font-weight: bold !important;
+      flex: 0 0 auto;
+    }
+    .jari-find-input {
+      display: block;
+      flex: 1 1 auto;
+      min-width: 0;
+      box-sizing: border-box;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      color: #cdcdcd;
+      background: #1c1c24;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      text-align: left !important;
+      padding: 0;
+      margin: 0;
+    }
+    .jari-find-input:focus,
+    .jari-find-input:focus-visible,
+    .jari-find-input:active {
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    .jari-find-toggle {
+      flex: 0 0 auto;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: 1 !important;
+      color: #878787;
+      background: transparent;
+      border: 1px solid #333738;
+      border-radius: 2px;
+      padding: 0 0.5ex;
+      margin: 0;
+      cursor: pointer;
+    }
+    .jari-find-toggle-on {
+      color: #e0a363;
+      border-color: #c38a22;
+    }
+    .jari-find-status {
+      flex: 0 0 auto;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      color: #878787;
+      white-space: nowrap;
+    }
+    .jari-find-status.jari-find-no-match {
+      color: #e06c75;
+    }
+  `;
+}
+
 function renderBar() {
+  const created = createShadowHost("jari-find-host", findCss());
+  host = created.host;
+  const shadow = created.shadow;
   overlay = document.createElement("div");
   overlay.className = "jari-overlay jari-find";
   const bar = document.createElement("div");
@@ -626,7 +731,7 @@ function renderBar() {
   }
   bar.appendChild(statusEl);
   overlay.appendChild(bar);
-  (document.body || document.documentElement).appendChild(overlay);
+  shadow.appendChild(overlay);
 
   restoreFocus = document.activeElement;
   historyIdx = -1;
@@ -668,25 +773,39 @@ function closeBar() {
   clearTimeout(inputDebounce);
   inputDebounce = null;
   const wasInput = inputEl;
+  const wasHost = host;
   active = false;
   pendingQuery = "";
-  if (overlay) {
+  if (host) {
     try {
-      overlay.remove();
+      host.remove();
     } catch {}
-    overlay = null;
+    host = null;
   }
+  overlay = null;
   inputEl = null;
   statusEl = null;
-  if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
+  let focused;
+  try {
+    focused = deepActiveElement();
+  } catch {
+    focused = document.activeElement;
+  }
+  if (restoreFocus && restoreFocus.isConnected && focused !== restoreFocus) {
     try {
       restoreFocus.focus();
     } catch {}
-  } else if (wasInput && document.activeElement === wasInput) {
+  } else if (wasInput && (focused === wasInput || focused === wasHost)) {
     try {
       wasInput.blur();
     } catch {}
-    if (document.activeElement === wasInput) {
+    let refocused;
+    try {
+      refocused = deepActiveElement();
+    } catch {
+      refocused = document.activeElement;
+    }
+    if (refocused === wasInput) {
       try {
         const body = document.body || null;
         if (body && typeof body.focus === "function") body.focus();
@@ -890,7 +1009,13 @@ function onKeyDown(event) {
   if (!active) return false;
   const combo = canonicalKey(event);
   const toggleCmd = findToggleCommandFor(settings.getKeymap(), combo);
-  if (toggleCmd && (combo.includes("+") || document.activeElement !== inputEl)) {
+  let focused;
+  try {
+    focused = deepActiveElement();
+  } catch {
+    focused = document.activeElement;
+  }
+  if (toggleCmd && (combo.includes("+") || focused !== inputEl)) {
     event.preventDefault();
     event.stopImmediatePropagation();
     toggleFindFlag(FIND_TOGGLE_COMMANDS[toggleCmd]);
@@ -899,7 +1024,7 @@ function onKeyDown(event) {
     } catch {}
     return true;
   }
-  const inInput = document.activeElement === inputEl;
+  const inInput = focused === inputEl;
   if (inInput) {
     if (event.key === "Escape") {
       event.preventDefault();

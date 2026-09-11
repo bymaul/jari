@@ -269,7 +269,7 @@ export function parseRepeatCount(raw) {
 }
 
 export const overlaySelectors =
-  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue";
+  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host";
 
 export function deepActiveElement() {
   let el = document.activeElement;
