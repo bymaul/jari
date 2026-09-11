@@ -252,6 +252,69 @@ test("stored settings prefer newer sync when sync is fresher", async () => {
   }
 });
 
+test("tab actions report failure without a sender tab", async () => {
+  assert.deepEqual(await handlers.duplicateTab({}, {}), { ok: false });
+  assert.deepEqual(await handlers.togglePin({}, {}), { ok: false });
+  assert.deepEqual(await handlers.toggleMute({}, {}), { ok: false });
+  assert.deepEqual(await handlers.reloadTab({}, {}), { ok: false });
+  assert.deepEqual(await handlers.goBack({}, {}), { ok: false });
+  assert.deepEqual(await handlers.moveTabLeft({}, {}), { ok: false });
+});
+
+test("tab actions succeed with a sender tab", async () => {
+  const calls = [];
+  const savedTabs = globalThis.chrome.tabs;
+  globalThis.chrome.tabs = {
+    ...savedTabs,
+    duplicate: async (id) => {
+      calls.push(["duplicate", id]);
+    },
+    update: async (id, props) => {
+      calls.push(["update", id, props]);
+    },
+    reload: async (id, opts) => {
+      calls.push(["reload", id, opts]);
+    },
+    move: async (id, props) => {
+      calls.push(["move", id, props]);
+    },
+    query: async () => [{ id: 4, index: 1 }],
+    goBack: async (id) => {
+      calls.push(["goBack", id]);
+    },
+  };
+  try {
+    assert.deepEqual(await handlers.duplicateTab({ tab: { id: 7 } }, {}), { ok: true });
+    assert.deepEqual(
+      await handlers.togglePin({ tab: { id: 7, pinned: false } }, {}),
+      { ok: true },
+    );
+    assert.deepEqual(await handlers.reloadTab({ tab: { id: 7 } }, {}), { ok: true });
+    assert.deepEqual(await handlers.goBack({ tab: { id: 7 } }, {}), { ok: true });
+    assert.deepEqual(
+      await handlers.moveTabLeft({ tab: { id: 7, index: 2 } }, {}),
+      { ok: true },
+    );
+    assert.deepEqual(calls[0], ["duplicate", 7]);
+  } finally {
+    globalThis.chrome.tabs = savedTabs;
+  }
+});
+
+test("goToFirstTab reports failure with no tabs", async () => {
+  const savedTabs = globalThis.chrome.tabs;
+  globalThis.chrome.tabs = { ...savedTabs, query: async () => [] };
+  try {
+    assert.deepEqual(await handlers.goToFirstTab({}, {}), { ok: false });
+  } finally {
+    globalThis.chrome.tabs = savedTabs;
+  }
+});
+
+test("restoreTab reports failure when sessions are unavailable", async () => {
+  assert.deepEqual(await handlers.restoreTab({}, {}), { ok: false });
+});
+
 function stubSuggestChrome(maxResults) {
   const saved = {
     query: globalThis.chrome.tabs.query,

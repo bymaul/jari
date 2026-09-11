@@ -34,21 +34,18 @@ async function getStoredSettings() {
   return synced || local || {};
 }
 
-async function getSuggestionSources() {
+async function getSuggestSettings() {
   const settings = await getStoredSettings();
   const sources = settings && settings.suggestionSources;
-  if (Array.isArray(sources)) {
-    return sources.filter((s) => suggestionSources.includes(s));
-  }
-  return suggestionSources.slice();
-}
-
-async function getMaxResults() {
-  const settings = await getStoredSettings();
-  if (settings && settings.maxResults !== undefined) {
-    return clampMaxResults(settings.maxResults);
-  }
-  return clampMaxResults();
+  return {
+    sources: Array.isArray(sources)
+      ? sources.filter((s) => suggestionSources.includes(s))
+      : suggestionSources.slice(),
+    maxResults:
+      settings && settings.maxResults !== undefined
+        ? clampMaxResults(settings.maxResults)
+        : clampMaxResults(),
+  };
 }
 
 async function getDefaultSearchUrl(text) {
@@ -103,7 +100,7 @@ export const handlers = {
       sessions = await chrome.sessions.getRecentlyClosed();
     } catch (err) {
       console.debug("[jari] Failed to get recently closed sessions:", err);
-      return { ok: true };
+      return { ok: false };
     }
     const tabs = (sessions || []).filter((s) => s.tab && s.tab.sessionId);
     for (let i = 0; i < Math.min(clampCount(count), tabs.length); i++) {
@@ -177,16 +174,18 @@ export const handlers = {
   duplicateTab: async (sender) => {
     if (sender.tab && sender.tab.id) {
       await chrome.tabs.duplicate(sender.tab.id);
+      return { ok: true };
     }
-    return { ok: true };
+    return { ok: false };
   },
 
   togglePin: async (sender) => {
     const tab = sender.tab;
     if (tab && tab.id) {
       await chrome.tabs.update(tab.id, { pinned: !tab.pinned });
+      return { ok: true };
     }
-    return { ok: true };
+    return { ok: false };
   },
 
   toggleMute: async (sender) => {
@@ -194,15 +193,17 @@ export const handlers = {
     if (tab && tab.id) {
       const muted = !!(tab.mutedInfo && tab.mutedInfo.muted);
       await chrome.tabs.update(tab.id, { muted: !muted });
+      return { ok: true };
     }
-    return { ok: true };
+    return { ok: false };
   },
 
   reloadTab: async (sender, { bypassCache = false } = {}) => {
     if (sender.tab && sender.tab.id) {
       await chrome.tabs.reload(sender.tab.id, { bypassCache });
+      return { ok: true };
     }
-    return { ok: true };
+    return { ok: false };
   },
 
   goBack: async (sender) => goHistory(sender.tab, -1),
@@ -239,7 +240,7 @@ export const handlers = {
       }
       map.set(url, { title: title || url, url, source, ...extra });
     }
-    const sources = await getSuggestionSources();
+    const { sources, maxResults } = await getSuggestSettings();
     let bookmarkFolderMap = null;
     async function getBookmarkFolderMap() {
       if (bookmarkFolderMap) return bookmarkFolderMap;
@@ -337,7 +338,7 @@ export const handlers = {
       }
     }
     const items = Array.from(map.values());
-    return items.slice(0, await getMaxResults());
+    return items.slice(0, maxResults);
   },
 
   search: async (sender, { query = "", newTab = true, incognito = false } = {}) => {
@@ -421,7 +422,7 @@ async function goHistory(tab, delta) {
     try {
       await chrome.tabs[method](tab.id);
     } catch {
-      return { ok: true };
+      return { ok: false };
     }
   }
   return { ok: true };
@@ -471,14 +472,16 @@ async function moveTab(sender, delta) {
   const tab = sender.tab;
   if (tab && tab.id) {
     await chrome.tabs.move(tab.id, { index: Math.max(0, tab.index + delta) });
+    return { ok: true };
   }
-  return { ok: true };
+  return { ok: false };
 }
 
 async function activateTabByIndex(index) {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const tab = tabs[index < 0 ? tabs.length + index : index];
-  if (tab) await chrome.tabs.update(tab.id, { active: true });
+  if (!tab) return { ok: false };
+  await chrome.tabs.update(tab.id, { active: true });
   return { ok: true };
 }
 

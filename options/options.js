@@ -1110,7 +1110,19 @@ function commitEngines() {
 }
 
 function removeEngine(li) {
-  if (readEngineRows().length <= 1) {
+  const rows = readEngineRows();
+  if (rows.length <= 1) {
+    failEngines("At least one search engine is required", []);
+    return;
+  }
+  const remaining = rows.filter((row) => {
+    try {
+      return row.kwEl.closest("li") !== li;
+    } catch {
+      return true;
+    }
+  });
+  if (!remaining.some((r) => r.keyword !== "" && r.url !== "")) {
     failEngines("At least one search engine is required", []);
     return;
   }
@@ -1406,7 +1418,9 @@ clueEnabledEl.addEventListener("change", () =>
   savePatch({ clueEnabled: clueEnabledEl.checked }),
 );
 copyFormatEl.addEventListener("change", () =>
-  savePatch({ copyFormat: copyFormatEl.value }),
+  savePatch({ copyFormat: copyFormatEl.value }).then(() => {
+    copyFormatEl.value = settings.getCopyFormat();
+  }),
 );
 for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
   el.addEventListener("change", () =>
@@ -1414,7 +1428,9 @@ for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
   );
 }
 defaultEngineEl?.addEventListener("change", () =>
-  savePatch({ defaultEngine: defaultEngineEl.value }),
+  savePatch({ defaultEngine: defaultEngineEl.value }).then(() => {
+    syncDefaultEngineOptions();
+  }),
 );
 addEngineBtn?.addEventListener("click", addEngine);
 resetEnginesBtn?.addEventListener("click", resetEngines);
@@ -1425,7 +1441,9 @@ hintCharsEl.addEventListener("input", () => {
 });
 hintCharsEl.addEventListener("change", commitHintChars);
 hintThemeEl?.addEventListener("change", () =>
-  savePatch({ hintTheme: hintThemeEl.value }),
+  savePatch({ hintTheme: hintThemeEl.value }).then(() => {
+    if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
+  }),
 );
 hintFontSizeEl.addEventListener("change", () =>
   commitNumber(hintFontSizeEl, "error-hint-font-size", {

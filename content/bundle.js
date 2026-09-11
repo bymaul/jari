@@ -1037,8 +1037,14 @@
     merge(normalizeSettings({ ...state, ...patch }));
   }
   async function update(patch) {
+    const prev = snapshot();
     set(patch);
-    await persist();
+    try {
+      await persist();
+    } catch (err) {
+      merge(prev);
+      throw err;
+    }
   }
   function getKeymap() {
     return state.keymap;
@@ -1103,10 +1109,12 @@
   }
   function toggleSiteEnabled() {
     const key = pageSiteKey(location.hostname || "", location.protocol || "");
+    const prev = state.disabledSites.slice();
     const idx = state.disabledSites.indexOf(key);
     if (idx >= 0) state.disabledSites.splice(idx, 1);
     else state.disabledSites.push(key);
     persist().catch(() => {
+      state.disabledSites = prev;
     });
   }
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -7625,7 +7633,13 @@ ${location.href}`;
     enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
     openSettings: { ...COMMAND_CATALOG.openSettings, run: () => sendMessage("openSettings") },
-    openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") }
+    openExtensions: {
+      ...COMMAND_CATALOG.openExtensions,
+      run: async () => {
+        const res = await sendMessage("openExtensions");
+        if (!res || !res.ok) ui.toast("Cannot open extensions page");
+      }
+    }
   };
 
   // content/clue.js

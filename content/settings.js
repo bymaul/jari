@@ -146,8 +146,14 @@ function set(patch) {
 }
 
 async function update(patch) {
+  const prev = snapshot();
   set(patch);
-  await persist();
+  try {
+    await persist();
+  } catch (err) {
+    merge(prev);
+    throw err;
+  }
 }
 
 function getKeymap() {
@@ -232,10 +238,13 @@ function getClueDelayMs() {
 
 function toggleSiteEnabled() {
   const key = pageSiteKey(location.hostname || "", location.protocol || "");
+  const prev = state.disabledSites.slice();
   const idx = state.disabledSites.indexOf(key);
   if (idx >= 0) state.disabledSites.splice(idx, 1);
   else state.disabledSites.push(key);
-  persist().catch(() => {});
+  persist().catch(() => {
+    state.disabledSites = prev;
+  });
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {

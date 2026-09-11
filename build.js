@@ -98,7 +98,7 @@ async function buildOne(dir, entry, outfile, banner) {
   });
 
   const firstLine = readFileSync(outPath, "utf8").split("\n", 1)[0];
-  if (!firstLine.startsWith("//")) {
+  if (firstLine !== buildBanner.trim()) {
     throw new Error(`Banner missing from ${outPath}`);
   }
 }

@@ -69,6 +69,17 @@ test("non-quota sync errors still throw", async () => {
   assert.equal(localWrites, 0);
 });
 
+test("failed updates roll back the in-memory state", async () => {
+  stubStorage({
+    syncSet: async () => {
+      throw new Error("network down");
+    },
+  });
+  assert.equal(settings.getScrollStep(), 120);
+  await assert.rejects(settings.update({ scrollStep: 999 }), /network down/);
+  assert.equal(settings.getScrollStep(), 120);
+});
+
 test("load reads back the local fallback", async () => {
   stubStorage({
     syncGet: async () => ({}),

@@ -745,8 +745,14 @@
     merge(normalizeSettings({ ...state, ...patch }));
   }
   async function update(patch) {
+    const prev = snapshot();
     set(patch);
-    await persist();
+    try {
+      await persist();
+    } catch (err) {
+      merge(prev);
+      throw err;
+    }
   }
   function getKeymap() {
     return state.keymap;
@@ -811,10 +817,12 @@
   }
   function toggleSiteEnabled() {
     const key = pageSiteKey(location.hostname || "", location.protocol || "");
+    const prev = state.disabledSites.slice();
     const idx = state.disabledSites.indexOf(key);
     if (idx >= 0) state.disabledSites.splice(idx, 1);
     else state.disabledSites.push(key);
     persist().catch(() => {
+      state.disabledSites = prev;
     });
   }
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -2067,7 +2075,19 @@
     });
   }
   function removeEngine(li) {
-    if (readEngineRows().length <= 1) {
+    const rows = readEngineRows();
+    if (rows.length <= 1) {
+      failEngines("At least one search engine is required", []);
+      return;
+    }
+    const remaining = rows.filter((row) => {
+      try {
+        return row.kwEl.closest("li") !== li;
+      } catch {
+        return true;
+      }
+    });
+    if (!remaining.some((r) => r.keyword !== "" && r.url !== "")) {
       failEngines("At least one search engine is required", []);
       return;
     }
@@ -2350,7 +2370,9 @@
   );
   copyFormatEl.addEventListener(
     "change",
-    () => savePatch({ copyFormat: copyFormatEl.value })
+    () => savePatch({ copyFormat: copyFormatEl.value }).then(() => {
+      copyFormatEl.value = settings.getCopyFormat();
+    })
   );
   for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
     el.addEventListener(
@@ -2360,7 +2382,9 @@
   }
   defaultEngineEl?.addEventListener(
     "change",
-    () => savePatch({ defaultEngine: defaultEngineEl.value })
+    () => savePatch({ defaultEngine: defaultEngineEl.value }).then(() => {
+      syncDefaultEngineOptions();
+    })
   );
   addEngineBtn?.addEventListener("click", addEngine);
   resetEnginesBtn?.addEventListener("click", resetEngines);
@@ -2372,7 +2396,9 @@
   hintCharsEl.addEventListener("change", commitHintChars);
   hintThemeEl?.addEventListener(
     "change",
-    () => savePatch({ hintTheme: hintThemeEl.value })
+    () => savePatch({ hintTheme: hintThemeEl.value }).then(() => {
+      if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
+    })
   );
   hintFontSizeEl.addEventListener(
     "change",

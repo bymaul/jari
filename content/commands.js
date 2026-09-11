@@ -319,5 +319,11 @@ export const commands = {
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
   openSettings: { ...COMMAND_CATALOG.openSettings, run: () => sendMessage("openSettings") },
-  openExtensions: { ...COMMAND_CATALOG.openExtensions, run: () => sendMessage("openExtensions") },
+  openExtensions: {
+    ...COMMAND_CATALOG.openExtensions,
+    run: async () => {
+      const res = await sendMessage("openExtensions");
+      if (!res || !res.ok) ui.toast("Cannot open extensions page");
+    },
+  },
 };
