@@ -177,6 +177,12 @@ function entryRows(doc) {
   return rows;
 }
 
+function helpList(doc) {
+  return doc.created.find((el) =>
+    el.className.split(/\s+/).includes("jari-help-list"),
+  );
+}
+
 function highlightSpans(doc) {
   return doc.body.querySelectorAll(".jari-find-hit");
 }
@@ -333,6 +339,33 @@ test("Esc while searching discards the query", async () => {
     Help.onKeyDown(keyEvent("Escape", overlay));
 
     assert.equal(highlightSpans(doc).length, 0);
+    assert.ok(Help.isActive());
+  });
+});
+
+test("gg scrolls to the top", async () => {
+  await withDocument((doc) => {
+    Help.open();
+    const overlay = overlayOf(doc);
+    const list = helpList(doc);
+    const scrolled = [];
+    list.scrollTo = (...args) => scrolled.push(args);
+
+    Help.onKeyDown(keyEvent("g", overlay));
+    assert.deepEqual(scrolled, []);
+    Help.onKeyDown(keyEvent("g", overlay));
+    assert.deepEqual(scrolled, [[0, 0]]);
+  });
+});
+
+test("modified keys and bare modifiers reach the page", async () => {
+  await withDocument((doc) => {
+    Help.open();
+    const overlay = overlayOf(doc);
+
+    assert.equal(Help.onKeyDown(keyEvent("t", overlay, { ctrlKey: true })), false);
+    assert.equal(Help.onKeyDown(keyEvent("Control", overlay)), false);
+    assert.equal(Help.onKeyDown(keyEvent("r", overlay, { ctrlKey: true })), false);
     assert.ok(Help.isActive());
   });
 });

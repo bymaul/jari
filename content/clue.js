@@ -8,6 +8,7 @@ let activePrefix = null;
 let renderPrefix = null;
 let renderCount = "";
 let filterText = "";
+let pendingFilter = "";
 let listEl = null;
 let titleEl = null;
 
@@ -32,6 +33,7 @@ function hide() {
   renderPrefix = null;
   renderCount = "";
   filterText = "";
+  pendingFilter = "";
   listEl = null;
   titleEl = null;
   if (clueEl) {
@@ -86,17 +88,37 @@ function paint() {
 }
 
 function hasFilter() {
-  return filterText !== "";
+  return filterText !== "" || pendingFilter !== "";
+}
+
+function narrowedRows(prefix, filter) {
+  const all = getPrefixEntries(settings.getKeymap(), prefix);
+  if (!filter) return all;
+  return all.filter((entry) =>
+    `${entry.suffix} ${commandLabel(entry.command)}`
+      .toLowerCase()
+      .includes(filter),
+  );
 }
 
 function refilter(ch) {
-  if (!clueEl || !activePrefix) return false;
+  if (!activePrefix) return false;
+  if (!clueEl) {
+    const next = pendingFilter + String(ch).toLowerCase();
+    if (narrowedRows(activePrefix, next).length === 0) return false;
+    pendingFilter = next;
+    return true;
+  }
   filterText += String(ch).toLowerCase();
   paint();
   return true;
 }
 
 function backspaceFilter() {
+  if (!clueEl && activePrefix && pendingFilter) {
+    pendingFilter = pendingFilter.slice(0, -1);
+    return true;
+  }
   if (!filterText) return false;
   filterText = filterText.slice(0, -1);
   paint();
@@ -130,7 +152,8 @@ function render(prefix, countStr) {
     activePrefix = prefix;
     renderPrefix = prefix;
     renderCount = countStr || "";
-    filterText = "";
+    filterText = pendingFilter;
+    pendingFilter = "";
     paint();
   } catch {}
 }

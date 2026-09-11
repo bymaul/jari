@@ -167,13 +167,14 @@ function handleKeydown(event) {
     const key = canonicalKey(event);
     if (settings.getKeymap()[key] === "toggleSiteEnabled")
       run("toggleSiteEnabled", 1, event);
+    else if (pendingKeys || pendingCount) clearPending();
     return;
   }
 
   const key = canonicalKey(event);
 
-  const buffer = pendingKeys;
-  const bufferWasPending = buffer !== "";
+  let buffer = pendingKeys;
+  let bufferWasPending = buffer !== "";
   let commandName = null;
   if (bufferWasPending) {
     commandName = settings.getKeymap()[buffer + key] || null;
@@ -190,7 +191,8 @@ function handleKeydown(event) {
       event.preventDefault();
       event.stopImmediatePropagation();
       activeEl.blur();
-    }
+      clearPending();
+    } else if (pendingKeys || pendingCount) clearPending();
     return;
   }
 
@@ -225,7 +227,8 @@ function handleKeydown(event) {
       return;
     }
     clearPending();
-    return;
+    buffer = "";
+    bufferWasPending = false;
   }
 
   if (event.key === "Escape") {

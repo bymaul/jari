@@ -10,6 +10,7 @@ import {
   searchEngineDefaults,
 } from "../shared/search-engines.js";
 import { normalizeSitePattern } from "../shared/url.js";
+import { COMMAND_CATALOG } from "./catalog.js";
 
 export const SETTINGS_SCHEMA_VERSION = 5;
 
@@ -295,7 +296,16 @@ export function queryAll(selector, onShadowRoot) {
 
 export function normalizeClickableSelector(raw) {
   if (typeof raw !== "string") return settingsDefaults.clickableSelector;
-  return raw.trim().slice(0, 500);
+  const selector = raw.trim().slice(0, 500);
+  if (!selector) return "";
+  try {
+    if (typeof document !== "undefined" && document.querySelector) {
+      document.querySelector(selector);
+    }
+  } catch {
+    return "";
+  }
+  return selector;
 }
 
 export function normalizeHintTheme(raw) {
@@ -340,8 +350,9 @@ export function migrateSettings(data) {
   // v3 -> v4: backfill bindings for commands added since the stored
   // keymap was written. Only combos that are still free are added and
   // only for commands the user has bound nowhere, so custom rebinds
-  // are never clobbered and intentional unbinds of existing commands
-  // are not resurrected.
+  // are never clobbered. Note this cannot tell a newly added command
+  // apart from one the user intentionally unbound, so unbinding a
+  // default before an upgrade may see it return.
   if (version < 4) {
     d.keymap = backfillNewBindings(d.keymap);
     version = 4;
@@ -379,6 +390,8 @@ export function normalizeSettings(data) {
   const d = migrateSettings(data);
   const storedKeymap = {};
   for (const [key, command] of Object.entries(d.keymap || {})) {
+    if (typeof key !== "string" || key.length === 0) continue;
+    if (!Object.hasOwn(COMMAND_CATALOG, command)) continue;
     storedKeymap[key] = command;
   }
   const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
@@ -392,9 +405,10 @@ export function normalizeSettings(data) {
     schemaVersion: SETTINGS_SCHEMA_VERSION,
     keymap,
     disabledSites,
-    scrollStep: Number.isFinite(d.scrollStep)
-      ? d.scrollStep
-      : settingsDefaults.scrollStep,
+    scrollStep:
+      Number.isFinite(d.scrollStep) && d.scrollStep >= 1 && d.scrollStep <= 500
+        ? Math.floor(d.scrollStep)
+        : settingsDefaults.scrollStep,
     smoothScroll:
       typeof d.smoothScroll === "boolean"
         ? d.smoothScroll
@@ -405,11 +419,11 @@ export function normalizeSettings(data) {
         : settingsDefaults.fuzzyMatching,
     timeoutMs:
       Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0
-        ? d.timeoutMs
+        ? Math.min(10000, d.timeoutMs)
         : settingsDefaults.timeoutMs,
     passthroughMs:
       Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0
-        ? d.passthroughMs
+        ? Math.min(30000, d.passthroughMs)
         : settingsDefaults.passthroughMs,
     suggestionSources: Array.isArray(d.suggestionSources)
       ? d.suggestionSources.filter((s) => suggestionSources.includes(s))

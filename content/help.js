@@ -226,10 +226,16 @@ function stepMatch(delta) {
 }
 
 function onKeyDown(event) {
+  const key = event.key;
+  if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
+    return false;
+  }
+  const hasMod = event.ctrlKey || event.altKey || event.metaKey;
+  const scrollOnly =
+    event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
+  if (hasMod && !scrollOnly) return false;
   event.preventDefault();
   event.stopImmediatePropagation();
-  const key = event.key;
-  const hasMod = event.ctrlKey || event.altKey || event.metaKey;
   if (searching) {
     if (key === 'Escape') {
       searching = false;
@@ -255,6 +261,7 @@ function onKeyDown(event) {
     }
   } else {
     if (key === 'Escape') {
+      gPending = false;
       if (matches.length > 0) {
         clearSearchHighlights();
         updateFooter();
@@ -264,6 +271,7 @@ function onKeyDown(event) {
       return;
     }
     if (key === '/' && !hasMod) {
+      gPending = false;
       searching = true;
       query = '';
       clearSearchHighlights();
@@ -271,11 +279,12 @@ function onKeyDown(event) {
       return;
     }
     if ((key === 'n' || key === 'N') && !hasMod && matches.length > 0) {
+      gPending = false;
       stepMatch(key === 'n' ? 1 : -1);
       return;
     }
   }
-  if (event.key === 'g') {
+  if (event.key === 'g' && !gPending) {
     gPending = true;
     return;
   }

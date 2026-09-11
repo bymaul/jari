@@ -305,34 +305,45 @@ test("keys typed into a form field reach the page, Escape blurs", () => {
   assert.deepEqual(calls, ["blur"]);
 });
 
+test("a pending prefix is dropped when focus moves into a form field", () => {
+  spyOn("goToParent");
+  handleKeydown(key({ key: "g" }));
+  document.activeElement = {
+    tagName: "INPUT",
+    isContentEditable: false,
+    getAttribute: () => null,
+    blur() {},
+  };
+  handleKeydown(key({ key: "u" }));
+  assert.equal(spiedCalls.goToParent.length, 0);
+  document.activeElement = null;
+  handleKeydown(key({ key: "u" }));
+  assert.equal(spiedCalls.goToParent.length, 0);
+});
+
+test("a pending prefix is dropped on disabled sites", () => {
+  spyOn("goToParent");
+  handleKeydown(key({ key: "g" }));
+  settings.set({ disabledSites: ["test.example"] });
+  handleKeydown(key({ key: "u" }));
+  assert.equal(spiedCalls.goToParent.length, 0);
+});
+
 test("counts are dropped for non-repeatable commands", () => {
-  const seen = [];
-  commands.__tmpProbe = { run: (c) => seen.push(c.count) };
-  const saved = { ...settings.getKeymap() };
-  settings.set({ keymap: { ...saved, Z: "__tmpProbe" } });
-  try {
-    handleKeydown(key({ key: "3" }));
-    handleKeydown(key({ key: "Z" }));
-    assert.deepEqual(seen, [1]);
-  } finally {
-    delete commands.__tmpProbe;
-    settings.set({ keymap: saved });
-  }
+  spyOn("goToParent");
+  handleKeydown(key({ key: "3" }));
+  handleKeydown(key({ key: "g" }));
+  handleKeydown(key({ key: "u" }));
+  assert.equal(spiedCalls.goToParent.length, 1);
+  assert.equal(spiedCalls.goToParent[0].count, 1);
 });
 
 test("counts reach repeatable commands", () => {
-  const seen = [];
-  commands.__tmpProbe = { repeatable: true, run: (c) => seen.push(c.count) };
-  const saved = { ...settings.getKeymap() };
-  settings.set({ keymap: { ...saved, Z: "__tmpProbe" } });
-  try {
-    handleKeydown(key({ key: "3" }));
-    handleKeydown(key({ key: "Z" }));
-    assert.deepEqual(seen, [3]);
-  } finally {
-    delete commands.__tmpProbe;
-    settings.set({ keymap: saved });
-  }
+  spyOn("scrollDown");
+  handleKeydown(key({ key: "3" }));
+  handleKeydown(key({ key: "j" }));
+  assert.equal(spiedCalls.scrollDown.length, 1);
+  assert.equal(spiedCalls.scrollDown[0].count, 3);
 });
 
 test("a dead key filters the visible clue instead of cancelling", () => {
@@ -381,37 +392,34 @@ test("Backspace pops the clue filter and keeps the prefix", () => {
 
 test("a three-key sequence composes a binding and takes a count", () => {
   const saved = { ...settings.getKeymap() };
-  settings.set({ keymap: { ...saved, qfk: "__tmpTriple" } });
-  const seen = [];
-  commands.__tmpTriple = { repeatable: true, run: (c) => seen.push(c.count) };
+  settings.set({ keymap: { ...saved, qfk: "scrollDown" } });
+  spyOn("scrollDown");
   try {
     handleKeydown(key({ key: "2" }));
     handleKeydown(key({ key: "q" }));
     handleKeydown(key({ key: "f" }));
-    assert.equal(seen.length, 0);
+    assert.equal(spiedCalls.scrollDown.length, 0);
     handleKeydown(key({ key: "k" }));
-    assert.deepEqual(seen, [2]);
+    assert.equal(spiedCalls.scrollDown.length, 1);
+    assert.equal(spiedCalls.scrollDown[0].count, 2);
   } finally {
-    delete commands.__tmpTriple;
     settings.set({ keymap: saved });
   }
 });
 
 test("a dead key mid-sequence cancels the whole buffer", () => {
   const saved = { ...settings.getKeymap() };
-  settings.set({ keymap: { ...saved, qfk: "__tmpTriple" } });
-  const seen = [];
-  commands.__tmpTriple = { run: (c) => seen.push(c.count) };
+  settings.set({ keymap: { ...saved, qfk: "scrollDown" } });
+  spyOn("scrollDown");
   spyOn("scrollUp");
   try {
     handleKeydown(key({ key: "q" }));
     handleKeydown(key({ key: "z" }));
-    assert.deepEqual(seen, []);
+    assert.equal(spiedCalls.scrollDown.length, 0);
     handleKeydown(key({ key: "k" }));
-    assert.deepEqual(seen, []);
+    assert.equal(spiedCalls.scrollDown.length, 0);
     assert.equal(spiedCalls.scrollUp.length, 1);
   } finally {
-    delete commands.__tmpTriple;
     settings.set({ keymap: saved });
   }
 });

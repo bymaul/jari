@@ -63,12 +63,21 @@ function withHiddenTextarea(fn) {
   const ta = document.createElement("textarea");
   ta.style.position = "fixed";
   ta.style.opacity = "0";
+  const prevFocus =
+    document.activeElement && document.activeElement.isConnected
+      ? document.activeElement
+      : null;
   document.body.appendChild(ta);
   ta.focus();
   try {
     return fn(ta);
   } finally {
     ta.remove();
+    if (prevFocus) {
+      try {
+        prevFocus.focus();
+      } catch {}
+    }
   }
 }
 
@@ -77,6 +86,7 @@ let flashTimer = null;
 
 function showcmd(text) {
   if (!text) {
+    clearTimeout(flashTimer);
     if (showcmdEl) {
       showcmdEl.remove();
       showcmdEl = null;

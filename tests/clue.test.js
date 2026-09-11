@@ -245,6 +245,23 @@ test("refilter narrows the visible clue and backspace restores it", async () => 
   });
 });
 
+test("filter keystrokes during the show delay are kept, not dropped", async () => {
+  settings.set({ keymap: { ...keymapDefaults }, clueEnabled: true, clueDelayMs: 30 });
+  const doc = makeDocument();
+  await withDocument(doc, async () => {
+    Clue.schedule("g", "");
+    assert.equal(Clue.isVisible(), false);
+    assert.equal(Clue.refilter("o"), true);
+    assert.equal(Clue.hasFilter(), true);
+    await new Promise((r) => setTimeout(r, 60));
+    assert.equal(Clue.isVisible(), true);
+    assert.equal(Clue.hasFilter(), true);
+    assert.equal(Clue.backspaceFilter(), true);
+    assert.equal(Clue.hasFilter(), false);
+    Clue.hide();
+  });
+});
+
 test("refilter returns false while the clue is hidden", async () => {
   const doc = makeDocument();
   await withDocument(doc, async () => {

@@ -54,6 +54,41 @@ test("rebinding away a default key removes the default binding", () => {
   assert.equal(s.keymap.p, undefined);
 });
 
+test("normalizeSettings drops keymap entries with bogus commands or keys", () => {
+  const s = Jari.normalizeSettings({
+    keymap: { j: "scrollDown", x: "bogusCommand", "": "scrollUp" },
+  });
+  assert.equal(s.keymap.j, "scrollDown");
+  assert.equal(s.keymap.x, undefined);
+  assert.equal(s.keymap[""], undefined);
+});
+
+test("normalizeSettings clamps scroll steps and timeouts to the UI bounds", () => {
+  assert.equal(Jari.normalizeSettings({ scrollStep: 0 }).scrollStep, 120);
+  assert.equal(Jari.normalizeSettings({ scrollStep: 501 }).scrollStep, 120);
+  assert.equal(Jari.normalizeSettings({ scrollStep: 120.9 }).scrollStep, 120);
+  assert.equal(Jari.normalizeSettings({ scrollStep: 200 }).scrollStep, 200);
+  assert.equal(Jari.normalizeSettings({ timeoutMs: 99999 }).timeoutMs, 10000);
+  assert.equal(Jari.normalizeSettings({ passthroughMs: 99999 }).passthroughMs, 30000);
+});
+
+test("normalizeClickableSelector rejects invalid selectors when DOM is present", () => {
+  const savedDocument = globalThis.document;
+  try {
+    globalThis.document = {
+      querySelector: (sel) => {
+        if (sel === "[") throw new Error("invalid selector");
+        return null;
+      },
+    };
+    assert.equal(Jari.normalizeClickableSelector("["), "");
+    assert.equal(Jari.normalizeClickableSelector("div.card"), "div.card");
+    assert.equal(Jari.normalizeClickableSelector(""), "");
+  } finally {
+    globalThis.document = savedDocument;
+  }
+});
+
 test("normalizeSettings validates suggestionSources and copyFormat", () => {
   const s = Jari.normalizeSettings({
     suggestionSources: ["tab"],

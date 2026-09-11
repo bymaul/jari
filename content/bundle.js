@@ -526,6 +526,73 @@
     return host;
   }
 
+  // content/catalog.js
+  var COMMAND_CATALOG = {
+    scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
+    scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
+    scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
+    scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
+    scrollToTop: { category: "scrolling", label: "Scroll to top" },
+    scrollToBottom: { category: "scrolling", label: "Scroll to bottom" },
+    scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
+    scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
+    scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
+    scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
+    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
+    resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
+    zoomIn: { category: "zoom", label: "Zoom in" },
+    zoomOut: { category: "zoom", label: "Zoom out" },
+    newTab: { category: "tabs", label: "New tab" },
+    newIncognitoTab: { category: "tabs", label: "New incognito tab" },
+    closeTab: { category: "tabs", label: "Close tab", repeatable: true },
+    restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
+    previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
+    nextTab: { category: "tabs", label: "Next tab", repeatable: true },
+    goToFirstTab: { category: "tabs", label: "Go to first tab" },
+    goToLastTab: { category: "tabs", label: "Go to last tab" },
+    openOmnibar: { category: "tabs", label: "Open URL or search" },
+    openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
+    openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
+    openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
+    duplicateTab: { category: "tabs", label: "Duplicate tab" },
+    moveTabLeft: { category: "tabs", label: "Move tab left" },
+    moveTabRight: { category: "tabs", label: "Move tab right" },
+    togglePin: { category: "tabs", label: "Pin / unpin tab" },
+    toggleMute: { category: "tabs", label: "Mute / unmute tab" },
+    moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
+    goBack: { category: "history", label: "Go back in history" },
+    goForward: { category: "history", label: "Go forward in history" },
+    reloadTab: { category: "page", label: "Reload tab" },
+    forceReload: { category: "page", label: "Reload without cache" },
+    goToParent: { category: "page", label: "Go to parent page" },
+    goToRoot: { category: "page", label: "Go to site root" },
+    editUrl: { category: "page", label: "Edit current URL" },
+    copyUrl: { category: "page", label: "Copy page URL" },
+    copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
+    toggleIgnore: { category: "modes", label: "Ignore mode" },
+    passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },
+    toggleSiteEnabled: { category: "modes", label: "Enable / disable on this site" },
+    hintClick: { category: "hints", label: "Click link" },
+    hintOpen: { category: "hints", label: "Open link in new tab" },
+    hintOpenBackground: { category: "hints", label: "Open link in background tab" },
+    hintOpenCurrent: { category: "hints", label: "Open link in this tab" },
+    hintInput: { category: "hints", label: "Focus input" },
+    hintYank: { category: "hints", label: "Copy link URL" },
+    hintYankText: { category: "hints", label: "Copy link text" },
+    hintHover: { category: "hints", label: "Hover element" },
+    findText: { category: "find", label: "Find in page" },
+    findNext: { category: "find", label: "Next match", repeatable: true },
+    findPrev: { category: "find", label: "Previous match", repeatable: true },
+    toggleFindRegex: { category: "find", label: "Toggle regex search" },
+    toggleFindWholeWord: { category: "find", label: "Toggle whole-word search" },
+    toggleFindCase: { category: "find", label: "Toggle case-sensitive search" },
+    enterVisual: { category: "visual", label: "Visual mode" },
+    enterVisualLine: { category: "visual", label: "Visual line mode" },
+    showHelp: { category: "help", label: "Show this help" },
+    openSettings: { category: "help", label: "Open settings" },
+    openExtensions: { category: "help", label: "Open extensions page" }
+  };
+
   // content/keymap.js
   var SETTINGS_SCHEMA_VERSION = 5;
   var Events = {
@@ -719,7 +786,16 @@
   }
   function normalizeClickableSelector(raw) {
     if (typeof raw !== "string") return settingsDefaults.clickableSelector;
-    return raw.trim().slice(0, 500);
+    const selector = raw.trim().slice(0, 500);
+    if (!selector) return "";
+    try {
+      if (typeof document !== "undefined" && document.querySelector) {
+        document.querySelector(selector);
+      }
+    } catch {
+      return "";
+    }
+    return selector;
   }
   function normalizeHintTheme(raw) {
     return HINT_THEMES.includes(raw) ? raw : HINT_THEME_DEFAULT;
@@ -782,6 +858,8 @@
     const d = migrateSettings(data);
     const storedKeymap = {};
     for (const [key, command] of Object.entries(d.keymap || {})) {
+      if (typeof key !== "string" || key.length === 0) continue;
+      if (!Object.hasOwn(COMMAND_CATALOG, command)) continue;
       storedKeymap[key] = command;
     }
     const keymap = d.keymap != null ? storedKeymap : { ...keymapDefaults };
@@ -791,11 +869,11 @@
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap,
       disabledSites,
-      scrollStep: Number.isFinite(d.scrollStep) ? d.scrollStep : settingsDefaults.scrollStep,
+      scrollStep: Number.isFinite(d.scrollStep) && d.scrollStep >= 1 && d.scrollStep <= 500 ? Math.floor(d.scrollStep) : settingsDefaults.scrollStep,
       smoothScroll: typeof d.smoothScroll === "boolean" ? d.smoothScroll : settingsDefaults.smoothScroll,
       fuzzyMatching: typeof d.fuzzyMatching === "boolean" ? d.fuzzyMatching : settingsDefaults.fuzzyMatching,
-      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0 ? d.timeoutMs : settingsDefaults.timeoutMs,
-      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? d.passthroughMs : settingsDefaults.passthroughMs,
+      timeoutMs: Number.isFinite(d.timeoutMs) && d.timeoutMs >= 0 ? Math.min(1e4, d.timeoutMs) : settingsDefaults.timeoutMs,
+      passthroughMs: Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0 ? Math.min(3e4, d.passthroughMs) : settingsDefaults.passthroughMs,
       suggestionSources: Array.isArray(d.suggestionSources) ? d.suggestionSources.filter((s) => suggestionSources.includes(s)) : settingsDefaults.suggestionSources.slice(),
       maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
       searchEngines,
@@ -1124,18 +1202,26 @@
     const ta = document.createElement("textarea");
     ta.style.position = "fixed";
     ta.style.opacity = "0";
+    const prevFocus = document.activeElement && document.activeElement.isConnected ? document.activeElement : null;
     document.body.appendChild(ta);
     ta.focus();
     try {
       return fn(ta);
     } finally {
       ta.remove();
+      if (prevFocus) {
+        try {
+          prevFocus.focus();
+        } catch {
+        }
+      }
     }
   }
   var showcmdEl = null;
   var flashTimer = null;
   function showcmd(text) {
     if (!text) {
+      clearTimeout(flashTimer);
       if (showcmdEl) {
         showcmdEl.remove();
         showcmdEl = null;
@@ -2903,73 +2989,6 @@
   };
   register("prompt", { close, onKeyDown, isActive });
 
-  // content/catalog.js
-  var COMMAND_CATALOG = {
-    scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
-    scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
-    scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
-    scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
-    scrollToTop: { category: "scrolling", label: "Scroll to top" },
-    scrollToBottom: { category: "scrolling", label: "Scroll to bottom" },
-    scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
-    scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
-    scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
-    scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
-    resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
-    zoomIn: { category: "zoom", label: "Zoom in" },
-    zoomOut: { category: "zoom", label: "Zoom out" },
-    newTab: { category: "tabs", label: "New tab" },
-    newIncognitoTab: { category: "tabs", label: "New incognito tab" },
-    closeTab: { category: "tabs", label: "Close tab", repeatable: true },
-    restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
-    previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
-    nextTab: { category: "tabs", label: "Next tab", repeatable: true },
-    goToFirstTab: { category: "tabs", label: "Go to first tab" },
-    goToLastTab: { category: "tabs", label: "Go to last tab" },
-    openOmnibar: { category: "tabs", label: "Open URL or search" },
-    openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
-    openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
-    openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
-    duplicateTab: { category: "tabs", label: "Duplicate tab" },
-    moveTabLeft: { category: "tabs", label: "Move tab left" },
-    moveTabRight: { category: "tabs", label: "Move tab right" },
-    togglePin: { category: "tabs", label: "Pin / unpin tab" },
-    toggleMute: { category: "tabs", label: "Mute / unmute tab" },
-    moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
-    goBack: { category: "history", label: "Go back in history" },
-    goForward: { category: "history", label: "Go forward in history" },
-    reloadTab: { category: "page", label: "Reload tab" },
-    forceReload: { category: "page", label: "Reload without cache" },
-    goToParent: { category: "page", label: "Go to parent page" },
-    goToRoot: { category: "page", label: "Go to site root" },
-    editUrl: { category: "page", label: "Edit current URL" },
-    copyUrl: { category: "page", label: "Copy page URL" },
-    copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
-    toggleIgnore: { category: "modes", label: "Ignore mode" },
-    passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },
-    toggleSiteEnabled: { category: "modes", label: "Enable / disable on this site" },
-    hintClick: { category: "hints", label: "Click link" },
-    hintOpen: { category: "hints", label: "Open link in new tab" },
-    hintOpenBackground: { category: "hints", label: "Open link in background tab" },
-    hintOpenCurrent: { category: "hints", label: "Open link in this tab" },
-    hintInput: { category: "hints", label: "Focus input" },
-    hintYank: { category: "hints", label: "Copy link URL" },
-    hintYankText: { category: "hints", label: "Copy link text" },
-    hintHover: { category: "hints", label: "Hover element" },
-    findText: { category: "find", label: "Find in page" },
-    findNext: { category: "find", label: "Next match", repeatable: true },
-    findPrev: { category: "find", label: "Previous match", repeatable: true },
-    toggleFindRegex: { category: "find", label: "Toggle regex search" },
-    toggleFindWholeWord: { category: "find", label: "Toggle whole-word search" },
-    toggleFindCase: { category: "find", label: "Toggle case-sensitive search" },
-    enterVisual: { category: "visual", label: "Visual mode" },
-    enterVisualLine: { category: "visual", label: "Visual line mode" },
-    showHelp: { category: "help", label: "Show this help" },
-    openSettings: { category: "help", label: "Open settings" },
-    openExtensions: { category: "help", label: "Open extensions page" }
-  };
-
   // content/help.js
   var STEP = 50;
   var COLUMNS = 3;
@@ -3170,10 +3189,15 @@
     scrollMatchIntoView();
   }
   function onKeyDown2(event) {
+    const key = event.key;
+    if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
+      return false;
+    }
+    const hasMod = event.ctrlKey || event.altKey || event.metaKey;
+    const scrollOnly = event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
+    if (hasMod && !scrollOnly) return false;
     event.preventDefault();
     event.stopImmediatePropagation();
-    const key = event.key;
-    const hasMod = event.ctrlKey || event.altKey || event.metaKey;
     if (searching) {
       if (key === "Escape") {
         searching = false;
@@ -3199,6 +3223,7 @@
       }
     } else {
       if (key === "Escape") {
+        gPending = false;
         if (matches.length > 0) {
           clearSearchHighlights();
           updateFooter();
@@ -3208,6 +3233,7 @@
         return;
       }
       if (key === "/" && !hasMod) {
+        gPending = false;
         searching = true;
         query2 = "";
         clearSearchHighlights();
@@ -3215,11 +3241,12 @@
         return;
       }
       if ((key === "n" || key === "N") && !hasMod && matches.length > 0) {
+        gPending = false;
         stepMatch(key === "n" ? 1 : -1);
         return;
       }
     }
-    if (event.key === "g") {
+    if (event.key === "g" && !gPending) {
       gPending = true;
       return;
     }
@@ -7608,6 +7635,7 @@ ${location.href}`;
   var renderPrefix = null;
   var renderCount = "";
   var filterText = "";
+  var pendingFilter = "";
   var listEl3 = null;
   var titleEl = null;
   function commandLabel(commandName) {
@@ -7628,6 +7656,7 @@ ${location.href}`;
     renderPrefix = null;
     renderCount = "";
     filterText = "";
+    pendingFilter = "";
     listEl3 = null;
     titleEl = null;
     if (clueEl) {
@@ -7670,15 +7699,32 @@ ${location.href}`;
     }
   }
   function hasFilter() {
-    return filterText !== "";
+    return filterText !== "" || pendingFilter !== "";
+  }
+  function narrowedRows(prefix2, filter) {
+    const all = getPrefixEntries(settings.getKeymap(), prefix2);
+    if (!filter) return all;
+    return all.filter(
+      (entry) => `${entry.suffix} ${commandLabel(entry.command)}`.toLowerCase().includes(filter)
+    );
   }
   function refilter(ch) {
-    if (!clueEl || !activePrefix) return false;
+    if (!activePrefix) return false;
+    if (!clueEl) {
+      const next2 = pendingFilter + String(ch).toLowerCase();
+      if (narrowedRows(activePrefix, next2).length === 0) return false;
+      pendingFilter = next2;
+      return true;
+    }
     filterText += String(ch).toLowerCase();
     paint();
     return true;
   }
   function backspaceFilter() {
+    if (!clueEl && activePrefix && pendingFilter) {
+      pendingFilter = pendingFilter.slice(0, -1);
+      return true;
+    }
     if (!filterText) return false;
     filterText = filterText.slice(0, -1);
     paint();
@@ -7706,7 +7752,8 @@ ${location.href}`;
       activePrefix = prefix2;
       renderPrefix = prefix2;
       renderCount = countStr || "";
-      filterText = "";
+      filterText = pendingFilter;
+      pendingFilter = "";
       paint();
     } catch {
     }
@@ -7884,11 +7931,12 @@ ${location.href}`;
       const key2 = canonicalKey(event);
       if (settings.getKeymap()[key2] === "toggleSiteEnabled")
         run("toggleSiteEnabled", 1, event);
+      else if (pendingKeys || pendingCount2) clearPending();
       return;
     }
     const key = canonicalKey(event);
-    const buffer = pendingKeys;
-    const bufferWasPending = buffer !== "";
+    let buffer = pendingKeys;
+    let bufferWasPending = buffer !== "";
     let commandName = null;
     if (bufferWasPending) {
       commandName = settings.getKeymap()[buffer + key] || null;
@@ -7904,7 +7952,8 @@ ${location.href}`;
         event.preventDefault();
         event.stopImmediatePropagation();
         activeEl.blur();
-      }
+        clearPending();
+      } else if (pendingKeys || pendingCount2) clearPending();
       return;
     }
     if (bufferWasPending && !commandName) {
@@ -7927,7 +7976,8 @@ ${location.href}`;
         return;
       }
       clearPending();
-      return;
+      buffer = "";
+      bufferWasPending = false;
     }
     if (event.key === "Escape") {
       if (pendingCount2) {
