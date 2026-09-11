@@ -3,7 +3,9 @@ import assert from "node:assert";
 import {
   fuzzyIndices,
   fuzzyMatch,
+  parseQuery,
   rankMatches,
+  substringIndices,
   substringMatch,
 } from "../content/rank.js";
 
@@ -139,4 +141,62 @@ test("substringMatch requires every term as a substring", () => {
   assert.equal(substringMatch("pria youtube", "Pria only"), false);
   assert.equal(substringMatch("pria", "My Pria Page"), true);
   assert.equal(substringMatch("", "anything"), false);
+});
+
+test("bestAlignment still finds distant completions past many same-char starts", () => {
+  const hay = "ax".repeat(70) + "ab";
+  const match = fuzzyMatch("ab", hay);
+  assert.ok(match !== null);
+  assert.equal(match.indices.length, 2);
+  assert.equal(match.indices[1], 141);
+});
+
+test("match indices map back through NFKD expansions", () => {
+  assert.deepEqual(fuzzyMatch("fi", "ﬁsh").indices, [0, 0]);
+  assert.deepEqual(substringIndices("fi", "ﬁsh"), [0]);
+  assert.deepEqual(fuzzyMatch("e", "café").indices, [3]);
+});
+
+test("parseQuery handles negated phrases and stray quotes", () => {
+  assert.deepEqual(parseQuery('-"foo bar"'), {
+    include: [],
+    exclude: ["foo bar"],
+    phrases: [],
+  });
+  assert.deepEqual(parseQuery('"foo bar" baz').phrases, ["foo bar"]);
+  assert.deepEqual(parseQuery('"unclosed').include, ["unclosed"]);
+});
+
+test("exclusion-only queries match everything not excluded", () => {
+  assert.ok(fuzzyMatch("-spam", "ham eggs") !== null);
+  assert.deepEqual(fuzzyMatch("-spam", "ham eggs").indices, []);
+  assert.equal(fuzzyMatch("-spam", "spam ham"), null);
+  assert.ok(fuzzyMatch('-"spam eggs"', "ham") !== null);
+  assert.equal(fuzzyMatch('-"spam eggs"', "spam eggs here"), null);
+  assert.equal(substringMatch("-spam", "ham"), true);
+  assert.deepEqual(
+    rankMatches("-spam", [{ title: "spam spam" }, { title: "ham" }]).map(
+      (x) => x.item.title,
+    ),
+    ["ham"],
+  );
+});
+
+test("rankMatches treats empty queries the same in both modes", () => {
+  const items = [
+    { title: "b", url: "https://b.example" },
+    { title: "a", url: "https://a.example" },
+  ];
+  assert.deepEqual(
+    rankMatches("", items).map((x) => x.title),
+    ["b", "a"],
+  );
+  assert.deepEqual(
+    rankMatches("", items, false).map((x) => x.title),
+    ["b", "a"],
+  );
+});
+
+test("rankMatches never matches a missing title as undefined", () => {
+  assert.deepEqual(rankMatches("ned", [{ url: "https://x.example" }]), []);
 });
