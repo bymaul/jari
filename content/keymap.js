@@ -12,7 +12,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
-export const SETTINGS_SCHEMA_VERSION = 5;
+export const SETTINGS_SCHEMA_VERSION = 6;
 
 export const Events = {
   listeners: {},
@@ -86,8 +86,8 @@ export const keymapDefaults = {
   ";w": "resetScrollTarget",
 
   yy: "copyUrl",
-  yfa: "hintYank",
-  yft: "hintYankText",
+  yf: "hintYank",
+  yF: "hintYankText",
 };
 
 export const prefixes = {
@@ -367,6 +367,13 @@ export function migrateSettings(data) {
     d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
     version = 5;
   }
+  // v5 -> v6: link yank binds shorten from yfa/yft to yf/yF. Only
+  // default-shaped entries move, and only onto free combos, so custom
+  // rebinds are never clobbered and intentional unbinds stay unbound.
+  if (version < 6) {
+    d.keymap = migrateYankBindings(d.keymap);
+    version = 6;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -381,6 +388,25 @@ export function backfillNewBindings(keymap) {
     if (!(combo in out) && !used.has(command)) {
       out[combo] = command;
       used.add(command);
+    }
+  }
+  return out;
+}
+
+const YANK_BINDING_SWAPS = [
+  ["yfa", "yf", "hintYank"],
+  ["yft", "yF", "hintYankText"],
+];
+
+export function migrateYankBindings(keymap) {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap;
+  }
+  const out = { ...keymap };
+  for (const [oldCombo, newCombo, command] of YANK_BINDING_SWAPS) {
+    if (out[oldCombo] === command && !(newCombo in out)) {
+      delete out[oldCombo];
+      out[newCombo] = command;
     }
   }
   return out;

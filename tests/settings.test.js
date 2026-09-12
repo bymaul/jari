@@ -2,7 +2,7 @@ import "./setup.mjs";
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { settings } from "../content/settings.js";
-import { keymapDefaults } from "../content/keymap.js";
+import { keymapDefaults, SETTINGS_SCHEMA_VERSION } from "../content/keymap.js";
 
 const origSync = { ...globalThis.chrome.storage.sync };
 const origLocal = { ...globalThis.chrome.storage.local };
@@ -148,7 +148,7 @@ test("persisted settings carry the current schema version", async () => {
   });
   await settings.update({ scrollStep: 123 });
   assert.equal(writes.length, 1);
-  assert.equal(writes[0].settings.schemaVersion, 5);
+  assert.equal(writes[0].settings.schemaVersion, SETTINGS_SCHEMA_VERSION);
 });
 
 test("unbinding a backfilled combo sticks", async () => {

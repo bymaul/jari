@@ -25,7 +25,7 @@ Bindings chain into sequences of any length.
 - History: `H`/`L` back/forward
 - Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
   `yy` copy URL, `Y` copy title + URL
-- Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yfa` copy link URL, `yft` copy link text
+- Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
   rebindable toggles `Alt+R` regex, `Alt+W` whole word, `Alt+C` case;
   `Up`/`Down` history)
@@ -71,7 +71,7 @@ Or build from source (below) and load this folder the same way. The checked-in
 | `history`, `bookmarks`      | Omnibox (`t`) suggestions from your history and bookmarks                             |
 | `storage`                   | Persist your settings via the browser's synced storage                                |
 | `clipboardRead`             | Open a URL from your clipboard (`gp`/`gP`)                                            |
-| `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yfa`) - Firefox only; Chrome uses the page clipboard API|
+| `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API|
 | `<all_urls>` content script | Link hints, scrolling, find, and visual mode on the pages you visit                   |
 
 Jari makes no network requests of its own and sends nothing anywhere.

@@ -304,7 +304,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 5;
+  var SETTINGS_SCHEMA_VERSION = 6;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -366,8 +366,8 @@
     ";x": "openExtensions",
     ";w": "resetScrollTarget",
     yy: "copyUrl",
-    yfa: "hintYank",
-    yft: "hintYankText"
+    yf: "hintYank",
+    yF: "hintYankText"
   };
   var prefixes = {
     g: {},
@@ -526,6 +526,10 @@
       d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
       version = 5;
     }
+    if (version < 6) {
+      d.keymap = migrateYankBindings(d.keymap);
+      version = 6;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -539,6 +543,23 @@
       if (!(combo in out) && !used.has(command)) {
         out[combo] = command;
         used.add(command);
+      }
+    }
+    return out;
+  }
+  var YANK_BINDING_SWAPS = [
+    ["yfa", "yf", "hintYank"],
+    ["yft", "yF", "hintYankText"]
+  ];
+  function migrateYankBindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    for (const [oldCombo, newCombo, command] of YANK_BINDING_SWAPS) {
+      if (out[oldCombo] === command && !(newCombo in out)) {
+        delete out[oldCombo];
+        out[newCombo] = command;
       }
     }
     return out;

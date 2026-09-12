@@ -274,6 +274,61 @@ test("backfillNewBindings only fills free combos for unused commands", () => {
   assert.deepEqual(Jari.backfillNewBindings(full), full);
 });
 
+test("link yank binds are two keys without conflicts", () => {
+  assert.equal(Jari.keymapDefaults.yf, "hintYank");
+  assert.equal(Jari.keymapDefaults.yF, "hintYankText");
+  for (const [combo, command] of [["yf", "hintYank"], ["yF", "hintYankText"]]) {
+    assert.equal(Jari.findBindingConflict(Jari.keymapDefaults, combo, command), null);
+    assert.deepEqual(Jari.findOverlapConflicts(Jari.keymapDefaults, combo), []);
+    assert.equal(Jari.isBrowserTrapped(combo), false);
+  }
+});
+
+test("migrateYankBindings swaps default-shaped yfa/yft for yf/yF", () => {
+  const swapped = Jari.migrateYankBindings({
+    j: "scrollDown",
+    yfa: "hintYank",
+    yft: "hintYankText",
+  });
+  assert.equal(swapped.yf, "hintYank");
+  assert.equal(swapped.yF, "hintYankText");
+  assert.equal(swapped.j, "scrollDown");
+  assert.equal(swapped.yfa, undefined);
+  assert.equal(swapped.yft, undefined);
+});
+
+test("migrateYankBindings leaves custom rebinds and occupied targets alone", () => {
+  const custom = {
+    yfa: "scrollDown",
+    yft: "hintYankText",
+    yF: "closeTab",
+  };
+  assert.deepEqual(Jari.migrateYankBindings(custom), custom);
+  assert.equal(Jari.migrateYankBindings(null), null);
+  assert.deepEqual(Jari.migrateYankBindings([]), []);
+});
+
+test("v5 stored keymaps migrate yank binds and stamp v6", () => {
+  const s = Jari.normalizeSettings({
+    schemaVersion: 5,
+    keymap: { yfa: "hintYank", yft: "hintYankText" },
+  });
+  assert.equal(s.schemaVersion, 6);
+  assert.equal(s.keymap.yf, "hintYank");
+  assert.equal(s.keymap.yF, "hintYankText");
+  assert.equal(s.keymap.yfa, undefined);
+  assert.equal(s.keymap.yft, undefined);
+});
+
+test("v6 migration keeps intentionally unbound yank unbound", () => {
+  const s = Jari.normalizeSettings({ schemaVersion: 5, keymap: { j: "scrollDown" } });
+  assert.equal(s.schemaVersion, 6);
+  assert.equal(s.keymap.j, "scrollDown");
+  for (const combo of ["yf", "yF", "yfa", "yft"]) {
+    assert.equal(s.keymap[combo], undefined);
+  }
+});
+
 test("normalizeHintTheme falls back to yellow for unknown themes", () => {
   assert.equal(Jari.normalizeHintTheme("dark"), "dark");
   assert.equal(Jari.normalizeHintTheme("cyan"), "cyan");
