@@ -53,7 +53,6 @@ let caretHost = null;
 
 let hintActive = false;
 let hintElements = [];
-let hintLabels = [];
 let hintPrefix = "";
 let hintHost = null;
 let hintHolder = null;
@@ -741,7 +740,6 @@ function renderHints() {
 
   const charset = normalizeCharset();
   const labels = genLabels(hintElements.length, charset);
-  hintLabels = labels;
   hintMap.clear();
 
   const hintEls = layoutHints(hintHolder, hintElements, labels);
@@ -760,8 +758,6 @@ function refreshHints() {
       hintEl.style.display = "";
       hintEl.classList.remove("jari-hint-hidden");
       updateHintText(hintEl, label, "");
-    } else if (label === hintPrefix) {
-      hintEl.style.opacity = "1";
     } else if (label.startsWith(hintPrefix)) {
       hintEl.style.opacity = "1";
       hintEl.style.display = "";
@@ -803,7 +799,6 @@ function closeHints() {
   hintActive = false;
   hintPrefix = "";
   hintElements = [];
-  hintLabels = [];
   hintMap.clear();
   if (hintHost) {
     try {
@@ -2032,12 +2027,6 @@ function onKeyDown(event) {
     }
     if (key === "Enter") {
       ui.consume(event);
-      const visible = Array.from(hintMap.entries()).filter(([label]) =>
-        label.startsWith(hintPrefix),
-      );
-      if (visible.length === 1) {
-        activateHintByLabel(visible[0][0]);
-      }
       return true;
     }
     if (key.length === 1) {
