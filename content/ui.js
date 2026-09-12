@@ -203,24 +203,6 @@ function dispatchClick(el) {
   }
 }
 
-const HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
-
-function dispatchHover(el) {
-  for (const type of HOVER_EVENTS) {
-    try {
-      el.dispatchEvent(
-        new MouseEvent(type, {
-          bubbles: type !== "mouseenter" && type !== "pointerenter",
-          cancelable: true,
-          composed: true,
-          view: window,
-          button: 0,
-        }),
-      );
-    } catch {}
-  }
-}
-
 function focusFrameElement(el) {
   try {
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -310,7 +292,6 @@ export const ui = {
   consume,
   safeFocus,
   dispatchClick,
-  dispatchHover,
   focusFrameElement,
   createShadowHost,
 };

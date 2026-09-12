@@ -290,7 +290,6 @@
     hintInput: { category: "hints", label: "Focus input" },
     hintYank: { category: "hints", label: "Copy link URL" },
     hintYankText: { category: "hints", label: "Copy link text" },
-    hintHover: { category: "hints", label: "Hover element" },
     findText: { category: "find", label: "Find in page" },
     findNext: { category: "find", label: "Next match", repeatable: true },
     findPrev: { category: "find", label: "Previous match", repeatable: true },
@@ -1040,23 +1039,6 @@
       }
     }
   }
-  var HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
-  function dispatchHover(el) {
-    for (const type of HOVER_EVENTS) {
-      try {
-        el.dispatchEvent(
-          new MouseEvent(type, {
-            bubbles: type !== "mouseenter" && type !== "pointerenter",
-            cancelable: true,
-            composed: true,
-            view: window,
-            button: 0
-          })
-        );
-      } catch {
-      }
-    }
-  }
   function focusFrameElement(el) {
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -1145,7 +1127,6 @@
     consume,
     safeFocus,
     dispatchClick,
-    dispatchHover,
     focusFrameElement,
     createShadowHost
   };

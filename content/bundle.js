@@ -579,7 +579,6 @@
     hintInput: { category: "hints", label: "Focus input" },
     hintYank: { category: "hints", label: "Copy link URL" },
     hintYankText: { category: "hints", label: "Copy link text" },
-    hintHover: { category: "hints", label: "Hover element" },
     findText: { category: "find", label: "Find in page" },
     findNext: { category: "find", label: "Next match", repeatable: true },
     findPrev: { category: "find", label: "Previous match", repeatable: true },
@@ -1344,23 +1343,6 @@
       }
     }
   }
-  var HOVER_EVENTS = ["pointerover", "mouseover", "mouseenter", "pointerenter"];
-  function dispatchHover(el) {
-    for (const type of HOVER_EVENTS) {
-      try {
-        el.dispatchEvent(
-          new MouseEvent(type, {
-            bubbles: type !== "mouseenter" && type !== "pointerenter",
-            cancelable: true,
-            composed: true,
-            view: window,
-            button: 0
-          })
-        );
-      } catch {
-      }
-    }
-  }
   function focusFrameElement(el) {
     try {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -1449,7 +1431,6 @@
     consume,
     safeFocus,
     dispatchClick,
-    dispatchHover,
     focusFrameElement,
     createShadowHost
   };
@@ -1808,8 +1789,7 @@
     else if (requestedMode === "open" || requestedMode === "openBackground" || requestedMode === "openCurrent" || requestedMode === "yank")
       raw = getLinkElements();
     else if (requestedMode === "input") raw = getInputElements();
-    else if (requestedMode === "yankText" || requestedMode === "hover")
-      raw = getClickableElements();
+    else if (requestedMode === "yankText") raw = getClickableElements();
     try {
       for (const el of collectIframeElements(requestedMode)) {
         if (!raw.includes(el)) raw.push(el);
@@ -1934,7 +1914,7 @@
       } catch {
       }
       eachInnerElement(doc, (el) => {
-        if (requestedMode === "click" || requestedMode === "yankText" || requestedMode === "hover") {
+        if (requestedMode === "click" || requestedMode === "yankText") {
           if (!isElementClickable(el)) return;
         } else if (requestedMode === "input") {
           if (!matchesInnerInput(el)) return;
@@ -4197,13 +4177,12 @@
     "openCurrent",
     "input",
     "yank",
-    "yankText",
-    "hover"
+    "yankText"
   ]);
   function open2(requestedMode) {
     if (active3) close3();
     mode2 = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
-    multipleHits = mode2 === "openBackground" || mode2 === "hover";
+    multipleHits = mode2 === "openBackground";
     let candidates = collectElements(mode2);
     if (mode2 === "input" && candidates.length === 1) {
       focusInput(candidates[0]);
@@ -4285,9 +4264,6 @@
         ui.toast("No text");
       }
       close3();
-    } else if (mode2 === "hover") {
-      ui.dispatchHover(el);
-      handleActivationEnd();
     }
   }
   function onKeyDown3(event) {
@@ -7991,7 +7967,6 @@ ${location.href}`;
     hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
     hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
     hintYankText: { ...COMMAND_CATALOG.hintYankText, run: () => Hints.open("yankText") },
-    hintHover: { ...COMMAND_CATALOG.hintHover, run: () => Hints.open("hover") },
     findText: { ...COMMAND_CATALOG.findText, run: () => Find.open() },
     findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
     findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },

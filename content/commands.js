@@ -305,7 +305,6 @@ export const commands = {
   hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
   hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
   hintYankText: { ...COMMAND_CATALOG.hintYankText, run: () => Hints.open("yankText") },
-  hintHover: { ...COMMAND_CATALOG.hintHover, run: () => Hints.open("hover") },
 
   findText: { ...COMMAND_CATALOG.findText, run: () => Find.open() },
   findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },

@@ -418,13 +418,12 @@ const VALID_HINT_MODES = new Set([
   "input",
   "yank",
   "yankText",
-  "hover",
 ]);
 
 function open(requestedMode) {
   if (active) close();
   mode = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
-  multipleHits = mode === "openBackground" || mode === "hover";
+  multipleHits = mode === "openBackground";
 
   let candidates = collectElements(mode);
 
@@ -519,9 +518,6 @@ function activate(el) {
       ui.toast("No text");
     }
     close();
-  } else if (mode === "hover") {
-    ui.dispatchHover(el);
-    handleActivationEnd();
   }
 }
 

@@ -36,7 +36,7 @@ Bindings chain into sequences of any length.
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
 scrollHalfPageDown/Up, newTab, newIncognitoTab, duplicateTab, togglePin,
-toggleMute, hintHover, hintOpenCurrent.
+toggleMute, hintOpenCurrent.
 
 ## Settings (`;e`)
 

@@ -57,7 +57,6 @@ export const COMMAND_CATALOG = {
   hintInput: { category: "hints", label: "Focus input" },
   hintYank: { category: "hints", label: "Copy link URL" },
   hintYankText: { category: "hints", label: "Copy link text" },
-  hintHover: { category: "hints", label: "Hover element" },
 
   findText: { category: "find", label: "Find in page" },
   findNext: { category: "find", label: "Next match", repeatable: true },

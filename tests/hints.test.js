@@ -5,7 +5,6 @@ import assert from "node:assert";
 const { settings } = await import("../content/settings.js");
 const { genLabels, normalizeCharset, __testHelpers } = await import("../content/hints.js");
 const { HINT_CHARSET_DEFAULT, keymapDefaults } = await import("../content/keymap.js");
-const { ui } = await import("../content/ui.js");
 
 const {
   isExplicitlyRequested,
@@ -220,29 +219,6 @@ test("collectIframeElements finds same-origin frame links", () => {
       else globalThis.window.getComputedStyle = savedGCS;
     }
   });
-});
-
-test("dispatchHover emits hover events without focusing or scrolling", () => {
-  const hadMouseEvent = "MouseEvent" in globalThis;
-  const savedMouseEvent = globalThis.MouseEvent;
-  globalThis.MouseEvent = class {
-    constructor(type, init = {}) {
-      this.type = type;
-      Object.assign(this, init);
-    }
-  };
-  try {
-    const seen = [];
-    const el = {
-      dispatchEvent: (e) => seen.push(e.type),
-      focus: () => seen.push("focus"),
-    };
-    ui.dispatchHover(el);
-    assert.deepEqual(seen, ["pointerover", "mouseover", "mouseenter", "pointerenter"]);
-  } finally {
-    if (hadMouseEvent) globalThis.MouseEvent = savedMouseEvent;
-    else delete globalThis.MouseEvent;
-  }
 });
 
 function fakeAnchor(rawHref, resolvedHref, extra = {}) {

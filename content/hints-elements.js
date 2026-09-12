@@ -426,8 +426,7 @@ export function collectElements(requestedMode) {
   )
     raw = getLinkElements();
   else if (requestedMode === "input") raw = getInputElements();
-  else if (requestedMode === "yankText" || requestedMode === "hover")
-    raw = getClickableElements();
+  else if (requestedMode === "yankText") raw = getClickableElements();
   try {
     for (const el of collectIframeElements(requestedMode)) {
       if (!raw.includes(el)) raw.push(el);
@@ -556,7 +555,7 @@ export function collectIframeElements(requestedMode) {
       base = doc.URL || doc.baseURI || location.href;
     } catch {}
     eachInnerElement(doc, (el) => {
-      if (requestedMode === "click" || requestedMode === "yankText" || requestedMode === "hover") {
+      if (requestedMode === "click" || requestedMode === "yankText") {
         if (!isElementClickable(el)) return;
       } else if (requestedMode === "input") {
         if (!matchesInnerInput(el)) return;
