@@ -317,7 +317,7 @@ test("a pending prefix is dropped when focus moves into a form field", () => {
   handleKeydown(key({ key: "u" }));
   assert.equal(spiedCalls.goToParent.length, 0);
   document.activeElement = null;
-  handleKeydown(key({ key: "u" }));
+  handleKeydown(key({ key: "z" }));
   assert.equal(spiedCalls.goToParent.length, 0);
 });
 
@@ -325,7 +325,7 @@ test("a pending prefix is dropped on disabled sites", () => {
   spyOn("goToParent");
   handleKeydown(key({ key: "g" }));
   settings.set({ disabledSites: ["test.example"] });
-  handleKeydown(key({ key: "u" }));
+  handleKeydown(key({ key: "z" }));
   assert.equal(spiedCalls.goToParent.length, 0);
 });
 

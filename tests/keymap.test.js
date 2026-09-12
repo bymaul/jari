@@ -308,21 +308,21 @@ test("migrateYankBindings leaves custom rebinds and occupied targets alone", () 
   assert.deepEqual(Jari.migrateYankBindings([]), []);
 });
 
-test("v5 stored keymaps migrate yank binds and stamp v6", () => {
+test("v5 stored keymaps migrate yank binds through v7", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 5,
     keymap: { yfa: "hintYank", yft: "hintYankText" },
   });
-  assert.equal(s.schemaVersion, 6);
+  assert.equal(s.schemaVersion, 7);
   assert.equal(s.keymap.yf, "hintYank");
   assert.equal(s.keymap.yF, "hintYankText");
   assert.equal(s.keymap.yfa, undefined);
   assert.equal(s.keymap.yft, undefined);
 });
 
-test("v6 migration keeps intentionally unbound yank unbound", () => {
+test("stored keymaps without yank binds keep them unbound through v7", () => {
   const s = Jari.normalizeSettings({ schemaVersion: 5, keymap: { j: "scrollDown" } });
-  assert.equal(s.schemaVersion, 6);
+  assert.equal(s.schemaVersion, 7);
   assert.equal(s.keymap.j, "scrollDown");
   for (const combo of ["yf", "yF", "yfa", "yft"]) {
     assert.equal(s.keymap[combo], undefined);
@@ -368,15 +368,71 @@ test("isBrowserTrapped flags combos the page may never see", () => {
   assert.equal(Jari.isBrowserTrapped("ctrl+f"), false);
 });
 
-test("find toggles default to Alt chords without conflicts", () => {
-  assert.equal(Jari.keymapDefaults["alt+r"], "toggleFindRegex");
-  assert.equal(Jari.keymapDefaults["alt+w"], "toggleFindWholeWord");
-  assert.equal(Jari.keymapDefaults["alt+c"], "toggleFindCase");
+test("find toggles default to alt+1/2/3 without conflicts", () => {
+  assert.equal(Jari.keymapDefaults["alt+1"], "toggleFindRegex");
+  assert.equal(Jari.keymapDefaults["alt+2"], "toggleFindWholeWord");
+  assert.equal(Jari.keymapDefaults["alt+3"], "toggleFindCase");
+  assert.equal(Jari.keymapDefaults["alt+r"], undefined);
+  assert.equal(Jari.keymapDefaults["alt+w"], undefined);
+  assert.equal(Jari.keymapDefaults["alt+c"], undefined);
   assert.equal(COMMAND_CATALOG.toggleFindRegex.category, "find");
-  assert.equal(
-    Jari.findBindingConflict(Jari.keymapDefaults, "alt+r", "toggleFindRegex"),
-    null,
-  );
+  for (const [combo, command] of [
+    ["alt+1", "toggleFindRegex"],
+    ["alt+2", "toggleFindWholeWord"],
+    ["alt+3", "toggleFindCase"],
+    ["d", "scrollHalfPageDown"],
+    ["u", "scrollHalfPageUp"],
+  ]) {
+    assert.equal(Jari.findBindingConflict(Jari.keymapDefaults, combo, command), null);
+    assert.deepEqual(Jari.findOverlapConflicts(Jari.keymapDefaults, combo), []);
+    assert.equal(Jari.isBrowserTrapped(combo), false);
+  }
+  assert.equal(Jari.keymapDefaults.d, "scrollHalfPageDown");
+  assert.equal(Jari.keymapDefaults.u, "scrollHalfPageUp");
+});
+
+test("migrateFindToggleBindings prunes old toggles and fills the new binds", () => {
+  const swapped = Jari.migrateFindToggleBindings({
+    j: "scrollDown",
+    "alt+r": "toggleFindRegex",
+    "alt+w": "toggleFindWholeWord",
+    "alt+c": "toggleFindCase",
+  });
+  assert.equal(swapped["alt+1"], "toggleFindRegex");
+  assert.equal(swapped["alt+2"], "toggleFindWholeWord");
+  assert.equal(swapped["alt+3"], "toggleFindCase");
+  assert.equal(swapped.d, "scrollHalfPageDown");
+  assert.equal(swapped.u, "scrollHalfPageUp");
+  assert.equal(swapped.j, "scrollDown");
+  for (const combo of ["alt+r", "alt+w", "alt+c"]) {
+    assert.equal(swapped[combo], undefined);
+  }
+});
+
+test("migrateFindToggleBindings leaves custom rebinds and occupied combos alone", () => {
+  const custom = {
+    "alt+r": "closeTab",
+    "alt+1": "reloadTab",
+    "alt+w": "toggleFindWholeWord",
+  };
+  const out = Jari.migrateFindToggleBindings(custom);
+  assert.equal(out["alt+r"], "closeTab");
+  assert.equal(out["alt+1"], "reloadTab");
+  assert.equal(out["alt+2"], "toggleFindWholeWord");
+  assert.equal(out["alt+w"], undefined);
+  assert.equal(Jari.migrateFindToggleBindings(null), null);
+  assert.deepEqual(Jari.migrateFindToggleBindings([]), []);
+});
+
+test("v6 stored keymaps migrate to the new toggle binds and stamp v7", () => {
+  const s = Jari.normalizeSettings({
+    schemaVersion: 6,
+    keymap: { "alt+r": "toggleFindRegex" },
+  });
+  assert.equal(s.schemaVersion, 7);
+  assert.equal(s.keymap["alt+1"], "toggleFindRegex");
+  assert.equal(s.keymap["alt+r"], undefined);
+  assert.equal(s.keymap.d, "scrollHalfPageDown");
 });
 
 test("prefix helpers work for multi-key sequences", () => {

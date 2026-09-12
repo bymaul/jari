@@ -12,7 +12,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
-export const SETTINGS_SCHEMA_VERSION = 6;
+export const SETTINGS_SCHEMA_VERSION = 7;
 
 export const Events = {
   listeners: {},
@@ -31,6 +31,8 @@ export const keymapDefaults = {
   l: "scrollRight",
   G: "scrollToBottom",
   w: "cycleScrollFrame",
+  d: "scrollHalfPageDown",
+  u: "scrollHalfPageUp",
   "+": "zoomIn",
   "=": "zoomIn",
   "-": "zoomOut",
@@ -69,9 +71,9 @@ export const keymapDefaults = {
   "/": "findText",
   n: "findNext",
   N: "findPrev",
-  "alt+r": "toggleFindRegex",
-  "alt+w": "toggleFindWholeWord",
-  "alt+c": "toggleFindCase",
+  "alt+1": "toggleFindRegex",
+  "alt+2": "toggleFindWholeWord",
+  "alt+3": "toggleFindCase",
   v: "enterVisual",
   V: "enterVisualLine",
 
@@ -374,6 +376,15 @@ export function migrateSettings(data) {
     d.keymap = migrateYankBindings(d.keymap);
     version = 6;
   }
+  // v6 -> v7: half-page binds land on d/u and find toggles move from
+  // alt+r/w/c to alt+1/2/3. Default-shaped toggle entries are pruned,
+  // then the new combos fill where free and their command is bound
+  // nowhere, so custom rebinds are never clobbered. Like the v4
+  // backfill, an intentionally unbound command may gain the new bind.
+  if (version < 7) {
+    d.keymap = migrateFindToggleBindings(d.keymap);
+    version = 7;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -407,6 +418,38 @@ export function migrateYankBindings(keymap) {
     if (out[oldCombo] === command && !(newCombo in out)) {
       delete out[oldCombo];
       out[newCombo] = command;
+    }
+  }
+  return out;
+}
+
+const FIND_TOGGLE_SWAPS = [
+  ["alt+r", "alt+1", "toggleFindRegex"],
+  ["alt+w", "alt+2", "toggleFindWholeWord"],
+  ["alt+c", "alt+3", "toggleFindCase"],
+];
+
+const HALF_PAGE_FILLS = [
+  ["d", "scrollHalfPageDown"],
+  ["u", "scrollHalfPageUp"],
+];
+
+export function migrateFindToggleBindings(keymap) {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap;
+  }
+  const out = { ...keymap };
+  for (const [oldCombo, , command] of FIND_TOGGLE_SWAPS) {
+    if (out[oldCombo] === command) delete out[oldCombo];
+  }
+  const used = new Set(Object.values(out));
+  for (const [newCombo, command] of [
+    ...FIND_TOGGLE_SWAPS.map(([, combo, cmd]) => [combo, cmd]),
+    ...HALF_PAGE_FILLS,
+  ]) {
+    if (!(newCombo in out) && !used.has(command)) {
+      out[newCombo] = command;
+      used.add(command);
     }
   }
   return out;

@@ -593,7 +593,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 6;
+  var SETTINGS_SCHEMA_VERSION = 7;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -610,6 +610,8 @@
     l: "scrollRight",
     G: "scrollToBottom",
     w: "cycleScrollFrame",
+    d: "scrollHalfPageDown",
+    u: "scrollHalfPageUp",
     "+": "zoomIn",
     "=": "zoomIn",
     "-": "zoomOut",
@@ -640,9 +642,9 @@
     "/": "findText",
     n: "findNext",
     N: "findPrev",
-    "alt+r": "toggleFindRegex",
-    "alt+w": "toggleFindWholeWord",
-    "alt+c": "toggleFindCase",
+    "alt+1": "toggleFindRegex",
+    "alt+2": "toggleFindWholeWord",
+    "alt+3": "toggleFindCase",
     v: "enterVisual",
     V: "enterVisualLine",
     gg: "scrollToTop",
@@ -840,6 +842,10 @@
       d.keymap = migrateYankBindings(d.keymap);
       version = 6;
     }
+    if (version < 7) {
+      d.keymap = migrateFindToggleBindings(d.keymap);
+      version = 7;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -870,6 +876,35 @@
       if (out[oldCombo] === command && !(newCombo in out)) {
         delete out[oldCombo];
         out[newCombo] = command;
+      }
+    }
+    return out;
+  }
+  var FIND_TOGGLE_SWAPS = [
+    ["alt+r", "alt+1", "toggleFindRegex"],
+    ["alt+w", "alt+2", "toggleFindWholeWord"],
+    ["alt+c", "alt+3", "toggleFindCase"]
+  ];
+  var HALF_PAGE_FILLS = [
+    ["d", "scrollHalfPageDown"],
+    ["u", "scrollHalfPageUp"]
+  ];
+  function migrateFindToggleBindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    for (const [oldCombo, , command] of FIND_TOGGLE_SWAPS) {
+      if (out[oldCombo] === command) delete out[oldCombo];
+    }
+    const used = new Set(Object.values(out));
+    for (const [newCombo, command] of [
+      ...FIND_TOGGLE_SWAPS.map(([, combo, cmd]) => [combo, cmd]),
+      ...HALF_PAGE_FILLS
+    ]) {
+      if (!(newCombo in out) && !used.has(command)) {
+        out[newCombo] = command;
+        used.add(command);
       }
     }
     return out;

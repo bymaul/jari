@@ -16,7 +16,7 @@ see [PRIVACY.md](PRIVACY.md).
 Commands take a repeat count (`3j`, `2x`); `0-9` are reserved for it.
 Bindings chain into sequences of any length.
 
-- Scroll: `j`/`k`/`h`/`l`, `gg`/`G` top/bottom, `w` cycle scroll area,
+- Scroll: `j`/`k`/`h`/`l`, `d`/`u` half page, `gg`/`G` top/bottom, `w` cycle scroll area,
   `;w` reset scroll area
 - Zoom: `+`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
@@ -27,7 +27,7 @@ Bindings chain into sequences of any length.
   `yy` copy URL, `Y` copy title + URL
 - Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
-  rebindable toggles `Alt+R` regex, `Alt+W` whole word, `Alt+C` case;
+  rebindable toggles `Alt+1` regex, `Alt+2` whole word, `Alt+3` case;
   `Up`/`Down` history)
 - Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,
   `G`/`gg`, `f`/`F`/`t`/`T` + char, `o` swap; `y` yank)
@@ -35,7 +35,7 @@ Bindings chain into sequences of any length.
 - Help: `?` cheatsheet, `;e` settings, `;x` extensions page
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
-scrollHalfPageDown/Up, newTab, newIncognitoTab, duplicateTab, togglePin,
+newTab, newIncognitoTab, duplicateTab, togglePin,
 toggleMute, hintOpenCurrent.
 
 ## Settings (`;e`)
