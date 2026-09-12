@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* global CSS, Highlight, NodeFilter, Range */
 import { register, touch } from "./overlays.js";
 import { ui } from "./ui.js";
 import {
@@ -14,8 +14,6 @@ import {
   unwrapSpans,
 } from "./highlight.js";
 import {
-  isElementDrawn,
-  isElementPartiallyInViewport,
   getVisibleElements,
   filterInvisibleElements,
   filterOverlapElements,
@@ -830,7 +828,7 @@ function activateHintByLabel(label) {
 function enterAtElement(el, newMode) {
   if (active) close(false);
   mode = newMode || "visual";
-  let range = null;
+  let range;
   try {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
@@ -1283,7 +1281,6 @@ function findNextWordEnd(count) {
           const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
           if (nextTxt && isWordChar(nextTxt[0])) break;
           if (txt.length === 0) break;
-          inWord = false;
           const wordEnd = txt.length - 1;
           if (i === startIdx && wordEnd <= from) break;
           found++;
@@ -1316,7 +1313,7 @@ function fallbackExtendWordEnd(count) {
   moveToPosition(pos.node, pos.offset + 1);
   return true;
 }
-function fallbackDocBoundary(dir, forCaret) {
+function fallbackDocBoundary(dir) {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let first = null,
     last = null,
@@ -1478,7 +1475,7 @@ function doMoveWord(dir) {
   updateBlockCaret();
 }
 
-function doMoveWordEnd(dir) {
+function doMoveWordEnd() {
   if (isCaret()) {
     if (!fallbackMoveWordEnd(1)) {
       let ok = moveCaret("forward", "word");
@@ -1525,13 +1522,13 @@ function doDocBoundary(dir) {
   const gran = "documentboundary";
   if (isCaret()) {
     let ok = moveCaret(dir < 0 ? "backward" : "forward", gran);
-    if (!ok) fallbackDocBoundary(dir, true);
+    if (!ok) fallbackDocBoundary(dir);
     ensureVisible();
     updateBlockCaret();
     return;
   }
   let ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
-  if (!ok) fallbackDocBoundary(dir, false);
+  if (!ok) fallbackDocBoundary(dir);
   ensureVisible();
   updateBlockCaret();
 }
@@ -1707,7 +1704,6 @@ function yankLineFromCaret() {
       fallbackMoveCaret(-1);
     }
     const atStartNode = sel.focusNode;
-    const atStartOffset = sel.focusOffset;
     const wasCollapsed = sel.isCollapsed;
     if (wasCollapsed) {
       const ok = extendSelection("forward", "lineboundary");
@@ -2083,8 +2079,8 @@ function onKeyDown(event) {
   }
 
   if (/^[0-9]$/.test(key)) {
-    if (key === "0" && pendingCount === "") {
-    } else {
+    // A bare "0" is line-start, not a count, so it falls through to the switch.
+    if (key !== "0" || pendingCount !== "") {
       ui.consume(event);
       if (pendingCount.length < 9) pendingCount += key;
       if (pillEl) pillEl.textContent = pillText(mode) + " " + pendingCount;
@@ -2274,7 +2270,7 @@ function onKeyDown(event) {
       break;
     case "e":
       ui.consume(event);
-      for (let i = 0; i < repeat; i++) doMoveWordEnd(1);
+      for (let i = 0; i < repeat; i++) doMoveWordEnd();
       break;
     case "0":
       ui.consume(event);

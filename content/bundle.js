@@ -5094,7 +5094,7 @@
   function enterAtElement(el, newMode) {
     if (active4) close4(false);
     mode3 = newMode || "visual";
-    let range = null;
+    let range;
     try {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
@@ -5535,7 +5535,6 @@
             const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
             if (nextTxt && isWordChar(nextTxt[0])) break;
             if (txt.length === 0) break;
-            inWord = false;
             const wordEnd2 = txt.length - 1;
             if (i === startIdx && wordEnd2 <= from) break;
             found++;
@@ -5568,7 +5567,7 @@
     moveToPosition(pos.node, pos.offset + 1);
     return true;
   }
-  function fallbackDocBoundary(dir, forCaret) {
+  function fallbackDocBoundary(dir) {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let first = null, last = null, n;
     while (n = walker.nextNode()) {
@@ -5720,7 +5719,7 @@
     ensureVisible();
     updateBlockCaret();
   }
-  function doMoveWordEnd(dir) {
+  function doMoveWordEnd() {
     if (isCaret()) {
       if (!fallbackMoveWordEnd(1)) {
         let ok = moveCaret("forward", "word");
@@ -5765,13 +5764,13 @@
     const gran = "documentboundary";
     if (isCaret()) {
       let ok2 = moveCaret(dir < 0 ? "backward" : "forward", gran);
-      if (!ok2) fallbackDocBoundary(dir, true);
+      if (!ok2) fallbackDocBoundary(dir);
       ensureVisible();
       updateBlockCaret();
       return;
     }
     let ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
-    if (!ok) fallbackDocBoundary(dir, false);
+    if (!ok) fallbackDocBoundary(dir);
     ensureVisible();
     updateBlockCaret();
   }
@@ -5941,7 +5940,6 @@
         fallbackMoveCaret(-1);
       }
       const atStartNode = sel.focusNode;
-      const atStartOffset = sel.focusOffset;
       const wasCollapsed = sel.isCollapsed;
       if (wasCollapsed) {
         const ok = extendSelection("forward", "lineboundary");
@@ -6302,8 +6300,7 @@
       return true;
     }
     if (/^[0-9]$/.test(key)) {
-      if (key === "0" && pendingCount === "") {
-      } else {
+      if (key !== "0" || pendingCount !== "") {
         ui.consume(event);
         if (pendingCount.length < 9) pendingCount += key;
         if (pillEl) pillEl.textContent = pillText(mode3) + " " + pendingCount;
@@ -6491,7 +6488,7 @@
         break;
       case "e":
         ui.consume(event);
-        for (let i = 0; i < repeat; i++) doMoveWordEnd(1);
+        for (let i = 0; i < repeat; i++) doMoveWordEnd();
         break;
       case "0":
         ui.consume(event);
