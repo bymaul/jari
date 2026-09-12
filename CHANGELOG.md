@@ -4,6 +4,32 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [0.4.1] - 2026-09-12
+
+### Fixed
+
+- Find: `Esc` discards only the uncommitted query and keeps history for
+  `n`/`N`; matches inside same-origin iframes, unicode queries, and the
+  committed-query observer.
+- Omnibox: unknown bare TLDs fall back to search instead of opening
+  invalid URLs; ports, schemes, and localhost no longer hit dead-ends;
+  incognito tabs stay isolated, with unified search routing and a
+  hardened activate path.
+- Hints: fragment links, click fidelity, iframe base URLs, delayed DOM
+  observation, and modifier handling.
+- Visual mode: word motions, multiline yank, linewise `Y`, and scroll
+  targets.
+- Omnibox ranking: NFKD index mapping, exclusion-only queries, and
+  unicode words.
+- Core: keymap validation plus hardened clue/help/dispatch focus paths.
+- Settings: newest-wins quota fallback with truthful copy feedback;
+  options failures report honestly with rollback and search-engine
+  guards.
+- Prompt, find, and help overlays render inside Shadow DOM so page
+  styles and scripts cannot break or snoop on them.
+- Dropped the `search` permission: incognito search (`T`) no longer
+  needs it.
+
 ## [0.4.0] - 2026-09-09
 
 ### Added

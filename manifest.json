@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jari",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "author": "Maulana Ahmad Aji Triadi",
   "homepage_url": "https://github.com/bymaul/jari",
