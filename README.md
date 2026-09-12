@@ -35,8 +35,8 @@ Bindings chain into sequences of any length.
 - Help: `?` cheatsheet, `;e` settings, `;x` extensions page
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
-scrollHalfPageDown/Up, newTab, duplicateTab, togglePin, toggleMute,
-hintHover, hintYankText, hintOpenCurrent.
+scrollHalfPageDown/Up, newTab, newIncognitoTab, duplicateTab, togglePin,
+toggleMute, hintHover, hintOpenCurrent.
 
 ## Settings (`;e`)
 
