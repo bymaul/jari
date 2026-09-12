@@ -4,6 +4,25 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Changed
+
+- Link yank bindings shorten from `yfa`/`yft` to `yf` (copy link URL)
+  and `yF` (copy link text). Stored keymaps migrate forward (schema
+  v6): untouched `yfa`/`yft` entries move to the new combos, custom
+  rebinds are never clobbered.
+- Find toggles move from `alt+r`/`w`/`c` to `alt+1`/`2`/`3` (regex,
+  whole word, case), and half-page scrolling gains `d`/`u` defaults.
+  Stored keymaps migrate forward (schema v7): default-shaped toggle
+  entries are pruned and the new combos fill where free; custom
+  rebinds are never clobbered. The freed `alt+r`/`w`/`c` stay unbound.
+
+### Removed
+
+- Hover-element hint action (`hintHover` and its hover mode); stored
+  bindings to it are pruned.
+
 ## [0.4.1] - 2026-09-12
 
 ### Fixed
