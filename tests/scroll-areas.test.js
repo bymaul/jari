@@ -173,14 +173,14 @@ test("cycle rotates feed -> sidebar -> comments -> feed", () => {
   assert.equal(Scroll.getTarget(), feed);
 });
 
-test("highlight label shows the stop position", () => {
+test("highlight label shows the area name", () => {
   const { feed } = tiktokFixtures();
   useFixtures([feed, tiktokFixtures().junk, tiktokFixtures().comments]);
   Scroll.showHighlight();
-  assert.deepEqual(labels(), ["current scroll area 1/3"]);
+  assert.deepEqual(labels(), ["current scroll area"]);
   created.length = 0;
   Scroll.cycle();
-  assert.deepEqual(labels(), ["current scroll area 2/3"]);
+  assert.deepEqual(labels(), ["current scroll area"]);
 });
 
 test("sliver with a few pixels of range still qualifies as a stop", () => {

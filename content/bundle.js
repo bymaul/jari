@@ -2006,7 +2006,7 @@
 
   // content/scroll.js
   var target = null;
-  var HIGHLIGHT_MS = 300;
+  var HIGHLIGHT_MS = 400;
   var resolved = false;
   var autoPicked = false;
   function getTarget() {
@@ -2299,7 +2299,7 @@
       ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames])
     ];
     const pos = stops.indexOf(area === window ? null : area);
-    const count = pos === -1 ? "" : ` ${pos + 1}/${stops.length}`;
+    const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
     const rect = area === window ? {
       left: 0,
       top: 0,
@@ -2316,8 +2316,9 @@
     el.style.height = rect.height + "px";
     const label = document.createElement("span");
     label.className = "jari-scroll-highlight-label";
-    label.textContent = area === window ? `global scroll${count}` : isFrame(area) ? `frame${count}` : `current scroll area${count}`;
+    label.textContent = area === window ? "global scroll" : isFrame(area) ? "frame" : "current scroll area";
     el.appendChild(label);
+    if (count) ui.toast(`${label.textContent} ${count}`);
     document.body.appendChild(el);
     highlightEl = el;
     highlightTimer = setTimeout(() => {

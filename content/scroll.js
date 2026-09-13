@@ -5,7 +5,7 @@ import { MIN_SCROLL_AREA_SIZE } from "../shared/constants.js";
 
 let target = null;
 
-const HIGHLIGHT_MS = 300;
+const HIGHLIGHT_MS = 400;
 
 let resolved = false;
 let autoPicked = false;
@@ -344,7 +344,7 @@ function showHighlight() {
     ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames]),
   ];
   const pos = stops.indexOf(area === window ? null : area);
-  const count = pos === -1 ? "" : ` ${pos + 1}/${stops.length}`;
+  const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
   const rect =
     area === window
       ? {
@@ -366,13 +366,9 @@ function showHighlight() {
   el.style.height = rect.height + "px";
   const label = document.createElement("span");
   label.className = "jari-scroll-highlight-label";
-  label.textContent =
-    area === window
-      ? `global scroll${count}`
-      : isFrame(area)
-        ? `frame${count}`
-        : `current scroll area${count}`;
+  label.textContent = area === window ? "global scroll" : isFrame(area) ? "frame" : "current scroll area";
   el.appendChild(label);
+  if (count) ui.toast(`${label.textContent} ${count}`);
   document.body.appendChild(el);
   highlightEl = el;
   highlightTimer = setTimeout(() => {
