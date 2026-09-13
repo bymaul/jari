@@ -63,17 +63,29 @@ function invalidateScrollCache() {
 }
 
 const observedRoots = new Set();
-function ensureObserved(root) {
+function ensureObserved(root, options) {
   if (observedRoots.has(root)) return;
   observedRoots.add(root);
   if (typeof window.MutationObserver !== "undefined") {
-    new window.MutationObserver(invalidateScrollCache).observe(root, {
+    new window.MutationObserver(invalidateScrollCache).observe(
+      root,
+      options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] },
+    );
+  }
+}
+
+function observeDocument() {
+  // queryAll only reports shadow roots to ensureObserved, so without this
+  // the scan cache never invalidates on pages without shadow-DOM churn
+  // (opened panels, SPA content, and feed growth would stay invisible).
+  // Attributes are deliberately excluded: progress bars and play-state
+  // churn would otherwise invalidate near-continuously on video sites.
+  try {
+    ensureObserved(document.documentElement || document, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "style"],
     });
-  }
+  } catch {}
 }
 
 function isScrollVisible(el) {
@@ -92,6 +104,7 @@ function isScrollVisible(el) {
 }
 
 const findScrollableElements = epochCache(() => {
+  observeDocument();
   const areas = [];
   const roots = new Set([document.documentElement, document.body]);
 
@@ -128,6 +141,7 @@ const findScrollableElements = epochCache(() => {
 });
 
 const findFrameElements = epochCache(() => {
+  observeDocument();
   const frames = [];
   for (const el of queryAll(FRAME_SELECTOR, ensureObserved)) {
     try {
@@ -316,15 +330,21 @@ let highlightTimer = null;
 
 function showHighlight() {
   let area = getTarget();
-  if (area === window && !pageCanScroll()) {
-    const areas = findScrollableElements();
-    const frames = findFrameElements();
+  const areas = findScrollableElements();
+  const frames = findFrameElements();
+  const pageScrolls = pageCanScroll();
+  if (area === window && !pageScrolls) {
     const stops = [...areas, ...frames];
     if (stops.length === 0) return;
     target = nearestArea(stops) || stops[0];
     autoPicked = false;
     area = target;
   }
+  const stops = [
+    ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames]),
+  ];
+  const pos = stops.indexOf(area === window ? null : area);
+  const count = pos === -1 ? "" : ` ${pos + 1}/${stops.length}`;
   const rect =
     area === window
       ? {
@@ -348,10 +368,10 @@ function showHighlight() {
   label.className = "jari-scroll-highlight-label";
   label.textContent =
     area === window
-      ? "global scroll"
+      ? `global scroll${count}`
       : isFrame(area)
-        ? "frame"
-        : "current scroll area";
+        ? `frame${count}`
+        : `current scroll area${count}`;
   el.appendChild(label);
   document.body.appendChild(el);
   highlightEl = el;
@@ -375,6 +395,11 @@ function reset() {
 }
 
 export const Scroll = { getTarget, cycle, reset, showHighlight };
+
+export function __resetScrollCache() {
+  scanEpoch++;
+  resolved = false;
+}
 
 function handleCycleMessage(event) {
   if (!isTopFrame()) return;

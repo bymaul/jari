@@ -2055,16 +2055,23 @@
     }, 150);
   }
   var observedRoots = /* @__PURE__ */ new Set();
-  function ensureObserved(root) {
+  function ensureObserved(root, options) {
     if (observedRoots.has(root)) return;
     observedRoots.add(root);
     if (typeof window.MutationObserver !== "undefined") {
-      new window.MutationObserver(invalidateScrollCache).observe(root, {
+      new window.MutationObserver(invalidateScrollCache).observe(
+        root,
+        options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] }
+      );
+    }
+  }
+  function observeDocument() {
+    try {
+      ensureObserved(document.documentElement || document, {
         childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["class", "style"]
+        subtree: true
       });
+    } catch {
     }
   }
   function isScrollVisible(el) {
@@ -2082,6 +2089,7 @@
     return true;
   }
   var findScrollableElements = epochCache(() => {
+    observeDocument();
     const areas = [];
     const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
     for (const el of queryAll("*", ensureObserved)) {
@@ -2105,6 +2113,7 @@
     return areas;
   });
   var findFrameElements = epochCache(() => {
+    observeDocument();
     const frames = [];
     for (const el of queryAll(FRAME_SELECTOR, ensureObserved)) {
       try {
@@ -2276,15 +2285,21 @@
   var highlightTimer = null;
   function showHighlight() {
     let area = getTarget();
-    if (area === window && !pageCanScroll()) {
-      const areas = findScrollableElements();
-      const frames = findFrameElements();
-      const stops = [...areas, ...frames];
-      if (stops.length === 0) return;
-      target = nearestArea(stops) || stops[0];
+    const areas = findScrollableElements();
+    const frames = findFrameElements();
+    const pageScrolls = pageCanScroll();
+    if (area === window && !pageScrolls) {
+      const stops2 = [...areas, ...frames];
+      if (stops2.length === 0) return;
+      target = nearestArea(stops2) || stops2[0];
       autoPicked = false;
       area = target;
     }
+    const stops = [
+      ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames])
+    ];
+    const pos = stops.indexOf(area === window ? null : area);
+    const count = pos === -1 ? "" : ` ${pos + 1}/${stops.length}`;
     const rect = area === window ? {
       left: 0,
       top: 0,
@@ -2301,7 +2316,7 @@
     el.style.height = rect.height + "px";
     const label = document.createElement("span");
     label.className = "jari-scroll-highlight-label";
-    label.textContent = area === window ? "global scroll" : isFrame(area) ? "frame" : "current scroll area";
+    label.textContent = area === window ? `global scroll${count}` : isFrame(area) ? `frame${count}` : `current scroll area${count}`;
     el.appendChild(label);
     document.body.appendChild(el);
     highlightEl = el;
