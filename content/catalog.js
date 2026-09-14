@@ -72,6 +72,7 @@ export const COMMAND_CATALOG = {
   enterVisualLine: { category: "visual", label: "Visual line mode" },
 
   showHelp: { category: "help", label: "Show this help" },
+  showCommandPalette: { category: "help", label: "Run command by name" },
   openSettings: { category: "help", label: "Open settings" },
   openExtensions: { category: "help", label: "Open extensions page" },
 };

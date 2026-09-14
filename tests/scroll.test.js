@@ -182,9 +182,22 @@ test("the top frame advances its cycle on a subframe request", () => {
   rotateTo(frame);
   globalThis.document.activeElement = frame;
 
-  onMessage({ data: { type: "jari-cycle-scroll" }, source: {} });
+  onMessage({ data: { type: "jari-cycle-scroll" }, source: frame.contentWindow });
 
   assert.equal(Scroll.getTarget(), globalThis.window);
+});
+
+test("the top frame ignores cycle requests from stranger sources", () => {
+  assert.ok(messageHandlers.length > 0, "expected a message listener");
+  const onMessage = messageHandlers[messageHandlers.length - 1];
+  rotateTo(frame);
+  globalThis.document.activeElement = frame;
+
+  onMessage({ data: { type: "jari-cycle-scroll" }, source: {} });
+  onMessage({ data: { type: "jari-cycle-scroll" }, source: globalThis.window });
+  onMessage({ data: { type: "jari-cycle-scroll" }, source: null });
+
+  assert.equal(Scroll.getTarget(), frame);
 });
 
 test("reset returns to the page after cycling onto an area", () => {

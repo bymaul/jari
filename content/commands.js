@@ -9,6 +9,7 @@ import { Find } from "./find.js";
 import { Visual } from "./visual.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 import { goPage } from "./page-nav.js";
+import { Palette } from "./palette.js";
 
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;
@@ -345,6 +346,10 @@ export const commands = {
   enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
+  showCommandPalette: {
+    ...COMMAND_CATALOG.showCommandPalette,
+    run: () => Palette.open(commands),
+  },
   openSettings: { ...COMMAND_CATALOG.openSettings, run: () => sendMessage("openSettings") },
   openExtensions: {
     ...COMMAND_CATALOG.openExtensions,

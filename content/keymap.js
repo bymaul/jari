@@ -97,6 +97,7 @@ export const keymapDefaults = {
 
   "[[": "prevPage",
   "]]": "nextPage",
+  ":": "showCommandPalette",
 };
 
 export const prefixes = {
@@ -339,10 +340,16 @@ export function normalizeHintChars(raw) {
 
 export function migrateSettings(data) {
   const d = { ...(data || {}) };
-  let version =
-    Number.isInteger(d.schemaVersion) && d.schemaVersion > 0
-      ? d.schemaVersion
-      : 0;
+  let version = 0;
+  if (Number.isInteger(d.schemaVersion) && d.schemaVersion > 0) {
+    version = Math.min(d.schemaVersion, SETTINGS_SCHEMA_VERSION);
+  }
+  if (
+    d.keymap !== undefined &&
+    (typeof d.keymap !== "object" || Array.isArray(d.keymap))
+  ) {
+    d.keymap = undefined;
+  }
   // v0 (pre-versioned): the stored keymap is authoritative, everything else
   // falls back to defaults in normalizeSettings. Add per-version fixups here
   // as the schema evolves.
@@ -417,10 +424,10 @@ export function backfillNewBindings(keymap) {
   const used = new Set(Object.values(keymap));
   const out = { ...keymap };
   for (const [combo, command] of Object.entries(keymapDefaults)) {
-    if (!(combo in out) && !used.has(command)) {
-      out[combo] = command;
-      used.add(command);
-    }
+    if (used.has(command)) continue;
+    if (combo in out) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
   }
   return out;
 }
@@ -460,25 +467,28 @@ export function migrateFindToggleBindings(keymap) {
     return keymap;
   }
   const out = { ...keymap };
-  for (const [oldCombo, , command] of FIND_TOGGLE_SWAPS) {
-    if (out[oldCombo] === command) delete out[oldCombo];
+  for (const [oldCombo, newCombo, command] of FIND_TOGGLE_SWAPS) {
+    if (out[oldCombo] !== command) continue;
+    if (newCombo in out && out[newCombo] !== command) continue;
+    delete out[oldCombo];
   }
   const used = new Set(Object.values(out));
   for (const [newCombo, command] of [
     ...FIND_TOGGLE_SWAPS.map(([, combo, cmd]) => [combo, cmd]),
     ...HALF_PAGE_FILLS,
   ]) {
-    if (!(newCombo in out) && !used.has(command)) {
-      out[newCombo] = command;
-      used.add(command);
-    }
+    if (newCombo in out || used.has(command)) continue;
+    if (findOverlapConflicts(out, newCombo).length > 0) continue;
+    out[newCombo] = command;
+    used.add(command);
   }
   return out;
 }
 
-const PAGE_NAV_FILLS = [
+const V8_DEFAULT_FILLS = [
   ["[[", "prevPage"],
   ["]]", "nextPage"],
+  [":", "showCommandPalette"],
 ];
 
 export function migratePageNavBindings(keymap) {
@@ -487,11 +497,11 @@ export function migratePageNavBindings(keymap) {
   }
   const out = { ...keymap };
   const used = new Set(Object.values(out));
-  for (const [combo, command] of PAGE_NAV_FILLS) {
-    if (!(combo in out) && !used.has(command)) {
-      out[combo] = command;
-      used.add(command);
-    }
+  for (const [combo, command] of V8_DEFAULT_FILLS) {
+    if (combo in out || used.has(command)) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
+    used.add(command);
   }
   return out;
 }

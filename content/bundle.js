@@ -74,18 +74,18 @@
     if (list.some((e) => e && e.keyword === keyword)) return keyword;
     return list[0].keyword;
   }
-  function parseEngineKeyword(query3, engines) {
-    const m = String(query3 || "").trim().match(/^(\w+)\s+(.*\S)/);
+  function parseEngineKeyword(query4, engines) {
+    const m = String(query4 || "").trim().match(/^(\w+)\s+(.*\S)/);
     if (!m) return null;
     const url = buildEngineUrl(engines, m[1], m[2]);
     if (!url) return null;
     return { keyword: m[1].toLowerCase(), rest: m[2], url };
   }
-  function buildEngineUrl(engines, keyword, query3) {
+  function buildEngineUrl(engines, keyword, query4) {
     const kw = String(keyword || "").toLowerCase();
     const engine = (engines || []).find((e) => e && e.keyword === kw);
     if (!engine) return null;
-    return String(engine.url).replaceAll("%s", encodeURIComponent(query3));
+    return String(engine.url).replaceAll("%s", encodeURIComponent(query4));
   }
 
   // shared/page-nav-texts.js
@@ -329,9 +329,9 @@
   yun za zappos zara zero zip zm zone zuerich zw
   `.trim().split(/\s+/)
   );
-  function isValidHostname(host4) {
-    if (!host4) return false;
-    let lower = host4.toLowerCase();
+  function isValidHostname(host5) {
+    if (!host5) return false;
+    let lower = host5.toLowerCase();
     if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
@@ -359,9 +359,9 @@
     if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
     return true;
   }
-  function isBareNavigableHostname(host4) {
-    if (!isValidHostname(host4)) return false;
-    let lower = host4.toLowerCase();
+  function isBareNavigableHostname(host5) {
+    if (!isValidHostname(host5)) return false;
+    let lower = host5.toLowerCase();
     if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) return true;
@@ -478,11 +478,11 @@
             }
             return true;
           }
-          const host4 = u.hostname;
-          if (!host4) return false;
-          if (host4 === "localhost" || /^127\.0\.0\.1$/.test(host4) || /^0\.0\.0\.0$/.test(host4)) return true;
-          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host4)) return isBareNavigableHostname(host4);
-          return isBareNavigableHostname(host4);
+          const host5 = u.hostname;
+          if (!host5) return false;
+          if (host5 === "localhost" || /^127\.0\.0\.1$/.test(host5) || /^0\.0\.0\.0$/.test(host5)) return true;
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host5)) return isBareNavigableHostname(host5);
+          return isBareNavigableHostname(host5);
         } catch {
           return false;
         }
@@ -519,26 +519,26 @@
         return false;
       }
     },
-    suggestionTerm(query3) {
-      const idx = query3.search(/\s/);
-      if (idx === -1) return query3;
-      return Url.looksLikeUrl(query3.slice(0, idx)) ? query3.slice(idx).trim() : query3;
+    suggestionTerm(query4) {
+      const idx = query4.search(/\s/);
+      if (idx === -1) return query4;
+      return Url.looksLikeUrl(query4.slice(0, idx)) ? query4.slice(idx).trim() : query4;
     }
   };
   function normalizeHost(raw) {
-    let host4 = raw.trim().toLowerCase();
-    if (!host4) return "";
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host4)) {
+    let host5 = raw.trim().toLowerCase();
+    if (!host5) return "";
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host5)) {
       try {
-        host4 = new URL(host4).hostname;
+        host5 = new URL(host5).hostname;
       } catch {
         return "";
       }
     }
-    host4 = host4.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
+    host5 = host5.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
     return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
-      host4
-    ) ? host4 : "";
+      host5
+    ) ? host5 : "";
   }
   function normalizeSitePattern(raw) {
     if (typeof raw !== "string") return "";
@@ -553,18 +553,18 @@
   }
   function matchesSitePattern(hostname, pattern, protocol = "") {
     if (!pattern) return false;
-    const host4 = (hostname || "").toLowerCase();
+    const host5 = (hostname || "").toLowerCase();
     if (pattern === "file://") return protocol === "file:";
     if (pattern.startsWith("*.")) {
       const base = pattern.slice(2);
-      return host4 === base || host4.endsWith(`.${base}`);
+      return host5 === base || host5.endsWith(`.${base}`);
     }
-    return host4 === pattern.toLowerCase();
+    return host5 === pattern.toLowerCase();
   }
   function pageSiteKey(hostname, protocol = "") {
-    const host4 = hostname || "";
-    if (!host4 && protocol === "file:") return "file://";
-    return host4;
+    const host5 = hostname || "";
+    if (!host5 && protocol === "file:") return "file://";
+    return host5;
   }
 
   // content/catalog.js
@@ -632,6 +632,7 @@
     enterVisual: { category: "visual", label: "Visual mode" },
     enterVisualLine: { category: "visual", label: "Visual line mode" },
     showHelp: { category: "help", label: "Show this help" },
+    showCommandPalette: { category: "help", label: "Run command by name" },
     openSettings: { category: "help", label: "Open settings" },
     openExtensions: { category: "help", label: "Open extensions page" }
   };
@@ -704,7 +705,8 @@
     yf: "hintYank",
     yF: "hintYankText",
     "[[": "prevPage",
-    "]]": "nextPage"
+    "]]": "nextPage",
+    ":": "showCommandPalette"
   };
   var prefixes = {
     g: {},
@@ -768,6 +770,22 @@
     if (typeof combo !== "string" || combo === "") return combo;
     if (combo === " ") return "<Space>";
     return combo.replaceAll(" ", " <Space>");
+  }
+  function findOverlapConflicts(keymap, combo) {
+    const out = [];
+    if (!combo || typeof combo !== "string") return out;
+    if (combo.includes("+")) return out;
+    for (const [key, command] of Object.entries(keymap || {})) {
+      if (key === combo) continue;
+      if (key.includes("+")) continue;
+      if (key.length > combo.length && key.startsWith(combo)) {
+        out.push({ key, command, kind: "shadows" });
+      } else if (combo.length > key.length && combo.startsWith(key)) {
+        out.push({ key, command, kind: "shadowed-by" });
+      }
+    }
+    out.sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+    return out;
   }
   function keysForCommand(keymap, commandName) {
     return Object.entries(keymap).filter(([, cmd]) => cmd === commandName).map(([key]) => key);
@@ -863,7 +881,13 @@
   }
   function migrateSettings(data) {
     const d = { ...data || {} };
-    let version = Number.isInteger(d.schemaVersion) && d.schemaVersion > 0 ? d.schemaVersion : 0;
+    let version = 0;
+    if (Number.isInteger(d.schemaVersion) && d.schemaVersion > 0) {
+      version = Math.min(d.schemaVersion, SETTINGS_SCHEMA_VERSION);
+    }
+    if (d.keymap !== void 0 && (typeof d.keymap !== "object" || Array.isArray(d.keymap))) {
+      d.keymap = void 0;
+    }
     if (version < 1) version = 1;
     if (version < 2) {
       if (d.clickableSelector === void 0) d.clickableSelector = "";
@@ -911,10 +935,10 @@
     const used = new Set(Object.values(keymap));
     const out = { ...keymap };
     for (const [combo, command] of Object.entries(keymapDefaults)) {
-      if (!(combo in out) && !used.has(command)) {
-        out[combo] = command;
-        used.add(command);
-      }
+      if (used.has(command)) continue;
+      if (combo in out) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
     }
     return out;
   }
@@ -949,24 +973,27 @@
       return keymap;
     }
     const out = { ...keymap };
-    for (const [oldCombo, , command] of FIND_TOGGLE_SWAPS) {
-      if (out[oldCombo] === command) delete out[oldCombo];
+    for (const [oldCombo, newCombo, command] of FIND_TOGGLE_SWAPS) {
+      if (out[oldCombo] !== command) continue;
+      if (newCombo in out && out[newCombo] !== command) continue;
+      delete out[oldCombo];
     }
     const used = new Set(Object.values(out));
     for (const [newCombo, command] of [
       ...FIND_TOGGLE_SWAPS.map(([, combo, cmd]) => [combo, cmd]),
       ...HALF_PAGE_FILLS
     ]) {
-      if (!(newCombo in out) && !used.has(command)) {
-        out[newCombo] = command;
-        used.add(command);
-      }
+      if (newCombo in out || used.has(command)) continue;
+      if (findOverlapConflicts(out, newCombo).length > 0) continue;
+      out[newCombo] = command;
+      used.add(command);
     }
     return out;
   }
-  var PAGE_NAV_FILLS = [
+  var V8_DEFAULT_FILLS = [
     ["[[", "prevPage"],
-    ["]]", "nextPage"]
+    ["]]", "nextPage"],
+    [":", "showCommandPalette"]
   ];
   function migratePageNavBindings(keymap) {
     if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
@@ -974,11 +1001,11 @@
     }
     const out = { ...keymap };
     const used = new Set(Object.values(out));
-    for (const [combo, command] of PAGE_NAV_FILLS) {
-      if (!(combo in out) && !used.has(command)) {
-        out[combo] = command;
-        used.add(command);
-      }
+    for (const [combo, command] of V8_DEFAULT_FILLS) {
+      if (combo in out || used.has(command)) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
+      used.add(command);
     }
     return out;
   }
@@ -1191,10 +1218,10 @@
     return state.keymap;
   }
   function isDisabled() {
-    const host4 = location.hostname || "";
+    const host5 = location.hostname || "";
     const protocol = location.protocol || "";
     return state.disabledSites.some(
-      (pattern) => matchesSitePattern(host4, pattern, protocol)
+      (pattern) => matchesSitePattern(host5, pattern, protocol)
     );
   }
   function getDisabledSites() {
@@ -1505,22 +1532,22 @@
     }
   }
   function createShadowHost(hostClass, cssText, zIndex = "2147483646") {
-    const host4 = document.createElement("div");
-    if (hostClass) host4.className = hostClass;
-    host4.style.position = "fixed";
-    host4.style.left = "0";
-    host4.style.top = "0";
-    host4.style.width = "0";
-    host4.style.height = "0";
-    host4.style.overflow = "visible";
-    host4.style.pointerEvents = "none";
-    host4.style.zIndex = zIndex;
+    const host5 = document.createElement("div");
+    if (hostClass) host5.className = hostClass;
+    host5.style.position = "fixed";
+    host5.style.left = "0";
+    host5.style.top = "0";
+    host5.style.width = "0";
+    host5.style.height = "0";
+    host5.style.overflow = "visible";
+    host5.style.pointerEvents = "none";
+    host5.style.zIndex = zIndex;
     try {
-      host4.attachShadow({ mode: "open" });
+      host5.attachShadow({ mode: "open" });
     } catch {
-      host4.shadowRoot = host4;
+      host5.shadowRoot = host5;
     }
-    const shadow = host4.shadowRoot || host4;
+    const shadow = host5.shadowRoot || host5;
     try {
       const style = document.createElement("style");
       style.textContent = cssText || "";
@@ -1528,10 +1555,10 @@
     } catch {
     }
     try {
-      (document.body || document.documentElement).appendChild(host4);
+      (document.body || document.documentElement).appendChild(host5);
     } catch {
     }
-    return { host: host4, shadow };
+    return { host: host5, shadow };
   }
   function buildCategoryTable(cat, headerClass, renderBody) {
     const table = document.createElement("table");
@@ -2218,6 +2245,7 @@
       if (rect.width < MIN_SCROLL_AREA_SIZE || rect.height < MIN_SCROLL_AREA_SIZE)
         continue;
       if (!isScrollVisible(el)) continue;
+      if (!isFrameScrollable(el)) continue;
       const vw = window.innerWidth || 0;
       const vh = window.innerHeight || 0;
       if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
@@ -2229,6 +2257,22 @@
   function isFrame(el) {
     if (!el || el === window) return false;
     return isFrameElement(el);
+  }
+  function isFrameScrollable(el) {
+    let doc;
+    try {
+      doc = el.contentDocument || null;
+    } catch {
+      return true;
+    }
+    if (!doc) return true;
+    try {
+      const root = doc.scrollingElement || doc.documentElement || doc.body;
+      if (!root) return true;
+      return root.scrollHeight > root.clientHeight + 1 || root.scrollWidth > root.clientWidth + 1;
+    } catch {
+      return true;
+    }
   }
   function focusTarget(el) {
     if (!el || el === window) return;
@@ -2269,8 +2313,8 @@
   }
   function releaseFrameFocus() {
     try {
-      const active6 = document.activeElement;
-      if (active6 && isFrame(active6)) active6.blur();
+      const active7 = document.activeElement;
+      if (active7 && isFrame(active7)) active7.blur();
     } catch {
     }
     try {
@@ -2447,8 +2491,24 @@
     if (!isTopFrame()) return;
     const data = event && event.data;
     if (!data || data.type !== CYCLE_FROM_FRAME) return;
-    if (event.source === window) return;
+    if (!isChildFrameWindow(event.source)) return;
     cycle();
+  }
+  function isChildFrameWindow(win) {
+    if (!win || win === window) return false;
+    let frames;
+    try {
+      frames = document.querySelectorAll ? document.querySelectorAll(FRAME_SELECTOR) : [];
+    } catch {
+      return false;
+    }
+    for (const el of frames) {
+      try {
+        if (el.contentWindow === win) return true;
+      } catch {
+      }
+    }
+    return false;
   }
   try {
     window.addEventListener("message", handleCycleMessage);
@@ -2488,8 +2548,8 @@
       return String(s).toLowerCase();
     }
   }
-  function parseQuery(query3) {
-    const normalized = normalizeForMatch(query3);
+  function parseQuery(query4) {
+    const normalized = normalizeForMatch(query4);
     const phrases = [];
     const exclude = [];
     const withoutExcludedPhrases = normalized.replace(/-"([^"]+)"/g, (_, p) => {
@@ -2588,8 +2648,8 @@
     if (best) best.indices = toOriginal(best.indices);
     return best;
   }
-  function matchPreamble(query3, text) {
-    const { include, exclude, phrases } = parseQuery(query3);
+  function matchPreamble(query4, text) {
+    const { include, exclude, phrases } = parseQuery(query4);
     const { norm: t, map } = normalizeWithMap(text);
     if (exclude.some((ex) => t.includes(ex))) return null;
     return { include, exclude, phrases, t, map };
@@ -2605,8 +2665,8 @@
     }
     return true;
   }
-  function fuzzyMatch(query3, text) {
-    const pre = matchPreamble(query3, text);
+  function fuzzyMatch(query4, text) {
+    const pre = matchPreamble(query4, text);
     if (!pre) return null;
     const { include, exclude, phrases, t, map } = pre;
     if (include.length === 0 && phrases.length === 0) {
@@ -2631,8 +2691,8 @@
     indices.sort((a, b) => a - b);
     return { score: total, indices };
   }
-  function fuzzyIndices(query3, text) {
-    const pre = matchPreamble(query3, text);
+  function fuzzyIndices(query4, text) {
+    const pre = matchPreamble(query4, text);
     if (!pre) return [];
     const { include, phrases, t, map } = pre;
     const indices = [];
@@ -2641,16 +2701,16 @@
     for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
   }
-  function substringMatch(query3, text) {
-    const pre = matchPreamble(query3, text);
+  function substringMatch(query4, text) {
+    const pre = matchPreamble(query4, text);
     if (!pre) return false;
     const { include, exclude, phrases, t } = pre;
     if (include.length === 0 && phrases.length === 0) return exclude.length > 0;
     if (phrases.some((ph) => !t.includes(ph))) return false;
     return include.every((term) => t.includes(term));
   }
-  function substringIndices(query3, text) {
-    const pre = matchPreamble(query3, text);
+  function substringIndices(query4, text) {
+    const pre = matchPreamble(query4, text);
     if (!pre) return [];
     const { include, phrases, t, map } = pre;
     if (include.length === 0 && phrases.length === 0) return [];
@@ -2666,16 +2726,16 @@
     }
     return [...new Set(indices)].sort((a, b) => a - b);
   }
-  function fieldBoost(query3, field, base, weight) {
+  function fieldBoost(query4, field, base, weight) {
     if (!field) return 0;
-    const m = fuzzyMatch(query3, field);
+    const m = fuzzyMatch(query4, field);
     return m ? base + m.score * weight : 0;
   }
-  function titleBoost(query3, item) {
-    return fieldBoost(query3, item.title, 8, 0.15);
+  function titleBoost(query4, item) {
+    return fieldBoost(query4, item.title, 8, 0.15);
   }
-  function hostBoost(query3, item) {
-    return fieldBoost(query3, extractHost(item.url || ""), 6, 0.1);
+  function hostBoost(query4, item) {
+    return fieldBoost(query4, extractHost(item.url || ""), 6, 0.1);
   }
   function recencyScore(item) {
     const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
@@ -2694,8 +2754,8 @@
     return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
   }
   var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
-  function rankMatches(query3, list, fuzzy = true) {
-    const q = String(query3).trim();
+  function rankMatches(query4, list, fuzzy = true) {
+    const q = String(query4).trim();
     if (!q) return [...list];
     if (!fuzzy) {
       return list.filter(
@@ -2736,35 +2796,35 @@
     openOrder.push(name);
   }
   function byName(name) {
-    return overlays.find((overlay4) => overlay4.name === name);
+    return overlays.find((overlay5) => overlay5.name === name);
   }
   var Overlays = {
     closeAll() {
       const seen = /* @__PURE__ */ new Set();
       for (let i = openOrder.length - 1; i >= 0; i--) {
-        const overlay4 = byName(openOrder[i]);
-        if (overlay4 && !seen.has(overlay4.name) && overlay4.isActive()) {
-          seen.add(overlay4.name);
-          overlay4.close();
+        const overlay5 = byName(openOrder[i]);
+        if (overlay5 && !seen.has(overlay5.name) && overlay5.isActive()) {
+          seen.add(overlay5.name);
+          overlay5.close();
         }
       }
-      for (const overlay4 of overlays) {
-        if (!seen.has(overlay4.name) && overlay4.isActive()) overlay4.close();
+      for (const overlay5 of overlays) {
+        if (!seen.has(overlay5.name) && overlay5.isActive()) overlay5.close();
       }
       openOrder.length = 0;
     },
     active() {
       for (let i = openOrder.length - 1; i >= 0; i--) {
-        const overlay4 = byName(openOrder[i]);
-        if (overlay4 && overlay4.modal && overlay4.isActive()) return overlay4;
+        const overlay5 = byName(openOrder[i]);
+        if (overlay5 && overlay5.modal && overlay5.isActive()) return overlay5;
       }
-      return overlays.find((overlay4) => overlay4.modal && overlay4.isActive()) || null;
+      return overlays.find((overlay5) => overlay5.modal && overlay5.isActive()) || null;
     }
   };
 
   // content/prompt.js
-  function parseKeyword(query3) {
-    return parseEngineKeyword(query3, settings.getSearchEngines());
+  function parseKeyword(query4) {
+    return parseEngineKeyword(query4, settings.getSearchEngines());
   }
   var active = false;
   var host = null;
@@ -2912,8 +2972,8 @@
       renderList();
     });
   }
-  function rank(list, query3) {
-    return rankMatches(query3, list, settings.isFuzzyMatching());
+  function rank(list, query4) {
+    return rankMatches(query4, list, settings.isFuzzyMatching());
   }
   function rankTabs(q, list) {
     return rank(list, q).map((x) => x.item);
@@ -3764,20 +3824,20 @@
     }
     return z;
   }
-  function placeHintsHost(host4) {
+  function placeHintsHost(host5) {
     try {
       const topLayer = document.querySelector("dialog[open]");
       if (topLayer) {
         const r = topLayer.getBoundingClientRect();
         const style = window.getComputedStyle(topLayer);
         if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
-          topLayer.appendChild(host4);
+          topLayer.appendChild(host5);
           return;
         }
       }
     } catch {
     }
-    (document.documentElement || document.body).appendChild(host4);
+    (document.documentElement || document.body).appendChild(host5);
   }
   function coordinate(holderEl) {
     const probe = document.createElement("div");
@@ -3870,22 +3930,22 @@
   `;
   }
   function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFAULT) {
-    const host4 = document.createElement("div");
-    host4.className = "jari-hints-host";
-    host4.style.position = "fixed";
-    host4.style.left = "0";
-    host4.style.top = "0";
-    host4.style.width = "0";
-    host4.style.height = "0";
-    host4.style.overflow = "visible";
-    host4.style.pointerEvents = "none";
-    host4.style.zIndex = "2147483647";
+    const host5 = document.createElement("div");
+    host5.className = "jari-hints-host";
+    host5.style.position = "fixed";
+    host5.style.left = "0";
+    host5.style.top = "0";
+    host5.style.width = "0";
+    host5.style.height = "0";
+    host5.style.overflow = "visible";
+    host5.style.pointerEvents = "none";
+    host5.style.zIndex = "2147483647";
     try {
-      host4.attachShadow({ mode: "open" });
+      host5.attachShadow({ mode: "open" });
     } catch {
-      host4.shadowRoot = host4;
+      host5.shadowRoot = host5;
     }
-    const shadow = host4.shadowRoot;
+    const shadow = host5.shadowRoot;
     const style = document.createElement("style");
     style.textContent = hintCss(theme, fontSize);
     shadow.appendChild(style);
@@ -3894,8 +3954,8 @@
     holder2.style.display = "block";
     holder2.style.opacity = "1";
     shadow.appendChild(holder2);
-    placeHintsHost(host4);
-    return { host: host4, holder: holder2 };
+    placeHintsHost(host5);
+    return { host: host5, holder: holder2 };
   }
   function estimateLabelBox(label, fontSize) {
     const size = hintFontSize(fontSize);
@@ -7017,22 +7077,22 @@
     }
     return out;
   }
-  function buildMatcher(query3, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
-    if (!query3) return null;
+  function buildMatcher(query4, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
+    if (!query4) return null;
     const flags = (caseSensitive ? "g" : "gi") + "mu";
     const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
     try {
-      if (regex) return new RegExp(wholeWord ? bounds(query3) : query3, flags);
-      const src = query3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (regex) return new RegExp(wholeWord ? bounds(query4) : query4, flags);
+      const src = query4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       return new RegExp(wholeWord ? bounds(src) : src, flags);
     } catch {
       return null;
     }
   }
-  function buildMatches(query3) {
-    if (!query3) return [];
-    const caseSensitive = findCase || !findRegex && hasUpperCase(query3);
-    const matcher = buildMatcher(query3, {
+  function buildMatches(query4) {
+    if (!query4) return [];
+    const caseSensitive = findCase || !findRegex && hasUpperCase(query4);
+    const matcher = buildMatcher(query4, {
       regex: findRegex,
       wholeWord: findWholeWord,
       caseSensitive
@@ -7242,9 +7302,9 @@
   function executeQuery(q) {
     highlightsHidden = false;
     pendingQuery = q;
-    const query3 = (q || "").trim();
+    const query4 = (q || "").trim();
     clearTimeout(inputDebounce);
-    if (!query3) {
+    if (!query4) {
       matches2 = [];
       currentIdx2 = 0;
       clearHighlightApi();
@@ -7252,13 +7312,13 @@
       return;
     }
     inputDebounce = setTimeout(() => {
-      runQuery(query3);
+      runQuery(query4);
     }, 80);
   }
-  function runQuery(query3) {
+  function runQuery(query4) {
     highlightsHidden = false;
     try {
-      matches2 = buildMatches(query3);
+      matches2 = buildMatches(query4);
       currentIdx2 = 0;
       applyHighlights();
       if (matches2.length > 0) scrollToCurrent();
@@ -7303,9 +7363,9 @@
     }
   }
   async function pushFindHistory(q) {
-    const query3 = (q || "").trim();
-    if (!query3) return;
-    findHistory = [query3, ...findHistory.filter((s) => s !== query3)].slice(
+    const query4 = (q || "").trim();
+    if (!query4) return;
+    findHistory = [query4, ...findHistory.filter((s) => s !== query4)].slice(
       0,
       MAX_FIND_HISTORY
     );
@@ -7628,20 +7688,20 @@
   function commitQuery(q) {
     clearTimeout(inputDebounce);
     inputDebounce = null;
-    const query3 = (q || "").trim();
-    if (!query3) {
+    const query4 = (q || "").trim();
+    if (!query4) {
       closeDiscardPending();
       return;
     }
     try {
-      matches2 = buildMatches(query3);
+      matches2 = buildMatches(query4);
       currentIdx2 = 0;
     } catch {
       matches2 = [];
       currentIdx2 = 0;
     }
-    lastQuery = query3;
-    committedQuery = query3;
+    lastQuery = query4;
+    committedQuery = query4;
     committedIdx = 0;
     committedHidden = false;
     committedRegex = findRegex;
@@ -7650,7 +7710,7 @@
     pendingQuery = "";
     highlightsHidden = false;
     useHighlights = detectHighlightSupport();
-    pushFindHistory(query3);
+    pushFindHistory(query4);
     closeBar();
     applyHighlights();
     if (matches2.length > 0) scrollToCurrent();
@@ -7929,6 +7989,197 @@
     }
     ui.dispatchClick(el);
   }
+
+  // content/palette.js
+  var active6 = false;
+  var host4 = null;
+  var overlay4 = null;
+  var inputEl3 = null;
+  var listEl3 = null;
+  var source = [];
+  var filtered2 = [];
+  var selected2 = 0;
+  var query3 = "";
+  var restoreFocus3 = null;
+  var commandTable = null;
+  function isActive6() {
+    return active6;
+  }
+  function buildCommandSource(keymap) {
+    const out = [];
+    for (const [name, meta] of Object.entries(COMMAND_CATALOG)) {
+      const keys = keysForCommand(keymap || {}, name);
+      out.push({
+        name,
+        title: `${meta.label} ${name}`,
+        url: keys.join(" "),
+        detail: keys.map(displayCombo).join(", ") || "unbound"
+      });
+    }
+    return out;
+  }
+  function filterCommands(items, q, fuzzy = true) {
+    const trimmed = String(q || "").trim();
+    if (!trimmed) return [...items];
+    const ranked = rankMatches(trimmed, items, fuzzy);
+    return fuzzy ? ranked.map((x) => x.item) : ranked;
+  }
+  function open4(table) {
+    if (active6) return;
+    commandTable = table || null;
+    source = buildCommandSource(settings.getKeymap());
+    filtered2 = source;
+    selected2 = 0;
+    query3 = "";
+    active6 = true;
+    touch("palette");
+    const created = createShadowHost("jari-palette-host", promptCss());
+    host4 = created.host;
+    const shadow = created.shadow;
+    overlay4 = document.createElement("div");
+    overlay4.className = "jari-overlay jari-prompt";
+    inputEl3 = document.createElement("input");
+    inputEl3.type = "text";
+    inputEl3.placeholder = "Run command...";
+    inputEl3.setAttribute("autocomplete", "off");
+    inputEl3.setAttribute("spellcheck", "false");
+    inputEl3.addEventListener("input", () => {
+      query3 = inputEl3.value.trim();
+      filtered2 = filterCommands(source, query3, settings.isFuzzyMatching());
+      selected2 = 0;
+      renderList2();
+    });
+    inputEl3.addEventListener("keydown", (event) => event.stopPropagation());
+    listEl3 = document.createElement("ul");
+    listEl3.className = "jari-prompt-list";
+    const header = document.createElement("div");
+    header.className = "jari-prompt-header";
+    header.textContent = "Command";
+    overlay4.appendChild(listEl3);
+    overlay4.appendChild(header);
+    overlay4.appendChild(inputEl3);
+    shadow.appendChild(overlay4);
+    renderList2();
+    restoreFocus3 = document.activeElement;
+    inputEl3.focus();
+  }
+  function renderRow(item) {
+    const li = document.createElement("li");
+    const title = document.createElement("span");
+    title.className = "title";
+    if (query3) {
+      renderText(
+        title,
+        item.title,
+        settings.isFuzzyMatching() ? fuzzyIndices(query3, item.title) : substringIndices(query3, item.title)
+      );
+    } else {
+      title.textContent = item.title;
+    }
+    const detail = document.createElement("span");
+    detail.className = "url";
+    detail.textContent = item.detail;
+    li.appendChild(title);
+    li.appendChild(detail);
+    return li;
+  }
+  function renderList2() {
+    const rows = filtered2.slice(0, settings.getMaxResults());
+    listEl3.textContent = "";
+    for (const row of rows) listEl3.appendChild(renderRow(row));
+    highlight2();
+  }
+  function highlight2() {
+    Array.from(listEl3.children).forEach(
+      (li, i) => li.classList.toggle("selected", i === selected2)
+    );
+    const el = listEl3.children[selected2];
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }
+  function move2(delta) {
+    if (filtered2.length === 0) return;
+    selected2 = (selected2 + delta + filtered2.length) % filtered2.length;
+    highlight2();
+  }
+  function activate3() {
+    const item = filtered2[selected2];
+    const table = commandTable;
+    close5();
+    if (!item || !table) return;
+    const cmd = table[item.name];
+    if (!cmd || typeof cmd.run !== "function") return;
+    cmd.run({ count: 1 });
+  }
+  function onKeyDown6(event) {
+    let focused;
+    try {
+      focused = deepActiveElement();
+    } catch {
+      focused = document.activeElement;
+    }
+    if (focused === inputEl3) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        close5();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        activate3();
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        move2(1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        move2(-1);
+      } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        move2(event.shiftKey ? -1 : 1);
+      }
+      return;
+    }
+    if (event.key === "Escape" || event.key === "Enter") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      close5();
+    } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      move2(event.shiftKey ? -1 : 1);
+    }
+  }
+  function close5() {
+    if (host4) {
+      try {
+        host4.remove();
+      } catch {
+      }
+      host4 = null;
+    }
+    overlay4 = null;
+    inputEl3 = null;
+    listEl3 = null;
+    source = [];
+    filtered2 = [];
+    selected2 = 0;
+    query3 = "";
+    commandTable = null;
+    active6 = false;
+    if (restoreFocus3 && restoreFocus3.isConnected && document.activeElement !== restoreFocus3) {
+      restoreFocus3.focus();
+    }
+    restoreFocus3 = null;
+  }
+  var Palette = {
+    open: open4,
+    close: close5,
+    onKeyDown: onKeyDown6,
+    isActive: isActive6
+  };
+  register("palette", { close: close5, onKeyDown: onKeyDown6, isActive: isActive6 });
 
   // content/commands.js
   var PAGE_RATIO = 0.9;
@@ -8232,6 +8483,10 @@ ${location.href}`;
     enterVisual: { ...COMMAND_CATALOG.enterVisual, run: () => Visual.enter("visual") },
     enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },
     showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
+    showCommandPalette: {
+      ...COMMAND_CATALOG.showCommandPalette,
+      run: () => Palette.open(commands)
+    },
     openSettings: { ...COMMAND_CATALOG.openSettings, run: () => sendMessage("openSettings") },
     openExtensions: {
       ...COMMAND_CATALOG.openExtensions,
@@ -8250,7 +8505,7 @@ ${location.href}`;
   var renderCount = "";
   var filterText = "";
   var pendingFilter = "";
-  var listEl3 = null;
+  var listEl4 = null;
   var titleEl = null;
   function commandLabel(commandName) {
     return COMMAND_CATALOG[commandName]?.label || commandName;
@@ -8271,7 +8526,7 @@ ${location.href}`;
     renderCount = "";
     filterText = "";
     pendingFilter = "";
-    listEl3 = null;
+    listEl4 = null;
     titleEl = null;
     if (clueEl) {
       try {
@@ -8294,10 +8549,10 @@ ${location.href}`;
     return { all, rows };
   }
   function paint() {
-    if (!clueEl || !listEl3 || !titleEl) return;
+    if (!clueEl || !listEl4 || !titleEl) return;
     const { all, rows } = filteredEntries();
     titleEl.textContent = `${renderCount || ""}${displayCombo(renderPrefix)} \u2014 ${rows.length}/${all.length} bindings` + (filterText ? ` \xB7 "${filterText}"` : "");
-    listEl3.textContent = "";
+    listEl4.textContent = "";
     for (const { suffix, command } of rows) {
       const row = document.createElement("div");
       row.className = "jari-clue-row";
@@ -8309,7 +8564,7 @@ ${location.href}`;
       label.textContent = commandLabel(command);
       row.appendChild(key);
       row.appendChild(label);
-      listEl3.appendChild(row);
+      listEl4.appendChild(row);
     }
   }
   function hasFilter() {
@@ -8362,7 +8617,7 @@ ${location.href}`;
       (document.body || document.documentElement).appendChild(root);
       clueEl = root;
       titleEl = title;
-      listEl3 = list;
+      listEl4 = list;
       activePrefix = prefix2;
       renderPrefix = prefix2;
       renderCount = countStr || "";
@@ -8518,10 +8773,10 @@ ${location.href}`;
       clearPending();
       return;
     }
-    const overlay4 = Overlays.active();
-    if (overlay4) {
+    const overlay5 = Overlays.active();
+    if (overlay5) {
       Clue.hide();
-      return overlay4.onKeyDown(event);
+      return overlay5.onKeyDown(event);
     }
     if (modifierKeys.has(event.key)) return;
     if (passthroughMode) {

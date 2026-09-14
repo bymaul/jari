@@ -17,6 +17,18 @@ versioned for the extension manifest (`manifest.base.json`).
 - Bookmark toggle (`toggleBookmark`, unbound by default): bookmarks the
   current page on the bookmarks bar (Other bookmarks as fallback) or
   removes it, with honest feedback for unbookmarkable pages.
+- Command palette (`:`): fuzzy-find and run any command by name,
+  including unbound ones. Stored keymaps migrate forward (schema v8):
+  the `:` combo fills where free and its command is bound nowhere.
+
+### Fixed
+
+- Scroll cycling only answers `w` requests from direct child frames;
+  same-origin frames without scrollable content are no longer stops.
+- Keymap migrations fill every missing alias, never strand a command
+  whose new combo is taken, skip fills that would overlap custom
+  bindings, drop corrupt keymaps to defaults, and clamp unknown
+  schema versions instead of replaying or downgrading.
 
 ### Changed
 

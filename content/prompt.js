@@ -183,8 +183,7 @@ function rankTabs(q, list) {
   return rank(list, q).map((x) => x.item);
 }
 
-function promptCss() {
-  return `
+export function promptCss() {  return `
     :host { all: initial !important; }
     .jari-overlay {
       all: initial;
@@ -338,7 +337,7 @@ function render(title, placeholder) {
   inputEl.focus();
 }
 
-function renderText(el, text, indices) {
+export function renderText(el, text, indices) {
   if (!indices || indices.length === 0) {
     el.textContent = text;
     return;

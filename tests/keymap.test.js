@@ -444,11 +444,14 @@ test("v6 stored keymaps migrate to the new toggle binds and stamp v8", () => {
 test("page navigation binds default to [[/]] without conflicts", () => {
   assert.equal(Jari.keymapDefaults["[["], "prevPage");
   assert.equal(Jari.keymapDefaults["]]"], "nextPage");
+  assert.equal(Jari.keymapDefaults[":"], "showCommandPalette");
   assert.equal(COMMAND_CATALOG.prevPage.category, "page");
   assert.equal(COMMAND_CATALOG.nextPage.category, "page");
+  assert.equal(COMMAND_CATALOG.showCommandPalette.category, "help");
   for (const [combo, command] of [
     ["[[", "prevPage"],
     ["]]", "nextPage"],
+    [":", "showCommandPalette"],
   ]) {
     assert.equal(Jari.findBindingConflict(Jari.keymapDefaults, combo, command), null);
     assert.deepEqual(Jari.findOverlapConflicts(Jari.keymapDefaults, combo), []);
@@ -490,6 +493,7 @@ test("v7 stored keymaps gain page-nav binds and texts, stamp v8", () => {
   assert.equal(s.schemaVersion, 8);
   assert.equal(s.keymap["[["], "prevPage");
   assert.equal(s.keymap["]]"], "nextPage");
+  assert.equal(s.keymap[":"], "showCommandPalette");
   assert.deepEqual(s.pageNavTexts.next[0], "Next");
   assert.ok(s.pageNavTexts.prev.length > 0);
 });
@@ -515,6 +519,54 @@ test("normalizeSettings falls back to default page-nav texts on corrupt input", 
   });
   assert.deepEqual(s.pageNavTexts.next, ["Next"]);
   assert.ok(s.pageNavTexts.prev.length > 0);
+});
+
+test("backfillNewBindings fills every missing alias of an unused command", () => {
+  const filled = Jari.backfillNewBindings({});
+  assert.equal(filled["+"], "zoomIn");
+  assert.equal(filled["="], "zoomIn");
+});
+
+test("backfillNewBindings skips fills that would overlap custom binds", () => {
+  const out = Jari.backfillNewBindings({ df: "closeTab", y: "reloadTab" });
+  assert.equal(out.df, "closeTab");
+  assert.equal(out.d, undefined);
+  assert.equal(out.y, "reloadTab");
+  assert.equal(out.yf, undefined);
+});
+
+test("migrateFindToggleBindings keeps the old bind when its home is taken", () => {
+  const out = Jari.migrateFindToggleBindings({
+    "alt+r": "toggleFindRegex",
+    "alt+1": "closeTab",
+  });
+  assert.equal(out["alt+r"], "toggleFindRegex");
+  assert.equal(out["alt+1"], "closeTab");
+});
+
+test("migratePageNavBindings skips fills that would overlap custom binds", () => {
+  const out = Jari.migratePageNavBindings({ "[[x": "closeTab" });
+  assert.equal(out["[[x"], "closeTab");
+  assert.equal(out["[["], undefined);
+  assert.equal(out["]]"], "nextPage");
+});
+
+test("migrateSettings drops corrupt keymaps instead of splintering them", () => {
+  assert.deepEqual(Jari.normalizeSettings({ keymap: ["scrollDown"] }).keymap, {
+    ...Jari.keymapDefaults,
+  });
+  assert.deepEqual(Jari.normalizeSettings({ keymap: "scrollDown" }).keymap, {
+    ...Jari.keymapDefaults,
+  });
+});
+
+test("migrateSettings clamps unknown and non-integer schema versions", () => {
+  const future = Jari.migrateSettings({ schemaVersion: 99, keymap: {} });
+  assert.equal(future.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.deepEqual(future.keymap, {});
+  const replayed = Jari.migrateSettings({ schemaVersion: "6", keymap: {} });
+  assert.equal(replayed.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(replayed.keymap.j, "scrollDown");
 });
 
 test("prefix helpers work for multi-key sequences", () => {

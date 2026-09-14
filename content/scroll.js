@@ -157,6 +157,7 @@ const findFrameElements = epochCache(() => {
     )
       continue;
     if (!isScrollVisible(el)) continue;
+    if (!isFrameScrollable(el)) continue;
     const vw = window.innerWidth || 0;
     const vh = window.innerHeight || 0;
     if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
@@ -169,6 +170,26 @@ const findFrameElements = epochCache(() => {
 export function isFrame(el) {
   if (!el || el === window) return false;
   return isFrameElement(el);
+}
+
+function isFrameScrollable(el) {
+  let doc;
+  try {
+    doc = el.contentDocument || null;
+  } catch {
+    return true;
+  }
+  if (!doc) return true;
+  try {
+    const root = doc.scrollingElement || doc.documentElement || doc.body;
+    if (!root) return true;
+    return (
+      root.scrollHeight > root.clientHeight + 1 ||
+      root.scrollWidth > root.clientWidth + 1
+    );
+  } catch {
+    return true;
+  }
 }
 
 export function focusTarget(el) {
@@ -415,8 +436,26 @@ function handleCycleMessage(event) {
   if (!isTopFrame()) return;
   const data = event && event.data;
   if (!data || data.type !== CYCLE_FROM_FRAME) return;
-  if (event.source === window) return;
+  if (!isChildFrameWindow(event.source)) return;
   cycle();
+}
+
+function isChildFrameWindow(win) {
+  if (!win || win === window) return false;
+  let frames;
+  try {
+    frames = document.querySelectorAll
+      ? document.querySelectorAll(FRAME_SELECTOR)
+      : [];
+  } catch {
+    return false;
+  }
+  for (const el of frames) {
+    try {
+      if (el.contentWindow === win) return true;
+    } catch {}
+  }
+  return false;
 }
 
 try {

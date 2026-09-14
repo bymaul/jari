@@ -15,6 +15,17 @@ globalThis.window.MutationObserver = class {
   disconnect() {}
 };
 
+const messageListeners = [];
+const baseAddEventListener =
+  globalThis.window.addEventListener.bind(globalThis.window);
+globalThis.window.addEventListener = (type, fn, ...rest) => {
+  if (type === "message" && typeof fn === "function") {
+    messageListeners.push(fn);
+    return;
+  }
+  baseAddEventListener(type, fn, ...rest);
+};
+
 function documentObservers() {
   return observers.filter((o) =>
     o.targets.some(
@@ -248,6 +259,81 @@ test("a panel added later becomes a stop after document mutation", async () => {
 function useFixturesWithoutReset(elements) {
   current = elements;
 }
+
+function makeFrame({ contentWindow, contentDocument } = {}) {
+  const el = makeDiv({
+    clientWidth: 352,
+    clientHeight: 901,
+    scrollHeight: 901,
+    rect: rectOf(1047, 60, 352, 901),
+  });
+  el.tagName = "IFRAME";
+  el.matches = () => true;
+  if (contentWindow !== undefined) el.contentWindow = contentWindow;
+  if (contentDocument !== undefined) el.contentDocument = contentDocument;
+  return el;
+}
+
+function cycleMessage(source) {
+  for (const fn of messageListeners) fn({ data: { type: "jari-cycle-scroll" }, source });
+}
+
+test("cycle ignores messages from non-frame sources", () => {
+  const { feed, junk } = tiktokFixtures();
+  useFixtures([feed, junk]);
+  assert.equal(Scroll.getTarget(), feed);
+  created.length = 0;
+  cycleMessage({});
+  cycleMessage(globalThis.window);
+  cycleMessage(null);
+  for (const fn of messageListeners) fn({ data: { type: "other" }, source: {} });
+  assert.equal(Scroll.getTarget(), feed);
+  assert.deepEqual(
+    created.filter((el) => el.tagName === "div"),
+    [],
+  );
+});
+
+test("cycle runs for messages from a direct child frame", () => {
+  const { feed } = tiktokFixtures();
+  const frameWin = {};
+  const frame = makeFrame({ contentWindow: frameWin });
+  useFixtures([feed]);
+  assert.equal(Scroll.getTarget(), feed);
+  useFixturesWithoutReset([feed, frame]);
+  __resetScrollCache();
+  cycleMessage(frameWin);
+  assert.equal(Scroll.getTarget(), frame);
+});
+
+test("same-origin frames without scrollable content are not stops", () => {
+  const flat = makeFrame({
+    contentWindow: {},
+    contentDocument: {
+      scrollingElement: {
+        scrollHeight: 901,
+        clientHeight: 901,
+        scrollWidth: 352,
+        clientWidth: 352,
+      },
+      documentElement: null,
+      body: null,
+    },
+  });
+  useFixtures([flat]);
+  assert.equal(Scroll.getTarget(), globalThis.window);
+});
+
+test("cross-origin frames stay admitted as stops", () => {
+  const foreign = makeFrame({ contentWindow: {} });
+  Object.defineProperty(foreign, "contentDocument", {
+    get() {
+      throw new Error("denied");
+    },
+  });
+  useFixtures([foreign]);
+  assert.equal(Scroll.getTarget(), foreign);
+});
 
 test("auto-picked target survives until a real rescan", () => {
   const { feed, junk } = tiktokFixtures();

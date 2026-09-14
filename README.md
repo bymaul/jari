@@ -33,7 +33,7 @@ Bindings chain into sequences of any length.
 - Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,
   `G`/`gg`, `f`/`F`/`t`/`T` + char, `o` swap; `y` yank)
 - Modes: `I` ignore, `p` passthrough, `ctrl+alt+v` disable on site
-- Help: `?` cheatsheet, `;e` settings, `;x` extensions page
+- Help: `?` cheatsheet, `:` command palette, `;e` settings, `;x` extensions page
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
 newTab, newIncognitoTab, duplicateTab, togglePin,
