@@ -18,8 +18,11 @@
     { keyword: "g", url: "https://www.google.com/search?q=%s" },
     { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
     { keyword: "gh", url: "https://github.com/search?q=%s" },
-    { keyword: "wiki", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
-    { keyword: "chat", url: "https://chatgpt.com/?q=%s" }
+    {
+      keyword: "wiki",
+      url: "https://en.wikipedia.org/wiki/Special:Search?search=%s"
+    },
+    { keyword: "r", url: "https://www.reddit.com/search/?q=%s" }
   ];
   var DEFAULT_SEARCH_ENGINE = "g";
   var MAX_SEARCH_ENGINES = 20;
@@ -30,7 +33,8 @@
     return SEARCH_ENGINE_DEFAULTS.map((e) => ({ ...e }));
   }
   function validateSearchEngine(entry) {
-    if (!entry || typeof entry !== "object") return "Engine must have a keyword and URL.";
+    if (!entry || typeof entry !== "object")
+      return "Engine must have a keyword and URL.";
     const keyword = String(entry.keyword || "").toLowerCase();
     if (!SEARCH_KEYWORD_RE.test(keyword)) {
       return "Keyword must be 1-16 letters, digits, or underscores.";
@@ -82,6 +86,43 @@
     const engine = (engines || []).find((e) => e && e.keyword === kw);
     if (!engine) return null;
     return String(engine.url).replaceAll("%s", encodeURIComponent(query3));
+  }
+
+  // shared/page-nav-texts.js
+  var PAGE_NAV_TEXT_DEFAULTS = {
+    next: ["Next", "Next page", "More results", "\u203A", "\xBB"],
+    prev: ["Previous", "Prev", "Previous page", "\u2039", "\xAB"]
+  };
+  var MAX_PAGE_NAV_TEXTS = 20;
+  var PAGE_NAV_TEXT_MAX = 100;
+  function pageNavTextDefaults() {
+    return {
+      next: PAGE_NAV_TEXT_DEFAULTS.next.slice(),
+      prev: PAGE_NAV_TEXT_DEFAULTS.prev.slice()
+    };
+  }
+  function normalizePageNavTextList(raw, fallback) {
+    const list = Array.isArray(raw) ? raw : fallback;
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const entry of list) {
+      if (out.length >= MAX_PAGE_NAV_TEXTS) break;
+      const text = String(entry || "").trim();
+      if (!text || text.length > PAGE_NAV_TEXT_MAX) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(text);
+    }
+    return out.length > 0 ? out : fallback.slice();
+  }
+  function normalizePageNavTexts(raw) {
+    const defaults = pageNavTextDefaults();
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+    return {
+      next: normalizePageNavTextList(raw.next, defaults.next),
+      prev: normalizePageNavTextList(raw.prev, defaults.prev)
+    };
   }
 
   // shared/url.js
@@ -566,6 +607,9 @@
     forceReload: { category: "page", label: "Reload without cache" },
     goToParent: { category: "page", label: "Go to parent page" },
     goToRoot: { category: "page", label: "Go to site root" },
+    nextPage: { category: "page", label: "Go to next page" },
+    prevPage: { category: "page", label: "Go to previous page" },
+    toggleBookmark: { category: "page", label: "Bookmark / unbookmark page" },
     editUrl: { category: "page", label: "Edit current URL" },
     copyUrl: { category: "page", label: "Copy page URL" },
     copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
@@ -593,7 +637,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 7;
+  var SETTINGS_SCHEMA_VERSION = 8;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -658,12 +702,15 @@
     ";w": "resetScrollTarget",
     yy: "copyUrl",
     yf: "hintYank",
-    yF: "hintYankText"
+    yF: "hintYankText",
+    "[[": "prevPage",
+    "]]": "nextPage"
   };
   var prefixes = {
     g: {},
     ";": {},
     y: {},
+    "[": {},
     "<": {},
     ">": {}
   };
@@ -697,6 +744,7 @@
     maxResults: maxResultsDefault,
     searchEngines: searchEngineDefaults(),
     defaultEngine: DEFAULT_SEARCH_ENGINE,
+    pageNavTexts: pageNavTextDefaults(),
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT,
     clickableSelector: "",
@@ -846,6 +894,13 @@
       d.keymap = migrateFindToggleBindings(d.keymap);
       version = 7;
     }
+    if (version < 8) {
+      if (d.pageNavTexts === void 0)
+        d.pageNavTexts = pageNavTextDefaults();
+      d.pageNavTexts = normalizePageNavTexts(d.pageNavTexts);
+      d.keymap = migratePageNavBindings(d.keymap);
+      version = 8;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -909,6 +964,24 @@
     }
     return out;
   }
+  var PAGE_NAV_FILLS = [
+    ["[[", "prevPage"],
+    ["]]", "nextPage"]
+  ];
+  function migratePageNavBindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    const used = new Set(Object.values(out));
+    for (const [combo, command] of PAGE_NAV_FILLS) {
+      if (!(combo in out) && !used.has(command)) {
+        out[combo] = command;
+        used.add(command);
+      }
+    }
+    return out;
+  }
   function normalizeSettings(data) {
     const d = migrateSettings(data);
     const storedKeymap = {};
@@ -933,6 +1006,7 @@
       maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
       searchEngines,
       defaultEngine: normalizeDefaultEngine(d.defaultEngine, searchEngines),
+      pageNavTexts: normalizePageNavTexts(d.pageNavTexts),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
       clickableSelector: normalizeClickableSelector(d.clickableSelector),
@@ -982,6 +1056,10 @@
     maxResults: settingsDefaults.maxResults,
     searchEngines: settingsDefaults.searchEngines.map((e) => ({ ...e })),
     defaultEngine: settingsDefaults.defaultEngine,
+    pageNavTexts: {
+      next: settingsDefaults.pageNavTexts.next.slice(),
+      prev: settingsDefaults.pageNavTexts.prev.slice()
+    },
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
     clickableSelector: settingsDefaults.clickableSelector,
@@ -1004,6 +1082,10 @@
     state.maxResults = s.maxResults;
     state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
     state.defaultEngine = s.defaultEngine;
+    state.pageNavTexts = {
+      next: s.pageNavTexts.next.slice(),
+      prev: s.pageNavTexts.prev.slice()
+    };
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
     state.clickableSelector = s.clickableSelector;
@@ -1061,6 +1143,10 @@
       maxResults: state.maxResults,
       searchEngines: state.searchEngines.map((e) => ({ ...e })),
       defaultEngine: state.defaultEngine,
+      pageNavTexts: {
+        next: state.pageNavTexts.next.slice(),
+        prev: state.pageNavTexts.prev.slice()
+      },
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
       clickableSelector: state.clickableSelector,
@@ -1141,6 +1227,12 @@
   function getDefaultEngine() {
     return state.defaultEngine;
   }
+  function getPageNavTexts() {
+    return {
+      next: state.pageNavTexts.next.slice(),
+      prev: state.pageNavTexts.prev.slice()
+    };
+  }
   function getCopyFormat() {
     return state.copyFormat;
   }
@@ -1198,6 +1290,7 @@
     getMaxResults,
     getSearchEngines,
     getDefaultEngine,
+    getPageNavTexts,
     getCopyFormat,
     getHintChars,
     getClickableSelector,
@@ -7787,6 +7880,56 @@
     historyDraft = "";
   }
 
+  // content/page-nav.js
+  function normText(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+  function relTokens(el) {
+    try {
+      const rel = el.getAttribute ? el.getAttribute("rel") : "";
+      return String(rel || "").toLowerCase().split(/\s+/).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+  function elementLabel(el) {
+    let text = "";
+    try {
+      text = el.textContent || "";
+    } catch {
+    }
+    let aria = "";
+    try {
+      aria = el.getAttribute ? el.getAttribute("aria-label") : "";
+    } catch {
+    }
+    return { text: normText(text), aria: normText(aria) };
+  }
+  function findPageNavLink(direction, texts, elements2) {
+    const rel = direction === "prev" ? "prev" : "next";
+    const els = elements2 || getClickableElements();
+    for (const el of els) {
+      if (relTokens(el).includes(rel)) return el;
+    }
+    const wants = new Set((texts || []).map(normText).filter(Boolean));
+    if (wants.size === 0) return null;
+    for (const el of els) {
+      const { text, aria } = elementLabel(el);
+      if (text && wants.has(text) || aria && wants.has(aria)) return el;
+    }
+    return null;
+  }
+  function goPage(direction) {
+    const dir = direction === "prev" ? "prev" : "next";
+    const texts = settings.getPageNavTexts()[dir] || [];
+    const el = findPageNavLink(dir, texts);
+    if (!el) {
+      ui.toast(dir === "prev" ? "No previous page" : "No next page");
+      return;
+    }
+    ui.dispatchClick(el);
+  }
+
   // content/commands.js
   var PAGE_RATIO = 0.9;
   var HALF_RATIO = 0.5;
@@ -7948,6 +8091,28 @@ ${location.href}`;
     if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
     sendMessage("navigate", { url: target2 });
   }
+  var UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
+  async function toggleBookmarkPage() {
+    const url = location.href || "";
+    if (UNBOOKMARKABLE_SCHEMES.test(url)) {
+      ui.toast("Cannot bookmark this page");
+      return;
+    }
+    let res;
+    try {
+      res = await sendMessage("toggleBookmark", {
+        url,
+        title: document.title || url
+      });
+    } catch {
+      res = null;
+    }
+    if (!res || !res.ok) {
+      ui.toast("Bookmark failed");
+      return;
+    }
+    ui.toast(res.bookmarked ? "Bookmarked" : "Bookmark removed");
+  }
   var commands = {
     scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
     scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
@@ -8037,6 +8202,9 @@ ${location.href}`;
     forceReload: { ...COMMAND_CATALOG.forceReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
     goToParent: { ...COMMAND_CATALOG.goToParent, run: () => goTo(Url.parentUrlOf) },
     goToRoot: { ...COMMAND_CATALOG.goToRoot, run: () => goTo(Url.rootUrlOf) },
+    nextPage: { ...COMMAND_CATALOG.nextPage, run: () => goPage("next") },
+    prevPage: { ...COMMAND_CATALOG.prevPage, run: () => goPage("prev") },
+    toggleBookmark: { ...COMMAND_CATALOG.toggleBookmark, run: () => toggleBookmarkPage() },
     editUrl: {
       ...COMMAND_CATALOG.editUrl,
       run: () => Prompt.openEditUrl()

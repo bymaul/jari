@@ -162,6 +162,29 @@ test("unbinding a backfilled combo sticks", async () => {
   assert.equal(settings.getKeymap()["t"], undefined);
 });
 
+test("page-nav texts default and round-trip through update", async () => {
+  const defaults = settings.getPageNavTexts();
+  assert.ok(defaults.next.includes("Next"));
+  assert.ok(defaults.prev.length > 0);
+  const writes = [];
+  stubStorage({
+    syncSet: async (data) => {
+      writes.push(data);
+    },
+  });
+  await settings.update({
+    pageNavTexts: { next: ["Weiter"], prev: ["Zurück"] },
+  });
+  assert.deepEqual(settings.getPageNavTexts(), {
+    next: ["Weiter"],
+    prev: ["Zurück"],
+  });
+  assert.deepEqual(writes[0].settings.pageNavTexts, {
+    next: ["Weiter"],
+    prev: ["Zurück"],
+  });
+});
+
 test("isDisabled matches wildcards and the file sentinel", () => {
   settings.set({ disabledSites: ["*.example.com", "file://"] });
   globalThis.location = { hostname: "sub.example.com", protocol: "https:" };

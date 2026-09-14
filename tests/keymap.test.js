@@ -241,7 +241,7 @@ test("v4 settings migrate forward gaining seeded search engines", () => {
   assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.deepEqual(
     s.searchEngines.map((e) => e.keyword),
-    ["g", "yt", "gh", "wiki", "chat"],
+    ["g", "yt", "gh", "wiki", "r"],
   );
   assert.equal(s.defaultEngine, "g");
   const custom = Jari.normalizeSettings({
@@ -308,25 +308,29 @@ test("migrateYankBindings leaves custom rebinds and occupied targets alone", () 
   assert.deepEqual(Jari.migrateYankBindings([]), []);
 });
 
-test("v5 stored keymaps migrate yank binds through v7", () => {
+test("v5 stored keymaps migrate yank binds through v8", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 5,
     keymap: { yfa: "hintYank", yft: "hintYankText" },
   });
-  assert.equal(s.schemaVersion, 7);
+  assert.equal(s.schemaVersion, 8);
   assert.equal(s.keymap.yf, "hintYank");
   assert.equal(s.keymap.yF, "hintYankText");
   assert.equal(s.keymap.yfa, undefined);
   assert.equal(s.keymap.yft, undefined);
+  assert.equal(s.keymap["[["], "prevPage");
+  assert.equal(s.keymap["]]"], "nextPage");
 });
 
-test("stored keymaps without yank binds keep them unbound through v7", () => {
+test("stored keymaps without yank binds keep them unbound through v8", () => {
   const s = Jari.normalizeSettings({ schemaVersion: 5, keymap: { j: "scrollDown" } });
-  assert.equal(s.schemaVersion, 7);
+  assert.equal(s.schemaVersion, 8);
   assert.equal(s.keymap.j, "scrollDown");
   for (const combo of ["yf", "yF", "yfa", "yft"]) {
     assert.equal(s.keymap[combo], undefined);
   }
+  assert.equal(s.keymap["[["], "prevPage");
+  assert.equal(s.keymap["]]"], "nextPage");
 });
 
 test("normalizeHintTheme falls back to yellow for unknown themes", () => {
@@ -424,15 +428,93 @@ test("migrateFindToggleBindings leaves custom rebinds and occupied combos alone"
   assert.deepEqual(Jari.migrateFindToggleBindings([]), []);
 });
 
-test("v6 stored keymaps migrate to the new toggle binds and stamp v7", () => {
+test("v6 stored keymaps migrate to the new toggle binds and stamp v8", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 6,
     keymap: { "alt+r": "toggleFindRegex" },
   });
-  assert.equal(s.schemaVersion, 7);
+  assert.equal(s.schemaVersion, 8);
   assert.equal(s.keymap["alt+1"], "toggleFindRegex");
   assert.equal(s.keymap["alt+r"], undefined);
   assert.equal(s.keymap.d, "scrollHalfPageDown");
+  assert.equal(s.keymap["[["], "prevPage");
+  assert.equal(s.keymap["]]"], "nextPage");
+});
+
+test("page navigation binds default to [[/]] without conflicts", () => {
+  assert.equal(Jari.keymapDefaults["[["], "prevPage");
+  assert.equal(Jari.keymapDefaults["]]"], "nextPage");
+  assert.equal(COMMAND_CATALOG.prevPage.category, "page");
+  assert.equal(COMMAND_CATALOG.nextPage.category, "page");
+  for (const [combo, command] of [
+    ["[[", "prevPage"],
+    ["]]", "nextPage"],
+  ]) {
+    assert.equal(Jari.findBindingConflict(Jari.keymapDefaults, combo, command), null);
+    assert.deepEqual(Jari.findOverlapConflicts(Jari.keymapDefaults, combo), []);
+    assert.equal(Jari.isBrowserTrapped(combo), false);
+  }
+});
+
+test("toggleBookmark stays unbound by design", () => {
+  assert.equal(COMMAND_CATALOG.toggleBookmark.category, "page");
+  assert.deepEqual(Jari.keysForCommand(Jari.keymapDefaults, "toggleBookmark"), []);
+});
+
+test("migratePageNavBindings fills free combos for unused commands", () => {
+  const filled = Jari.migratePageNavBindings({ j: "scrollDown" });
+  assert.equal(filled["[["], "prevPage");
+  assert.equal(filled["]]"], "nextPage");
+  assert.equal(filled.j, "scrollDown");
+});
+
+test("migratePageNavBindings leaves custom rebinds and occupied combos alone", () => {
+  const custom = {
+    "[[": "closeTab",
+    "]]": "nextPage",
+    z: "prevPage",
+  };
+  const out = Jari.migratePageNavBindings(custom);
+  assert.equal(out["[["], "closeTab");
+  assert.equal(out["]]"], "nextPage");
+  assert.equal(out.z, "prevPage");
+  assert.equal(Jari.migratePageNavBindings(null), null);
+  assert.deepEqual(Jari.migratePageNavBindings([]), []);
+});
+
+test("v7 stored keymaps gain page-nav binds and texts, stamp v8", () => {
+  const s = Jari.normalizeSettings({
+    schemaVersion: 7,
+    keymap: { j: "scrollDown" },
+  });
+  assert.equal(s.schemaVersion, 8);
+  assert.equal(s.keymap["[["], "prevPage");
+  assert.equal(s.keymap["]]"], "nextPage");
+  assert.deepEqual(s.pageNavTexts.next[0], "Next");
+  assert.ok(s.pageNavTexts.prev.length > 0);
+});
+
+test("v7 stored keymaps keep custom page-nav texts", () => {
+  const s = Jari.normalizeSettings({
+    schemaVersion: 7,
+    keymap: {},
+    pageNavTexts: { next: ["Weiter"], prev: [] },
+  });
+  assert.equal(s.schemaVersion, 8);
+  assert.deepEqual(s.pageNavTexts.next, ["Weiter"]);
+  assert.ok(s.pageNavTexts.prev.length > 0);
+});
+
+test("normalizeSettings falls back to default page-nav texts on corrupt input", () => {
+  assert.deepEqual(
+    Jari.normalizeSettings({}).pageNavTexts,
+    Jari.normalizeSettings({ pageNavTexts: null }).pageNavTexts,
+  );
+  const s = Jari.normalizeSettings({
+    pageNavTexts: { next: ["Next", "next", "", "x".repeat(200)], prev: "nope" },
+  });
+  assert.deepEqual(s.pageNavTexts.next, ["Next"]);
+  assert.ok(s.pageNavTexts.prev.length > 0);
 });
 
 test("prefix helpers work for multi-key sequences", () => {

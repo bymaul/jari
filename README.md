@@ -24,7 +24,8 @@ Bindings chain into sequences of any length.
   `gp`/`gP` open clipboard here/background
 - History: `H`/`L` back/forward
 - Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
-  `yy` copy URL, `Y` copy title + URL
+  `yy` copy URL, `Y` copy title + URL, `[[`/`]]` previous/next page
+  (customizable link texts in settings)
 - Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
   rebindable toggles `alt+1` regex, `alt+2` whole word, `alt+3` case;
@@ -36,7 +37,7 @@ Bindings chain into sequences of any length.
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
 newTab, newIncognitoTab, duplicateTab, togglePin,
-toggleMute, hintOpenCurrent.
+toggleMute, hintOpenCurrent, toggleBookmark.
 
 ## Settings (`;e`)
 
@@ -46,7 +47,7 @@ fires first.
 
 Hints offers themes, label size, and an extra clickable selector; disabled
 sites accept `*.example.com` wildcards. Search offers a default engine plus
-custom `keyword query` engines (`g`, `yt`, `gh`, `wiki`, `chat` built in).
+custom `keyword query` engines (`g`, `yt`, `gh`, `wiki`, `r` built in).
 
 ## Install
 
@@ -69,7 +70,7 @@ Or build from source (below) and load this folder the same way. The checked-in
 | `history`, `bookmarks`      | Omnibox (`t`) suggestions from your history and bookmarks                             |
 | `storage`                   | Persist your settings via the browser's synced storage                                |
 | `clipboardRead`             | Open a URL from your clipboard (`gp`/`gP`)                                            |
-| `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API|
+| `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API |
 | `<all_urls>` content script | Link hints, scrolling, find, and visual mode on the pages you visit                   |
 
 Jari makes no network requests of its own and sends nothing anywhere.

@@ -16,7 +16,7 @@ import {
 test("defaults seed the five previous hardcoded engines", () => {
   assert.deepEqual(
     SEARCH_ENGINE_DEFAULTS.map((e) => e.keyword),
-    ["g", "yt", "gh", "wiki", "chat"],
+    ["g", "yt", "gh", "wiki", "r"],
   );
   for (const engine of SEARCH_ENGINE_DEFAULTS) {
     assert.match(engine.url, /^https:\/\//);
@@ -29,7 +29,10 @@ test("defaults seed the five previous hardcoded engines", () => {
 
 test("validateSearchEngine accepts a well-formed engine", () => {
   assert.equal(
-    validateSearchEngine({ keyword: "ddg", url: "https://duckduckgo.com/?q=%s" }),
+    validateSearchEngine({
+      keyword: "ddg",
+      url: "https://duckduckgo.com/?q=%s",
+    }),
     null,
   );
   assert.equal(
@@ -39,11 +42,23 @@ test("validateSearchEngine accepts a well-formed engine", () => {
 });
 
 test("validateSearchEngine rejects bad keywords", () => {
-  assert.match(validateSearchEngine({ keyword: "", url: "https://e.com/?q=%s" }), /Keyword/);
-  assert.match(validateSearchEngine({ keyword: "a b", url: "https://e.com/?q=%s" }), /Keyword/);
-  assert.match(validateSearchEngine({ keyword: "g!", url: "https://e.com/?q=%s" }), /Keyword/);
   assert.match(
-    validateSearchEngine({ keyword: "a".repeat(17), url: "https://e.com/?q=%s" }),
+    validateSearchEngine({ keyword: "", url: "https://e.com/?q=%s" }),
+    /Keyword/,
+  );
+  assert.match(
+    validateSearchEngine({ keyword: "a b", url: "https://e.com/?q=%s" }),
+    /Keyword/,
+  );
+  assert.match(
+    validateSearchEngine({ keyword: "g!", url: "https://e.com/?q=%s" }),
+    /Keyword/,
+  );
+  assert.match(
+    validateSearchEngine({
+      keyword: "a".repeat(17),
+      url: "https://e.com/?q=%s",
+    }),
     /Keyword/,
   );
   assert.match(validateSearchEngine(null), /keyword/i);
@@ -75,7 +90,10 @@ test("validateSearchEngine rejects bad URLs", () => {
     /%s/,
   );
   assert.match(
-    validateSearchEngine({ keyword: "ddg", url: `https://e.com/${"a".repeat(490)}?q=%s` }),
+    validateSearchEngine({
+      keyword: "ddg",
+      url: `https://e.com/${"a".repeat(490)}?q=%s`,
+    }),
     /500/,
   );
 });
@@ -133,16 +151,11 @@ test("parseEngineKeyword resolves custom engines case-insensitively", () => {
   assert.equal(parseEngineKeyword("g hi", engines), null);
   assert.equal(parseEngineKeyword("ddg", engines), null);
   assert.equal(parseEngineKeyword("", engines), null);
-  assert.equal(
-    parseEngineKeyword("t something", searchEngineDefaults()),
-    null,
-  );
+  assert.equal(parseEngineKeyword("t something", searchEngineDefaults()), null);
 });
 
 test("buildEngineUrl encodes the query and replaces every marker", () => {
-  const engines = [
-    { keyword: "x", url: "https://e.com/?a=%s&b=%s" },
-  ];
+  const engines = [{ keyword: "x", url: "https://e.com/?a=%s&b=%s" }];
   assert.equal(
     buildEngineUrl(engines, "x", "a b&c"),
     "https://e.com/?a=a%20b%26c&b=a%20b%26c",

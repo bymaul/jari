@@ -17,8 +17,11 @@
     { keyword: "g", url: "https://www.google.com/search?q=%s" },
     { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
     { keyword: "gh", url: "https://github.com/search?q=%s" },
-    { keyword: "wiki", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
-    { keyword: "chat", url: "https://chatgpt.com/?q=%s" }
+    {
+      keyword: "wiki",
+      url: "https://en.wikipedia.org/wiki/Special:Search?search=%s"
+    },
+    { keyword: "r", url: "https://www.reddit.com/search/?q=%s" }
   ];
   var DEFAULT_SEARCH_ENGINE = "g";
   var MAX_SEARCH_ENGINES = 20;
@@ -29,7 +32,8 @@
     return SEARCH_ENGINE_DEFAULTS.map((e) => ({ ...e }));
   }
   function validateSearchEngine(entry) {
-    if (!entry || typeof entry !== "object") return "Engine must have a keyword and URL.";
+    if (!entry || typeof entry !== "object")
+      return "Engine must have a keyword and URL.";
     const keyword = String(entry.keyword || "").toLowerCase();
     if (!SEARCH_KEYWORD_RE.test(keyword)) {
       return "Keyword must be 1-16 letters, digits, or underscores.";
@@ -68,6 +72,43 @@
     const keyword = String(raw || "").toLowerCase();
     if (list.some((e) => e && e.keyword === keyword)) return keyword;
     return list[0].keyword;
+  }
+
+  // shared/page-nav-texts.js
+  var PAGE_NAV_TEXT_DEFAULTS = {
+    next: ["Next", "Next page", "More results", "\u203A", "\xBB"],
+    prev: ["Previous", "Prev", "Previous page", "\u2039", "\xAB"]
+  };
+  var MAX_PAGE_NAV_TEXTS = 20;
+  var PAGE_NAV_TEXT_MAX = 100;
+  function pageNavTextDefaults() {
+    return {
+      next: PAGE_NAV_TEXT_DEFAULTS.next.slice(),
+      prev: PAGE_NAV_TEXT_DEFAULTS.prev.slice()
+    };
+  }
+  function normalizePageNavTextList(raw, fallback) {
+    const list = Array.isArray(raw) ? raw : fallback;
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const entry of list) {
+      if (out.length >= MAX_PAGE_NAV_TEXTS) break;
+      const text = String(entry || "").trim();
+      if (!text || text.length > PAGE_NAV_TEXT_MAX) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(text);
+    }
+    return out.length > 0 ? out : fallback.slice();
+  }
+  function normalizePageNavTexts(raw) {
+    const defaults = pageNavTextDefaults();
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+    return {
+      next: normalizePageNavTextList(raw.next, defaults.next),
+      prev: normalizePageNavTextList(raw.prev, defaults.prev)
+    };
   }
 
   // shared/url.js
@@ -277,6 +318,9 @@
     forceReload: { category: "page", label: "Reload without cache" },
     goToParent: { category: "page", label: "Go to parent page" },
     goToRoot: { category: "page", label: "Go to site root" },
+    nextPage: { category: "page", label: "Go to next page" },
+    prevPage: { category: "page", label: "Go to previous page" },
+    toggleBookmark: { category: "page", label: "Bookmark / unbookmark page" },
     editUrl: { category: "page", label: "Edit current URL" },
     copyUrl: { category: "page", label: "Copy page URL" },
     copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
@@ -304,7 +348,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 7;
+  var SETTINGS_SCHEMA_VERSION = 8;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -369,12 +413,15 @@
     ";w": "resetScrollTarget",
     yy: "copyUrl",
     yf: "hintYank",
-    yF: "hintYankText"
+    yF: "hintYankText",
+    "[[": "prevPage",
+    "]]": "nextPage"
   };
   var prefixes = {
     g: {},
     ";": {},
     y: {},
+    "[": {},
     "<": {},
     ">": {}
   };
@@ -408,6 +455,7 @@
     maxResults: maxResultsDefault,
     searchEngines: searchEngineDefaults(),
     defaultEngine: DEFAULT_SEARCH_ENGINE,
+    pageNavTexts: pageNavTextDefaults(),
     copyFormat: "plain",
     hintChars: HINT_CHARSET_DEFAULT,
     clickableSelector: "",
@@ -536,6 +584,13 @@
       d.keymap = migrateFindToggleBindings(d.keymap);
       version = 7;
     }
+    if (version < 8) {
+      if (d.pageNavTexts === void 0)
+        d.pageNavTexts = pageNavTextDefaults();
+      d.pageNavTexts = normalizePageNavTexts(d.pageNavTexts);
+      d.keymap = migratePageNavBindings(d.keymap);
+      version = 8;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -599,6 +654,24 @@
     }
     return out;
   }
+  var PAGE_NAV_FILLS = [
+    ["[[", "prevPage"],
+    ["]]", "nextPage"]
+  ];
+  function migratePageNavBindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    const used = new Set(Object.values(out));
+    for (const [combo, command] of PAGE_NAV_FILLS) {
+      if (!(combo in out) && !used.has(command)) {
+        out[combo] = command;
+        used.add(command);
+      }
+    }
+    return out;
+  }
   function normalizeSettings(data) {
     const d = migrateSettings(data);
     const storedKeymap = {};
@@ -623,6 +696,7 @@
       maxResults: d.maxResults === void 0 ? settingsDefaults.maxResults : clampMaxResults(d.maxResults),
       searchEngines,
       defaultEngine: normalizeDefaultEngine(d.defaultEngine, searchEngines),
+      pageNavTexts: normalizePageNavTexts(d.pageNavTexts),
       copyFormat: d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
       hintChars: normalizeHintChars(d.hintChars),
       clickableSelector: normalizeClickableSelector(d.clickableSelector),
@@ -690,6 +764,10 @@
     maxResults: settingsDefaults.maxResults,
     searchEngines: settingsDefaults.searchEngines.map((e) => ({ ...e })),
     defaultEngine: settingsDefaults.defaultEngine,
+    pageNavTexts: {
+      next: settingsDefaults.pageNavTexts.next.slice(),
+      prev: settingsDefaults.pageNavTexts.prev.slice()
+    },
     copyFormat: settingsDefaults.copyFormat,
     hintChars: settingsDefaults.hintChars,
     clickableSelector: settingsDefaults.clickableSelector,
@@ -712,6 +790,10 @@
     state.maxResults = s.maxResults;
     state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
     state.defaultEngine = s.defaultEngine;
+    state.pageNavTexts = {
+      next: s.pageNavTexts.next.slice(),
+      prev: s.pageNavTexts.prev.slice()
+    };
     state.copyFormat = s.copyFormat;
     state.hintChars = s.hintChars;
     state.clickableSelector = s.clickableSelector;
@@ -769,6 +851,10 @@
       maxResults: state.maxResults,
       searchEngines: state.searchEngines.map((e) => ({ ...e })),
       defaultEngine: state.defaultEngine,
+      pageNavTexts: {
+        next: state.pageNavTexts.next.slice(),
+        prev: state.pageNavTexts.prev.slice()
+      },
       copyFormat: state.copyFormat,
       hintChars: state.hintChars,
       clickableSelector: state.clickableSelector,
@@ -849,6 +935,12 @@
   function getDefaultEngine() {
     return state.defaultEngine;
   }
+  function getPageNavTexts() {
+    return {
+      next: state.pageNavTexts.next.slice(),
+      prev: state.pageNavTexts.prev.slice()
+    };
+  }
   function getCopyFormat() {
     return state.copyFormat;
   }
@@ -906,6 +998,7 @@
     getMaxResults,
     getSearchEngines,
     getDefaultEngine,
+    getPageNavTexts,
     getCopyFormat,
     getHintChars,
     getClickableSelector,
@@ -1209,6 +1302,11 @@
   var engineListEl = document.querySelector("#engine-list");
   var addEngineBtn = document.querySelector("#add-engine");
   var resetEnginesBtn = document.querySelector("#reset-engines");
+  var pagenavNextListEl = document.querySelector("#pagenav-next-list");
+  var pagenavPrevListEl = document.querySelector("#pagenav-prev-list");
+  var addPagenavNextBtn = document.querySelector("#add-pagenav-next");
+  var addPagenavPrevBtn = document.querySelector("#add-pagenav-prev");
+  var resetPagenavBtn = document.querySelector("#reset-pagenav");
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
   var hintCharsMetaEl = document.querySelector("#hint-chars-meta");
@@ -1318,7 +1416,8 @@
     if (summaries.search) {
       const n = settings.getSuggestionSources().length;
       const engines = settings.getSearchEngines();
-      summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} \xB7 ${n} source${n === 1 ? "" : "s"} \xB7 max ${settings.getMaxResults()} \xB7 ${engines.length} engine${engines.length === 1 ? "" : "s"} \xB7 default ${settings.getDefaultEngine()}`;
+      const nav = settings.getPageNavTexts();
+      summaries.search.textContent = `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} \xB7 ${n} source${n === 1 ? "" : "s"} \xB7 max ${settings.getMaxResults()} \xB7 ${engines.length} engine${engines.length === 1 ? "" : "s"} \xB7 default ${settings.getDefaultEngine()} \xB7 page nav ${nav.next.length}+${nav.prev.length}`;
     }
     if (summaries.clipboard) {
       summaries.clipboard.textContent = settings.getCopyFormat() === "markdown" ? "Markdown link" : "Plain (title + URL)";
@@ -1386,6 +1485,7 @@
     sourceBookmarkEl.checked = sources.includes("bookmark");
     maxResultsEl.value = settings.getMaxResults();
     renderEngines();
+    renderPagenav();
     copyFormatEl.value = settings.getCopyFormat();
     hintCharsEl.value = settings.getHintChars();
     if (clickableSelectorEl)
@@ -2186,6 +2286,137 @@
       }
     });
   }
+  function pagenavRow(text) {
+    const li = document.createElement("li");
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "pagenav-text";
+    input.value = text;
+    input.placeholder = "Next";
+    input.setAttribute("aria-label", "Page navigation link text");
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("spellcheck", "false");
+    input.addEventListener("change", commitPagenav);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${text || "navigation text"}`);
+    remove.addEventListener("click", () => removePagenavRow(li));
+    li.appendChild(input);
+    li.appendChild(remove);
+    return li;
+  }
+  function readPagenavRows(listEl) {
+    const rows = [];
+    if (!listEl) return rows;
+    for (const li of listEl.children) {
+      const input = li.querySelector(".pagenav-text");
+      if (!input) continue;
+      rows.push({ input, text: input.value.trim() });
+    }
+    return rows;
+  }
+  function renderPagenav() {
+    if (pagenavNextListEl) {
+      pagenavNextListEl.textContent = "";
+      for (const text of settings.getPageNavTexts().next) {
+        pagenavNextListEl.appendChild(pagenavRow(text));
+      }
+    }
+    if (pagenavPrevListEl) {
+      pagenavPrevListEl.textContent = "";
+      for (const text of settings.getPageNavTexts().prev) {
+        pagenavPrevListEl.appendChild(pagenavRow(text));
+      }
+    }
+    clearFieldError("error-pagenav");
+  }
+  function failPagenav(message, badEls) {
+    for (const el of badEls || []) markInvalid(el, true);
+    showFieldError("error-pagenav", `${message} (not saved)`);
+    status(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+  }
+  function collectPagenavList(rows, label) {
+    const seen = /* @__PURE__ */ new Set();
+    const list = [];
+    for (const row of rows) {
+      markInvalid(row.input, false);
+      if (row.text === "") continue;
+      if (row.text.length > PAGE_NAV_TEXT_MAX) {
+        return {
+          error: `Text must be ${PAGE_NAV_TEXT_MAX} characters or fewer`,
+          bad: [row.input]
+        };
+      }
+      const key = row.text.toLowerCase();
+      if (seen.has(key)) {
+        return { error: `Duplicate text "${row.text}"`, bad: [row.input] };
+      }
+      seen.add(key);
+      list.push(row.text);
+    }
+    if (list.length === 0) {
+      return { error: `At least one ${label} text is required`, bad: [] };
+    }
+    return { list };
+  }
+  function commitPagenav() {
+    clearFieldError("error-pagenav");
+    const nextRows = readPagenavRows(pagenavNextListEl);
+    const prevRows = readPagenavRows(pagenavPrevListEl);
+    const next = collectPagenavList(nextRows, "next page");
+    if (next.error) {
+      failPagenav(next.error, next.bad);
+      return;
+    }
+    const prev = collectPagenavList(prevRows, "previous page");
+    if (prev.error) {
+      failPagenav(prev.error, prev.bad);
+      return;
+    }
+    if (next.list.length > MAX_PAGE_NAV_TEXTS || prev.list.length > MAX_PAGE_NAV_TEXTS) {
+      failPagenav(`At most ${MAX_PAGE_NAV_TEXTS} texts per list`, []);
+      return;
+    }
+    savePatch({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
+      (ok) => {
+        if (!ok) return;
+        renderPagenav();
+      }
+    );
+  }
+  function removePagenavRow(li) {
+    const listEl = li.parentElement;
+    const rows = readPagenavRows(listEl);
+    if (rows.length <= 1) {
+      failPagenav("At least one text per list is required", []);
+      return;
+    }
+    li.remove();
+    commitPagenav();
+  }
+  function addPagenavRow(listEl) {
+    if (!listEl) return;
+    clearFieldError("error-pagenav");
+    if (listEl.children.length >= MAX_PAGE_NAV_TEXTS) {
+      showFieldError(
+        "error-pagenav",
+        `At most ${MAX_PAGE_NAV_TEXTS} texts per list (not saved)`
+      );
+      return;
+    }
+    const li = pagenavRow("");
+    listEl.appendChild(li);
+    li.querySelector(".pagenav-text").focus();
+  }
+  function resetPagenav() {
+    savePatch({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
+      if (ok) {
+        renderPagenav();
+        status("Page navigation texts restored to defaults");
+      }
+    });
+  }
   var confirmCount = 0;
   function confirmDialog(message, confirmLabel) {
     const previousFocus = document.activeElement;
@@ -2260,6 +2491,7 @@
       maxResults: settingsDefaults.maxResults,
       searchEngines: searchEngineDefaults(),
       defaultEngine: settingsDefaults.defaultEngine,
+      pageNavTexts: pageNavTextDefaults(),
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,
       clickableSelector: settingsDefaults.clickableSelector,
@@ -2455,6 +2687,15 @@
   );
   addEngineBtn?.addEventListener("click", addEngine);
   resetEnginesBtn?.addEventListener("click", resetEngines);
+  addPagenavNextBtn?.addEventListener(
+    "click",
+    () => addPagenavRow(pagenavNextListEl)
+  );
+  addPagenavPrevBtn?.addEventListener(
+    "click",
+    () => addPagenavRow(pagenavPrevListEl)
+  );
+  resetPagenavBtn?.addEventListener("click", resetPagenav);
   hintCharsEl.addEventListener("input", () => {
     clearFieldError("error-hint-chars");
     markInvalid(hintCharsEl, false);

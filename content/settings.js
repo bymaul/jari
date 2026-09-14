@@ -25,6 +25,10 @@ const state = {
   maxResults: settingsDefaults.maxResults,
   searchEngines: settingsDefaults.searchEngines.map((e) => ({ ...e })),
   defaultEngine: settingsDefaults.defaultEngine,
+  pageNavTexts: {
+    next: settingsDefaults.pageNavTexts.next.slice(),
+    prev: settingsDefaults.pageNavTexts.prev.slice(),
+  },
   copyFormat: settingsDefaults.copyFormat,
   hintChars: settingsDefaults.hintChars,
   clickableSelector: settingsDefaults.clickableSelector,
@@ -48,6 +52,10 @@ function merge(data) {
   state.maxResults = s.maxResults;
   state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
   state.defaultEngine = s.defaultEngine;
+  state.pageNavTexts = {
+    next: s.pageNavTexts.next.slice(),
+    prev: s.pageNavTexts.prev.slice(),
+  };
   state.copyFormat = s.copyFormat;
   state.hintChars = s.hintChars;
   state.clickableSelector = s.clickableSelector;
@@ -110,6 +118,10 @@ function snapshot() {
     maxResults: state.maxResults,
     searchEngines: state.searchEngines.map((e) => ({ ...e })),
     defaultEngine: state.defaultEngine,
+    pageNavTexts: {
+      next: state.pageNavTexts.next.slice(),
+      prev: state.pageNavTexts.prev.slice(),
+    },
     copyFormat: state.copyFormat,
     hintChars: state.hintChars,
     clickableSelector: state.clickableSelector,
@@ -208,6 +220,13 @@ function getDefaultEngine() {
   return state.defaultEngine;
 }
 
+function getPageNavTexts() {
+  return {
+    next: state.pageNavTexts.next.slice(),
+    prev: state.pageNavTexts.prev.slice(),
+  };
+}
+
 function getCopyFormat() {
   return state.copyFormat;
 }
@@ -274,6 +293,7 @@ export const settings = {
   getMaxResults,
   getSearchEngines,
   getDefaultEngine,
+  getPageNavTexts,
   getCopyFormat,
   getHintChars,
   getClickableSelector,

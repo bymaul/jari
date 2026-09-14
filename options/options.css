@@ -657,13 +657,15 @@ dialog.jari-confirm-box::backdrop {
   font-size: 11px;
 }
 
-#engine-list {
+#engine-list,
+.pagenav-list {
   list-style: none;
   padding: 0;
   margin: 0 0 10px;
 }
 
-#engine-list li {
+#engine-list li,
+.pagenav-list li {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -672,7 +674,8 @@ dialog.jari-confirm-box::backdrop {
   margin-bottom: 4px;
 }
 
-#engine-list input {
+#engine-list input,
+.pagenav-list input {
   padding: 3px 8px;
   background: #1e1e26;
   border: 1px solid var(--border);
@@ -681,7 +684,8 @@ dialog.jari-confirm-box::backdrop {
   font-size: 12px;
 }
 
-#engine-list input[aria-invalid="true"] {
+#engine-list input[aria-invalid="true"],
+.pagenav-list input[aria-invalid="true"] {
   border-color: var(--danger);
 }
 
@@ -691,6 +695,11 @@ dialog.jari-confirm-box::backdrop {
 }
 
 #engine-list .engine-url {
+  flex: 1;
+  min-width: 0;
+}
+
+.pagenav-list .pagenav-text {
   flex: 1;
   min-width: 0;
 }

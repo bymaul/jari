@@ -17,8 +17,11 @@
     { keyword: "g", url: "https://www.google.com/search?q=%s" },
     { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
     { keyword: "gh", url: "https://github.com/search?q=%s" },
-    { keyword: "wiki", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
-    { keyword: "chat", url: "https://chatgpt.com/?q=%s" }
+    {
+      keyword: "wiki",
+      url: "https://en.wikipedia.org/wiki/Special:Search?search=%s"
+    },
+    { keyword: "r", url: "https://www.reddit.com/search/?q=%s" }
   ];
   var MAX_SEARCH_ENGINES = 20;
   var SEARCH_KEYWORD_RE = /^[a-z0-9_]{1,16}$/;
@@ -28,7 +31,8 @@
     return SEARCH_ENGINE_DEFAULTS.map((e) => ({ ...e }));
   }
   function validateSearchEngine(entry) {
-    if (!entry || typeof entry !== "object") return "Engine must have a keyword and URL.";
+    if (!entry || typeof entry !== "object")
+      return "Engine must have a keyword and URL.";
     const keyword = String(entry.keyword || "").toLowerCase();
     if (!SEARCH_KEYWORD_RE.test(keyword)) {
       return "Keyword must be 1-16 letters, digits, or underscores.";
@@ -424,6 +428,27 @@
     );
     return buildEngineUrl(engines, keyword, text) || "https://www.google.com/search?q=" + encodeURIComponent(text);
   }
+  async function findBookmarkBarId() {
+    let roots;
+    try {
+      roots = await chrome.bookmarks.getTree() || [];
+    } catch {
+      return "1";
+    }
+    const folders = [];
+    for (const root of roots) {
+      for (const child of root && root.children || []) {
+        if (child && child.children && child.id) folders.push(child);
+      }
+    }
+    const byTitle = (re) => folders.find((f) => re.test(String(f.title || "")));
+    const bar = byTitle(/bookmarks?\s?(bar|toolbar)/i);
+    if (bar) return bar.id;
+    const other = byTitle(/other/i);
+    if (other) return other.id;
+    if (folders.length > 0) return folders[0].id;
+    return "1";
+  }
   var handlers = {
     createTab: async (_, { url } = {}) => {
       const target = url === void 0 ? void 0 : normalizeUrl(url);
@@ -722,6 +747,40 @@
     },
     openInBackgroundTab: async (_, { url } = {}) => openTab(url, false),
     openInForegroundTab: async (_, { url } = {}) => openTab(url, true),
+    toggleBookmark: async (_, { url = "", title = "" } = {}) => {
+      const target = String(url || "");
+      if (!/^(https?|file):\/\//i.test(target)) return { ok: false };
+      let found;
+      try {
+        found = await chrome.bookmarks.search(target);
+      } catch {
+        return { ok: false };
+      }
+      const existing = (found || []).filter(
+        (node) => node && node.url === target
+      );
+      if (existing.length > 0) {
+        try {
+          await Promise.all(
+            existing.map((node) => chrome.bookmarks.remove(node.id))
+          );
+        } catch {
+          return { ok: false };
+        }
+        return { ok: true, bookmarked: false };
+      }
+      const parentId = await findBookmarkBarId();
+      try {
+        await chrome.bookmarks.create({
+          parentId,
+          title: String(title || target),
+          url: target
+        });
+      } catch {
+        return { ok: false };
+      }
+      return { ok: true, bookmarked: true };
+    },
     openSettings: async () => {
       await chrome.runtime.openOptionsPage();
       return { ok: true };

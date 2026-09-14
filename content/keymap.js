@@ -9,10 +9,14 @@ import {
   normalizeSearchEngines,
   searchEngineDefaults,
 } from "../shared/search-engines.js";
+import {
+  normalizePageNavTexts,
+  pageNavTextDefaults,
+} from "../shared/page-nav-texts.js";
 import { normalizeSitePattern } from "../shared/url.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
-export const SETTINGS_SCHEMA_VERSION = 7;
+export const SETTINGS_SCHEMA_VERSION = 8;
 
 export const Events = {
   listeners: {},
@@ -90,12 +94,16 @@ export const keymapDefaults = {
   yy: "copyUrl",
   yf: "hintYank",
   yF: "hintYankText",
+
+  "[[": "prevPage",
+  "]]": "nextPage",
 };
 
 export const prefixes = {
   g: {},
   ";": {},
   y: {},
+  "[": {},
   "<": {},
   ">": {},
 };
@@ -139,6 +147,7 @@ export const settingsDefaults = {
 
   searchEngines: searchEngineDefaults(),
   defaultEngine: DEFAULT_SEARCH_ENGINE,
+  pageNavTexts: pageNavTextDefaults(),
 
   copyFormat: "plain",
 
@@ -385,6 +394,18 @@ export function migrateSettings(data) {
     d.keymap = migrateFindToggleBindings(d.keymap);
     version = 7;
   }
+  // v7 -> v8: page navigation binds land on [[/]] and the custom
+  // next/previous texts are seeded. Combos fill only where free and
+  // only for commands bound nowhere, so custom rebinds are never
+  // clobbered. Like the v4 backfill, an intentionally unbound command
+  // may gain the new bind. toggleBookmark stays unbound by design.
+  if (version < 8) {
+    if (d.pageNavTexts === undefined)
+      d.pageNavTexts = pageNavTextDefaults();
+    d.pageNavTexts = normalizePageNavTexts(d.pageNavTexts);
+    d.keymap = migratePageNavBindings(d.keymap);
+    version = 8;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -455,6 +476,26 @@ export function migrateFindToggleBindings(keymap) {
   return out;
 }
 
+const PAGE_NAV_FILLS = [
+  ["[[", "prevPage"],
+  ["]]", "nextPage"],
+];
+
+export function migratePageNavBindings(keymap) {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap;
+  }
+  const out = { ...keymap };
+  const used = new Set(Object.values(out));
+  for (const [combo, command] of PAGE_NAV_FILLS) {
+    if (!(combo in out) && !used.has(command)) {
+      out[combo] = command;
+      used.add(command);
+    }
+  }
+  return out;
+}
+
 export function normalizeSettings(data) {
   const d = migrateSettings(data);
   const storedKeymap = {};
@@ -503,6 +544,7 @@ export function normalizeSettings(data) {
         : clampMaxResults(d.maxResults),
     searchEngines,
     defaultEngine: normalizeDefaultEngine(d.defaultEngine, searchEngines),
+    pageNavTexts: normalizePageNavTexts(d.pageNavTexts),
     copyFormat:
       d.copyFormat === "markdown" ? "markdown" : settingsDefaults.copyFormat,
     hintChars: normalizeHintChars(d.hintChars),

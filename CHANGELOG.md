@@ -6,6 +6,18 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
+### Added
+
+- Page navigation: `[[` jumps to the previous page and `]]` to the
+  next page by activating the first matching link or button
+  (`rel="next"`/`rel="prev"` always match, otherwise the customizable
+  next/previous link texts in settings). Stored keymaps migrate
+  forward (schema v8): the new combos fill where free and their
+  commands are bound nowhere, so custom rebinds are never clobbered.
+- Bookmark toggle (`toggleBookmark`, unbound by default): bookmarks the
+  current page on the bookmarks bar (Other bookmarks as fallback) or
+  removes it, with honest feedback for unbookmarkable pages.
+
 ### Changed
 
 - Link yank bindings shorten from `yfa`/`yft` to `yf` (copy link URL)
@@ -68,7 +80,7 @@ versioned for the extension manifest (`manifest.base.json`).
 ### Added
 
 - Customizable search engines: the Search settings hold an editable
-  keyword engine list (seeded with `g`, `yt`, `gh`, `wiki`, `chat`) plus
+  keyword engine list (seeded with `g`, `yt`, `gh`, `wiki`, `r`) plus
   a default engine for bare queries, including incognito search.
 - Hover, yank-text and open-in-this-tab hint actions (unbound by default).
 - Same-origin iframe links get their own hints; crowded pages keep

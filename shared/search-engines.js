@@ -2,8 +2,11 @@ export const SEARCH_ENGINE_DEFAULTS = [
   { keyword: "g", url: "https://www.google.com/search?q=%s" },
   { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
   { keyword: "gh", url: "https://github.com/search?q=%s" },
-  { keyword: "wiki", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
-  { keyword: "chat", url: "https://chatgpt.com/?q=%s" },
+  {
+    keyword: "wiki",
+    url: "https://en.wikipedia.org/wiki/Special:Search?search=%s",
+  },
+  { keyword: "r", url: "https://www.reddit.com/search/?q=%s" },
 ];
 
 export const DEFAULT_SEARCH_ENGINE = "g";
@@ -11,9 +14,6 @@ export const DEFAULT_SEARCH_ENGINE = "g";
 export const MAX_SEARCH_ENGINES = 20;
 export const SEARCH_KEYWORD_RE = /^[a-z0-9_]{1,16}$/;
 export const SEARCH_ENGINE_URL_MAX = 500;
-
-// `t ` (with a space) lists and searches open tabs, so it can never
-// reach keyword lookup.
 export const RESERVED_ENGINE_KEYWORDS = ["t"];
 
 export function searchEngineDefaults() {
@@ -21,7 +21,8 @@ export function searchEngineDefaults() {
 }
 
 export function validateSearchEngine(entry) {
-  if (!entry || typeof entry !== "object") return "Engine must have a keyword and URL.";
+  if (!entry || typeof entry !== "object")
+    return "Engine must have a keyword and URL.";
   const keyword = String(entry.keyword || "").toLowerCase();
   if (!SEARCH_KEYWORD_RE.test(keyword)) {
     return "Keyword must be 1-16 letters, digits, or underscores.";
@@ -59,14 +60,18 @@ export function normalizeSearchEngines(raw) {
 
 export function normalizeDefaultEngine(raw, engines) {
   const list =
-    Array.isArray(engines) && engines.length > 0 ? engines : searchEngineDefaults();
+    Array.isArray(engines) && engines.length > 0
+      ? engines
+      : searchEngineDefaults();
   const keyword = String(raw || "").toLowerCase();
   if (list.some((e) => e && e.keyword === keyword)) return keyword;
   return list[0].keyword;
 }
 
 export function parseEngineKeyword(query, engines) {
-  const m = String(query || "").trim().match(/^(\w+)\s+(.*\S)/);
+  const m = String(query || "")
+    .trim()
+    .match(/^(\w+)\s+(.*\S)/);
   if (!m) return null;
   const url = buildEngineUrl(engines, m[1], m[2]);
   if (!url) return null;

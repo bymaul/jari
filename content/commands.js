@@ -8,6 +8,7 @@ import { Hints } from "./hints.js";
 import { Find } from "./find.js";
 import { Visual } from "./visual.js";
 import { COMMAND_CATALOG } from "./catalog.js";
+import { goPage } from "./page-nav.js";
 
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;
@@ -192,6 +193,30 @@ function goTo(urlFn) {
   sendMessage("navigate", { url: target });
 }
 
+const UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
+
+async function toggleBookmarkPage() {
+  const url = location.href || "";
+  if (UNBOOKMARKABLE_SCHEMES.test(url)) {
+    ui.toast("Cannot bookmark this page");
+    return;
+  }
+  let res;
+  try {
+    res = await sendMessage("toggleBookmark", {
+      url,
+      title: document.title || url,
+    });
+  } catch {
+    res = null;
+  }
+  if (!res || !res.ok) {
+    ui.toast("Bookmark failed");
+    return;
+  }
+  ui.toast(res.bookmarked ? "Bookmarked" : "Bookmark removed");
+}
+
 export const commands = {
 
   scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
@@ -283,6 +308,9 @@ export const commands = {
   forceReload: { ...COMMAND_CATALOG.forceReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
   goToParent: { ...COMMAND_CATALOG.goToParent, run: () => goTo(Url.parentUrlOf) },
   goToRoot: { ...COMMAND_CATALOG.goToRoot, run: () => goTo(Url.rootUrlOf) },
+  nextPage: { ...COMMAND_CATALOG.nextPage, run: () => goPage("next") },
+  prevPage: { ...COMMAND_CATALOG.prevPage, run: () => goPage("prev") },
+  toggleBookmark: { ...COMMAND_CATALOG.toggleBookmark, run: () => toggleBookmarkPage() },
   editUrl: {
     ...COMMAND_CATALOG.editUrl,
     run: () => Prompt.openEditUrl(),

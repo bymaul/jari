@@ -150,6 +150,51 @@
           <button id="add-engine" type="button">Add engine</button>
           <button id="reset-engines" type="button">Restore defaults</button>
         </div>
+        <div class="setting">
+          <div class="setting-text">
+            <span class="setting-label" id="pagenav-label"
+              >Page navigation texts</span
+            >
+            <p class="helper">
+              <code data-key="nextPage"></code> and
+              <code data-key="prevPage"></code> activate the first link or
+              button whose text matches these lists.
+              <code>rel="next"</code> and <code>rel="prev"</code> links
+              always match.
+            </p>
+            <p
+              class="field-error"
+              id="error-pagenav"
+              aria-live="polite"
+              hidden
+            ></p>
+          </div>
+        </div>
+        <span class="setting-label" id="pagenav-next-label"
+          >Next page texts</span
+        >
+        <ul
+          id="pagenav-next-list"
+          class="pagenav-list"
+          aria-labelledby="pagenav-next-label"
+        ></ul>
+        <div class="engine-actions">
+          <button id="add-pagenav-next" type="button">Add next text</button>
+        </div>
+        <span class="setting-label" id="pagenav-prev-label"
+          >Previous page texts</span
+        >
+        <ul
+          id="pagenav-prev-list"
+          class="pagenav-list"
+          aria-labelledby="pagenav-prev-label"
+        ></ul>
+        <div class="engine-actions">
+          <button id="add-pagenav-prev" type="button">
+            Add previous text
+          </button>
+          <button id="reset-pagenav" type="button">Restore defaults</button>
+        </div>
       </details>
 
       <details class="card" id="card-clipboard">

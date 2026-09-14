@@ -20,6 +20,11 @@ import {
   searchEngineDefaults,
   validateSearchEngine,
 } from "../shared/search-engines.js";
+import {
+  MAX_PAGE_NAV_TEXTS,
+  PAGE_NAV_TEXT_MAX,
+  pageNavTextDefaults,
+} from "../shared/page-nav-texts.js";
 import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
 import { ui } from "../content/ui.js";
@@ -45,6 +50,11 @@ const defaultEngineEl = document.querySelector("#default-engine");
 const engineListEl = document.querySelector("#engine-list");
 const addEngineBtn = document.querySelector("#add-engine");
 const resetEnginesBtn = document.querySelector("#reset-engines");
+const pagenavNextListEl = document.querySelector("#pagenav-next-list");
+const pagenavPrevListEl = document.querySelector("#pagenav-prev-list");
+const addPagenavNextBtn = document.querySelector("#add-pagenav-next");
+const addPagenavPrevBtn = document.querySelector("#add-pagenav-prev");
+const resetPagenavBtn = document.querySelector("#reset-pagenav");
 const copyFormatEl = document.querySelector("#copy-format");
 const hintCharsEl = document.querySelector("#hint-chars");
 const hintCharsMetaEl = document.querySelector("#hint-chars-meta");
@@ -171,9 +181,11 @@ function updateSummaries() {
   if (summaries.search) {
     const n = settings.getSuggestionSources().length;
     const engines = settings.getSearchEngines();
+    const nav = settings.getPageNavTexts();
     summaries.search.textContent =
       `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} · ${n} source${n === 1 ? "" : "s"} · max ${settings.getMaxResults()}` +
-      ` · ${engines.length} engine${engines.length === 1 ? "" : "s"} · default ${settings.getDefaultEngine()}`;
+      ` · ${engines.length} engine${engines.length === 1 ? "" : "s"} · default ${settings.getDefaultEngine()}` +
+      ` · page nav ${nav.next.length}+${nav.prev.length}`;
   }
   if (summaries.clipboard) {
     summaries.clipboard.textContent =
@@ -259,6 +271,7 @@ async function load() {
   sourceBookmarkEl.checked = sources.includes("bookmark");
   maxResultsEl.value = settings.getMaxResults();
   renderEngines();
+  renderPagenav();
   copyFormatEl.value = settings.getCopyFormat();
   hintCharsEl.value = settings.getHintChars();
   if (clickableSelectorEl)
@@ -1157,6 +1170,149 @@ function resetEngines() {
   });
 }
 
+function pagenavRow(text) {
+  const li = document.createElement("li");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "pagenav-text";
+  input.value = text;
+  input.placeholder = "Next";
+  input.setAttribute("aria-label", "Page navigation link text");
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("spellcheck", "false");
+  input.addEventListener("change", commitPagenav);
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.textContent = "Remove";
+  remove.setAttribute("aria-label", `Remove ${text || "navigation text"}`);
+  remove.addEventListener("click", () => removePagenavRow(li));
+  li.appendChild(input);
+  li.appendChild(remove);
+  return li;
+}
+
+function readPagenavRows(listEl) {
+  const rows = [];
+  if (!listEl) return rows;
+  for (const li of listEl.children) {
+    const input = li.querySelector(".pagenav-text");
+    if (!input) continue;
+    rows.push({ input, text: input.value.trim() });
+  }
+  return rows;
+}
+
+function renderPagenav() {
+  if (pagenavNextListEl) {
+    pagenavNextListEl.textContent = "";
+    for (const text of settings.getPageNavTexts().next) {
+      pagenavNextListEl.appendChild(pagenavRow(text));
+    }
+  }
+  if (pagenavPrevListEl) {
+    pagenavPrevListEl.textContent = "";
+    for (const text of settings.getPageNavTexts().prev) {
+      pagenavPrevListEl.appendChild(pagenavRow(text));
+    }
+  }
+  clearFieldError("error-pagenav");
+}
+
+function failPagenav(message, badEls) {
+  for (const el of badEls || []) markInvalid(el, true);
+  showFieldError("error-pagenav", `${message} (not saved)`);
+  status(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+}
+
+function collectPagenavList(rows, label) {
+  const seen = new Set();
+  const list = [];
+  for (const row of rows) {
+    markInvalid(row.input, false);
+    if (row.text === "") continue;
+    if (row.text.length > PAGE_NAV_TEXT_MAX) {
+      return {
+        error: `Text must be ${PAGE_NAV_TEXT_MAX} characters or fewer`,
+        bad: [row.input],
+      };
+    }
+    const key = row.text.toLowerCase();
+    if (seen.has(key)) {
+      return { error: `Duplicate text "${row.text}"`, bad: [row.input] };
+    }
+    seen.add(key);
+    list.push(row.text);
+  }
+  if (list.length === 0) {
+    return { error: `At least one ${label} text is required`, bad: [] };
+  }
+  return { list };
+}
+
+function commitPagenav() {
+  clearFieldError("error-pagenav");
+  const nextRows = readPagenavRows(pagenavNextListEl);
+  const prevRows = readPagenavRows(pagenavPrevListEl);
+  const next = collectPagenavList(nextRows, "next page");
+  if (next.error) {
+    failPagenav(next.error, next.bad);
+    return;
+  }
+  const prev = collectPagenavList(prevRows, "previous page");
+  if (prev.error) {
+    failPagenav(prev.error, prev.bad);
+    return;
+  }
+  if (
+    next.list.length > MAX_PAGE_NAV_TEXTS ||
+    prev.list.length > MAX_PAGE_NAV_TEXTS
+  ) {
+    failPagenav(`At most ${MAX_PAGE_NAV_TEXTS} texts per list`, []);
+    return;
+  }
+  savePatch({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
+    (ok) => {
+      if (!ok) return;
+      renderPagenav();
+    },
+  );
+}
+
+function removePagenavRow(li) {
+  const listEl = li.parentElement;
+  const rows = readPagenavRows(listEl);
+  if (rows.length <= 1) {
+    failPagenav("At least one text per list is required", []);
+    return;
+  }
+  li.remove();
+  commitPagenav();
+}
+
+function addPagenavRow(listEl) {
+  if (!listEl) return;
+  clearFieldError("error-pagenav");
+  if (listEl.children.length >= MAX_PAGE_NAV_TEXTS) {
+    showFieldError(
+      "error-pagenav",
+      `At most ${MAX_PAGE_NAV_TEXTS} texts per list (not saved)`,
+    );
+    return;
+  }
+  const li = pagenavRow("");
+  listEl.appendChild(li);
+  li.querySelector(".pagenav-text").focus();
+}
+
+function resetPagenav() {
+  savePatch({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
+    if (ok) {
+      renderPagenav();
+      status("Page navigation texts restored to defaults");
+    }
+  });
+}
+
 let confirmCount = 0;
 
 function confirmDialog(message, confirmLabel) {
@@ -1239,6 +1395,7 @@ async function reset() {
       maxResults: settingsDefaults.maxResults,
       searchEngines: searchEngineDefaults(),
       defaultEngine: settingsDefaults.defaultEngine,
+      pageNavTexts: pageNavTextDefaults(),
       copyFormat: settingsDefaults.copyFormat,
       hintChars: settingsDefaults.hintChars,
       clickableSelector: settingsDefaults.clickableSelector,
@@ -1434,6 +1591,13 @@ defaultEngineEl?.addEventListener("change", () =>
 );
 addEngineBtn?.addEventListener("click", addEngine);
 resetEnginesBtn?.addEventListener("click", resetEngines);
+addPagenavNextBtn?.addEventListener("click", () =>
+  addPagenavRow(pagenavNextListEl),
+);
+addPagenavPrevBtn?.addEventListener("click", () =>
+  addPagenavRow(pagenavPrevListEl),
+);
+resetPagenavBtn?.addEventListener("click", resetPagenav);
 hintCharsEl.addEventListener("input", () => {
   clearFieldError("error-hint-chars");
   markInvalid(hintCharsEl, false);
