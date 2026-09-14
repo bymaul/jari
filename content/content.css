@@ -364,7 +364,7 @@
 }
 
 .jari-scroll-highlight {
-  position: fixed;
+  position: fixed !important;
   z-index: 2147483646 !important;
   box-sizing: border-box;
   pointer-events: none;
@@ -614,6 +614,20 @@
   .jari-visual-caret {
     background: CanvasText !important;
     border-color: Canvas !important;
+    forced-color-adjust: none !important;
+  }
+  .jari-scroll-highlight {
+    background: transparent !important;
+    border: 2px solid Highlight !important;
+    box-shadow: none !important;
+    forced-color-adjust: none !important;
+  }
+  .jari-scroll-highlight-label {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border: 1px solid CanvasText !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
     forced-color-adjust: none !important;
   }
 }

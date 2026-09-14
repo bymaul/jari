@@ -8,18 +8,11 @@ let target = null;
 const HIGHLIGHT_MS = 400;
 
 let resolved = false;
-let autoPicked = false;
 
 function getTarget() {
   if (target !== null && !target.isConnected) {
-
     target = null;
-    autoPicked = false;
     resolved = false;
-  }
-  if (target !== null && autoPicked && !resolved) {
-
-    target = null;
   }
   if (target === null && !resolved) {
     resolved = true;
@@ -29,7 +22,6 @@ function getTarget() {
       const stops = [...areas, ...frames];
       if (stops.length > 0) {
         target = nearestArea(stops) || stops[0];
-        autoPicked = true;
       }
     }
   }
@@ -43,7 +35,7 @@ function epochCache(compute) {
   let epoch = -1;
   let value = null;
   return () => {
-    if (epoch === scanEpoch && value) return value;
+    if (epoch === scanEpoch) return value;
     epoch = scanEpoch;
     value = compute();
     return value;
@@ -51,9 +43,11 @@ function epochCache(compute) {
 }
 
 function invalidateScrollCache() {
-  if (mutationTimeout) {
-    clearTimeout(mutationTimeout);
-  }
+  // Mark resolved stale synchronously so the next getTarget() re-picks
+  // even within the throttle window; the epoch bump itself is throttled
+  // (not debounced) so sustained churn still rescans periodically.
+  resolved = false;
+  if (mutationTimeout) return;
 
   mutationTimeout = setTimeout(() => {
     scanEpoch++;
@@ -78,12 +72,15 @@ function observeDocument() {
   // queryAll only reports shadow roots to ensureObserved, so without this
   // the scan cache never invalidates on pages without shadow-DOM churn
   // (opened panels, SPA content, and feed growth would stay invisible).
-  // Attributes are deliberately excluded: progress bars and play-state
-  // churn would otherwise invalidate near-continuously on video sites.
+  // Class attributes are watched for overflow flips; style is excluded:
+  // progress bars and play-state churn would otherwise invalidate
+  // near-continuously on video sites.
   try {
     ensureObserved(document.documentElement || document, {
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: ["class"],
     });
   } catch {}
 }
@@ -256,14 +253,21 @@ function pageCanScroll() {
 }
 
 function nearestArea(areas) {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
+  if (vw === 0 || vh === 0) return areas[0] || null;
   const cx = vw / 2;
   const cy = vh / 2;
   let best = null;
   let bestScore = -Infinity;
   for (const el of areas) {
-    const r = el.getBoundingClientRect();
+    let r;
+    try {
+      r = el.getBoundingClientRect();
+    } catch {
+      continue;
+    }
+    if (!r) continue;
     const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
     const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
     const coverage = (coveredW * coveredH) / (vw * vh);
@@ -303,7 +307,6 @@ function cycle() {
   } else {
     target = stops[(idx + 1) % stops.length];
   }
-  autoPicked = false;
   focusTarget(target);
   if (!isFrame(target)) releaseFrameFocus();
   showHighlight();
@@ -337,7 +340,6 @@ function showHighlight() {
     const stops = [...areas, ...frames];
     if (stops.length === 0) return;
     target = nearestArea(stops) || stops[0];
-    autoPicked = false;
     area = target;
   }
   const stops = [
@@ -345,15 +347,23 @@ function showHighlight() {
   ];
   const pos = stops.indexOf(area === window ? null : area);
   const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
-  const rect =
-    area === window
-      ? {
-          left: 0,
-          top: 0,
-          width: window.innerWidth,
-          height: window.innerHeight,
-        }
-      : area.getBoundingClientRect();
+  if (!document.body) return;
+  let rect;
+  if (area === window) {
+    rect = {
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+  } else {
+    try {
+      rect = area.getBoundingClientRect();
+    } catch {
+      return;
+    }
+    if (!rect) return;
+  }
 
   clearTimeout(highlightTimer);
   if (highlightEl) highlightEl.remove();
@@ -382,9 +392,9 @@ function showHighlight() {
 function reset() {
   if (!isTopFrame()) {
     forwardCycleToTop();
+    return;
   }
   target = null;
-  autoPicked = false;
   resolved = false;
   releaseFrameFocus();
   showHighlight();
@@ -393,6 +403,10 @@ function reset() {
 export const Scroll = { getTarget, cycle, reset, showHighlight };
 
 export function __resetScrollCache() {
+  if (mutationTimeout) {
+    clearTimeout(mutationTimeout);
+    mutationTimeout = null;
+  }
   scanEpoch++;
   resolved = false;
 }

@@ -207,7 +207,7 @@ test("horizontal-only scroller still qualifies", () => {
   assert.equal(Scroll.getTarget(), carousel);
 });
 
-test("document observation skips attributes to avoid churn invalidation", () => {
+test("document observation watches class attributes, not style churn", () => {
   const { feed } = tiktokFixtures();
   useFixtures([feed]);
   const docs = documentObservers();
@@ -216,7 +216,8 @@ test("document observation skips attributes to avoid churn invalidation", () => 
     for (const { options } of observer.targets) {
       assert.equal(options.childList, true);
       assert.equal(options.subtree, true);
-      assert.ok(!("attributes" in options), "attributes must not invalidate");
+      assert.equal(options.attributes, true);
+      assert.deepEqual(options.attributeFilter, ["class"]);
     }
   }
 });
@@ -247,3 +248,43 @@ test("a panel added later becomes a stop after document mutation", async () => {
 function useFixturesWithoutReset(elements) {
   current = elements;
 }
+
+test("auto-picked target survives until a real rescan", () => {
+  const { feed, junk } = tiktokFixtures();
+  useFixtures([feed, junk]);
+  assert.equal(Scroll.getTarget(), feed);
+  // A mutation marks the cache stale but must not drop a still-connected
+  // auto-picked target before the rescan runs.
+  const docs = documentObservers();
+  assert.ok(docs.length > 0, "expected the document to be observed");
+  for (const observer of docs) observer.callback([], observer);
+  assert.equal(Scroll.getTarget(), feed);
+});
+
+test("showHighlight tolerates a missing body", () => {
+  const { feed } = tiktokFixtures();
+  useFixtures([feed]);
+  const savedBody = globalThis.document.body;
+  globalThis.document.body = null;
+  try {
+    Scroll.showHighlight();
+  } finally {
+    globalThis.document.body = savedBody;
+  }
+});
+
+test("reset from a frame forwards without a local highlight", () => {
+  const { feed } = tiktokFixtures();
+  useFixtures([feed]);
+  created.length = 0;
+  globalThis.window.top = {};
+  try {
+    Scroll.reset();
+  } finally {
+    globalThis.window.top = globalThis.window;
+  }
+  assert.deepEqual(
+    created.filter((el) => el.tagName === "div"),
+    [],
+  );
+});

@@ -2023,6 +2023,11 @@ function onKeyDown(event) {
     }
     if (key === "Enter") {
       ui.consume(event);
+      const visible = [];
+      for (const label of hintMap.keys()) {
+        if (label.startsWith(hintPrefix)) visible.push(label);
+      }
+      if (visible.length === 1) activateHintByLabel(visible[0]);
       return true;
     }
     if (key.length === 1) {
