@@ -4,6 +4,20 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [0.4.2]
+
+### Fixed
+
+- Scroll areas: late panels, SPA content, and feed growth rescan via
+  document-mutation observation; class-driven overflow flips invalidate
+  without style-attribute churn.
+- Scroll highlight: stop count (`1/3`) via toast, hardened target
+  handling (missing body, detached rects, zero-size viewports), no
+  double highlight when resetting from a frame.
+- Scroll cache: synchronous stale marking with throttled rescans so
+  sustained DOM churn still rescans periodically.
+- Visual mode: hint `Enter` again activates the single remaining match.
+
 ## [0.4.1] - 2026-09-12
 
 ### Fixed

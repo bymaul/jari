@@ -1970,17 +1970,12 @@
 
   // content/scroll.js
   var target = null;
-  var HIGHLIGHT_MS = 300;
+  var HIGHLIGHT_MS = 400;
   var resolved = false;
-  var autoPicked = false;
   function getTarget() {
     if (target !== null && !target.isConnected) {
       target = null;
-      autoPicked = false;
       resolved = false;
-    }
-    if (target !== null && autoPicked && !resolved) {
-      target = null;
     }
     if (target === null && !resolved) {
       resolved = true;
@@ -1990,7 +1985,6 @@
         const stops = [...areas, ...frames];
         if (stops.length > 0) {
           target = nearestArea(stops) || stops[0];
-          autoPicked = true;
         }
       }
     }
@@ -2002,16 +1996,15 @@
     let epoch = -1;
     let value = null;
     return () => {
-      if (epoch === scanEpoch && value) return value;
+      if (epoch === scanEpoch) return value;
       epoch = scanEpoch;
       value = compute();
       return value;
     };
   }
   function invalidateScrollCache() {
-    if (mutationTimeout) {
-      clearTimeout(mutationTimeout);
-    }
+    resolved = false;
+    if (mutationTimeout) return;
     mutationTimeout = setTimeout(() => {
       scanEpoch++;
       resolved = false;
@@ -2019,16 +2012,25 @@
     }, 150);
   }
   var observedRoots = /* @__PURE__ */ new Set();
-  function ensureObserved(root) {
+  function ensureObserved(root, options) {
     if (observedRoots.has(root)) return;
     observedRoots.add(root);
     if (typeof window.MutationObserver !== "undefined") {
-      new window.MutationObserver(invalidateScrollCache).observe(root, {
+      new window.MutationObserver(invalidateScrollCache).observe(
+        root,
+        options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] }
+      );
+    }
+  }
+  function observeDocument() {
+    try {
+      ensureObserved(document.documentElement || document, {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["class", "style"]
+        attributeFilter: ["class"]
       });
+    } catch {
     }
   }
   function isScrollVisible(el) {
@@ -2046,6 +2048,7 @@
     return true;
   }
   var findScrollableElements = epochCache(() => {
+    observeDocument();
     const areas = [];
     const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
     for (const el of queryAll("*", ensureObserved)) {
@@ -2069,6 +2072,7 @@
     return areas;
   });
   var findFrameElements = epochCache(() => {
+    observeDocument();
     const frames = [];
     for (const el of queryAll(FRAME_SELECTOR, ensureObserved)) {
       try {
@@ -2177,14 +2181,21 @@
     return true;
   }
   function nearestArea(areas) {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    if (vw === 0 || vh === 0) return areas[0] || null;
     const cx = vw / 2;
     const cy = vh / 2;
     let best = null;
     let bestScore = -Infinity;
     for (const el of areas) {
-      const r = el.getBoundingClientRect();
+      let r;
+      try {
+        r = el.getBoundingClientRect();
+      } catch {
+        continue;
+      }
+      if (!r) continue;
       const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
       const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
       const coverage = coveredW * coveredH / (vw * vh);
@@ -2222,7 +2233,6 @@
     } else {
       target = stops[(idx + 1) % stops.length];
     }
-    autoPicked = false;
     focusTarget(target);
     if (!isFrame(target)) releaseFrameFocus();
     showHighlight();
@@ -2240,21 +2250,37 @@
   var highlightTimer = null;
   function showHighlight() {
     let area = getTarget();
-    if (area === window && !pageCanScroll()) {
-      const areas = findScrollableElements();
-      const frames = findFrameElements();
-      const stops = [...areas, ...frames];
-      if (stops.length === 0) return;
-      target = nearestArea(stops) || stops[0];
-      autoPicked = false;
+    const areas = findScrollableElements();
+    const frames = findFrameElements();
+    const pageScrolls = pageCanScroll();
+    if (area === window && !pageScrolls) {
+      const stops2 = [...areas, ...frames];
+      if (stops2.length === 0) return;
+      target = nearestArea(stops2) || stops2[0];
       area = target;
     }
-    const rect = area === window ? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight
-    } : area.getBoundingClientRect();
+    const stops = [
+      ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames])
+    ];
+    const pos = stops.indexOf(area === window ? null : area);
+    const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
+    if (!document.body) return;
+    let rect;
+    if (area === window) {
+      rect = {
+        left: 0,
+        top: 0,
+        width: window.innerWidth,
+        height: window.innerHeight
+      };
+    } else {
+      try {
+        rect = area.getBoundingClientRect();
+      } catch {
+        return;
+      }
+      if (!rect) return;
+    }
     clearTimeout(highlightTimer);
     if (highlightEl) highlightEl.remove();
     const el = document.createElement("div");
@@ -2267,6 +2293,7 @@
     label.className = "jari-scroll-highlight-label";
     label.textContent = area === window ? "global scroll" : isFrame(area) ? "frame" : "current scroll area";
     el.appendChild(label);
+    if (count) ui.toast(`${label.textContent} ${count}`);
     document.body.appendChild(el);
     highlightEl = el;
     highlightTimer = setTimeout(() => {
@@ -2279,9 +2306,9 @@
   function reset() {
     if (!isTopFrame()) {
       forwardCycleToTop();
+      return;
     }
     target = null;
-    autoPicked = false;
     resolved = false;
     releaseFrameFocus();
     showHighlight();
@@ -4415,7 +4442,6 @@
   var caretHost = null;
   var hintActive = false;
   var hintElements = [];
-  var hintLabels = [];
   var hintPrefix = "";
   var hintHost = null;
   var hintHolder = null;
@@ -5008,7 +5034,6 @@
     hintHolder = created.holder;
     const charset = normalizeCharset();
     const labels = genLabels(hintElements.length, charset);
-    hintLabels = labels;
     hintMap.clear();
     const hintEls = layoutHints(hintHolder, hintElements, labels);
     for (const link of hintEls) {
@@ -5025,8 +5050,6 @@
         hintEl.style.display = "";
         hintEl.classList.remove("jari-hint-hidden");
         updateHintText(hintEl, label, "");
-      } else if (label === hintPrefix) {
-        hintEl.style.opacity = "1";
       } else if (label.startsWith(hintPrefix)) {
         hintEl.style.opacity = "1";
         hintEl.style.display = "";
@@ -5067,7 +5090,6 @@
     hintActive = false;
     hintPrefix = "";
     hintElements = [];
-    hintLabels = [];
     hintMap.clear();
     if (hintHost) {
       try {
@@ -5099,7 +5121,7 @@
   function enterAtElement(el, newMode) {
     if (active4) close4(false);
     mode3 = newMode || "visual";
-    let range = null;
+    let range;
     try {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
@@ -5540,7 +5562,6 @@
             const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
             if (nextTxt && isWordChar(nextTxt[0])) break;
             if (txt.length === 0) break;
-            inWord = false;
             const wordEnd2 = txt.length - 1;
             if (i === startIdx && wordEnd2 <= from) break;
             found++;
@@ -5573,7 +5594,7 @@
     moveToPosition(pos.node, pos.offset + 1);
     return true;
   }
-  function fallbackDocBoundary(dir, forCaret) {
+  function fallbackDocBoundary(dir) {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let first = null, last = null, n;
     while (n = walker.nextNode()) {
@@ -5725,7 +5746,7 @@
     ensureVisible();
     updateBlockCaret();
   }
-  function doMoveWordEnd(dir) {
+  function doMoveWordEnd() {
     if (isCaret()) {
       if (!fallbackMoveWordEnd(1)) {
         let ok = moveCaret("forward", "word");
@@ -5770,13 +5791,13 @@
     const gran = "documentboundary";
     if (isCaret()) {
       let ok2 = moveCaret(dir < 0 ? "backward" : "forward", gran);
-      if (!ok2) fallbackDocBoundary(dir, true);
+      if (!ok2) fallbackDocBoundary(dir);
       ensureVisible();
       updateBlockCaret();
       return;
     }
     let ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
-    if (!ok) fallbackDocBoundary(dir, false);
+    if (!ok) fallbackDocBoundary(dir);
     ensureVisible();
     updateBlockCaret();
   }
@@ -5946,7 +5967,6 @@
         fallbackMoveCaret(-1);
       }
       const atStartNode = sel.focusNode;
-      const atStartOffset = sel.focusOffset;
       const wasCollapsed = sel.isCollapsed;
       if (wasCollapsed) {
         const ok = extendSelection("forward", "lineboundary");
@@ -6256,12 +6276,11 @@
       }
       if (key2 === "Enter") {
         ui.consume(event);
-        const visible = Array.from(hintMap.entries()).filter(
-          ([label]) => label.startsWith(hintPrefix)
-        );
-        if (visible.length === 1) {
-          activateHintByLabel(visible[0][0]);
+        const visible = [];
+        for (const label of hintMap.keys()) {
+          if (label.startsWith(hintPrefix)) visible.push(label);
         }
+        if (visible.length === 1) activateHintByLabel(visible[0]);
         return true;
       }
       if (key2.length === 1) {
@@ -6313,8 +6332,7 @@
       return true;
     }
     if (/^[0-9]$/.test(key)) {
-      if (key === "0" && pendingCount === "") {
-      } else {
+      if (key !== "0" || pendingCount !== "") {
         ui.consume(event);
         if (pendingCount.length < 9) pendingCount += key;
         if (pillEl) pillEl.textContent = pillText(mode3) + " " + pendingCount;
@@ -6502,7 +6520,7 @@
         break;
       case "e":
         ui.consume(event);
-        for (let i = 0; i < repeat; i++) doMoveWordEnd(1);
+        for (let i = 0; i < repeat; i++) doMoveWordEnd();
         break;
       case "0":
         ui.consume(event);
