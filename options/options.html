@@ -158,7 +158,7 @@
             <p class="helper">
               <code data-key="nextPage"></code> and
               <code data-key="prevPage"></code> activate the first link or
-              button whose text matches these lists.
+              button whose text matches these comma-separated lists.
               <code>rel="next"</code> and <code>rel="prev"</code> links
               always match.
             </p>
@@ -170,29 +170,35 @@
             ></p>
           </div>
         </div>
-        <span class="setting-label" id="pagenav-next-label"
-          >Next page texts</span
-        >
-        <ul
-          id="pagenav-next-list"
-          class="pagenav-list"
-          aria-labelledby="pagenav-next-label"
-        ></ul>
-        <div class="engine-actions">
-          <button id="add-pagenav-next" type="button">Add next text</button>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="pagenav-next">Next page texts</label>
+          </div>
+          <div class="setting-control">
+            <input
+              id="pagenav-next"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Next, Next page, ›"
+            />
+          </div>
         </div>
-        <span class="setting-label" id="pagenav-prev-label"
-          >Previous page texts</span
-        >
-        <ul
-          id="pagenav-prev-list"
-          class="pagenav-list"
-          aria-labelledby="pagenav-prev-label"
-        ></ul>
-        <div class="engine-actions">
-          <button id="add-pagenav-prev" type="button">
-            Add previous text
-          </button>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="pagenav-prev">Previous page texts</label>
+          </div>
+          <div class="setting-control">
+            <input
+              id="pagenav-prev"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Previous, Prev, ‹"
+            />
+          </div>
+        </div>
+        <div class="pagenav-actions">
           <button id="reset-pagenav" type="button">Restore defaults</button>
         </div>
       </details>

@@ -1302,10 +1302,8 @@
   var engineListEl = document.querySelector("#engine-list");
   var addEngineBtn = document.querySelector("#add-engine");
   var resetEnginesBtn = document.querySelector("#reset-engines");
-  var pagenavNextListEl = document.querySelector("#pagenav-next-list");
-  var pagenavPrevListEl = document.querySelector("#pagenav-prev-list");
-  var addPagenavNextBtn = document.querySelector("#add-pagenav-next");
-  var addPagenavPrevBtn = document.querySelector("#add-pagenav-prev");
+  var pagenavNextEl = document.querySelector("#pagenav-next");
+  var pagenavPrevEl = document.querySelector("#pagenav-prev");
   var resetPagenavBtn = document.querySelector("#reset-pagenav");
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
@@ -2286,49 +2284,11 @@
       }
     });
   }
-  function pagenavRow(text) {
-    const li = document.createElement("li");
-    const input = document.createElement("input");
-    input.type = "text";
-    input.className = "pagenav-text";
-    input.value = text;
-    input.placeholder = "Next";
-    input.setAttribute("aria-label", "Page navigation link text");
-    input.setAttribute("autocomplete", "off");
-    input.setAttribute("spellcheck", "false");
-    input.addEventListener("change", commitPagenav);
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.textContent = "Remove";
-    remove.setAttribute("aria-label", `Remove ${text || "navigation text"}`);
-    remove.addEventListener("click", () => removePagenavRow(li));
-    li.appendChild(input);
-    li.appendChild(remove);
-    return li;
-  }
-  function readPagenavRows(listEl) {
-    const rows = [];
-    if (!listEl) return rows;
-    for (const li of listEl.children) {
-      const input = li.querySelector(".pagenav-text");
-      if (!input) continue;
-      rows.push({ input, text: input.value.trim() });
-    }
-    return rows;
-  }
   function renderPagenav() {
-    if (pagenavNextListEl) {
-      pagenavNextListEl.textContent = "";
-      for (const text of settings.getPageNavTexts().next) {
-        pagenavNextListEl.appendChild(pagenavRow(text));
-      }
-    }
-    if (pagenavPrevListEl) {
-      pagenavPrevListEl.textContent = "";
-      for (const text of settings.getPageNavTexts().prev) {
-        pagenavPrevListEl.appendChild(pagenavRow(text));
-      }
-    }
+    if (pagenavNextEl)
+      pagenavNextEl.value = settings.getPageNavTexts().next.join(", ");
+    if (pagenavPrevEl)
+      pagenavPrevEl.value = settings.getPageNavTexts().prev.join(", ");
     clearFieldError("error-pagenav");
   }
   function failPagenav(message, badEls) {
@@ -2336,46 +2296,45 @@
     showFieldError("error-pagenav", `${message} (not saved)`);
     status(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
   }
-  function collectPagenavList(rows, label) {
+  function parsePagenavField(input, label) {
+    markInvalid(input, false);
     const seen = /* @__PURE__ */ new Set();
     const list = [];
-    for (const row of rows) {
-      markInvalid(row.input, false);
-      if (row.text === "") continue;
-      if (row.text.length > PAGE_NAV_TEXT_MAX) {
+    for (const part of String(input.value || "").split(",")) {
+      const text = part.trim();
+      if (text === "") continue;
+      if (text.length > PAGE_NAV_TEXT_MAX) {
         return {
           error: `Text must be ${PAGE_NAV_TEXT_MAX} characters or fewer`,
-          bad: [row.input]
+          bad: [input]
         };
       }
-      const key = row.text.toLowerCase();
+      const key = text.toLowerCase();
       if (seen.has(key)) {
-        return { error: `Duplicate text "${row.text}"`, bad: [row.input] };
+        return { error: `Duplicate text "${text}"`, bad: [input] };
       }
       seen.add(key);
-      list.push(row.text);
+      list.push(text);
     }
     if (list.length === 0) {
-      return { error: `At least one ${label} text is required`, bad: [] };
+      return { error: `At least one ${label} text is required`, bad: [input] };
+    }
+    if (list.length > MAX_PAGE_NAV_TEXTS) {
+      return { error: `At most ${MAX_PAGE_NAV_TEXTS} texts per field`, bad: [input] };
     }
     return { list };
   }
   function commitPagenav() {
+    if (!pagenavNextEl || !pagenavPrevEl) return;
     clearFieldError("error-pagenav");
-    const nextRows = readPagenavRows(pagenavNextListEl);
-    const prevRows = readPagenavRows(pagenavPrevListEl);
-    const next = collectPagenavList(nextRows, "next page");
+    const next = parsePagenavField(pagenavNextEl, "next page");
     if (next.error) {
       failPagenav(next.error, next.bad);
       return;
     }
-    const prev = collectPagenavList(prevRows, "previous page");
+    const prev = parsePagenavField(pagenavPrevEl, "previous page");
     if (prev.error) {
       failPagenav(prev.error, prev.bad);
-      return;
-    }
-    if (next.list.length > MAX_PAGE_NAV_TEXTS || prev.list.length > MAX_PAGE_NAV_TEXTS) {
-      failPagenav(`At most ${MAX_PAGE_NAV_TEXTS} texts per list`, []);
       return;
     }
     savePatch({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
@@ -2384,30 +2343,6 @@
         renderPagenav();
       }
     );
-  }
-  function removePagenavRow(li) {
-    const listEl = li.parentElement;
-    const rows = readPagenavRows(listEl);
-    if (rows.length <= 1) {
-      failPagenav("At least one text per list is required", []);
-      return;
-    }
-    li.remove();
-    commitPagenav();
-  }
-  function addPagenavRow(listEl) {
-    if (!listEl) return;
-    clearFieldError("error-pagenav");
-    if (listEl.children.length >= MAX_PAGE_NAV_TEXTS) {
-      showFieldError(
-        "error-pagenav",
-        `At most ${MAX_PAGE_NAV_TEXTS} texts per list (not saved)`
-      );
-      return;
-    }
-    const li = pagenavRow("");
-    listEl.appendChild(li);
-    li.querySelector(".pagenav-text").focus();
   }
   function resetPagenav() {
     savePatch({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
@@ -2687,14 +2622,8 @@
   );
   addEngineBtn?.addEventListener("click", addEngine);
   resetEnginesBtn?.addEventListener("click", resetEngines);
-  addPagenavNextBtn?.addEventListener(
-    "click",
-    () => addPagenavRow(pagenavNextListEl)
-  );
-  addPagenavPrevBtn?.addEventListener(
-    "click",
-    () => addPagenavRow(pagenavPrevListEl)
-  );
+  pagenavNextEl?.addEventListener("change", commitPagenav);
+  pagenavPrevEl?.addEventListener("change", commitPagenav);
   resetPagenavBtn?.addEventListener("click", resetPagenav);
   hintCharsEl.addEventListener("input", () => {
     clearFieldError("error-hint-chars");
