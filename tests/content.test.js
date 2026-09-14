@@ -7,7 +7,22 @@ const { commands } = await import("../content/commands.js");
 const { keymapDefaults } = await import("../content/keymap.js");
 const { Clue } = await import("../content/clue.js");
 const { ui } = await import("../content/ui.js");
-const { handleKeydown, __resetState } = await import("../content/content.js");
+const { handleKeydown, shieldOverlayKey, __resetState } = await import(
+  "../content/content.js"
+);
+const { Overlays, register, touch } = await import("../content/overlays.js");
+
+let shieldActive = false;
+const shieldKeys = [];
+register("test-shield", {
+  isActive: () => shieldActive,
+  onKeyDown: (event) => {
+    shieldKeys.push(event.key);
+  },
+  close: () => {
+    shieldActive = false;
+  },
+});
 
 function key(partial = {}) {
   return {
@@ -22,6 +37,9 @@ function key(partial = {}) {
     },
     stopImmediatePropagation() {
       this.claimed = true;
+    },
+    stopPropagation() {
+      this.shielded = true;
     },
     ...partial,
   };
@@ -74,6 +92,9 @@ beforeEach(() => {
 afterEach(() => {
   __resetState();
   document.activeElement = null;
+  shieldActive = false;
+  shieldKeys.length = 0;
+  Overlays.closeAll();
   restoreSpies();
   restoreUi();
 });
@@ -422,4 +443,74 @@ test("a dead key mid-sequence cancels the whole buffer", () => {
   } finally {
     settings.set({ keymap: saved });
   }
+});
+
+test("keys typed into overlay UI are shielded from the page", () => {
+  shieldActive = true;
+  touch("test-shield");
+  const ev = key({
+    key: "/",
+    target: { className: "page-node" },
+    composedPath: () => [{ className: "jari-prompt-host" }],
+  });
+  handleKeydown(ev);
+  assert.deepEqual(shieldKeys, ["/"]);
+  assert.ok(ev.shielded, "expected stopPropagation for Jari UI targets");
+});
+
+test("overlay UI shielding falls back to the event target", () => {
+  shieldActive = true;
+  touch("test-shield");
+  const ev = key({
+    key: "/",
+    target: { className: "jari-palette-host" },
+  });
+  handleKeydown(ev);
+  assert.deepEqual(shieldKeys, ["/"]);
+  assert.ok(ev.shielded, "expected stopPropagation without composedPath");
+});
+
+test("page targets are never shielded while an overlay is open", () => {
+  shieldActive = true;
+  touch("test-shield");
+  const ev = key({
+    key: "/",
+    target: { className: "google-search" },
+    composedPath: () => [{ className: "google-search" }],
+  });
+  handleKeydown(ev);
+  assert.deepEqual(shieldKeys, ["/"]);
+  assert.ok(!ev.shielded, "expected the key to reach the page");
+});
+
+test("no shielding without an active overlay", () => {
+  spyOn("scrollDown");
+  const ev = key({
+    key: "j",
+    target: { className: "jari-toast" },
+    composedPath: () => [{ className: "jari-toast" }],
+  });
+  handleKeydown(ev);
+  assert.equal(spiedCalls.scrollDown.length, 1);
+  assert.ok(!ev.shielded, "expected no shielding outside overlays");
+});
+
+test("keypress and keyup in overlay UI are shielded from the page", () => {
+  shieldActive = true;
+  touch("test-shield");
+  for (const type of ["keypress", "keyup"]) {
+    const ev = key({
+      key: "/",
+      target: { className: "jari-prompt-host" },
+    });
+    shieldOverlayKey(ev);
+    assert.ok(ev.shielded, `expected stopPropagation for ${type} in Jari UI`);
+  }
+  const page = key({
+    key: "/",
+    target: { className: "page-node" },
+    composedPath: () => [{ className: "page-node" }],
+  });
+  shieldOverlayKey(page);
+  assert.ok(!page.shielded, "expected page keypress/keyup to pass through");
 });

@@ -124,6 +124,25 @@ function handleFullscreenChange() {
   }
 }
 
+function isJariUiTarget(event) {
+  let path = null;
+  try {
+    if (typeof event.composedPath === "function") path = event.composedPath();
+  } catch {}
+  const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
+  for (const node of nodes) {
+    try {
+      const cls = node && node.className;
+      if (typeof cls === "string" && cls.includes("jari-")) return true;
+    } catch {}
+  }
+  return false;
+}
+
+export function shieldOverlayKey(event) {
+  if (Overlays.active() && isJariUiTarget(event)) event.stopPropagation();
+}
+
 function handleKeydown(event) {
   if (!event.isTrusted) return;
 
@@ -136,7 +155,9 @@ function handleKeydown(event) {
   const overlay = Overlays.active();
   if (overlay) {
     Clue.hide();
-    return overlay.onKeyDown(event);
+    const handled = overlay.onKeyDown(event);
+    if (isJariUiTarget(event)) event.stopPropagation();
+    return handled;
   }
 
   if (modifierKeys.has(event.key)) return;
@@ -301,6 +322,8 @@ async function boot() {
   });
 
   window.addEventListener("keydown", handleKeydown, true);
+  window.addEventListener("keypress", shieldOverlayKey, true);
+  window.addEventListener("keyup", shieldOverlayKey, true);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
 }
 

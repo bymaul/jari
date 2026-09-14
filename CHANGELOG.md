@@ -29,6 +29,8 @@ versioned for the extension manifest (`manifest.base.json`).
   whose new combo is taken, skip fills that would overlap custom
   bindings, drop corrupt keymaps to defaults, and clamp unknown
   schema versions instead of replaying or downgrading.
+- Keystrokes typed into the prompt, palette, or help no longer leak
+  to page shortcuts (e.g. `/` focusing search on results pages).
 
 ### Changed
 

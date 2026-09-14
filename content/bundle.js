@@ -8767,6 +8767,25 @@ ${location.href}`;
       if (passthroughMode) showPill2("passthrough", pillPassthroughText());
     }
   }
+  function isJariUiTarget(event) {
+    let path = null;
+    try {
+      if (typeof event.composedPath === "function") path = event.composedPath();
+    } catch {
+    }
+    const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
+    for (const node of nodes) {
+      try {
+        const cls = node && node.className;
+        if (typeof cls === "string" && cls.includes("jari-")) return true;
+      } catch {
+      }
+    }
+    return false;
+  }
+  function shieldOverlayKey(event) {
+    if (Overlays.active() && isJariUiTarget(event)) event.stopPropagation();
+  }
   function handleKeydown(event) {
     if (!event.isTrusted) return;
     if (window.__jariOptionsRecording) {
@@ -8776,7 +8795,9 @@ ${location.href}`;
     const overlay5 = Overlays.active();
     if (overlay5) {
       Clue.hide();
-      return overlay5.onKeyDown(event);
+      const handled = overlay5.onKeyDown(event);
+      if (isJariUiTarget(event)) event.stopPropagation();
+      return handled;
     }
     if (modifierKeys.has(event.key)) return;
     if (passthroughMode) {
@@ -8908,6 +8929,8 @@ ${location.href}`;
       }
     });
     window.addEventListener("keydown", handleKeydown, true);
+    window.addEventListener("keypress", shieldOverlayKey, true);
+    window.addEventListener("keyup", shieldOverlayKey, true);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
   }
   setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
