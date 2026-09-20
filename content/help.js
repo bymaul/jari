@@ -3,6 +3,7 @@ import { ui, createShadowHost } from "./ui.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 import { displayCombo } from "./keymap.js";
 import { register, touch } from "./overlays.js";
+import { Find } from "./find.js";
 
 const STEP = 50;
 const COLUMNS = 3;
@@ -29,6 +30,9 @@ function open() {
   if (active) return;
   active = true;
   touch("help");
+  try {
+    if (Find.hasHighlights()) Find.hideHighlights();
+  } catch {}
   render();
 
   overlay.tabIndex = -1;
@@ -134,6 +138,19 @@ function helpCss() {
       gap: 1ex;
       padding: 0.25ex 0.5ex;
       border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+    }
+    .jari-find-hit {
+      background: rgba(224, 163, 99, 0.35) !important;
+      color: #1a1a1a !important;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+    .jari-find-current {
+      background: #e0a363 !important;
+      color: #1a1a1a !important;
+      border-radius: 2px;
+      padding: 0 1px;
+      outline: 1px solid #c38a22;
     }
   `;
 }
@@ -337,14 +354,10 @@ function onKeyDown(event) {
   if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
     return false;
   }
-  const hasMod = event.ctrlKey || event.altKey || event.metaKey;
-  const scrollOnly =
-    event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
-  if (hasMod && !scrollOnly) return false;
-  event.preventDefault();
-  event.stopImmediatePropagation();
   if (searching) {
     if (key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       searching = false;
       query = '';
       clearSearchHighlights();
@@ -352,21 +365,50 @@ function onKeyDown(event) {
       return;
     }
     if (key === 'Enter') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       searching = false;
       updateFooter();
       return;
     }
     if (key === 'Backspace') {
-      query = query.slice(0, -1);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.ctrlKey || event.metaKey) {
+        const trimmed = query.trimEnd();
+        if (!trimmed) {
+          query = "";
+        } else {
+          const words = trimmed.split(/\s+/);
+          words.pop();
+          query = words.join(" ");
+        }
+      } else {
+        query = query.slice(0, -1);
+      }
       applySearch();
       return;
     }
-    if (key.length === 1 && !hasMod) {
+    if (key.length === 1 && !event.altKey && !event.metaKey) {
+      if (event.ctrlKey) return false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
       query += key;
       applySearch();
       return;
     }
+    if (key.length === 1 || key === 'Backspace' || key === 'Escape' || key === 'Enter') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
   } else {
+  const hasMod = event.ctrlKey || event.altKey || event.metaKey;
+  const scrollOnly =
+    event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
+  if (hasMod && !scrollOnly) return false;
+  event.preventDefault();
+  event.stopImmediatePropagation();
     if (key === 'Escape') {
       gPending = false;
       if (matches.length > 0) {

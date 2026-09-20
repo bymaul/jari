@@ -960,6 +960,7 @@ export const Find = {
   open,
   close: closeBar,
   clearHighlights,
+  hideHighlights,
   next,
   toggleOrOpen,
   isActive,

@@ -3378,424 +3378,184 @@
   };
   register("prompt", { close, onKeyDown, isActive });
 
-  // content/help.js
-  var STEP = 50;
-  var COLUMNS = 3;
-  var active2 = false;
-  var host2 = null;
-  var overlay2 = null;
-  var listEl2 = null;
-  var footerBar = null;
-  var entries = [];
-  var searching = false;
-  var query2 = "";
-  var matches = [];
-  var currentIdx = 0;
-  var gPending = false;
-  var FOOTER_DEFAULT = "j/k scroll | / search | esc close";
-  function isActive2() {
-    return active2;
-  }
-  function open() {
-    if (active2) return;
-    active2 = true;
-    touch("help");
-    render2();
-    overlay2.tabIndex = -1;
-    overlay2.focus();
-  }
-  function helpCss() {
-    return `
-    :host { all: initial !important; }
-    .jari-overlay {
-      all: initial;
-      display: block;
-      position: fixed !important;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 2147483646 !important;
-      box-sizing: border-box;
-      background: var(--jari-cmplt-bg, #f5f5f7) !important;
-      color: var(--jari-cmplt-fg, #333738) !important;
-      font-family: var(--jari-cmplt-font-family, monospace) !important;
-      font-size: var(--jari-cmplt-font-size, 9pt) !important;
-      max-height: 75vh;
-      overflow: hidden;
-      text-align: left !important;
-      pointer-events: auto;
-    }
-    .jari-help {
-      background: var(--jari-cmplt-bg, #f5f5f7);
-      color: var(--jari-cmplt-fg, #333738);
-      font-size: var(--jari-cmplt-font-size, 9pt) !important;
-      font-family: var(--jari-cmplt-font-family, monospace) !important;
-      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
-      outline: none;
-    }
-    .jari-help:focus { outline: none; }
-    .jari-help-title {
-      display: block;
-      background: var(--jari-header-bg, #e8e8ec);
-      color: var(--jari-fg, #333738);
-      font-size: var(--jari-header-font-size, 9pt) !important;
-      font-weight: var(--jari-header-font-weight, bold) !important;
-      border-bottom: var(--jari-header-border-bottom, 1px solid #c5c5cf);
-      padding: 0 0.5ex;
-      margin: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-align: left !important;
-    }
-    .jari-help-list {
-      display: block;
-      max-height: 60vh;
-      overflow: auto;
-    }
-    .jari-help-columns {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0 3ex;
-      align-items: start;
-    }
-    .jari-help-column { min-width: 0; }
-    .jari-help table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin-bottom: 2ex;
-      margin-top: 0;
-    }
-    .jari-help tr.jari-help-cat-header th {
-      background: var(--jari-header-bg, #e8e8ec);
-      font-size: var(--jari-header-font-size, 9pt) !important;
-      font-weight: var(--jari-header-font-weight, bold) !important;
-      color: var(--jari-fg, #333738);
-      text-align: left;
-      border-bottom: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
-      padding: 0.25ex 0.5ex;
-    }
-    .jari-help td {
-      padding: 0 0.5ex;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      height: var(--jari-cmplt-option-height, 1.4em);
-      line-height: var(--jari-cmplt-option-height, 1.4em) !important;
-      text-align: left !important;
-    }
-    .jari-help td.jari-help-key {
-      width: 40%;
-      font-weight: bold !important;
-      color: var(--jari-fg, #333738);
-      text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
-    }
-    .jari-help td.jari-help-key.jari-unbound {
-      font-weight: normal !important;
-      font-style: italic;
-      color: var(--jari-muted, #606079);
-      text-shadow: none;
-    }
-    .jari-help-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1ex;
-      padding: 0.25ex 0.5ex;
-      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
-    }
-  `;
-  }
-  function render2() {
-    const created = createShadowHost("jari-help-host", helpCss());
-    host2 = created.host;
-    const shadow = created.shadow;
-    overlay2 = document.createElement("div");
-    overlay2.className = "jari-overlay jari-help";
-    const title = document.createElement("div");
-    title.className = "jari-help-title";
-    title.textContent = "Jari keybindings";
-    overlay2.appendChild(title);
-    entries = [];
-    searching = false;
-    query2 = "";
-    matches = [];
-    currentIdx = 0;
-    const byCommand = /* @__PURE__ */ new Map();
-    for (const [key, commandName] of Object.entries(settings.getKeymap())) {
-      if (!byCommand.has(commandName)) byCommand.set(commandName, []);
-      byCommand.get(commandName).push(key);
-    }
-    const byCategory = /* @__PURE__ */ new Map();
-    for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
-      const keys = byCommand.get(commandName) || [];
-      const id = meta.category || "other";
-      if (!byCategory.has(id)) byCategory.set(id, []);
-      byCategory.get(id).push({ keys, label: meta.label, commandName });
-    }
-    listEl2 = document.createElement("div");
-    listEl2.className = "jari-help-list";
-    listEl2.appendChild(
-      ui.buildCategorizedGrid(byCategory, {
-        columnCount: COLUMNS,
-        gridClass: "jari-help-columns",
-        columnClass: "jari-help-column",
-        headerClass: "jari-help-cat-header",
-        renderEntries(tbody, rowEntries) {
-          for (const { keys, label, commandName } of rowEntries) {
-            const tr = document.createElement("tr");
-            const keyTd = document.createElement("td");
-            keyTd.className = "jari-help-key";
-            if (keys.length === 0) {
-              keyTd.textContent = "unbound";
-              keyTd.classList.add("jari-unbound");
-            } else {
-              keyTd.textContent = keys.map(displayCombo).join(", ");
-            }
-            const labelTd = document.createElement("td");
-            labelTd.className = "jari-help-label";
-            labelTd.textContent = label;
-            tr.appendChild(keyTd);
-            tr.appendChild(labelTd);
-            tbody.appendChild(tr);
-            entries.push({
-              tr,
-              keyTd,
-              labelTd,
-              haystack: `${keys.join(" ")} ${label} ${commandName}`.toLowerCase()
-            });
-          }
-        }
-      })
-    );
-    overlay2.appendChild(listEl2);
-    const footer = document.createElement("div");
-    footer.className = "jari-help-footer";
-    footerBar = document.createElement("span");
-    footerBar.textContent = FOOTER_DEFAULT;
-    footer.appendChild(footerBar);
-    overlay2.appendChild(footer);
-    shadow.appendChild(overlay2);
-  }
-  function updateFooter() {
-    if (!footerBar) return;
-    if (searching) {
-      footerBar.textContent = matches.length === 0 ? `/${query2} \u2014 No match` : `/${query2} ${currentIdx + 1}/${matches.length} (Enter done)`;
-    } else if (matches.length > 0) {
-      footerBar.textContent = `${currentIdx + 1}/${matches.length} (n/N jump) | / search | esc close`;
-    } else {
-      footerBar.textContent = FOOTER_DEFAULT;
-    }
-  }
-  function saveOriginal(td) {
-    if (td._jariOrig === void 0) td._jariOrig = td.textContent;
-    return td._jariOrig;
-  }
-  function restoreCell(td) {
-    if (td._jariOrig !== void 0) {
-      try {
-        td.textContent = td._jariOrig;
-      } catch {
-      }
-      td._jariOrig = void 0;
-    }
-  }
-  function clearSearchHighlights() {
-    for (const entry of entries) {
-      restoreCell(entry.keyTd);
-      restoreCell(entry.labelTd);
-    }
-    matches = [];
-    currentIdx = 0;
-  }
-  function highlightCell(td, q) {
-    const orig = saveOriginal(td);
-    const lower = orig.toLowerCase();
-    const parts = [];
-    let pos = 0;
-    let found = false;
-    while (true) {
-      const idx = lower.indexOf(q, pos);
-      if (idx === -1) break;
-      found = true;
-      parts.push({ text: orig.slice(pos, idx), match: false });
-      parts.push({ text: orig.slice(idx, idx + q.length), match: true });
-      pos = idx + q.length;
-    }
-    if (!found) return [];
-    parts.push({ text: orig.slice(pos), match: false });
+  // content/highlight.js
+  function detectHighlightSupport() {
     try {
-      td.textContent = "";
+      return typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
     } catch {
-      return [];
-    }
-    const spans = [];
-    for (const part of parts) {
-      if (!part.text) continue;
-      if (part.match) {
-        const span = document.createElement("span");
-        span.className = "jari-find-hit";
-        span.textContent = part.text;
-        td.appendChild(span);
-        spans.push(span);
-      } else {
-        td.appendChild(document.createTextNode(part.text));
-      }
-    }
-    return spans;
-  }
-  function markCurrent() {
-    for (const m of matches) m.span.className = "jari-find-hit";
-    if (matches.length > 0) matches[currentIdx].span.className = "jari-find-current";
-  }
-  function scrollMatchIntoView() {
-    if (matches.length === 0) return;
-    try {
-      matches[currentIdx].entry.tr.scrollIntoView({ block: "nearest" });
-    } catch {
-    }
-  }
-  function applySearch() {
-    clearSearchHighlights();
-    const q = query2.toLowerCase();
-    if (q) {
-      for (const entry of entries) {
-        for (const td of [entry.keyTd, entry.labelTd]) {
-          try {
-            for (const span of highlightCell(td, q)) {
-              matches.push({ entry, span });
-            }
-          } catch {
-          }
-        }
-      }
-    }
-    currentIdx = 0;
-    markCurrent();
-    updateFooter();
-    scrollMatchIntoView();
-  }
-  function stepMatch(delta) {
-    if (matches.length === 0) return;
-    const len = matches.length;
-    currentIdx = ((currentIdx + delta) % len + len) % len;
-    markCurrent();
-    updateFooter();
-    scrollMatchIntoView();
-  }
-  function onKeyDown2(event) {
-    const key = event.key;
-    if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
       return false;
     }
-    const hasMod = event.ctrlKey || event.altKey || event.metaKey;
-    const scrollOnly = event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
-    if (hasMod && !scrollOnly) return false;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (searching) {
-      if (key === "Escape") {
-        searching = false;
-        query2 = "";
-        clearSearchHighlights();
-        updateFooter();
-        return;
-      }
-      if (key === "Enter") {
-        searching = false;
-        updateFooter();
-        return;
-      }
-      if (key === "Backspace") {
-        query2 = query2.slice(0, -1);
-        applySearch();
-        return;
-      }
-      if (key.length === 1 && !hasMod) {
-        query2 += key;
-        applySearch();
-        return;
-      }
-    } else {
-      if (key === "Escape") {
-        gPending = false;
-        if (matches.length > 0) {
-          clearSearchHighlights();
-          updateFooter();
-          return;
-        }
-        close2();
-        return;
-      }
-      if (key === "/" && !hasMod) {
-        gPending = false;
-        searching = true;
-        query2 = "";
-        clearSearchHighlights();
-        updateFooter();
-        return;
-      }
-      if ((key === "n" || key === "N") && !hasMod && matches.length > 0) {
-        gPending = false;
-        stepMatch(key === "n" ? 1 : -1);
-        return;
-      }
-    }
-    if (event.key === "g" && !gPending) {
-      gPending = true;
-      return;
-    }
-    if (gPending) {
-      gPending = false;
-      if (event.key === "g") listEl2.scrollTo(0, 0);
-      return;
-    }
-    if (event.ctrlKey) {
-      if (event.key === "d") listEl2.scrollBy(0, listEl2.clientHeight * 0.5);
-      else if (event.key === "u") listEl2.scrollBy(0, -listEl2.clientHeight * 0.5);
-      else if (event.key === "f") listEl2.scrollBy(0, listEl2.clientHeight * 0.9);
-      else if (event.key === "b") listEl2.scrollBy(0, -listEl2.clientHeight * 0.9);
-      return;
-    }
-    switch (event.key) {
-      case "G":
-        listEl2.scrollTo(0, listEl2.scrollHeight);
-        break;
-      case "j":
-      case "ArrowDown":
-        listEl2.scrollBy(0, STEP);
-        break;
-      case "k":
-      case "ArrowUp":
-        listEl2.scrollBy(0, -STEP);
-        break;
-    }
   }
-  function close2() {
+  function clearHighlightNames(...names) {
     try {
-      clearSearchHighlights();
+      if (CSS.highlights) {
+        for (const name of names) CSS.highlights.delete(name);
+      }
     } catch {
     }
-    if (host2) {
+  }
+  function unwrapSpans(spans) {
+    for (const span of spans) {
       try {
-        host2.remove();
+        const parent = span.parentNode;
+        if (!parent) continue;
+        const text = span.textContent;
+        const tn = document.createTextNode(text);
+        parent.replaceChild(tn, span);
+        parent.normalize();
       } catch {
       }
-      host2 = null;
     }
-    overlay2 = null;
-    listEl2 = null;
-    footerBar = null;
-    entries = [];
-    searching = false;
-    query2 = "";
-    matches = [];
-    currentIdx = 0;
-    gPending = false;
-    active2 = false;
+    spans.length = 0;
   }
-  var Help = { open, close: close2, onKeyDown: onKeyDown2, isActive: isActive2 };
-  register("help", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
+
+  // content/find/matcher.js
+  function hasUpperCase(s) {
+    return /\p{Lu}/u.test(s);
+  }
+  function buildMatcher(query4, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
+    if (!query4) return null;
+    const flags = (caseSensitive ? "g" : "gi") + "mu";
+    const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
+    try {
+      if (regex) return new RegExp(wholeWord ? bounds(query4) : query4, flags);
+      const src = query4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(wholeWord ? bounds(src) : src, flags);
+    } catch {
+      return null;
+    }
+  }
+
+  // content/find/collect.js
+  function isOverlayElement(el) {
+    try {
+      return el.closest && el.closest(overlaySelectors);
+    } catch {
+      return false;
+    }
+  }
+  function shouldSkipNode(node) {
+    const parent = node.parentElement;
+    if (!parent) return true;
+    const tag = parent.tagName;
+    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
+    if (isOverlayElement(parent)) return true;
+    try {
+      const root = parent.getRootNode && parent.getRootNode();
+      if (root && root.host && root.host.classList) {
+        const host5 = root.host;
+        if (host5.classList.contains("jari-help-host") || host5.classList.contains("jari-find-host") || host5.classList.contains("jari-prompt-host") || host5.classList.contains("jari-hints-host") || host5.classList.contains("jari-visual-caret-host"))
+          return true;
+      }
+    } catch {
+    }
+    if (parent.closest) {
+      try {
+        if (parent.closest(
+          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay"
+        ))
+          return true;
+        if (parent.closest('[aria-hidden="true"]')) return true;
+        if (parent.closest("[hidden]")) return true;
+      } catch {
+      }
+    }
+    try {
+      if (!isElementDrawn(parent)) return true;
+      const style = window.getComputedStyle(parent);
+      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
+      if (parseFloat(style.opacity) < 0.05) return true;
+    } catch {
+    }
+    return false;
+  }
+  function collectTextNodes() {
+    const out = [];
+    const rootEl = document.body || document.documentElement;
+    if (!rootEl) return out;
+    try {
+      const walker = document.createTreeWalker(
+        rootEl,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode(node2) {
+            if (!node2.nodeValue || !node2.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            if (shouldSkipNode(node2)) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        }
+      );
+      let node = walker.nextNode();
+      while (node) {
+        out.push(node);
+        if (out.length > 5e3) break;
+        node = walker.nextNode();
+      }
+    } catch {
+    }
+    try {
+      const visit = (root) => {
+        let els;
+        try {
+          els = root.querySelectorAll("*");
+        } catch {
+          return;
+        }
+        for (const el of els) {
+          if (el.shadowRoot) {
+            try {
+              const sw = document.createTreeWalker(
+                el.shadowRoot,
+                NodeFilter.SHOW_TEXT,
+                {
+                  acceptNode(n) {
+                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    if (shouldSkipNode(n)) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                  }
+                }
+              );
+              let sn = sw.nextNode();
+              while (sn) {
+                out.push(sn);
+                if (out.length > 5e3) return;
+                sn = sw.nextNode();
+              }
+              visit(el.shadowRoot);
+            } catch {
+            }
+          }
+          if (el.tagName === "IFRAME") {
+            try {
+              const doc = el.contentDocument;
+              if (doc && doc.body) {
+                const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+                  acceptNode(n) {
+                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    const p = n.parentElement;
+                    if (!p) return NodeFilter.FILTER_REJECT;
+                    const tag = p.tagName;
+                    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                  }
+                });
+                let nn = w.nextNode();
+                while (nn) {
+                  out.push(nn);
+                  if (out.length > 5e3) return;
+                  nn = w.nextNode();
+                }
+              }
+            } catch {
+            }
+          }
+        }
+      };
+      visit(document);
+    } catch {
+    }
+    return out;
+  }
 
   // content/hint-layer.js
   function normalizeCharset() {
@@ -4051,701 +3811,6 @@
       }
     }
     return links;
-  }
-
-  // content/hints.js
-  var MAX_HINTS = 800;
-  var REGENERATE_DELAY = 150;
-  var active3 = false;
-  var hintsHost = null;
-  var holder = null;
-  var elements = [];
-  var hints = [];
-  var prefix = "";
-  var mode2 = "click";
-  var multipleHits = false;
-  var resizeHandler = null;
-  var mutationObserver = null;
-  var regenerateTimer = null;
-  var hintPill = null;
-  var spaceHeld = false;
-  function showHintPill() {
-    if (hintPill) return;
-    try {
-      hintPill = document.createElement("div");
-      hintPill.className = "jari-pill";
-      hintPill.textContent = "hint";
-      ui.statusContainer().appendChild(hintPill);
-    } catch {
-    }
-  }
-  function hideHintPill() {
-    if (!hintPill) return;
-    try {
-      hintPill.remove();
-    } catch {
-    }
-    hintPill = null;
-  }
-  function hasJariClass(node) {
-    try {
-      if (!node || node.nodeType !== 1) return false;
-      const classes = node.classList;
-      if (classes) {
-        for (const c of classes) {
-          if (typeof c === "string" && c.startsWith("jari-")) return true;
-        }
-      }
-      if (node.closest) {
-        return !!node.closest("[class^='jari-'], [class*=' jari-']");
-      }
-    } catch {
-    }
-    return false;
-  }
-  function isOwnMutation(mutation) {
-    try {
-      const nodes = [
-        ...mutation.addedNodes || [],
-        ...mutation.removedNodes || []
-      ];
-      const allOwn = (list) => list.every((n) => n.nodeType !== 1 || hasJariClass(n));
-      if (mutation.target && mutation.target.nodeType === 1 && hasJariClass(mutation.target)) {
-        return allOwn(nodes);
-      }
-      return nodes.length > 0 && allOwn(nodes);
-    } catch {
-    }
-    return false;
-  }
-  function scheduleRegenerate() {
-    if (regenerateTimer) return;
-    regenerateTimer = setTimeout(() => {
-      regenerateTimer = null;
-      if (!active3) return;
-      const savedPrefix = prefix;
-      const fresh = collectElements(mode2);
-      if (fresh.length === 0) {
-        close3();
-        ui.toast("No hints");
-        return;
-      }
-      const capped = fresh.length > MAX_HINTS ? prioritizeForViewport(fresh).slice(0, MAX_HINTS) : fresh;
-      if (capped.length !== fresh.length) {
-        ui.toast(`Too many hints (${capped.length} shown)`);
-      }
-      elements = capped;
-      render3();
-      if (holder && !spaceHeld) holder.style.display = "";
-      prefix = savedPrefix;
-      if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
-        prefix = "";
-      }
-      refresh();
-    }, REGENERATE_DELAY);
-  }
-  function isActive3() {
-    return active3;
-  }
-  function focusFrame(el) {
-    ui.focusFrameElement(el);
-    try {
-      ui.toast("Focused frame");
-    } catch {
-    }
-  }
-  function focusInput(el) {
-    try {
-      el.scrollIntoView({ block: "center", inline: "center" });
-    } catch {
-    }
-    ui.safeFocus(el, { preventScroll: true });
-    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
-      try {
-        const len = el.value ? el.value.length : 0;
-        if (typeof el.select === "function" && el.type !== "checkbox" && el.type !== "radio") {
-          el.select();
-        } else if (typeof el.setSelectionRange === "function") {
-          el.setSelectionRange(len, len);
-        }
-      } catch {
-      }
-    } else if (el.isContentEditable) {
-      try {
-        const sel = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        range.collapse(false);
-        if (sel) {
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      } catch {
-      }
-    }
-  }
-  function refresh() {
-    if (!active3) return;
-    for (const h of hints) {
-      if (!prefix) {
-        h.hintEl.style.opacity = "1";
-        h.hintEl.style.display = "";
-        h.hintEl.classList.remove("jari-hint-hidden");
-        updateHintText(h.hintEl, h.label, "");
-      } else if (h.label.startsWith(prefix)) {
-        h.hintEl.style.opacity = "1";
-        h.hintEl.style.display = "";
-        updateHintText(h.hintEl, h.label, prefix);
-      } else {
-        h.hintEl.style.opacity = "0";
-        h.hintEl.style.display = "none";
-      }
-    }
-  }
-  function flip() {
-    if (hints.length === 0) return;
-    const first = hints[0].hintEl;
-    const isFlipped = first.style.zIndex !== String(first.zIndex);
-    hints.forEach((h, i) => {
-      const el = h.hintEl;
-      const z = parseInt(el.style.zIndex, 10) || 0;
-      el.style.zIndex = isFlipped ? String(el.zIndex) : String(hints.length - i + 2147483e3 - z);
-    });
-  }
-  function assignLabels(nextElements, charset) {
-    const oldByEl = new Map(hints.map((h) => [h.el, h.label]));
-    const assigned = /* @__PURE__ */ new Map();
-    const taken = [];
-    const newcomers = [];
-    for (const el of nextElements) {
-      const old = oldByEl.get(el);
-      if (old) {
-        assigned.set(el, old);
-        taken.push(old);
-      } else {
-        newcomers.push(el);
-      }
-    }
-    if (newcomers.length > 0) {
-      if (taken.length === 0) return genLabels(nextElements.length, charset);
-      const pool = genLabels(nextElements.length + newcomers.length, charset).filter(
-        (label) => taken.every((t) => t !== label && !t.startsWith(label) && !label.startsWith(t))
-      );
-      newcomers.forEach((el, i) => {
-        if (i < pool.length) {
-          assigned.set(el, pool[i]);
-          taken.push(pool[i]);
-        }
-      });
-      if (assigned.size !== nextElements.length) {
-        prefix = "";
-        return genLabels(nextElements.length, charset);
-      }
-    }
-    return nextElements.map((el) => assigned.get(el));
-  }
-  function render3() {
-    if (hintsHost) {
-      try {
-        hintsHost.remove();
-      } catch {
-      }
-      hintsHost = null;
-      holder = null;
-    }
-    const created = createHintsHost(
-      settings.getHintTheme(),
-      settings.getHintFontSize()
-    );
-    hintsHost = created.host;
-    holder = created.holder;
-    const charset = normalizeCharset();
-    const labels = assignLabels(elements, charset);
-    hints = [];
-    const links = layoutHints(
-      holder,
-      elements,
-      labels,
-      settings.getHintFontSize()
-    );
-    hints = links.map((link) => ({
-      el: link.link,
-      label: link.label,
-      hintEl: link
-    }));
-    refresh();
-  }
-  function flashElement(el) {
-    try {
-      const r = getHintRect(el);
-      if (!r || r.width <= 0 || r.height <= 0) return;
-      const d = document.createElement("div");
-      d.className = "jari-flash";
-      d.style.left = `${r.left}px`;
-      d.style.top = `${r.top}px`;
-      d.style.width = `${r.width}px`;
-      d.style.height = `${r.height}px`;
-      (document.body || document.documentElement).appendChild(d);
-      setTimeout(() => {
-        try {
-          d.remove();
-        } catch {
-        }
-      }, 150);
-    } catch {
-    }
-  }
-  var scrollLockPrevent = null;
-  var keyUpHandler = null;
-  function disableScrollLock() {
-    if (scrollLockPrevent) return;
-    scrollLockPrevent = (e) => {
-      if (!active3) return;
-      const t = e.target;
-      if (t?.closest?.(".jari-hint")) return;
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    for (const type of ["wheel", "touchmove"]) {
-      try {
-        window.addEventListener(type, scrollLockPrevent, {
-          passive: false,
-          capture: true
-        });
-      } catch {
-      }
-    }
-  }
-  function enableScrollLock() {
-    if (!scrollLockPrevent) return;
-    for (const type of ["wheel", "touchmove"]) {
-      try {
-        window.removeEventListener(type, scrollLockPrevent, { capture: true });
-      } catch {
-      }
-    }
-    scrollLockPrevent = null;
-  }
-  function stopTracking() {
-    if (resizeHandler) {
-      try {
-        window.removeEventListener("resize", resizeHandler);
-      } catch {
-      }
-      resizeHandler = null;
-    }
-    if (mutationObserver) {
-      try {
-        mutationObserver.disconnect();
-      } catch {
-      }
-      mutationObserver = null;
-    }
-    if (regenerateTimer) {
-      clearTimeout(regenerateTimer);
-      regenerateTimer = null;
-    }
-    if (keyUpHandler) {
-      try {
-        window.removeEventListener("keyup", keyUpHandler, true);
-      } catch {
-      }
-      keyUpHandler = null;
-    }
-    enableScrollLock();
-    hideHintPill();
-  }
-  function startTracking() {
-    stopTracking();
-    disableScrollLock();
-    showHintPill();
-    try {
-      ui.toast(`Hints: ${elements.length} targets (${mode2})`);
-    } catch {
-    }
-    try {
-      mutationObserver = new MutationObserver((mutations) => {
-        try {
-          if (mutations.every(isOwnMutation)) return;
-        } catch {
-        }
-        scheduleRegenerate();
-      });
-      const target2 = document.body || document.documentElement;
-      mutationObserver.observe(target2, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["style", "class", "hidden", "aria-hidden", "inert"]
-      });
-    } catch {
-    }
-    keyUpHandler = (e) => {
-      if (active3) onKeyUp(e);
-    };
-    try {
-      window.addEventListener("keyup", keyUpHandler, true);
-    } catch {
-    }
-    resizeHandler = () => {
-      if (!active3) return;
-      scheduleRegenerate();
-    };
-    window.addEventListener("resize", resizeHandler);
-  }
-  function close3() {
-    if (!active3) return;
-    active3 = false;
-    prefix = "";
-    spaceHeld = false;
-    for (const el of elements) {
-      try {
-        delete el._jariViewportRect;
-        delete el._jariBase;
-      } catch {
-      }
-    }
-    elements = [];
-    hints = [];
-    if (hintsHost) {
-      try {
-        hintsHost.remove();
-      } catch {
-      }
-      hintsHost = null;
-      holder = null;
-    }
-    stopTracking();
-  }
-  var VALID_HINT_MODES = /* @__PURE__ */ new Set([
-    "click",
-    "open",
-    "openBackground",
-    "openCurrent",
-    "input",
-    "yank",
-    "yankText"
-  ]);
-  function open2(requestedMode) {
-    if (active3) close3();
-    mode2 = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
-    multipleHits = mode2 === "openBackground";
-    let candidates = collectElements(mode2);
-    if (mode2 === "input" && candidates.length === 1) {
-      focusInput(candidates[0]);
-      return;
-    }
-    if (candidates.length === 0) {
-      const msg = mode2 === "yank" ? "No links to yank" : mode2 === "input" ? "No inputs" : "No hints";
-      ui.toast(msg);
-      return;
-    }
-    if (candidates.length > MAX_HINTS) {
-      candidates = prioritizeForViewport(candidates).slice(0, MAX_HINTS);
-      ui.toast(`Too many hints (${candidates.length} shown)`);
-    }
-    elements = candidates;
-    prefix = "";
-    active3 = true;
-    touch("hints");
-    render3();
-    startTracking();
-  }
-  function handleActivationEnd() {
-    if (!multipleHits) close3();
-    else {
-      prefix = "";
-      refresh();
-    }
-  }
-  function activate2(el) {
-    flashElement(el);
-    if (mode2 === "click") {
-      if (isFrameElement(el)) focusFrame(el);
-      else if (isEditable(el)) focusInput(el);
-      else ui.dispatchClick(el);
-      handleActivationEnd();
-    } else if (mode2 === "open") {
-      const url = getHref(el);
-      if (url) sendMessage("openInForegroundTab", { url });
-      else if (isFrameElement(el)) focusFrame(el);
-      else ui.dispatchClick(el);
-      handleActivationEnd();
-    } else if (mode2 === "openBackground") {
-      const url = getHref(el);
-      if (url) sendMessage("openInBackgroundTab", { url });
-      else if (isFrameElement(el)) focusFrame(el);
-      handleActivationEnd();
-    } else if (mode2 === "openCurrent") {
-      const url = getHref(el);
-      if (url) {
-        sendMessage("navigate", { url });
-        close3();
-      } else if (isFrameElement(el)) {
-        focusFrame(el);
-        close3();
-      } else {
-        ui.dispatchClick(el);
-        close3();
-      }
-    } else if (mode2 === "input") {
-      focusInput(el);
-      close3();
-    } else if (mode2 === "yank") {
-      const url = getHref(el);
-      if (url) {
-        ui.copyText(url).then(
-          (ok) => ui.toast(ok ? `Yanked ${url}` : "Copy failed")
-        );
-      } else {
-        ui.toast("No link");
-      }
-      close3();
-    } else if (mode2 === "yankText") {
-      const text = (el.innerText || el.textContent || "").trim();
-      if (text) {
-        ui.copyText(text).then(
-          (ok) => ui.toast(ok ? "Yanked text" : "Copy failed")
-        );
-      } else {
-        ui.toast("No text");
-      }
-      close3();
-    }
-  }
-  function onKeyDown3(event) {
-    if (!active3) return false;
-    const key = event.key;
-    if (key === "Escape") {
-      ui.consume(event);
-      if (prefix) {
-        prefix = "";
-        refresh();
-      } else {
-        close3();
-      }
-      return true;
-    }
-    if (key === "Shift") {
-      ui.consume(event);
-      flip();
-      return true;
-    }
-    if (key === " " || event.code === "Space") {
-      ui.consume(event);
-      spaceHeld = true;
-      if (holder) holder.style.display = "none";
-      return true;
-    }
-    if (key === "Backspace") {
-      ui.consume(event);
-      if (prefix) {
-        prefix = prefix.slice(0, -1);
-        refresh();
-      } else {
-        close3();
-      }
-      return true;
-    }
-    if (key === "Enter") {
-      ui.consume(event);
-      return true;
-    }
-    if (event.ctrlKey || event.metaKey || event.altKey) return false;
-    if (key.length === 1) {
-      const charset = normalizeCharset();
-      const lower = key.toLowerCase();
-      if (charset.includes(lower)) {
-        ui.consume(event);
-        const next2 = prefix + lower.toUpperCase();
-        const exact = hints.find((h) => h.label === next2);
-        prefix = next2;
-        refresh();
-        if (exact) activate2(exact.el);
-        return true;
-      }
-    }
-    ui.consume(event);
-    return true;
-  }
-  function onKeyUp(event) {
-    if (!active3) return false;
-    if (event.key === " " || event.code === "Space") {
-      ui.consume(event);
-      spaceHeld = false;
-      if (holder) holder.style.display = "";
-      return true;
-    }
-    return false;
-  }
-  var Hints = { open: open2, close: close3, isActive: isActive3, onKeyDown: onKeyDown3, genLabels };
-  register("hints", { close: close3, onKeyDown: onKeyDown3, isActive: isActive3 });
-
-  // content/highlight.js
-  function detectHighlightSupport() {
-    try {
-      return typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
-    } catch {
-      return false;
-    }
-  }
-  function clearHighlightNames(...names) {
-    try {
-      if (CSS.highlights) {
-        for (const name of names) CSS.highlights.delete(name);
-      }
-    } catch {
-    }
-  }
-  function unwrapSpans(spans) {
-    for (const span of spans) {
-      try {
-        const parent = span.parentNode;
-        if (!parent) continue;
-        const text = span.textContent;
-        const tn = document.createTextNode(text);
-        parent.replaceChild(tn, span);
-        parent.normalize();
-      } catch {
-      }
-    }
-    spans.length = 0;
-  }
-
-  // content/find/matcher.js
-  function hasUpperCase(s) {
-    return /\p{Lu}/u.test(s);
-  }
-  function buildMatcher(query4, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
-    if (!query4) return null;
-    const flags = (caseSensitive ? "g" : "gi") + "mu";
-    const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
-    try {
-      if (regex) return new RegExp(wholeWord ? bounds(query4) : query4, flags);
-      const src = query4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return new RegExp(wholeWord ? bounds(src) : src, flags);
-    } catch {
-      return null;
-    }
-  }
-
-  // content/find/collect.js
-  function isOverlayElement(el) {
-    try {
-      return el.closest && el.closest(overlaySelectors);
-    } catch {
-      return false;
-    }
-  }
-  function shouldSkipNode(node) {
-    const parent = node.parentElement;
-    if (!parent) return true;
-    const tag = parent.tagName;
-    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
-    if (isOverlayElement(parent)) return true;
-    if (parent.closest) {
-      try {
-        if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host")) return true;
-        if (parent.closest('[aria-hidden="true"]')) return true;
-        if (parent.closest("[hidden]")) return true;
-      } catch {
-      }
-    }
-    try {
-      if (!isElementDrawn(parent)) return true;
-      const style = window.getComputedStyle(parent);
-      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
-      if (parseFloat(style.opacity) < 0.05) return true;
-    } catch {
-    }
-    return false;
-  }
-  function collectTextNodes() {
-    const out = [];
-    const rootEl = document.body || document.documentElement;
-    if (!rootEl) return out;
-    try {
-      const walker = document.createTreeWalker(
-        rootEl,
-        NodeFilter.SHOW_TEXT,
-        {
-          acceptNode(node2) {
-            if (!node2.nodeValue || !node2.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-            if (shouldSkipNode(node2)) return NodeFilter.FILTER_REJECT;
-            return NodeFilter.FILTER_ACCEPT;
-          }
-        }
-      );
-      let node = walker.nextNode();
-      while (node) {
-        out.push(node);
-        if (out.length > 5e3) break;
-        node = walker.nextNode();
-      }
-    } catch {
-    }
-    try {
-      const visit = (root) => {
-        let els;
-        try {
-          els = root.querySelectorAll("*");
-        } catch {
-          return;
-        }
-        for (const el of els) {
-          if (el.shadowRoot) {
-            try {
-              const sw = document.createTreeWalker(
-                el.shadowRoot,
-                NodeFilter.SHOW_TEXT,
-                {
-                  acceptNode(n) {
-                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                    if (shouldSkipNode(n)) return NodeFilter.FILTER_REJECT;
-                    return NodeFilter.FILTER_ACCEPT;
-                  }
-                }
-              );
-              let sn = sw.nextNode();
-              while (sn) {
-                out.push(sn);
-                if (out.length > 5e3) return;
-                sn = sw.nextNode();
-              }
-              visit(el.shadowRoot);
-            } catch {
-            }
-          }
-          if (el.tagName === "IFRAME") {
-            try {
-              const doc = el.contentDocument;
-              if (doc && doc.body) {
-                const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
-                  acceptNode(n) {
-                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                    const p = n.parentElement;
-                    if (!p) return NodeFilter.FILTER_REJECT;
-                    const tag = p.tagName;
-                    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
-                    return NodeFilter.FILTER_ACCEPT;
-                  }
-                });
-                let nn = w.nextNode();
-                while (nn) {
-                  out.push(nn);
-                  if (out.length > 5e3) return;
-                  nn = w.nextNode();
-                }
-              }
-            } catch {
-            }
-          }
-        }
-      };
-      visit(document);
-    } catch {
-    }
-    return out;
   }
 
   // content/visual/collect.js
@@ -5589,8 +4654,8 @@
   }
 
   // content/visual.js
-  var active4 = false;
-  var mode3 = "visual";
+  var active2 = false;
+  var mode2 = "visual";
   var pillEl = null;
   var pendingCount = "";
   var pendingG = false;
@@ -5621,8 +4686,8 @@
   var pendingVisualMode = "visual";
   var findOpenHandler = null;
   var findNavHandler = null;
-  function isActive4() {
-    return active4 || hintActive;
+  function isActive2() {
+    return active2 || hintActive;
   }
   function setFindOpen(handler) {
     findOpenHandler = handler;
@@ -5640,7 +4705,7 @@
     try {
       pillEl = document.createElement("div");
       pillEl.className = "jari-pill";
-      pillEl.textContent = pillText(mode3);
+      pillEl.textContent = pillText(mode2);
       ui.statusContainer().appendChild(pillEl);
     } catch {
     }
@@ -5712,7 +4777,7 @@
     }
   }
   function updateBlockCaretImmediate() {
-    if (!active4 || !caretEl || !caretHost) return;
+    if (!active2 || !caretEl || !caretHost) return;
     const sel = getSelection2();
     if (!sel || sel.rangeCount === 0) return;
     try {
@@ -5775,7 +4840,7 @@
       if (!geo) return;
       caretEl.style.transform = `translate3d(${geo.left}px, ${geo.top}px, 0)`;
       caretEl.style.height = `${Math.max(12, geo.height)}px`;
-      if (mode3 === "line") {
+      if (mode2 === "line") {
         caretEl.style.width = `${Math.max(20, geo.width || 0)}px`;
         caretEl.style.opacity = "0.35";
       } else {
@@ -5861,7 +4926,7 @@
       }
       caretRaf = null;
     }
-    if (!active4 && !hintActive) disableSelectOverride();
+    if (!active2 && !hintActive) disableSelectOverride();
   }
   var selectOverrideEl = null;
   function enableSelectOverride() {
@@ -5886,7 +4951,7 @@
     clearVisualHighlight();
   }
   function applyVisualHighlight2() {
-    applyVisualHighlight({ active: active4, mode: mode3, getSelection: getSelection2 });
+    applyVisualHighlight({ active: active2, mode: mode2, getSelection: getSelection2 });
   }
   function renderHints() {
     if (hintHost) {
@@ -5967,15 +5032,15 @@
       hintHost = null;
       hintHolder = null;
     }
-    if (!active4 && !hintActive) disableSelectOverride();
-    if (!active4 && pillEl) {
+    if (!active2 && !hintActive) disableSelectOverride();
+    if (!active2 && pillEl) {
       try {
         pillEl.remove();
       } catch {
       }
       pillEl = null;
-    } else if (active4 && pillEl) {
-      pillEl.textContent = pillText(mode3);
+    } else if (active2 && pillEl) {
+      pillEl.textContent = pillText(mode2);
     }
   }
   function activateHintByLabel(label) {
@@ -5987,8 +5052,8 @@
     return true;
   }
   function enterAtElement(el, newMode) {
-    if (active4) close4(false);
-    mode3 = newMode || "visual";
+    if (active2) close2(false);
+    mode2 = newMode || "visual";
     let range;
     try {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
@@ -6020,7 +5085,7 @@
       sel.addRange(range);
     } catch {
     }
-    if (mode3 !== "line" && sel.isCollapsed) {
+    if (mode2 !== "line" && sel.isCollapsed) {
       if (hasModify()) {
         try {
           sel.modify("extend", "forward", "character");
@@ -6028,10 +5093,10 @@
         }
       }
     }
-    if (mode3 !== "line" && sel.isCollapsed) {
+    if (mode2 !== "line" && sel.isCollapsed) {
       ui.toast("No text to select");
     }
-    if (mode3 === "line") {
+    if (mode2 === "line") {
       try {
         if (hasModify()) {
           sel.modify("extend", "forward", "lineboundary");
@@ -6048,7 +5113,7 @@
         sel.addRange(r2);
       }
     }
-    active4 = true;
+    active2 = true;
     showPill();
     showBlockCaret();
     attachCaretListeners();
@@ -6086,7 +5151,7 @@
     return false;
   }
   function isCaret() {
-    return mode3 === "caret";
+    return mode2 === "caret";
   }
   function doMoveChar(dir) {
     if (isCaret()) {
@@ -6592,10 +5657,10 @@
     }
   }
   function enterCaretAtFocus() {
-    if (!active4) return;
+    if (!active2) return;
     collapseToFocus();
-    mode3 = "caret";
-    if (pillEl) pillEl.textContent = pillText(mode3);
+    mode2 = "caret";
+    if (pillEl) pillEl.textContent = pillText(mode2);
     pendingCount = "";
     pendingG = false;
     pendingF = null;
@@ -6608,15 +5673,15 @@
   }
   function enter(newMode) {
     if (hintActive) closeHints();
-    if (active4) close4(false);
+    if (active2) close2(false);
     touch("visual");
     pendingVisualMode = newMode || "visual";
     showVisualHints(pendingVisualMode);
   }
-  function close4(keepSelection = false) {
+  function close2(keepSelection = false) {
     if (hintActive) closeHints();
-    if (!active4) return;
-    active4 = false;
+    if (!active2) return;
+    active2 = false;
     hidePill();
     hideBlockCaret();
     clearVisualHighlight2();
@@ -6636,7 +5701,7 @@
       }
     }
   }
-  function onKeyDown4(event) {
+  function onKeyDown2(event) {
     if (hintActive) {
       const key2 = event.key;
       if (key2 === "Escape") {
@@ -6686,7 +5751,7 @@
       ui.consume(event);
       return true;
     }
-    if (!active4) return false;
+    if (!active2) return false;
     if (pendingF) {
       const ch = event.key;
       if (ch.length === 1) {
@@ -6707,11 +5772,11 @@
     if (key === "Escape") {
       ui.consume(event);
       if (isCaret()) {
-        close4(false);
+        close2(false);
       } else {
         enterCaretAtFocus();
-        if (!active4) {
-          close4(false);
+        if (!active2) {
+          close2(false);
         }
       }
       return true;
@@ -6720,7 +5785,7 @@
       if (key !== "0" || pendingCount !== "") {
         ui.consume(event);
         if (pendingCount.length < 9) pendingCount += key;
-        if (pillEl) pillEl.textContent = pillText(mode3) + " " + pendingCount;
+        if (pillEl) pillEl.textContent = pillText(mode2) + " " + pendingCount;
         return true;
       }
     }
@@ -6730,7 +5795,7 @@
       const dir = isUpper ? "backward" : "forward";
       const count = pendingCount ? parseInt(pendingCount, 10) || 1 : 1;
       pendingCount = "";
-      if (pillEl) pillEl.textContent = pillText(mode3);
+      if (pillEl) pillEl.textContent = pillText(mode2);
       pendingF = { dir, till, count };
       ui.consume(event);
       ui.toast(`/${till ? "t" : "f"}-char\u2026`);
@@ -6747,7 +5812,7 @@
       if (isReverse) dir = dir === "forward" ? "backward" : "forward";
       const count = pendingCount ? parseInt(pendingCount, 10) || 1 : 1;
       pendingCount = "";
-      if (pillEl) pillEl.textContent = pillText(mode3);
+      if (pillEl) pillEl.textContent = pillText(mode2);
       pendingF = { dir, till: lastF.till, count };
       handleFChar(lastF.ch);
       return true;
@@ -6759,18 +5824,18 @@
         if (n > 1) doGoToLine(n);
         else doDocBoundary(-1);
         pendingG = false;
-        if (pillEl) pillEl.textContent = pillText(mode3);
+        if (pillEl) pillEl.textContent = pillText(mode2);
         return true;
       } else {
         ui.consume(event);
         pendingG = true;
-        if (pillEl) pillEl.textContent = pillText(mode3) + " g";
+        if (pillEl) pillEl.textContent = pillText(mode2) + " g";
         clearTimeout(pendingGTimer);
         pendingGTimer = setTimeout(() => {
           pendingGTimer = null;
           pendingG = false;
           if (pillEl && pillEl.textContent.endsWith(" g"))
-            pillEl.textContent = pillText(mode3);
+            pillEl.textContent = pillText(mode2);
         }, 1500);
         return true;
       }
@@ -6778,7 +5843,7 @@
     if (pendingG) {
       clearPendingKeyTimers();
       pendingG = false;
-      if (pillEl) pillEl.textContent = pillText(mode3);
+      if (pillEl) pillEl.textContent = pillText(mode2);
     }
     let repeat = 1;
     if (pendingCount) {
@@ -6789,7 +5854,7 @@
         clearPendingKeyTimers();
         pendingY = false;
         if (pillEl && pillEl.textContent.endsWith(" y"))
-          pillEl.textContent = pillText(mode3);
+          pillEl.textContent = pillText(mode2);
         if (key === "y") {
           ui.consume(event);
           yankLinesFromCaret(repeat);
@@ -6800,14 +5865,14 @@
       if (key === "y") {
         ui.consume(event);
         pendingY = true;
-        if (pillEl) pillEl.textContent = pillText(mode3) + " y";
+        if (pillEl) pillEl.textContent = pillText(mode2) + " y";
         clearTimeout(pendingYTimer);
         pendingYTimer = setTimeout(() => {
           pendingYTimer = null;
           if (pendingY) {
             pendingY = false;
             if (pillEl && pillEl.textContent.endsWith(" y"))
-              pillEl.textContent = pillText(mode3);
+              pillEl.textContent = pillText(mode2);
           }
         }, 1500);
         return true;
@@ -6822,7 +5887,7 @@
       }
       if (key === "/") {
         ui.consume(event);
-        close4(false);
+        close2(false);
         if (findOpenHandler) findOpenHandler();
         pendingCount = "";
         return true;
@@ -6831,8 +5896,8 @@
         ui.consume(event);
         const sel = getSelection2();
         if (key === "v") {
-          mode3 = "visual";
-          if (pillEl) pillEl.textContent = pillText(mode3);
+          mode2 = "visual";
+          if (pillEl) pillEl.textContent = pillText(mode2);
           if (sel && sel.isCollapsed && hasModify()) {
             try {
               sel.modify("extend", "forward", "character");
@@ -6842,8 +5907,8 @@
           ensureVisible();
           updateBlockCaret();
         } else {
-          mode3 = "line";
-          if (pillEl) pillEl.textContent = pillText(mode3);
+          mode2 = "line";
+          if (pillEl) pillEl.textContent = pillText(mode2);
           if (sel && sel.isCollapsed) {
             try {
               sel.modify("extend", "forward", "lineboundary");
@@ -6868,7 +5933,7 @@
         if (!activateCaretLink()) {
           ui.toast("No link at caret");
         } else {
-          close4(false);
+          close2(false);
         }
         pendingCount = "";
         return true;
@@ -6935,8 +6000,8 @@
           collapseToFocus();
         } catch {
         }
-        mode3 = "caret";
-        if (pillEl) pillEl.textContent = pillText(mode3);
+        mode2 = "caret";
+        if (pillEl) pillEl.textContent = pillText(mode2);
         pendingCount = "";
         pendingG = false;
         pendingF = null;
@@ -6948,21 +6013,21 @@
         break;
       case "v":
         ui.consume(event);
-        if (mode3 === "visual") {
+        if (mode2 === "visual") {
           enterCaretAtFocus();
-        } else if (mode3 === "line") {
+        } else if (mode2 === "line") {
           enterCaretAtFocus();
         } else {
-          close4(false);
+          close2(false);
           enter("visual");
         }
         break;
       case "V":
         ui.consume(event);
-        if (mode3 === "line" || mode3 === "visual") {
+        if (mode2 === "line" || mode2 === "visual") {
           enterCaretAtFocus();
         } else {
-          close4(false);
+          close2(false);
           enter("line");
         }
         break;
@@ -6982,8 +6047,8 @@
           collapseToFocus();
         } catch {
         }
-        mode3 = "caret";
-        if (pillEl) pillEl.textContent = pillText(mode3);
+        mode2 = "caret";
+        if (pillEl) pillEl.textContent = pillText(mode2);
         pendingCount = "";
         pendingG = false;
         pendingF = null;
@@ -7028,12 +6093,12 @@
   }
   var Visual = {
     enter,
-    close: close4,
-    isActive: isActive4,
+    close: close2,
+    isActive: isActive2,
     setFindOpen,
     setFindNav,
     enterCaretAtFocus,
-    onKeyDown: onKeyDown4,
+    onKeyDown: onKeyDown2,
     showBlockCaret,
     hideBlockCaret,
     updateBlockCaret
@@ -7041,14 +6106,14 @@
   register("visual", {
     close: () => {
       closeHints();
-      close4(false);
+      close2(false);
     },
-    onKeyDown: onKeyDown4,
-    isActive: isActive4
+    onKeyDown: onKeyDown2,
+    isActive: isActive2
   });
   function __resetVisualState() {
     closeHints();
-    close4(false);
+    close2(false);
     pendingCount = "";
     pendingG = false;
     pendingF = null;
@@ -7059,14 +6124,14 @@
 
   // content/find.js
   var MAX_MATCHES = 1500;
-  var active5 = false;
-  var host3 = null;
-  var overlay3 = null;
+  var active3 = false;
+  var host2 = null;
+  var overlay2 = null;
   var inputEl2 = null;
   var statusEl = null;
   var restoreFocus2 = null;
-  var matches2 = [];
-  var currentIdx2 = 0;
+  var matches = [];
+  var currentIdx = 0;
   var lastQuery = "";
   var pendingQuery = "";
   var committedQuery = "";
@@ -7090,10 +6155,10 @@
   var findObserver = null;
   var findObserverTimer = null;
   function hasHighlights() {
-    return matches2.length > 0 && !highlightsHidden;
+    return matches.length > 0 && !highlightsHidden;
   }
-  function isActive5() {
-    return active5;
+  function isActive3() {
+    return active3;
   }
   function matchesChanged(a, b) {
     if (a.length !== b.length) return true;
@@ -7106,24 +6171,24 @@
     clearTimeout(findObserverTimer);
     findObserverTimer = setTimeout(() => {
       try {
-        if (active5 && pendingQuery) {
+        if (active3 && pendingQuery) {
           const q = pendingQuery.trim();
           if (!q) return;
           const rebuilt = buildMatches(q);
-          if (matchesChanged(rebuilt, matches2)) {
-            matches2 = rebuilt;
-            currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
+          if (matchesChanged(rebuilt, matches)) {
+            matches = rebuilt;
+            currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
             applyHighlights();
             updateStatus();
-            if (matches2.length > 0) scrollToCurrent();
+            if (matches.length > 0) scrollToCurrent();
           }
           return;
         }
-        if (!active5 && hasHighlights() && (lastQuery || "").trim()) {
+        if (!active3 && hasHighlights() && (lastQuery || "").trim()) {
           const rebuilt = buildMatches(lastQuery.trim());
-          if (matchesChanged(rebuilt, matches2)) {
-            matches2 = rebuilt;
-            currentIdx2 = Math.min(currentIdx2, Math.max(0, matches2.length - 1));
+          if (matchesChanged(rebuilt, matches)) {
+            matches = rebuilt;
+            currentIdx = Math.min(currentIdx, Math.max(0, matches.length - 1));
             applyHighlights();
           }
         }
@@ -7151,7 +6216,7 @@
     }
   }
   function syncObserver() {
-    if (active5 || hasHighlights()) {
+    if (active3 || hasHighlights()) {
       if (!findObserver) startFindObserver();
     } else {
       stopFindObserver();
@@ -7194,8 +6259,8 @@
     clearHighlightNames("jari-find", "jari-find-current");
   }
   function clearHighlights() {
-    matches2 = [];
-    currentIdx2 = 0;
+    matches = [];
+    currentIdx = 0;
     highlightsHidden = false;
     clearHighlightApi();
     updateStatus();
@@ -7205,8 +6270,8 @@
     clearHighlightApi();
   }
   function getCurrentLinkElement() {
-    if (matches2.length === 0) return null;
-    const r = matches2[currentIdx2];
+    if (matches.length === 0) return null;
+    const r = matches[currentIdx];
     if (!r || !r.startContainer) return null;
     return getLinkAncestor(r.startContainer.parentElement);
   }
@@ -7221,27 +6286,27 @@
   }
   function applyHighlights() {
     clearHighlightApi();
-    if (matches2.length === 0) return;
+    if (matches.length === 0) return;
     if (highlightsHidden) return;
-    const valid = matches2.filter((r) => {
+    const valid = matches.filter((r) => {
       try {
         return r.startContainer && r.startContainer.isConnected !== false && r.endContainer && r.endContainer.isConnected !== false;
       } catch {
         return false;
       }
     });
-    if (valid.length !== matches2.length) {
-      matches2 = valid;
-      if (currentIdx2 >= matches2.length) currentIdx2 = Math.max(0, matches2.length - 1);
-      if (matches2.length === 0) {
+    if (valid.length !== matches.length) {
+      matches = valid;
+      if (currentIdx >= matches.length) currentIdx = Math.max(0, matches.length - 1);
+      if (matches.length === 0) {
         updateStatus();
         return;
       }
     }
-    const cur = matches2[currentIdx2];
+    const cur = matches[currentIdx];
     if (!useHighlights) return;
     try {
-      const others = valid.filter((_, i) => i !== currentIdx2);
+      const others = valid.filter((_, i) => i !== currentIdx);
       if (others.length > 0) {
         CSS.highlights.set("jari-find", new Highlight(...others));
       } else {
@@ -7263,8 +6328,8 @@
     }
   }
   function scrollToCurrent() {
-    if (matches2.length === 0) return;
-    const r = matches2[currentIdx2];
+    if (matches.length === 0) return;
+    const r = matches[currentIdx];
     if (!r) return;
     try {
       if (r.startContainer && r.startContainer.isConnected === false) return;
@@ -7373,8 +6438,8 @@
     const query4 = (q || "").trim();
     clearTimeout(inputDebounce);
     if (!query4) {
-      matches2 = [];
-      currentIdx2 = 0;
+      matches = [];
+      currentIdx = 0;
       clearHighlightApi();
       updateStatus();
       return;
@@ -7386,10 +6451,10 @@
   function runQuery(query4) {
     highlightsHidden = false;
     try {
-      matches2 = buildMatches(query4);
-      currentIdx2 = 0;
+      matches = buildMatches(query4);
+      currentIdx = 0;
       applyHighlights();
-      if (matches2.length > 0) scrollToCurrent();
+      if (matches.length > 0) scrollToCurrent();
       updateStatus();
     } catch {
     }
@@ -7463,7 +6528,7 @@
   }
   function updateStatus() {
     if (!statusEl) return;
-    if (!pendingQuery && matches2.length === 0 && !lastQuery) {
+    if (!pendingQuery && matches.length === 0 && !lastQuery) {
       statusEl.textContent = "";
       statusEl.classList.remove("jari-find-no-match");
       return;
@@ -7473,7 +6538,7 @@
       statusEl.textContent = "";
       return;
     }
-    if (matches2.length === 0) {
+    if (matches.length === 0) {
       if (findRegex && !buildMatcher(q, { regex: true, wholeWord: findWholeWord, caseSensitive: findCase })) {
         statusEl.textContent = "Invalid pattern";
       } else {
@@ -7481,7 +6546,7 @@
       }
       statusEl.classList.add("jari-find-no-match");
     } else {
-      statusEl.textContent = `${currentIdx2 + 1}/${matches2.length}${activeFlagSuffix()}`;
+      statusEl.textContent = `${currentIdx + 1}/${matches.length}${activeFlagSuffix()}`;
       statusEl.classList.remove("jari-find-no-match");
     }
   }
@@ -7582,10 +6647,10 @@
   }
   function renderBar() {
     const created = createShadowHost("jari-find-host", findCss());
-    host3 = created.host;
+    host2 = created.host;
     const shadow = created.shadow;
-    overlay3 = document.createElement("div");
-    overlay3.className = "jari-overlay jari-find";
+    overlay2 = document.createElement("div");
+    overlay2.className = "jari-overlay jari-find";
     const bar = document.createElement("div");
     bar.className = "jari-find-bar";
     const label = document.createElement("span");
@@ -7625,8 +6690,8 @@
       bar.appendChild(btn);
     }
     bar.appendChild(statusEl);
-    overlay3.appendChild(bar);
-    shadow.appendChild(overlay3);
+    overlay2.appendChild(bar);
+    shadow.appendChild(overlay2);
     restoreFocus2 = document.activeElement;
     historyIdx = -1;
     historyDraft = "";
@@ -7644,35 +6709,35 @@
     inputEl2.focus();
     updateStatus();
   }
-  function open3() {
-    if (active5) return;
+  function open() {
+    if (active3) return;
     touch("find");
     useHighlights = detectHighlightSupport();
     committedQuery = lastQuery;
-    committedIdx = currentIdx2;
+    committedIdx = currentIdx;
     committedHidden = highlightsHidden;
-    active5 = true;
+    active3 = true;
     startFindObserver();
     pendingQuery = "";
     loadFindHistory();
     renderBar();
   }
   function closeBar() {
-    if (!active5) return;
+    if (!active3) return;
     clearTimeout(inputDebounce);
     inputDebounce = null;
     const wasInput = inputEl2;
-    const wasHost = host3;
-    active5 = false;
+    const wasHost = host2;
+    active3 = false;
     pendingQuery = "";
-    if (host3) {
+    if (host2) {
       try {
-        host3.remove();
+        host2.remove();
       } catch {
       }
-      host3 = null;
+      host2 = null;
     }
-    overlay3 = null;
+    overlay2 = null;
     inputEl2 = null;
     statusEl = null;
     let focused;
@@ -7737,11 +6802,11 @@
     findWholeWord = committedWholeWord;
     findCase = committedCase;
     try {
-      matches2 = buildMatches(q);
-      currentIdx2 = Math.min(committedIdx, Math.max(0, matches2.length - 1));
+      matches = buildMatches(q);
+      currentIdx = Math.min(committedIdx, Math.max(0, matches.length - 1));
     } catch {
-      matches2 = [];
-      currentIdx2 = 0;
+      matches = [];
+      currentIdx = 0;
     } finally {
       findRegex = keepRegex;
       findWholeWord = keepWholeWord;
@@ -7762,11 +6827,11 @@
       return;
     }
     try {
-      matches2 = buildMatches(query4);
-      currentIdx2 = 0;
+      matches = buildMatches(query4);
+      currentIdx = 0;
     } catch {
-      matches2 = [];
-      currentIdx2 = 0;
+      matches = [];
+      currentIdx = 0;
     }
     lastQuery = query4;
     committedQuery = query4;
@@ -7781,20 +6846,20 @@
     pushFindHistory(query4);
     closeBar();
     applyHighlights();
-    if (matches2.length > 0) scrollToCurrent();
+    if (matches.length > 0) scrollToCurrent();
     updateStatus();
     syncObserver();
   }
   function next(count = 1, reverse = false) {
     const c = Math.max(1, Math.floor(count) || 1);
-    if (highlightsHidden && matches2.length > 0) {
+    if (highlightsHidden && matches.length > 0) {
       highlightsHidden = false;
       useHighlights = detectHighlightSupport();
       syncObserver();
     }
-    if (matches2.length > 0) {
+    if (matches.length > 0) {
       try {
-        const stale = matches2.some((r) => !r.startContainer || r.startContainer.isConnected === false);
+        const stale = matches.some((r) => !r.startContainer || r.startContainer.isConnected === false);
         if (stale) {
           const q = (lastQuery || pendingQuery || "").trim();
           if (q) {
@@ -7805,8 +6870,8 @@
               ui.toast(`No match for "${q}"`);
               return;
             }
-            matches2 = rebuilt;
-            if (currentIdx2 >= matches2.length) currentIdx2 = 0;
+            matches = rebuilt;
+            if (currentIdx >= matches.length) currentIdx = 0;
             useHighlights = detectHighlightSupport();
             applyHighlights();
             updateStatus();
@@ -7818,7 +6883,7 @@
       } catch {
       }
     }
-    if (matches2.length === 0) {
+    if (matches.length === 0) {
       const q = pendingQuery && pendingQuery.trim() || lastQuery;
       if (!q) {
         ui.toast("No search");
@@ -7827,9 +6892,9 @@
       pendingQuery = q;
       lastQuery = q;
       pushFindHistory(q);
-      matches2 = buildMatches(q);
-      currentIdx2 = 0;
-      if (matches2.length === 0) {
+      matches = buildMatches(q);
+      currentIdx = 0;
+      if (matches.length === 0) {
         ui.toast(`No match for "${q}"`);
         clearHighlightApi();
         updateStatus();
@@ -7840,22 +6905,22 @@
       updateStatus();
       if (c > 1) {
         const delta2 = reverse ? -c : c;
-        const len2 = matches2.length;
-        currentIdx2 = ((currentIdx2 + (delta2 > 0 ? delta2 - 1 : delta2)) % len2 + len2) % len2;
+        const len2 = matches.length;
+        currentIdx = ((currentIdx + (delta2 > 0 ? delta2 - 1 : delta2)) % len2 + len2) % len2;
         applyHighlights();
         updateStatus();
       }
       scrollToCurrent();
-      ui.toast(`${currentIdx2 + 1}/${matches2.length}`);
+      ui.toast(`${currentIdx + 1}/${matches.length}`);
       return;
     }
-    const len = matches2.length;
+    const len = matches.length;
     const delta = reverse ? -c : c;
-    currentIdx2 = ((currentIdx2 + delta) % len + len) % len;
+    currentIdx = ((currentIdx + delta) % len + len) % len;
     applyHighlights();
     scrollToCurrent();
     updateStatus();
-    ui.toast(`${currentIdx2 + 1}/${len}`);
+    ui.toast(`${currentIdx + 1}/${len}`);
   }
   var FIND_TOGGLE_COMMANDS = {
     toggleFindRegex: "regex",
@@ -7878,7 +6943,7 @@
     else findCase = true;
   }
   function toggleOrOpen(name) {
-    if (isActive5()) {
+    if (isActive3()) {
       toggleFindFlag(name);
       try {
         if (inputEl2) inputEl2.focus();
@@ -7886,14 +6951,14 @@
       }
       return;
     }
-    open3();
+    open();
     if (!inputEl2) return;
     enableFindFlag(name);
     refreshToggles();
     updateStatus();
   }
-  function onKeyDown5(event) {
-    if (!active5) return false;
+  function onKeyDown3(event) {
+    if (!active3) return false;
     const combo = canonicalKey(event);
     const toggleCmd = findToggleCommandFor(settings.getKeymap(), combo);
     let focused;
@@ -7967,20 +7032,21 @@
     return true;
   }
   var Find = {
-    open: open3,
+    open,
     close: closeBar,
     clearHighlights,
+    hideHighlights,
     next,
     toggleOrOpen,
-    isActive: isActive5,
+    isActive: isActive3,
     hasHighlights,
     handleGlobalEsc,
     handleGlobalEnter,
-    onKeyDown: onKeyDown5
+    onKeyDown: onKeyDown3
   };
-  register("find", { close: closeAndClear, onKeyDown: onKeyDown5, isActive: isActive5 });
+  register("find", { close: closeAndClear, onKeyDown: onKeyDown3, isActive: isActive3 });
   try {
-    Visual.setFindOpen(() => open3());
+    Visual.setFindOpen(() => open());
     if (typeof Visual.setFindNav === "function") Visual.setFindNav((count, reverse) => next(count, reverse));
   } catch {
   }
@@ -8007,6 +7073,995 @@
     historyIdx = -1;
     historyDraft = "";
   }
+
+  // content/help.js
+  var STEP = 50;
+  var COLUMNS = 3;
+  var active4 = false;
+  var host3 = null;
+  var overlay3 = null;
+  var listEl2 = null;
+  var footerBar = null;
+  var entries = [];
+  var searching = false;
+  var query2 = "";
+  var matches2 = [];
+  var currentIdx2 = 0;
+  var gPending = false;
+  var FOOTER_DEFAULT = "j/k scroll | / search | esc close";
+  function isActive4() {
+    return active4;
+  }
+  function open2() {
+    if (active4) return;
+    active4 = true;
+    touch("help");
+    try {
+      if (Find.hasHighlights()) Find.hideHighlights();
+    } catch {
+    }
+    render2();
+    overlay3.tabIndex = -1;
+    overlay3.focus();
+  }
+  function helpCss() {
+    return `
+    :host { all: initial !important; }
+    .jari-overlay {
+      all: initial;
+      display: block;
+      position: fixed !important;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483646 !important;
+      box-sizing: border-box;
+      background: var(--jari-cmplt-bg, #f5f5f7) !important;
+      color: var(--jari-cmplt-fg, #333738) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      max-height: 75vh;
+      overflow: hidden;
+      text-align: left !important;
+      pointer-events: auto;
+    }
+    .jari-help {
+      background: var(--jari-cmplt-bg, #f5f5f7);
+      color: var(--jari-cmplt-fg, #333738);
+      font-size: var(--jari-cmplt-font-size, 9pt) !important;
+      font-family: var(--jari-cmplt-font-family, monospace) !important;
+      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      outline: none;
+    }
+    .jari-help:focus { outline: none; }
+    .jari-help-title {
+      display: block;
+      background: var(--jari-header-bg, #e8e8ec);
+      color: var(--jari-fg, #333738);
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+      border-bottom: var(--jari-header-border-bottom, 1px solid #c5c5cf);
+      padding: 0 0.5ex;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-help-list {
+      display: block;
+      max-height: 60vh;
+      overflow: auto;
+    }
+    .jari-help-columns {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0 3ex;
+      align-items: start;
+    }
+    .jari-help-column { min-width: 0; }
+    .jari-help table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin-bottom: 2ex;
+      margin-top: 0;
+    }
+    .jari-help tr.jari-help-cat-header th {
+      background: var(--jari-header-bg, #e8e8ec);
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+      color: var(--jari-fg, #333738);
+      text-align: left;
+      border-bottom: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      padding: 0.25ex 0.5ex;
+    }
+    .jari-help td {
+      padding: 0 0.5ex;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      height: var(--jari-cmplt-option-height, 1.4em);
+      line-height: var(--jari-cmplt-option-height, 1.4em) !important;
+      text-align: left !important;
+    }
+    .jari-help td.jari-help-key {
+      width: 40%;
+      font-weight: bold !important;
+      color: var(--jari-fg, #333738);
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
+    }
+    .jari-help td.jari-help-key.jari-unbound {
+      font-weight: normal !important;
+      font-style: italic;
+      color: var(--jari-muted, #606079);
+      text-shadow: none;
+    }
+    .jari-help-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1ex;
+      padding: 0.25ex 0.5ex;
+      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+    }
+    .jari-find-hit {
+      background: rgba(224, 163, 99, 0.35) !important;
+      color: #1a1a1a !important;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+    .jari-find-current {
+      background: #e0a363 !important;
+      color: #1a1a1a !important;
+      border-radius: 2px;
+      padding: 0 1px;
+      outline: 1px solid #c38a22;
+    }
+  `;
+  }
+  function render2() {
+    const created = createShadowHost("jari-help-host", helpCss());
+    host3 = created.host;
+    const shadow = created.shadow;
+    overlay3 = document.createElement("div");
+    overlay3.className = "jari-overlay jari-help";
+    const title = document.createElement("div");
+    title.className = "jari-help-title";
+    title.textContent = "Jari keybindings";
+    overlay3.appendChild(title);
+    entries = [];
+    searching = false;
+    query2 = "";
+    matches2 = [];
+    currentIdx2 = 0;
+    const byCommand = /* @__PURE__ */ new Map();
+    for (const [key, commandName] of Object.entries(settings.getKeymap())) {
+      if (!byCommand.has(commandName)) byCommand.set(commandName, []);
+      byCommand.get(commandName).push(key);
+    }
+    const byCategory = /* @__PURE__ */ new Map();
+    for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
+      const keys = byCommand.get(commandName) || [];
+      const id = meta.category || "other";
+      if (!byCategory.has(id)) byCategory.set(id, []);
+      byCategory.get(id).push({ keys, label: meta.label, commandName });
+    }
+    listEl2 = document.createElement("div");
+    listEl2.className = "jari-help-list";
+    listEl2.appendChild(
+      ui.buildCategorizedGrid(byCategory, {
+        columnCount: COLUMNS,
+        gridClass: "jari-help-columns",
+        columnClass: "jari-help-column",
+        headerClass: "jari-help-cat-header",
+        renderEntries(tbody, rowEntries) {
+          for (const { keys, label, commandName } of rowEntries) {
+            const tr = document.createElement("tr");
+            const keyTd = document.createElement("td");
+            keyTd.className = "jari-help-key";
+            if (keys.length === 0) {
+              keyTd.textContent = "unbound";
+              keyTd.classList.add("jari-unbound");
+            } else {
+              keyTd.textContent = keys.map(displayCombo).join(", ");
+            }
+            const labelTd = document.createElement("td");
+            labelTd.className = "jari-help-label";
+            labelTd.textContent = label;
+            tr.appendChild(keyTd);
+            tr.appendChild(labelTd);
+            tbody.appendChild(tr);
+            entries.push({
+              tr,
+              keyTd,
+              labelTd,
+              haystack: `${keys.join(" ")} ${label} ${commandName}`.toLowerCase()
+            });
+          }
+        }
+      })
+    );
+    overlay3.appendChild(listEl2);
+    const footer = document.createElement("div");
+    footer.className = "jari-help-footer";
+    footerBar = document.createElement("span");
+    footerBar.textContent = FOOTER_DEFAULT;
+    footer.appendChild(footerBar);
+    overlay3.appendChild(footer);
+    shadow.appendChild(overlay3);
+  }
+  function updateFooter() {
+    if (!footerBar) return;
+    if (searching) {
+      footerBar.textContent = matches2.length === 0 ? `/${query2} \u2014 No match` : `/${query2} ${currentIdx2 + 1}/${matches2.length} (Enter done)`;
+    } else if (matches2.length > 0) {
+      footerBar.textContent = `${currentIdx2 + 1}/${matches2.length} (n/N jump) | / search | esc close`;
+    } else {
+      footerBar.textContent = FOOTER_DEFAULT;
+    }
+  }
+  function saveOriginal(td) {
+    if (td._jariOrig === void 0) td._jariOrig = td.textContent;
+    return td._jariOrig;
+  }
+  function restoreCell(td) {
+    if (td._jariOrig !== void 0) {
+      try {
+        td.textContent = td._jariOrig;
+      } catch {
+      }
+      td._jariOrig = void 0;
+    }
+  }
+  function clearSearchHighlights() {
+    for (const entry of entries) {
+      restoreCell(entry.keyTd);
+      restoreCell(entry.labelTd);
+    }
+    matches2 = [];
+    currentIdx2 = 0;
+  }
+  function highlightCell(td, q) {
+    const orig = saveOriginal(td);
+    const lower = orig.toLowerCase();
+    const parts = [];
+    let pos = 0;
+    let found = false;
+    while (true) {
+      const idx = lower.indexOf(q, pos);
+      if (idx === -1) break;
+      found = true;
+      parts.push({ text: orig.slice(pos, idx), match: false });
+      parts.push({ text: orig.slice(idx, idx + q.length), match: true });
+      pos = idx + q.length;
+    }
+    if (!found) return [];
+    parts.push({ text: orig.slice(pos), match: false });
+    try {
+      td.textContent = "";
+    } catch {
+      return [];
+    }
+    const spans = [];
+    for (const part of parts) {
+      if (!part.text) continue;
+      if (part.match) {
+        const span = document.createElement("span");
+        span.className = "jari-find-hit";
+        span.textContent = part.text;
+        td.appendChild(span);
+        spans.push(span);
+      } else {
+        td.appendChild(document.createTextNode(part.text));
+      }
+    }
+    return spans;
+  }
+  function markCurrent() {
+    for (const m of matches2) m.span.className = "jari-find-hit";
+    if (matches2.length > 0) matches2[currentIdx2].span.className = "jari-find-current";
+  }
+  function scrollMatchIntoView() {
+    if (matches2.length === 0) return;
+    try {
+      matches2[currentIdx2].entry.tr.scrollIntoView({ block: "nearest" });
+    } catch {
+    }
+  }
+  function applySearch() {
+    clearSearchHighlights();
+    const q = query2.toLowerCase();
+    if (q) {
+      for (const entry of entries) {
+        for (const td of [entry.keyTd, entry.labelTd]) {
+          try {
+            for (const span of highlightCell(td, q)) {
+              matches2.push({ entry, span });
+            }
+          } catch {
+          }
+        }
+      }
+    }
+    currentIdx2 = 0;
+    markCurrent();
+    updateFooter();
+    scrollMatchIntoView();
+  }
+  function stepMatch(delta) {
+    if (matches2.length === 0) return;
+    const len = matches2.length;
+    currentIdx2 = ((currentIdx2 + delta) % len + len) % len;
+    markCurrent();
+    updateFooter();
+    scrollMatchIntoView();
+  }
+  function onKeyDown4(event) {
+    const key = event.key;
+    if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
+      return false;
+    }
+    if (searching) {
+      if (key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        searching = false;
+        query2 = "";
+        clearSearchHighlights();
+        updateFooter();
+        return;
+      }
+      if (key === "Enter") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        searching = false;
+        updateFooter();
+        return;
+      }
+      if (key === "Backspace") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (event.ctrlKey || event.metaKey) {
+          const trimmed = query2.trimEnd();
+          if (!trimmed) {
+            query2 = "";
+          } else {
+            const words = trimmed.split(/\s+/);
+            words.pop();
+            query2 = words.join(" ");
+          }
+        } else {
+          query2 = query2.slice(0, -1);
+        }
+        applySearch();
+        return;
+      }
+      if (key.length === 1 && !event.altKey && !event.metaKey) {
+        if (event.ctrlKey) return false;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        query2 += key;
+        applySearch();
+        return;
+      }
+      if (key.length === 1 || key === "Backspace" || key === "Escape" || key === "Enter") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+    } else {
+      const hasMod = event.ctrlKey || event.altKey || event.metaKey;
+      const scrollOnly = event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
+      if (hasMod && !scrollOnly) return false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (key === "Escape") {
+        gPending = false;
+        if (matches2.length > 0) {
+          clearSearchHighlights();
+          updateFooter();
+          return;
+        }
+        close3();
+        return;
+      }
+      if (key === "/" && !hasMod) {
+        gPending = false;
+        searching = true;
+        query2 = "";
+        clearSearchHighlights();
+        updateFooter();
+        return;
+      }
+      if ((key === "n" || key === "N") && !hasMod && matches2.length > 0) {
+        gPending = false;
+        stepMatch(key === "n" ? 1 : -1);
+        return;
+      }
+    }
+    if (event.key === "g" && !gPending) {
+      gPending = true;
+      return;
+    }
+    if (gPending) {
+      gPending = false;
+      if (event.key === "g") listEl2.scrollTo(0, 0);
+      return;
+    }
+    if (event.ctrlKey) {
+      if (event.key === "d") listEl2.scrollBy(0, listEl2.clientHeight * 0.5);
+      else if (event.key === "u") listEl2.scrollBy(0, -listEl2.clientHeight * 0.5);
+      else if (event.key === "f") listEl2.scrollBy(0, listEl2.clientHeight * 0.9);
+      else if (event.key === "b") listEl2.scrollBy(0, -listEl2.clientHeight * 0.9);
+      return;
+    }
+    switch (event.key) {
+      case "G":
+        listEl2.scrollTo(0, listEl2.scrollHeight);
+        break;
+      case "j":
+      case "ArrowDown":
+        listEl2.scrollBy(0, STEP);
+        break;
+      case "k":
+      case "ArrowUp":
+        listEl2.scrollBy(0, -STEP);
+        break;
+    }
+  }
+  function close3() {
+    try {
+      clearSearchHighlights();
+    } catch {
+    }
+    if (host3) {
+      try {
+        host3.remove();
+      } catch {
+      }
+      host3 = null;
+    }
+    overlay3 = null;
+    listEl2 = null;
+    footerBar = null;
+    entries = [];
+    searching = false;
+    query2 = "";
+    matches2 = [];
+    currentIdx2 = 0;
+    gPending = false;
+    active4 = false;
+  }
+  var Help = { open: open2, close: close3, onKeyDown: onKeyDown4, isActive: isActive4 };
+  register("help", { close: close3, onKeyDown: onKeyDown4, isActive: isActive4 });
+
+  // content/hints.js
+  var MAX_HINTS = 800;
+  var REGENERATE_DELAY = 150;
+  var active5 = false;
+  var hintsHost = null;
+  var holder = null;
+  var elements = [];
+  var hints = [];
+  var prefix = "";
+  var mode3 = "click";
+  var multipleHits = false;
+  var resizeHandler = null;
+  var mutationObserver = null;
+  var regenerateTimer = null;
+  var hintPill = null;
+  var spaceHeld = false;
+  function showHintPill() {
+    if (hintPill) return;
+    try {
+      hintPill = document.createElement("div");
+      hintPill.className = "jari-pill";
+      hintPill.textContent = "hint";
+      ui.statusContainer().appendChild(hintPill);
+    } catch {
+    }
+  }
+  function hideHintPill() {
+    if (!hintPill) return;
+    try {
+      hintPill.remove();
+    } catch {
+    }
+    hintPill = null;
+  }
+  function hasJariClass(node) {
+    try {
+      if (!node || node.nodeType !== 1) return false;
+      const classes = node.classList;
+      if (classes) {
+        for (const c of classes) {
+          if (typeof c === "string" && c.startsWith("jari-")) return true;
+        }
+      }
+      if (node.closest) {
+        return !!node.closest("[class^='jari-'], [class*=' jari-']");
+      }
+    } catch {
+    }
+    return false;
+  }
+  function isOwnMutation(mutation) {
+    try {
+      const nodes = [
+        ...mutation.addedNodes || [],
+        ...mutation.removedNodes || []
+      ];
+      const allOwn = (list) => list.every((n) => n.nodeType !== 1 || hasJariClass(n));
+      if (mutation.target && mutation.target.nodeType === 1 && hasJariClass(mutation.target)) {
+        return allOwn(nodes);
+      }
+      return nodes.length > 0 && allOwn(nodes);
+    } catch {
+    }
+    return false;
+  }
+  function scheduleRegenerate() {
+    if (regenerateTimer) return;
+    regenerateTimer = setTimeout(() => {
+      regenerateTimer = null;
+      if (!active5) return;
+      const savedPrefix = prefix;
+      const fresh = collectElements(mode3);
+      if (fresh.length === 0) {
+        close4();
+        ui.toast("No hints");
+        return;
+      }
+      const capped = fresh.length > MAX_HINTS ? prioritizeForViewport(fresh).slice(0, MAX_HINTS) : fresh;
+      if (capped.length !== fresh.length) {
+        ui.toast(`Too many hints (${capped.length} shown)`);
+      }
+      elements = capped;
+      render3();
+      if (holder && !spaceHeld) holder.style.display = "";
+      prefix = savedPrefix;
+      if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
+        prefix = "";
+      }
+      refresh();
+    }, REGENERATE_DELAY);
+  }
+  function isActive5() {
+    return active5;
+  }
+  function focusFrame(el) {
+    ui.focusFrameElement(el);
+    try {
+      ui.toast("Focused frame");
+    } catch {
+    }
+  }
+  function focusInput(el) {
+    try {
+      el.scrollIntoView({ block: "center", inline: "center" });
+    } catch {
+    }
+    ui.safeFocus(el, { preventScroll: true });
+    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+      try {
+        const len = el.value ? el.value.length : 0;
+        if (typeof el.select === "function" && el.type !== "checkbox" && el.type !== "radio") {
+          el.select();
+        } else if (typeof el.setSelectionRange === "function") {
+          el.setSelectionRange(len, len);
+        }
+      } catch {
+      }
+    } else if (el.isContentEditable) {
+      try {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      } catch {
+      }
+    }
+  }
+  function refresh() {
+    if (!active5) return;
+    for (const h of hints) {
+      if (!prefix) {
+        h.hintEl.style.opacity = "1";
+        h.hintEl.style.display = "";
+        h.hintEl.classList.remove("jari-hint-hidden");
+        updateHintText(h.hintEl, h.label, "");
+      } else if (h.label.startsWith(prefix)) {
+        h.hintEl.style.opacity = "1";
+        h.hintEl.style.display = "";
+        updateHintText(h.hintEl, h.label, prefix);
+      } else {
+        h.hintEl.style.opacity = "0";
+        h.hintEl.style.display = "none";
+      }
+    }
+  }
+  function flip() {
+    if (hints.length === 0) return;
+    const first = hints[0].hintEl;
+    const isFlipped = first.style.zIndex !== String(first.zIndex);
+    hints.forEach((h, i) => {
+      const el = h.hintEl;
+      const z = parseInt(el.style.zIndex, 10) || 0;
+      el.style.zIndex = isFlipped ? String(el.zIndex) : String(hints.length - i + 2147483e3 - z);
+    });
+  }
+  function assignLabels(nextElements, charset) {
+    const oldByEl = new Map(hints.map((h) => [h.el, h.label]));
+    const assigned = /* @__PURE__ */ new Map();
+    const taken = [];
+    const newcomers = [];
+    for (const el of nextElements) {
+      const old = oldByEl.get(el);
+      if (old) {
+        assigned.set(el, old);
+        taken.push(old);
+      } else {
+        newcomers.push(el);
+      }
+    }
+    if (newcomers.length > 0) {
+      if (taken.length === 0) return genLabels(nextElements.length, charset);
+      const pool = genLabels(nextElements.length + newcomers.length, charset).filter(
+        (label) => taken.every((t) => t !== label && !t.startsWith(label) && !label.startsWith(t))
+      );
+      newcomers.forEach((el, i) => {
+        if (i < pool.length) {
+          assigned.set(el, pool[i]);
+          taken.push(pool[i]);
+        }
+      });
+      if (assigned.size !== nextElements.length) {
+        prefix = "";
+        return genLabels(nextElements.length, charset);
+      }
+    }
+    return nextElements.map((el) => assigned.get(el));
+  }
+  function render3() {
+    if (hintsHost) {
+      try {
+        hintsHost.remove();
+      } catch {
+      }
+      hintsHost = null;
+      holder = null;
+    }
+    const created = createHintsHost(
+      settings.getHintTheme(),
+      settings.getHintFontSize()
+    );
+    hintsHost = created.host;
+    holder = created.holder;
+    const charset = normalizeCharset();
+    const labels = assignLabels(elements, charset);
+    hints = [];
+    const links = layoutHints(
+      holder,
+      elements,
+      labels,
+      settings.getHintFontSize()
+    );
+    hints = links.map((link) => ({
+      el: link.link,
+      label: link.label,
+      hintEl: link
+    }));
+    refresh();
+  }
+  function flashElement(el) {
+    try {
+      const r = getHintRect(el);
+      if (!r || r.width <= 0 || r.height <= 0) return;
+      const d = document.createElement("div");
+      d.className = "jari-flash";
+      d.style.left = `${r.left}px`;
+      d.style.top = `${r.top}px`;
+      d.style.width = `${r.width}px`;
+      d.style.height = `${r.height}px`;
+      (document.body || document.documentElement).appendChild(d);
+      setTimeout(() => {
+        try {
+          d.remove();
+        } catch {
+        }
+      }, 150);
+    } catch {
+    }
+  }
+  var scrollLockPrevent = null;
+  var keyUpHandler = null;
+  function disableScrollLock() {
+    if (scrollLockPrevent) return;
+    scrollLockPrevent = (e) => {
+      if (!active5) return;
+      const t = e.target;
+      if (t?.closest?.(".jari-hint")) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    for (const type of ["wheel", "touchmove"]) {
+      try {
+        window.addEventListener(type, scrollLockPrevent, {
+          passive: false,
+          capture: true
+        });
+      } catch {
+      }
+    }
+  }
+  function enableScrollLock() {
+    if (!scrollLockPrevent) return;
+    for (const type of ["wheel", "touchmove"]) {
+      try {
+        window.removeEventListener(type, scrollLockPrevent, { capture: true });
+      } catch {
+      }
+    }
+    scrollLockPrevent = null;
+  }
+  function stopTracking() {
+    if (resizeHandler) {
+      try {
+        window.removeEventListener("resize", resizeHandler);
+      } catch {
+      }
+      resizeHandler = null;
+    }
+    if (mutationObserver) {
+      try {
+        mutationObserver.disconnect();
+      } catch {
+      }
+      mutationObserver = null;
+    }
+    if (regenerateTimer) {
+      clearTimeout(regenerateTimer);
+      regenerateTimer = null;
+    }
+    if (keyUpHandler) {
+      try {
+        window.removeEventListener("keyup", keyUpHandler, true);
+      } catch {
+      }
+      keyUpHandler = null;
+    }
+    enableScrollLock();
+    hideHintPill();
+  }
+  function startTracking() {
+    stopTracking();
+    disableScrollLock();
+    showHintPill();
+    try {
+      ui.toast(`Hints: ${elements.length} targets (${mode3})`);
+    } catch {
+    }
+    try {
+      mutationObserver = new MutationObserver((mutations) => {
+        try {
+          if (mutations.every(isOwnMutation)) return;
+        } catch {
+        }
+        scheduleRegenerate();
+      });
+      const target2 = document.body || document.documentElement;
+      mutationObserver.observe(target2, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style", "class", "hidden", "aria-hidden", "inert"]
+      });
+    } catch {
+    }
+    keyUpHandler = (e) => {
+      if (active5) onKeyUp(e);
+    };
+    try {
+      window.addEventListener("keyup", keyUpHandler, true);
+    } catch {
+    }
+    resizeHandler = () => {
+      if (!active5) return;
+      scheduleRegenerate();
+    };
+    window.addEventListener("resize", resizeHandler);
+  }
+  function close4() {
+    if (!active5) return;
+    active5 = false;
+    prefix = "";
+    spaceHeld = false;
+    for (const el of elements) {
+      try {
+        delete el._jariViewportRect;
+        delete el._jariBase;
+      } catch {
+      }
+    }
+    elements = [];
+    hints = [];
+    if (hintsHost) {
+      try {
+        hintsHost.remove();
+      } catch {
+      }
+      hintsHost = null;
+      holder = null;
+    }
+    stopTracking();
+  }
+  var VALID_HINT_MODES = /* @__PURE__ */ new Set([
+    "click",
+    "open",
+    "openBackground",
+    "openCurrent",
+    "input",
+    "yank",
+    "yankText"
+  ]);
+  function open3(requestedMode) {
+    if (active5) close4();
+    mode3 = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
+    multipleHits = mode3 === "openBackground";
+    let candidates = collectElements(mode3);
+    if (mode3 === "input" && candidates.length === 1) {
+      focusInput(candidates[0]);
+      return;
+    }
+    if (candidates.length === 0) {
+      const msg = mode3 === "yank" ? "No links to yank" : mode3 === "input" ? "No inputs" : "No hints";
+      ui.toast(msg);
+      return;
+    }
+    if (candidates.length > MAX_HINTS) {
+      candidates = prioritizeForViewport(candidates).slice(0, MAX_HINTS);
+      ui.toast(`Too many hints (${candidates.length} shown)`);
+    }
+    elements = candidates;
+    prefix = "";
+    active5 = true;
+    touch("hints");
+    render3();
+    startTracking();
+  }
+  function handleActivationEnd() {
+    if (!multipleHits) close4();
+    else {
+      prefix = "";
+      refresh();
+    }
+  }
+  function activate2(el) {
+    flashElement(el);
+    if (mode3 === "click") {
+      if (isFrameElement(el)) focusFrame(el);
+      else if (isEditable(el)) focusInput(el);
+      else ui.dispatchClick(el);
+      handleActivationEnd();
+    } else if (mode3 === "open") {
+      const url = getHref(el);
+      if (url) sendMessage("openInForegroundTab", { url });
+      else if (isFrameElement(el)) focusFrame(el);
+      else ui.dispatchClick(el);
+      handleActivationEnd();
+    } else if (mode3 === "openBackground") {
+      const url = getHref(el);
+      if (url) sendMessage("openInBackgroundTab", { url });
+      else if (isFrameElement(el)) focusFrame(el);
+      handleActivationEnd();
+    } else if (mode3 === "openCurrent") {
+      const url = getHref(el);
+      if (url) {
+        sendMessage("navigate", { url });
+        close4();
+      } else if (isFrameElement(el)) {
+        focusFrame(el);
+        close4();
+      } else {
+        ui.dispatchClick(el);
+        close4();
+      }
+    } else if (mode3 === "input") {
+      focusInput(el);
+      close4();
+    } else if (mode3 === "yank") {
+      const url = getHref(el);
+      if (url) {
+        ui.copyText(url).then(
+          (ok) => ui.toast(ok ? `Yanked ${url}` : "Copy failed")
+        );
+      } else {
+        ui.toast("No link");
+      }
+      close4();
+    } else if (mode3 === "yankText") {
+      const text = (el.innerText || el.textContent || "").trim();
+      if (text) {
+        ui.copyText(text).then(
+          (ok) => ui.toast(ok ? "Yanked text" : "Copy failed")
+        );
+      } else {
+        ui.toast("No text");
+      }
+      close4();
+    }
+  }
+  function onKeyDown5(event) {
+    if (!active5) return false;
+    const key = event.key;
+    if (key === "Escape") {
+      ui.consume(event);
+      if (prefix) {
+        prefix = "";
+        refresh();
+      } else {
+        close4();
+      }
+      return true;
+    }
+    if (key === "Shift") {
+      ui.consume(event);
+      flip();
+      return true;
+    }
+    if (key === " " || event.code === "Space") {
+      ui.consume(event);
+      spaceHeld = true;
+      if (holder) holder.style.display = "none";
+      return true;
+    }
+    if (key === "Backspace") {
+      ui.consume(event);
+      if (prefix) {
+        prefix = prefix.slice(0, -1);
+        refresh();
+      } else {
+        close4();
+      }
+      return true;
+    }
+    if (key === "Enter") {
+      ui.consume(event);
+      return true;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (key.length === 1) {
+      const charset = normalizeCharset();
+      const lower = key.toLowerCase();
+      if (charset.includes(lower)) {
+        ui.consume(event);
+        const next2 = prefix + lower.toUpperCase();
+        const exact = hints.find((h) => h.label === next2);
+        prefix = next2;
+        refresh();
+        if (exact) activate2(exact.el);
+        return true;
+      }
+    }
+    ui.consume(event);
+    return true;
+  }
+  function onKeyUp(event) {
+    if (!active5) return false;
+    if (event.key === " " || event.code === "Space") {
+      ui.consume(event);
+      spaceHeld = false;
+      if (holder) holder.style.display = "";
+      return true;
+    }
+    return false;
+  }
+  var Hints = { open: open3, close: close4, isActive: isActive5, onKeyDown: onKeyDown5, genLabels };
+  register("hints", { close: close4, onKeyDown: onKeyDown5, isActive: isActive5 });
 
   // content/page-nav.js
   function normText(value) {

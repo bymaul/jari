@@ -17,9 +17,28 @@ function shouldSkipNode(node) {
   const tag = parent.tagName;
   if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
   if (isOverlayElement(parent)) return true;
+  try {
+    const root = parent.getRootNode && parent.getRootNode();
+    if (root && root.host && root.host.classList) {
+      const host = root.host;
+      if (
+        host.classList.contains("jari-help-host") ||
+        host.classList.contains("jari-find-host") ||
+        host.classList.contains("jari-prompt-host") ||
+        host.classList.contains("jari-hints-host") ||
+        host.classList.contains("jari-visual-caret-host")
+      )
+        return true;
+    }
+  } catch {}
   if (parent.closest) {
     try {
-      if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host")) return true;
+      if (
+        parent.closest(
+          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay",
+        )
+      )
+        return true;
       if (parent.closest('[aria-hidden="true"]')) return true;
       if (parent.closest('[hidden]')) return true;
     } catch {}

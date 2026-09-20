@@ -294,6 +294,27 @@ test("Backspace edits the query", async () => {
   });
 });
 
+test("Ctrl+Backspace deletes the last word", async () => {
+  await withDocument((doc) => {
+    Help.open();
+    const overlay = overlayOf(doc);
+
+    Help.onKeyDown(keyEvent("/", overlay));
+    typeHelp(doc, "hello world test");
+    assert.match(footerText(doc), /\/hello world test/);
+
+    Help.onKeyDown(keyEvent("Backspace", overlay, { ctrlKey: true }));
+    assert.match(footerText(doc), /\/hello world/);
+
+    Help.onKeyDown(keyEvent("Backspace", overlay, { ctrlKey: true }));
+    assert.match(footerText(doc), /\/hello/);
+
+    Help.onKeyDown(keyEvent("Backspace", overlay, { ctrlKey: true }));
+    assert.match(footerText(doc), /\/\s*— No match/);
+    assert.equal(highlightSpans(doc).length, 0);
+  });
+});
+
 test("a query with no matches reports it in the footer", async () => {
   await withDocument((doc) => {
     Help.open();
