@@ -2928,6 +2928,98 @@
     el.appendChild(frag);
   }
 
+  // content/prompt/list.js
+  function makeSpan(className) {
+    const el = document.createElement("span");
+    el.className = className;
+    return el;
+  }
+  function renderTitleUrl(li, titleText, urlText, q) {
+    const title = makeSpan("title");
+    const url = makeSpan("url");
+    if (q) {
+      if (settings.isFuzzyMatching()) {
+        renderText(title, titleText, fuzzyIndices(q, titleText));
+        renderText(url, urlText, fuzzyIndices(q, urlText));
+      } else {
+        renderText(title, titleText, substringIndices(q, titleText));
+        renderText(url, urlText, substringIndices(q, urlText));
+      }
+    } else {
+      title.textContent = titleText;
+      url.textContent = urlText;
+    }
+    li.appendChild(title);
+    li.appendChild(url);
+    return li;
+  }
+  function renderSuggestionRow(row, query4, tabUrlMap2) {
+    const li = document.createElement("li");
+    let titleText;
+    if (row.kind === "search") {
+      if (row.keyword)
+        titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
+      else titleText = `Search for "${row.title}"`;
+    } else if (row.kind === "url") {
+      titleText = `Open ${row.title}`;
+    } else {
+      const isSwitch = row.url && tabUrlMap2.has(row.url) && tabUrlMap2.get(row.url).source === "tab";
+      titleText = isSwitch ? `Switch to: ${row.title || "(untitled)"}` : row.title || "(untitled)";
+    }
+    let urlText = row.kind === "suggestion" ? row.url || "" : "";
+    if (row.kind === "suggestion" && row.url && tabUrlMap2.has(row.url)) {
+      const tabInfo = tabUrlMap2.get(row.url);
+      if (tabInfo && tabInfo.source === "tab") urlText = `${urlText}  \u2022  Tab`;
+      else if (row.folderPath) urlText = `${urlText}  \u2022  ${row.folderPath}`;
+    } else if (row.folderPath) {
+      urlText = row.folderPath;
+    }
+    return renderTitleUrl(
+      li,
+      titleText,
+      urlText,
+      row.kind === "suggestion" ? query4 : ""
+    );
+  }
+  function renderTabRow(tab, winLabel, query4) {
+    const li = document.createElement("li");
+    const win = makeSpan("jari-win-tag");
+    win.textContent = "#" + winLabel;
+    li.appendChild(win);
+    return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query4);
+  }
+  function renderList({ listEl: listEl5, filtered: filtered3, query: query4, mode: mode4, tabUrlMap: tabUrlMap2, selected: selected3 = 0 }) {
+    const rows = filtered3.slice(0, settings.getMaxResults());
+    listEl5.textContent = "";
+    if (mode4 === "open" || mode4 === "edit" || mode4 === "incognito") {
+      for (const row of rows) listEl5.appendChild(renderSuggestionRow(row, query4, tabUrlMap2));
+      highlight({ listEl: listEl5, selected: selected3 });
+      return;
+    }
+    const winLabels = /* @__PURE__ */ new Map();
+    let winIndex = 0;
+    for (const tab of rows) {
+      if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
+    }
+    for (const tab of rows)
+      listEl5.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query4));
+    highlight({ listEl: listEl5, selected: selected3 });
+  }
+  function highlight({ listEl: listEl5, selected: selected3 }) {
+    const sel = typeof selected3 === "number" ? selected3 : 0;
+    Array.from(listEl5.children).forEach(
+      (li, i) => li.classList.toggle("selected", i === sel)
+    );
+    const el = listEl5.children[sel];
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }
+  function move({ listEl: listEl5, filtered: filtered3, selected: selected3, delta }) {
+    if (filtered3.length === 0) return selected3;
+    const next2 = (selected3 + delta + filtered3.length) % filtered3.length;
+    highlight({ listEl: listEl5, selected: next2 });
+    return next2;
+  }
+
   // content/overlays.js
   var overlays = [];
   var openOrder = [];
@@ -3062,11 +3154,11 @@
     if (!q) {
       filtered = [];
       selected = 0;
-      renderList();
+      renderList2();
       requestSuggestions("", (res) => {
         filtered = res.slice(0, settings.getMaxResults()).map((item) => toSuggestionRow(item, null));
         selected = 0;
-        renderList();
+        renderList2();
       });
       return;
     }
@@ -3084,7 +3176,7 @@
     }
     filtered = [row];
     selected = 0;
-    renderList();
+    renderList2();
     requestSuggestions(term, (res) => {
       const pool = tabQuery != null ? res.filter((item) => item.source === "tab") : res;
       const suggestions = rank(pool, term).map(
@@ -3093,7 +3185,7 @@
       const max = settings.getMaxResults();
       filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
       selected = 0;
-      renderList();
+      renderList2();
     });
   }
   function handleTabListAll() {
@@ -3103,7 +3195,7 @@
     query = "";
     filtered = [];
     selected = 0;
-    renderList();
+    renderList2();
     sendMessage("listTabs").then((res) => {
       if (!active || seq !== suggestSeq || !inputEl || !isTabListAll(inputEl.value)) return;
       tabUrlMap.clear();
@@ -3113,7 +3205,7 @@
         return toSuggestionRow(tab, null);
       }).slice(0, settings.getMaxResults());
       selected = 0;
-      renderList();
+      renderList2();
     });
   }
   function rank(list, query4) {
@@ -3142,7 +3234,7 @@
       } else {
         filtered = query ? rankTabs(query, tabs) : tabs;
         selected = 0;
-        renderList();
+        renderList2();
       }
     });
     inputEl.addEventListener("keydown", (event) => event.stopPropagation());
@@ -3156,97 +3248,17 @@
     overlay.appendChild(inputEl);
     shadow.appendChild(overlay);
     filtered = tabs;
-    renderList();
+    renderList2();
     restoreFocus = document.activeElement;
     inputEl.focus();
   }
-  function makeSpan(className) {
-    const el = document.createElement("span");
-    el.className = className;
-    return el;
+  function renderList2() {
+    return renderList({ listEl, filtered, query, mode, tabUrlMap, selected });
   }
-  function renderTitleUrl(li, titleText, urlText, q) {
-    const title = makeSpan("title");
-    const url = makeSpan("url");
-    if (q) {
-      if (settings.isFuzzyMatching()) {
-        renderText(title, titleText, fuzzyIndices(q, titleText));
-        renderText(url, urlText, fuzzyIndices(q, urlText));
-      } else {
-        renderText(title, titleText, substringIndices(q, titleText));
-        renderText(url, urlText, substringIndices(q, urlText));
-      }
-    } else {
-      title.textContent = titleText;
-      url.textContent = urlText;
-    }
-    li.appendChild(title);
-    li.appendChild(url);
-    return li;
-  }
-  function renderSuggestionRow(row) {
-    const li = document.createElement("li");
-    let titleText;
-    if (row.kind === "search") {
-      if (row.keyword)
-        titleText = `Search ${row.keyword} for "${row.title.split(" ").slice(1).join(" ")}"`;
-      else titleText = `Search for "${row.title}"`;
-    } else if (row.kind === "url") {
-      titleText = `Open ${row.title}`;
-    } else {
-      const isSwitch = row.url && tabUrlMap.has(row.url) && tabUrlMap.get(row.url).source === "tab";
-      titleText = isSwitch ? `Switch to: ${row.title || "(untitled)"}` : row.title || "(untitled)";
-    }
-    let urlText = row.kind === "suggestion" ? row.url || "" : "";
-    if (row.kind === "suggestion" && row.url && tabUrlMap.has(row.url)) {
-      const tabInfo = tabUrlMap.get(row.url);
-      if (tabInfo && tabInfo.source === "tab") urlText = `${urlText}  \u2022  Tab`;
-      else if (row.folderPath) urlText = `${urlText}  \u2022  ${row.folderPath}`;
-    } else if (row.folderPath) {
-      urlText = row.folderPath;
-    }
-    return renderTitleUrl(
-      li,
-      titleText,
-      urlText,
-      row.kind === "suggestion" ? query : ""
-    );
-  }
-  function renderTabRow(tab, winLabel) {
-    const li = document.createElement("li");
-    const win = makeSpan("jari-win-tag");
-    win.textContent = "#" + winLabel;
-    li.appendChild(win);
-    return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query);
-  }
-  function renderList() {
-    const rows = filtered.slice(0, settings.getMaxResults());
-    listEl.textContent = "";
-    if (mode === "open" || mode === "edit" || mode === "incognito") {
-      for (const row of rows) listEl.appendChild(renderSuggestionRow(row));
-      highlight();
-      return;
-    }
-    const winLabels = /* @__PURE__ */ new Map();
-    let winIndex = 0;
-    for (const tab of rows) {
-      if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
-    }
-    for (const tab of rows)
-      listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId)));
-    highlight();
-  }
-  function highlight() {
-    Array.from(listEl.children).forEach(
-      (li, i) => li.classList.toggle("selected", i === selected)
-    );
-    const el = listEl.children[selected];
-    if (el) el.scrollIntoView({ block: "nearest" });
-  }
-  function move(delta) {
-    if (filtered.length === 0) return;
-    selected = (selected + delta + filtered.length) % filtered.length;
-    highlight();
+  function move2(delta) {
+    const next2 = move({ listEl, filtered, selected, delta });
+    selected = next2;
+    return next2;
   }
   function onKeyDown(event) {
     let focused;
@@ -3268,15 +3280,15 @@
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move(1);
+        move2(1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move(-1);
+        move2(-1);
       } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move(event.shiftKey ? -1 : 1);
+        move2(event.shiftKey ? -1 : 1);
       }
       return;
     }
@@ -3287,7 +3299,7 @@
     } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      move(event.shiftKey ? -1 : 1);
+      move2(event.shiftKey ? -1 : 1);
     }
   }
   function openUrl(url) {
@@ -8170,7 +8182,7 @@
       query3 = inputEl3.value.trim();
       filtered2 = filterCommands(source, query3, settings.isFuzzyMatching());
       selected2 = 0;
-      renderList2();
+      renderList3();
     });
     inputEl3.addEventListener("keydown", (event) => event.stopPropagation());
     listEl3 = document.createElement("ul");
@@ -8182,7 +8194,7 @@
     overlay4.appendChild(header);
     overlay4.appendChild(inputEl3);
     shadow.appendChild(overlay4);
-    renderList2();
+    renderList3();
     restoreFocus3 = document.activeElement;
     inputEl3.focus();
   }
@@ -8206,7 +8218,7 @@
     li.appendChild(detail);
     return li;
   }
-  function renderList2() {
+  function renderList3() {
     const rows = filtered2.slice(0, settings.getMaxResults());
     listEl3.textContent = "";
     for (const row of rows) listEl3.appendChild(renderRow(row));
@@ -8219,7 +8231,7 @@
     const el = listEl3.children[selected2];
     if (el) el.scrollIntoView({ block: "nearest" });
   }
-  function move2(delta) {
+  function move3(delta) {
     if (filtered2.length === 0) return;
     selected2 = (selected2 + delta + filtered2.length) % filtered2.length;
     highlight2();
@@ -8252,15 +8264,15 @@
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move2(1);
+        move3(1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move2(-1);
+        move3(-1);
       } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move2(event.shiftKey ? -1 : 1);
+        move3(event.shiftKey ? -1 : 1);
       }
       return;
     }
@@ -8271,7 +8283,7 @@
     } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      move2(event.shiftKey ? -1 : 1);
+      move3(event.shiftKey ? -1 : 1);
     }
   }
   function close5() {
