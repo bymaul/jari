@@ -33,17 +33,25 @@ source (repo convention).
 ## Layout
 
 - `content/` - content scripts; `content.js` is the key dispatcher, `commands.js`
-  maps catalog names to actions
+  maps catalog names to actions (`cmd()` helper wraps `COMMAND_CATALOG`)
 - `content/hints-elements.js` - DOM queries/predicates (`isEditable`,
   `isFrameElement`, `getLinkAncestor`, selectors)
 - `content/ui.js` - shared interaction primitives (`ui.consume`,
   `ui.safeFocus`, `ui.dispatchClick`, `ui.focusFrameElement`, toast/pills,
-  `buildCategorizedGrid`)
+  `buildCategorizedGrid`, `createShadowHost`)
 - `content/hint-layer.js` - shared hint rendering (labels, host, layout,
   `yellow`/`cyan` themes); `content/highlight.js` - Highlight-API + span
   fallback helpers
+- `content/visual/` - visual mode subsystems (`caret-geometry.js` caret rects,
+  `collect.js` text collection, `selection.js` highlight, `word.js` word motion,
+  `motion.js` fallback `Selection.modify` helpers); `content/visual.js` is the
+  mode orchestrator
+- `content/find/` - find subsystems (`matcher.js` `buildMatcher`/`hasUpperCase`,
+  `collect.js` `collectTextNodes`); `content/find.js` is the bar + highlights
+- `content/scroll.js` - scroll target + smooth queue (`smoothScrollBy`,
+  `shouldSmooth`, `cycle`/`reset`); `content/commands.js` now imports smooth helpers
 - `background/` - service-worker source (`main.js` + `handlers.js`),
-  `shared/` - `url.js` (URL parsing, scheme policy) + `constants.js`
+  `shared/` - `url.js` (URL parsing, scheme policy) + `tlds.js` (known TLD set) + `constants.js`
 - `options/` - options page; `tests/setup.mjs` - shared chrome/DOM stubs
 
 ## Conventions
@@ -62,7 +70,7 @@ source (repo convention).
 - Tests import `./setup.mjs` for window/document/location/chrome stubs;
   per-test DOM fixtures use save/restore (`prompt.test.js`, `shadow.test.js`
   pattern). Pure-logic suites (`rank`, `keymap`, `url`) need no stubs.
-- `content/visual.js` starts with `/* eslint-disable */`; new shared modules
-  must pass eslint (declare browser globals via `/* global ... */`).
+- `content/visual.js` now passes eslint (previously `/* eslint-disable */`); new
+  modules must pass eslint (declare browser globals via `/* global ... */`).
 - Commit messages: `refactor(scope): ...` / `fix: ...` / `feat: ...`,
   one logical change per commit with rebuilt bundles included.
