@@ -15,11 +15,7 @@ import {
   settingsDefaults,
 } from "../content/keymap.js";
 import { normalizeSitePattern } from "../shared/url.js";
-import {
-  MAX_SEARCH_ENGINES,
-  searchEngineDefaults,
-  validateSearchEngine,
-} from "../shared/search-engines.js";
+import { searchEngineDefaults } from "../shared/search-engines.js";
 import {
   MAX_PAGE_NAV_TEXTS,
   PAGE_NAV_TEXT_MAX,
@@ -28,6 +24,7 @@ import {
 import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
 import { ui } from "../content/ui.js";
+import { renderEngines, initEngines } from "./engines.js";
 
 const tableEl = document.querySelector("#keymap-table");
 const resetBtn = document.querySelector("#reset");
@@ -46,10 +43,6 @@ const sourceTabEl = document.querySelector("#source-tab");
 const sourceHistoryEl = document.querySelector("#source-history");
 const sourceBookmarkEl = document.querySelector("#source-bookmark");
 const maxResultsEl = document.querySelector("#max-results");
-const defaultEngineEl = document.querySelector("#default-engine");
-const engineListEl = document.querySelector("#engine-list");
-const addEngineBtn = document.querySelector("#add-engine");
-const resetEnginesBtn = document.querySelector("#reset-engines");
 const pagenavNextEl = document.querySelector("#pagenav-next");
 const pagenavPrevEl = document.querySelector("#pagenav-prev");
 const resetPagenavBtn = document.querySelector("#reset-pagenav");
@@ -984,190 +977,6 @@ function collectSources() {
   return sources;
 }
 
-function engineRow(keyword, url) {
-  const li = document.createElement("li");
-  const kwEl = document.createElement("input");
-  kwEl.type = "text";
-  kwEl.className = "engine-keyword";
-  kwEl.value = keyword;
-  kwEl.placeholder = "kw";
-  kwEl.setAttribute("aria-label", "Search engine keyword");
-  kwEl.setAttribute("autocomplete", "off");
-  kwEl.setAttribute("spellcheck", "false");
-  kwEl.addEventListener("change", commitEngines);
-  const urlEl = document.createElement("input");
-  urlEl.type = "text";
-  urlEl.className = "engine-url";
-  urlEl.value = url;
-  urlEl.placeholder = "https://example.com/search?q=%s";
-  urlEl.setAttribute(
-    "aria-label",
-    "Search engine URL (%s is replaced by the query)",
-  );
-  urlEl.setAttribute("autocomplete", "off");
-  urlEl.setAttribute("spellcheck", "false");
-  urlEl.addEventListener("change", commitEngines);
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.textContent = "Remove";
-  remove.setAttribute("aria-label", `Remove ${keyword || "engine"}`);
-  remove.addEventListener("click", () => removeEngine(li));
-  li.appendChild(kwEl);
-  li.appendChild(urlEl);
-  li.appendChild(remove);
-  return li;
-}
-
-function readEngineRows() {
-  const rows = [];
-  if (!engineListEl) return rows;
-  for (const li of engineListEl.children) {
-    const kwEl = li.querySelector(".engine-keyword");
-    const urlEl = li.querySelector(".engine-url");
-    if (!kwEl || !urlEl) continue;
-    rows.push({
-      kwEl,
-      urlEl,
-      keyword: kwEl.value.trim(),
-      url: urlEl.value.trim(),
-    });
-  }
-  return rows;
-}
-
-function renderEngines() {
-  if (!engineListEl) return;
-  engineListEl.textContent = "";
-  clearFieldError("error-engines");
-  for (const engine of settings.getSearchEngines()) {
-    engineListEl.appendChild(engineRow(engine.keyword, engine.url));
-  }
-  syncDefaultEngineOptions();
-}
-
-function syncDefaultEngineOptions() {
-  if (!defaultEngineEl) return;
-  const engines = settings.getSearchEngines();
-  defaultEngineEl.textContent = "";
-  for (const engine of engines) {
-    const opt = document.createElement("option");
-    opt.value = engine.keyword;
-    opt.textContent = engine.keyword;
-    defaultEngineEl.appendChild(opt);
-  }
-  defaultEngineEl.value = settings.getDefaultEngine();
-}
-
-function failEngines(message, badEls) {
-  for (const el of badEls || []) markInvalid(el, true);
-  showFieldError("error-engines", `${message} (not saved)`);
-  status(`Search engines: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
-}
-
-function commitEngines() {
-  const rows = readEngineRows();
-  for (const row of rows) {
-    markInvalid(row.kwEl, false);
-    markInvalid(row.urlEl, false);
-  }
-  clearFieldError("error-engines");
-  // Rows missing a keyword or URL are still being filled in - leave them
-  // alone until both fields have something.
-  const complete = rows.filter((r) => r.keyword !== "" && r.url !== "");
-  const seen = new Set();
-  const list = [];
-  for (const row of complete) {
-    const problem = validateSearchEngine({
-      keyword: row.keyword,
-      url: row.url,
-    });
-    if (problem) {
-      failEngines(problem, [row.kwEl, row.urlEl]);
-      return;
-    }
-    const keyword = row.keyword.toLowerCase();
-    if (seen.has(keyword)) {
-      failEngines(`Duplicate keyword "${keyword}"`, [row.kwEl]);
-      return;
-    }
-    seen.add(keyword);
-    list.push({ keyword, url: row.url });
-  }
-  if (list.length === 0) {
-    if (rows.length === 0) {
-      failEngines("At least one search engine is required", []);
-      renderEngines();
-    }
-    return;
-  }
-  if (list.length > MAX_SEARCH_ENGINES) {
-    failEngines(`At most ${MAX_SEARCH_ENGINES} search engines`, []);
-    return;
-  }
-  const current = settings.getDefaultEngine();
-  const def = list.some((e) => e.keyword === current)
-    ? current
-    : list[0].keyword;
-  savePatch({ searchEngines: list, defaultEngine: def }).then((ok) => {
-    if (!ok) return;
-    for (let i = 0; i < list.length; i++) {
-      const row = complete[i];
-      if (!row) break;
-      row.kwEl.value = list[i].keyword;
-      row.urlEl.value = list[i].url;
-    }
-    syncDefaultEngineOptions();
-  });
-}
-
-function removeEngine(li) {
-  const rows = readEngineRows();
-  if (rows.length <= 1) {
-    failEngines("At least one search engine is required", []);
-    return;
-  }
-  const remaining = rows.filter((row) => {
-    try {
-      return row.kwEl.closest("li") !== li;
-    } catch {
-      return true;
-    }
-  });
-  if (!remaining.some((r) => r.keyword !== "" && r.url !== "")) {
-    failEngines("At least one search engine is required", []);
-    return;
-  }
-  li.remove();
-  commitEngines();
-}
-
-function addEngine() {
-  if (!engineListEl) return;
-  clearFieldError("error-engines");
-  if (engineListEl.children.length >= MAX_SEARCH_ENGINES) {
-    showFieldError(
-      "error-engines",
-      `At most ${MAX_SEARCH_ENGINES} search engines (not saved)`,
-    );
-    return;
-  }
-  const li = engineRow("", "");
-  engineListEl.appendChild(li);
-  li.querySelector(".engine-keyword").focus();
-}
-
-function resetEngines() {
-  savePatch({
-    searchEngines: searchEngineDefaults(),
-    defaultEngine: settingsDefaults.defaultEngine,
-  }).then((ok) => {
-    if (ok) {
-      renderEngines();
-      status("Search engines restored to defaults");
-    }
-  });
-}
-
 function renderPagenav() {
   if (pagenavNextEl)
     pagenavNextEl.value = settings.getPageNavTexts().next.join(", ");
@@ -1512,13 +1321,7 @@ for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
     savePatch({ suggestionSources: collectSources() }),
   );
 }
-defaultEngineEl?.addEventListener("change", () =>
-  savePatch({ defaultEngine: defaultEngineEl.value }).then(() => {
-    syncDefaultEngineOptions();
-  }),
-);
-addEngineBtn?.addEventListener("click", addEngine);
-resetEnginesBtn?.addEventListener("click", resetEngines);
+initEngines();
 pagenavNextEl?.addEventListener("change", commitPagenav);
 pagenavPrevEl?.addEventListener("change", commitPagenav);
 resetPagenavBtn?.addEventListener("click", resetPagenav);

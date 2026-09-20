@@ -1293,12 +1293,260 @@
     createShadowHost
   };
 
+  // options/engines.js
+  var engineListEl = document.querySelector("#engine-list");
+  var defaultEngineEl = document.querySelector("#default-engine");
+  var addEngineBtn = document.querySelector("#add-engine");
+  var resetEnginesBtn = document.querySelector("#reset-engines");
+  var statusEl = document.querySelector("#status");
+  var saveStateEl = document.querySelector("#save-state");
+  function setSaveState(mode, message) {
+    if (!saveStateEl) return;
+    saveStateEl.classList.remove("saving", "failed", "warn");
+    if (mode === "saving") {
+      saveStateEl.classList.add("saving");
+      saveStateEl.textContent = message || "Saving...";
+    } else if (mode === "failed") {
+      saveStateEl.classList.add("failed");
+      saveStateEl.textContent = message || "Save failed \u2014 will retry on next change";
+    } else if (mode === "warn") {
+      saveStateEl.classList.add("warn");
+      saveStateEl.textContent = message || "Saved locally";
+    } else {
+      saveStateEl.textContent = message || "All changes saved";
+    }
+  }
+  function savedState() {
+    if (settings.isPersistedLocally()) {
+      setSaveState("warn", "Saved on this device only \u2014 browser sync is full");
+    } else {
+      setSaveState("saved");
+    }
+  }
+  async function savePatch(patch) {
+    setSaveState("saving");
+    try {
+      await settings.update(patch);
+    } catch {
+      setSaveState("failed");
+      return false;
+    }
+    savedState();
+    return true;
+  }
+  function status(message) {
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    clearTimeout(statusEl._timer);
+    statusEl._timer = setTimeout(() => {
+      statusEl.textContent = "";
+    }, 2500);
+  }
+  function showFieldError(id, message) {
+    const el = document.querySelector(`#${id}`);
+    if (!el) return;
+    el.textContent = message;
+    el.hidden = false;
+  }
+  function clearFieldError(id) {
+    const el = document.querySelector(`#${id}`);
+    if (!el) return;
+    el.textContent = "";
+    el.hidden = true;
+  }
+  function markInvalid(el, invalid) {
+    if (!el) return;
+    if (invalid) el.setAttribute("aria-invalid", "true");
+    else el.removeAttribute("aria-invalid");
+  }
+  function engineRow(keyword, url) {
+    const li = document.createElement("li");
+    const kwEl = document.createElement("input");
+    kwEl.type = "text";
+    kwEl.className = "engine-keyword";
+    kwEl.value = keyword;
+    kwEl.placeholder = "kw";
+    kwEl.setAttribute("aria-label", "Search engine keyword");
+    kwEl.setAttribute("autocomplete", "off");
+    kwEl.setAttribute("spellcheck", "false");
+    kwEl.addEventListener("change", commitEngines);
+    const urlEl = document.createElement("input");
+    urlEl.type = "text";
+    urlEl.className = "engine-url";
+    urlEl.value = url;
+    urlEl.placeholder = "https://example.com/search?q=%s";
+    urlEl.setAttribute(
+      "aria-label",
+      "Search engine URL (%s is replaced by the query)"
+    );
+    urlEl.setAttribute("autocomplete", "off");
+    urlEl.setAttribute("spellcheck", "false");
+    urlEl.addEventListener("change", commitEngines);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${keyword || "engine"}`);
+    remove.addEventListener("click", () => removeEngine(li));
+    li.appendChild(kwEl);
+    li.appendChild(urlEl);
+    li.appendChild(remove);
+    return li;
+  }
+  function readEngineRows() {
+    const rows = [];
+    if (!engineListEl) return rows;
+    for (const li of engineListEl.children) {
+      const kwEl = li.querySelector(".engine-keyword");
+      const urlEl = li.querySelector(".engine-url");
+      if (!kwEl || !urlEl) continue;
+      rows.push({
+        kwEl,
+        urlEl,
+        keyword: kwEl.value.trim(),
+        url: urlEl.value.trim()
+      });
+    }
+    return rows;
+  }
+  function renderEngines() {
+    if (!engineListEl) return;
+    engineListEl.textContent = "";
+    clearFieldError("error-engines");
+    for (const engine of settings.getSearchEngines()) {
+      engineListEl.appendChild(engineRow(engine.keyword, engine.url));
+    }
+    syncDefaultEngineOptions();
+  }
+  function syncDefaultEngineOptions() {
+    if (!defaultEngineEl) return;
+    const engines = settings.getSearchEngines();
+    defaultEngineEl.textContent = "";
+    for (const engine of engines) {
+      const opt = document.createElement("option");
+      opt.value = engine.keyword;
+      opt.textContent = engine.keyword;
+      defaultEngineEl.appendChild(opt);
+    }
+    defaultEngineEl.value = settings.getDefaultEngine();
+  }
+  function failEngines(message, badEls) {
+    for (const el of badEls || []) markInvalid(el, true);
+    showFieldError("error-engines", `${message} (not saved)`);
+    status(`Search engines: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+  }
+  function commitEngines() {
+    const rows = readEngineRows();
+    for (const row of rows) {
+      markInvalid(row.kwEl, false);
+      markInvalid(row.urlEl, false);
+    }
+    clearFieldError("error-engines");
+    const complete = rows.filter((r) => r.keyword !== "" && r.url !== "");
+    const seen = /* @__PURE__ */ new Set();
+    const list = [];
+    for (const row of complete) {
+      const problem = validateSearchEngine({
+        keyword: row.keyword,
+        url: row.url
+      });
+      if (problem) {
+        failEngines(problem, [row.kwEl, row.urlEl]);
+        return;
+      }
+      const keyword = row.keyword.toLowerCase();
+      if (seen.has(keyword)) {
+        failEngines(`Duplicate keyword "${keyword}"`, [row.kwEl]);
+        return;
+      }
+      seen.add(keyword);
+      list.push({ keyword, url: row.url });
+    }
+    if (list.length === 0) {
+      if (rows.length === 0) {
+        failEngines("At least one search engine is required", []);
+        renderEngines();
+      }
+      return;
+    }
+    if (list.length > MAX_SEARCH_ENGINES) {
+      failEngines(`At most ${MAX_SEARCH_ENGINES} search engines`, []);
+      return;
+    }
+    const current = settings.getDefaultEngine();
+    const def = list.some((e) => e.keyword === current) ? current : list[0].keyword;
+    savePatch({ searchEngines: list, defaultEngine: def }).then((ok) => {
+      if (!ok) return;
+      for (let i = 0; i < list.length; i++) {
+        const row = complete[i];
+        if (!row) break;
+        row.kwEl.value = list[i].keyword;
+        row.urlEl.value = list[i].url;
+      }
+      syncDefaultEngineOptions();
+    });
+  }
+  function removeEngine(li) {
+    const rows = readEngineRows();
+    if (rows.length <= 1) {
+      failEngines("At least one search engine is required", []);
+      return;
+    }
+    const remaining = rows.filter((row) => {
+      try {
+        return row.kwEl.closest("li") !== li;
+      } catch {
+        return true;
+      }
+    });
+    if (!remaining.some((r) => r.keyword !== "" && r.url !== "")) {
+      failEngines("At least one search engine is required", []);
+      return;
+    }
+    li.remove();
+    commitEngines();
+  }
+  function addEngine() {
+    if (!engineListEl) return;
+    clearFieldError("error-engines");
+    if (engineListEl.children.length >= MAX_SEARCH_ENGINES) {
+      showFieldError(
+        "error-engines",
+        `At most ${MAX_SEARCH_ENGINES} search engines (not saved)`
+      );
+      return;
+    }
+    const li = engineRow("", "");
+    engineListEl.appendChild(li);
+    li.querySelector(".engine-keyword").focus();
+  }
+  function resetEngines() {
+    savePatch({
+      searchEngines: searchEngineDefaults(),
+      defaultEngine: settingsDefaults.defaultEngine
+    }).then((ok) => {
+      if (ok) {
+        renderEngines();
+        status("Search engines restored to defaults");
+      }
+    });
+  }
+  function initEngines() {
+    addEngineBtn?.addEventListener("click", addEngine);
+    resetEnginesBtn?.addEventListener("click", resetEngines);
+    defaultEngineEl?.addEventListener(
+      "change",
+      () => savePatch({ defaultEngine: defaultEngineEl.value }).then(() => {
+        syncDefaultEngineOptions();
+      })
+    );
+  }
+
   // options/options.js
   var tableEl = document.querySelector("#keymap-table");
   var resetBtn = document.querySelector("#reset");
   var resetKeysBtn = document.querySelector("#reset-keys");
-  var statusEl = document.querySelector("#status");
-  var saveStateEl = document.querySelector("#save-state");
+  var statusEl2 = document.querySelector("#status");
+  var saveStateEl2 = document.querySelector("#save-state");
   var disabledList = document.querySelector("#disabled-list");
   var scrollStepEl = document.querySelector("#scroll-step");
   var smoothScrollEl = document.querySelector("#smooth-scroll");
@@ -1311,10 +1559,6 @@
   var sourceHistoryEl = document.querySelector("#source-history");
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
   var maxResultsEl = document.querySelector("#max-results");
-  var defaultEngineEl = document.querySelector("#default-engine");
-  var engineListEl = document.querySelector("#engine-list");
-  var addEngineBtn = document.querySelector("#add-engine");
-  var resetEnginesBtn = document.querySelector("#reset-engines");
   var pagenavNextEl = document.querySelector("#pagenav-next");
   var pagenavPrevEl = document.querySelector("#pagenav-prev");
   var resetPagenavBtn = document.querySelector("#reset-pagenav");
@@ -1351,54 +1595,54 @@
   var ADD_LABEL = "+";
   var RECORDING_TITLE = "Press a key to bind. Esc cancels. Any letter can start a multi-key sequence \u2014 keep typing keys, then Enter to save.";
   var OPEN_KEY = "jari.options.open";
-  function setSaveState(mode, message) {
-    if (!saveStateEl) return;
-    saveStateEl.classList.remove("saving", "failed", "warn");
+  function setSaveState2(mode, message) {
+    if (!saveStateEl2) return;
+    saveStateEl2.classList.remove("saving", "failed", "warn");
     if (mode === "saving") {
-      saveStateEl.classList.add("saving");
-      saveStateEl.textContent = message || "Saving...";
+      saveStateEl2.classList.add("saving");
+      saveStateEl2.textContent = message || "Saving...";
     } else if (mode === "failed") {
-      saveStateEl.classList.add("failed");
-      saveStateEl.textContent = message || "Save failed \u2014 will retry on next change";
+      saveStateEl2.classList.add("failed");
+      saveStateEl2.textContent = message || "Save failed \u2014 will retry on next change";
     } else if (mode === "warn") {
-      saveStateEl.classList.add("warn");
-      saveStateEl.textContent = message || "Saved locally";
+      saveStateEl2.classList.add("warn");
+      saveStateEl2.textContent = message || "Saved locally";
     } else {
-      saveStateEl.textContent = message || "All changes saved";
+      saveStateEl2.textContent = message || "All changes saved";
     }
   }
-  function savedState() {
+  function savedState2() {
     if (settings.isPersistedLocally()) {
-      setSaveState("warn", "Saved on this device only \u2014 browser sync is full");
+      setSaveState2("warn", "Saved on this device only \u2014 browser sync is full");
     } else {
-      setSaveState("saved");
+      setSaveState2("saved");
     }
   }
-  async function savePatch(patch) {
-    setSaveState("saving");
+  async function savePatch2(patch) {
+    setSaveState2("saving");
     try {
       await settings.update(patch);
     } catch {
-      setSaveState("failed");
+      setSaveState2("failed");
       return false;
     }
-    savedState();
+    savedState2();
     updateSummaries();
     return true;
   }
-  function showFieldError(id, message) {
+  function showFieldError2(id, message) {
     const el = document.querySelector(`#${id}`);
     if (!el) return;
     el.textContent = message;
     el.hidden = false;
   }
-  function clearFieldError(id) {
+  function clearFieldError2(id) {
     const el = document.querySelector(`#${id}`);
     if (!el) return;
     el.textContent = "";
     el.hidden = true;
   }
-  function markInvalid(el, invalid) {
+  function markInvalid2(el, invalid) {
     if (!el) return;
     if (invalid) el.setAttribute("aria-invalid", "true");
     else el.removeAttribute("aria-invalid");
@@ -1514,7 +1758,7 @@
       hintFontSizeEl,
       siteInputEl
     ]) {
-      markInvalid(el, false);
+      markInvalid2(el, false);
     }
     for (const id of [
       "error-scroll-step",
@@ -1527,7 +1771,7 @@
       "error-clickable-selector",
       "error-hint-font-size"
     ]) {
-      clearFieldError(id);
+      clearFieldError2(id);
     }
     if (siteErrorEl) {
       siteErrorEl.textContent = "";
@@ -1538,7 +1782,7 @@
     renderKeymap();
     renderDisabled();
     updateSummaries();
-    savedState();
+    savedState2();
     updateAddButton();
   }
   function matchesFilter(name, cmd, filter) {
@@ -1762,7 +2006,7 @@
     if (!activeRecording) return;
     const { button } = activeRecording;
     cancelRecordingSilent();
-    status("Cancelled \u2014 no changes");
+    status2("Cancelled \u2014 no changes");
     if (button.isConnected) button.focus?.();
   }
   function exitRecording() {
@@ -1796,7 +2040,7 @@
         activeRecording.waitingKeys = [];
         const hint = recordingHintEl(button);
         if (hint) hint.textContent = "Press a key\u2026 Esc cancels.";
-        status("Sequence cancelled \u2014 press a key, or Esc again to stop");
+        status2("Sequence cancelled \u2014 press a key, or Esc again to stop");
         return;
       }
       cancelRecording();
@@ -1811,13 +2055,13 @@
         if (hint) {
           hint.textContent = keys ? `Next key for ${shown}\u2026 or Enter to save ${shown}` : "Press a key\u2026 Esc cancels.";
         }
-        status(
+        status2(
           keys ? `Sequence ${shown} \u2014 press the next key, or Enter to save` : "Press a key"
         );
         return;
       }
       cancelRecordingSilent();
-      status("Cancelled \u2014 no changes (remove bindings with the \xD7 on each key)");
+      status2("Cancelled \u2014 no changes (remove bindings with the \xD7 on each key)");
       if (button.isConnected) button.focus?.();
       return;
     }
@@ -1833,7 +2077,7 @@
       const shown = displayCombo(activeRecording.waitingKeys.join(""));
       const hint = recordingHintEl(button);
       if (hint) hint.textContent = `Next key for ${shown}\u2026 or Enter to save ${shown}`;
-      status(`Sequence ${shown} \u2014 press the next key, or Enter to save`);
+      status2(`Sequence ${shown} \u2014 press the next key, or Enter to save`);
       return;
     }
     if (isBindablePrefixStarter(combo)) {
@@ -1842,14 +2086,14 @@
       const hint = recordingHintEl(button);
       if (hint)
         hint.textContent = `Next key for ${shown}\u2026 or Enter to save ${shown} alone`;
-      status(
+      status2(
         `Sequence ${shown} \u2014 press the next key, or Enter to save ${shown} alone`
       );
       return;
     }
     if (isReservedCombo(combo)) {
       exitRecording();
-      status("Digits 0-9 are reserved for the repeat count");
+      status2("Digits 0-9 are reserved for the repeat count");
       if (button.isConnected) button.focus?.();
       return;
     }
@@ -1868,7 +2112,7 @@
     if (keymap[combo] === name) {
       exitRecording();
       renderKeymap();
-      status(`${shown} is already bound to ${commandLabel(name)}`);
+      status2(`${shown} is already bound to ${commandLabel(name)}`);
       focusChipFor(name, combo);
       return;
     }
@@ -1880,14 +2124,14 @@
     showConflict(button, name, combo, conflict);
   }
   function persistKeymap() {
-    setSaveState("saving");
+    setSaveState2("saving");
     return settings.update({ keymap: { ...settings.getKeymap() } }).then(() => {
-      savedState();
+      savedState2();
       updateSummaries();
       return true;
     }).catch(() => {
-      setSaveState("failed");
-      status("Save failed");
+      setSaveState2("failed");
+      status2("Save failed");
       return false;
     });
   }
@@ -1909,15 +2153,15 @@
     const shown = displayCombo(combo);
     const shownPrevious = previous ? displayCombo(previous) : "";
     if (swapped) {
-      status(
+      status2(
         `Swapped: ${shown} \u2192 ${commandLabel(name)}, ${shownPrevious} \u2192 ${commandLabel(swapWith)}${notes}`
       );
     } else if (swapWith) {
-      status(
+      status2(
         `Saved ${shown} \u2192 ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${shown})${notes}`
       );
     } else {
-      status(`Saved ${shown} \u2192 ${commandLabel(name)}${notes}`);
+      status2(`Saved ${shown} \u2192 ${commandLabel(name)}${notes}`);
     }
     focusChipFor(name, combo);
   }
@@ -1947,11 +2191,11 @@
     if (!ok) return;
     if (removed.length === 1) {
       const rest = keysFor(name).length;
-      status(
+      status2(
         rest > 0 ? `Removed ${removed[0]} from ${commandLabel(name)}` : `Removed ${removed[0]} \u2014 ${commandLabel(name)} now unbound`
       );
     } else {
-      status(`Cleared ${commandLabel(name)} \u2014 now unbound`);
+      status2(`Cleared ${commandLabel(name)} \u2014 now unbound`);
     }
     focusAddFor(name);
   }
@@ -2021,7 +2265,7 @@
       const hint2 = recordingHintEl(button);
       if (hint2) hint2.textContent = "Press a key\u2026 Esc cancels.";
       button.focus?.();
-      status("Kept the existing binding");
+      status2("Kept the existing binding");
     });
     actions.appendChild(reassign);
     const previous = keysForCommand(settings.getKeymap(), name).filter((k) => k !== combo)[0] || "";
@@ -2047,7 +2291,7 @@
       }
     });
     cell.appendChild(box);
-    status(`${shown} is already bound \u2014 choose Reassign or Keep both`);
+    status2(`${shown} is already bound \u2014 choose Reassign or Keep both`);
     cancel.focus();
   }
   function commitNumber(el, errorId, { min, max, fallback, settingKey, label, unit }) {
@@ -2056,18 +2300,18 @@
     const invalid = raw === "" || !Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max;
     if (invalid) {
       el.value = settings[fallback]();
-      markInvalid(el, true);
-      showFieldError(
+      markInvalid2(el, true);
+      showFieldError2(
         errorId,
         `Enter ${min}-${max}${unit ? ` ${unit}` : ""} (reset to ${el.value})`
       );
-      status(`${label}: reset to ${el.value}`);
+      status2(`${label}: reset to ${el.value}`);
       return;
     }
-    markInvalid(el, false);
-    clearFieldError(errorId);
+    markInvalid2(el, false);
+    clearFieldError2(errorId);
     el.value = String(parsed);
-    savePatch({ [settingKey]: parsed });
+    savePatch2({ [settingKey]: parsed });
   }
   function commitHintChars() {
     const raw = hintCharsEl.value;
@@ -2075,22 +2319,22 @@
     const deduped = [...new Set(trimmed.replace(/[^a-z0-9]/g, ""))].join("");
     if (deduped.length < 2) {
       hintCharsEl.value = settings.getHintChars();
-      markInvalid(hintCharsEl, true);
-      showFieldError(
+      markInvalid2(hintCharsEl, true);
+      showFieldError2(
         "error-hint-chars",
         "Need at least 2 unique letters or digits (reset to previous)"
       );
-      status("Hint characters: need at least 2 unique letters or digits");
+      status2("Hint characters: need at least 2 unique letters or digits");
       updateHintMeta();
       return;
     }
-    markInvalid(hintCharsEl, false);
-    clearFieldError("error-hint-chars");
+    markInvalid2(hintCharsEl, false);
+    clearFieldError2("error-hint-chars");
     const cleaned = deduped !== trimmed;
     hintCharsEl.value = deduped;
     updateHintMeta();
-    savePatch({ hintChars: normalizeHintChars(deduped) }).then((ok) => {
-      if (ok && cleaned) status(`Cleaned up hint characters: ${deduped}`);
+    savePatch2({ hintChars: normalizeHintChars(deduped) }).then((ok) => {
+      if (ok && cleaned) status2(`Cleaned up hint characters: ${deduped}`);
     });
   }
   function isValidSelector(sel) {
@@ -2106,18 +2350,18 @@
     const raw = clickableSelectorEl.value.trim();
     if (raw && !isValidSelector(raw)) {
       clickableSelectorEl.value = settings.getClickableSelector();
-      markInvalid(clickableSelectorEl, true);
-      showFieldError(
+      markInvalid2(clickableSelectorEl, true);
+      showFieldError2(
         "error-clickable-selector",
         "Not a valid CSS selector (reset to previous)"
       );
-      status("Clickable selector: not valid CSS");
+      status2("Clickable selector: not valid CSS");
       return;
     }
-    markInvalid(clickableSelectorEl, false);
-    clearFieldError("error-clickable-selector");
+    markInvalid2(clickableSelectorEl, false);
+    clearFieldError2("error-clickable-selector");
     clickableSelectorEl.value = raw;
-    savePatch({ clickableSelector: raw });
+    savePatch2({ clickableSelector: raw });
   }
   function collectSources() {
     const sources = [];
@@ -2126,191 +2370,20 @@
     if (sourceBookmarkEl.checked) sources.push("bookmark");
     return sources;
   }
-  function engineRow(keyword, url) {
-    const li = document.createElement("li");
-    const kwEl = document.createElement("input");
-    kwEl.type = "text";
-    kwEl.className = "engine-keyword";
-    kwEl.value = keyword;
-    kwEl.placeholder = "kw";
-    kwEl.setAttribute("aria-label", "Search engine keyword");
-    kwEl.setAttribute("autocomplete", "off");
-    kwEl.setAttribute("spellcheck", "false");
-    kwEl.addEventListener("change", commitEngines);
-    const urlEl = document.createElement("input");
-    urlEl.type = "text";
-    urlEl.className = "engine-url";
-    urlEl.value = url;
-    urlEl.placeholder = "https://example.com/search?q=%s";
-    urlEl.setAttribute(
-      "aria-label",
-      "Search engine URL (%s is replaced by the query)"
-    );
-    urlEl.setAttribute("autocomplete", "off");
-    urlEl.setAttribute("spellcheck", "false");
-    urlEl.addEventListener("change", commitEngines);
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.textContent = "Remove";
-    remove.setAttribute("aria-label", `Remove ${keyword || "engine"}`);
-    remove.addEventListener("click", () => removeEngine(li));
-    li.appendChild(kwEl);
-    li.appendChild(urlEl);
-    li.appendChild(remove);
-    return li;
-  }
-  function readEngineRows() {
-    const rows = [];
-    if (!engineListEl) return rows;
-    for (const li of engineListEl.children) {
-      const kwEl = li.querySelector(".engine-keyword");
-      const urlEl = li.querySelector(".engine-url");
-      if (!kwEl || !urlEl) continue;
-      rows.push({
-        kwEl,
-        urlEl,
-        keyword: kwEl.value.trim(),
-        url: urlEl.value.trim()
-      });
-    }
-    return rows;
-  }
-  function renderEngines() {
-    if (!engineListEl) return;
-    engineListEl.textContent = "";
-    clearFieldError("error-engines");
-    for (const engine of settings.getSearchEngines()) {
-      engineListEl.appendChild(engineRow(engine.keyword, engine.url));
-    }
-    syncDefaultEngineOptions();
-  }
-  function syncDefaultEngineOptions() {
-    if (!defaultEngineEl) return;
-    const engines = settings.getSearchEngines();
-    defaultEngineEl.textContent = "";
-    for (const engine of engines) {
-      const opt = document.createElement("option");
-      opt.value = engine.keyword;
-      opt.textContent = engine.keyword;
-      defaultEngineEl.appendChild(opt);
-    }
-    defaultEngineEl.value = settings.getDefaultEngine();
-  }
-  function failEngines(message, badEls) {
-    for (const el of badEls || []) markInvalid(el, true);
-    showFieldError("error-engines", `${message} (not saved)`);
-    status(`Search engines: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
-  }
-  function commitEngines() {
-    const rows = readEngineRows();
-    for (const row of rows) {
-      markInvalid(row.kwEl, false);
-      markInvalid(row.urlEl, false);
-    }
-    clearFieldError("error-engines");
-    const complete = rows.filter((r) => r.keyword !== "" && r.url !== "");
-    const seen = /* @__PURE__ */ new Set();
-    const list = [];
-    for (const row of complete) {
-      const problem = validateSearchEngine({
-        keyword: row.keyword,
-        url: row.url
-      });
-      if (problem) {
-        failEngines(problem, [row.kwEl, row.urlEl]);
-        return;
-      }
-      const keyword = row.keyword.toLowerCase();
-      if (seen.has(keyword)) {
-        failEngines(`Duplicate keyword "${keyword}"`, [row.kwEl]);
-        return;
-      }
-      seen.add(keyword);
-      list.push({ keyword, url: row.url });
-    }
-    if (list.length === 0) {
-      if (rows.length === 0) {
-        failEngines("At least one search engine is required", []);
-        renderEngines();
-      }
-      return;
-    }
-    if (list.length > MAX_SEARCH_ENGINES) {
-      failEngines(`At most ${MAX_SEARCH_ENGINES} search engines`, []);
-      return;
-    }
-    const current = settings.getDefaultEngine();
-    const def = list.some((e) => e.keyword === current) ? current : list[0].keyword;
-    savePatch({ searchEngines: list, defaultEngine: def }).then((ok) => {
-      if (!ok) return;
-      for (let i = 0; i < list.length; i++) {
-        const row = complete[i];
-        if (!row) break;
-        row.kwEl.value = list[i].keyword;
-        row.urlEl.value = list[i].url;
-      }
-      syncDefaultEngineOptions();
-    });
-  }
-  function removeEngine(li) {
-    const rows = readEngineRows();
-    if (rows.length <= 1) {
-      failEngines("At least one search engine is required", []);
-      return;
-    }
-    const remaining = rows.filter((row) => {
-      try {
-        return row.kwEl.closest("li") !== li;
-      } catch {
-        return true;
-      }
-    });
-    if (!remaining.some((r) => r.keyword !== "" && r.url !== "")) {
-      failEngines("At least one search engine is required", []);
-      return;
-    }
-    li.remove();
-    commitEngines();
-  }
-  function addEngine() {
-    if (!engineListEl) return;
-    clearFieldError("error-engines");
-    if (engineListEl.children.length >= MAX_SEARCH_ENGINES) {
-      showFieldError(
-        "error-engines",
-        `At most ${MAX_SEARCH_ENGINES} search engines (not saved)`
-      );
-      return;
-    }
-    const li = engineRow("", "");
-    engineListEl.appendChild(li);
-    li.querySelector(".engine-keyword").focus();
-  }
-  function resetEngines() {
-    savePatch({
-      searchEngines: searchEngineDefaults(),
-      defaultEngine: settingsDefaults.defaultEngine
-    }).then((ok) => {
-      if (ok) {
-        renderEngines();
-        status("Search engines restored to defaults");
-      }
-    });
-  }
   function renderPagenav() {
     if (pagenavNextEl)
       pagenavNextEl.value = settings.getPageNavTexts().next.join(", ");
     if (pagenavPrevEl)
       pagenavPrevEl.value = settings.getPageNavTexts().prev.join(", ");
-    clearFieldError("error-pagenav");
+    clearFieldError2("error-pagenav");
   }
   function failPagenav(message, badEls) {
-    for (const el of badEls || []) markInvalid(el, true);
-    showFieldError("error-pagenav", `${message} (not saved)`);
-    status(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+    for (const el of badEls || []) markInvalid2(el, true);
+    showFieldError2("error-pagenav", `${message} (not saved)`);
+    status2(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
   }
   function parsePagenavField(input, label) {
-    markInvalid(input, false);
+    markInvalid2(input, false);
     const seen = /* @__PURE__ */ new Set();
     const list = [];
     for (const part of String(input.value || "").split(",")) {
@@ -2339,7 +2412,7 @@
   }
   function commitPagenav() {
     if (!pagenavNextEl || !pagenavPrevEl) return;
-    clearFieldError("error-pagenav");
+    clearFieldError2("error-pagenav");
     const next = parsePagenavField(pagenavNextEl, "next page");
     if (next.error) {
       failPagenav(next.error, next.bad);
@@ -2350,7 +2423,7 @@
       failPagenav(prev.error, prev.bad);
       return;
     }
-    savePatch({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
+    savePatch2({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
       (ok) => {
         if (!ok) return;
         renderPagenav();
@@ -2358,10 +2431,10 @@
     );
   }
   function resetPagenav() {
-    savePatch({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
+    savePatch2({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
       if (ok) {
         renderPagenav();
-        status("Page navigation texts restored to defaults");
+        status2("Page navigation texts restored to defaults");
       }
     });
   }
@@ -2411,10 +2484,10 @@
     cancelRecordingSilent();
     if (!await confirmDialog("Reset all keybindings to defaults?", "Reset keys"))
       return;
-    savePatch({ keymap: { ...keymapDefaults } }).then((ok) => {
+    savePatch2({ keymap: { ...keymapDefaults } }).then((ok) => {
       if (!ok) return;
       renderKeymap();
-      status("Keybindings reset to defaults");
+      status2("Keybindings reset to defaults");
     });
   }
   async function reset() {
@@ -2424,7 +2497,7 @@
       "Reset all"
     ))
       return;
-    setSaveState("saving");
+    setSaveState2("saving");
     settings.update({
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap: { ...keymapDefaults },
@@ -2446,9 +2519,9 @@
       hintTheme: settingsDefaults.hintTheme,
       hintFontSize: settingsDefaults.hintFontSize,
       disabledSites: []
-    }).then(() => load2()).then(() => status("Reset everything to defaults")).catch(() => {
-      setSaveState("failed");
-      status("Save failed");
+    }).then(() => load2()).then(() => status2("Reset everything to defaults")).catch(() => {
+      setSaveState2("failed");
+      status2("Save failed");
     });
   }
   function renderDisabled() {
@@ -2470,11 +2543,11 @@
         btn.title = `Re-enable Jari on ${site}`;
         btn.setAttribute("aria-label", `Re-enable Jari on ${site}`);
         btn.addEventListener("click", async () => {
-          const ok = await savePatch({
+          const ok = await savePatch2({
             disabledSites: sites.filter((s) => s !== site)
           });
           renderDisabled();
-          if (ok) status(`Enabled: ${site}`);
+          if (ok) status2(`Enabled: ${site}`);
         });
         li.appendChild(siteSpan);
         li.appendChild(btn);
@@ -2485,18 +2558,18 @@
   }
   function showSiteError(message) {
     if (!siteErrorEl) {
-      status(message);
+      status2(message);
       return;
     }
     siteErrorEl.textContent = message;
     siteErrorEl.hidden = false;
-    markInvalid(siteInputEl, true);
+    markInvalid2(siteInputEl, true);
   }
   function clearSiteError() {
     if (!siteErrorEl) return;
     siteErrorEl.textContent = "";
     siteErrorEl.hidden = true;
-    markInvalid(siteInputEl, false);
+    markInvalid2(siteInputEl, false);
   }
   function updateAddButton() {
     if (!addSiteBtn || !siteInputEl) return;
@@ -2517,18 +2590,18 @@
       return;
     }
     clearSiteError();
-    const ok = await savePatch({ disabledSites: [...sites, pattern] });
+    const ok = await savePatch2({ disabledSites: [...sites, pattern] });
     siteInputEl.value = "";
     updateAddButton();
     renderDisabled();
-    if (ok) status(`Disabled: ${pattern}`);
+    if (ok) status2(`Disabled: ${pattern}`);
     siteInputEl.focus();
   }
-  function status(message) {
-    statusEl.textContent = message;
-    clearTimeout(statusEl._timer);
-    statusEl._timer = setTimeout(() => {
-      statusEl.textContent = "";
+  function status2(message) {
+    statusEl2.textContent = message;
+    clearTimeout(statusEl2._timer);
+    statusEl2._timer = setTimeout(() => {
+      statusEl2.textContent = "";
     }, 2500);
   }
   resetBtn.addEventListener("click", reset);
@@ -2605,48 +2678,41 @@
   );
   smoothScrollEl.addEventListener(
     "change",
-    () => savePatch({ smoothScroll: smoothScrollEl.checked })
+    () => savePatch2({ smoothScroll: smoothScrollEl.checked })
   );
   fuzzyMatchingEl.addEventListener(
     "change",
-    () => savePatch({ fuzzyMatching: fuzzyMatchingEl.checked })
+    () => savePatch2({ fuzzyMatching: fuzzyMatchingEl.checked })
   );
   clueEnabledEl.addEventListener(
     "change",
-    () => savePatch({ clueEnabled: clueEnabledEl.checked })
+    () => savePatch2({ clueEnabled: clueEnabledEl.checked })
   );
   copyFormatEl.addEventListener(
     "change",
-    () => savePatch({ copyFormat: copyFormatEl.value }).then(() => {
+    () => savePatch2({ copyFormat: copyFormatEl.value }).then(() => {
       copyFormatEl.value = settings.getCopyFormat();
     })
   );
   for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
     el.addEventListener(
       "change",
-      () => savePatch({ suggestionSources: collectSources() })
+      () => savePatch2({ suggestionSources: collectSources() })
     );
   }
-  defaultEngineEl?.addEventListener(
-    "change",
-    () => savePatch({ defaultEngine: defaultEngineEl.value }).then(() => {
-      syncDefaultEngineOptions();
-    })
-  );
-  addEngineBtn?.addEventListener("click", addEngine);
-  resetEnginesBtn?.addEventListener("click", resetEngines);
+  initEngines();
   pagenavNextEl?.addEventListener("change", commitPagenav);
   pagenavPrevEl?.addEventListener("change", commitPagenav);
   resetPagenavBtn?.addEventListener("click", resetPagenav);
   hintCharsEl.addEventListener("input", () => {
-    clearFieldError("error-hint-chars");
-    markInvalid(hintCharsEl, false);
+    clearFieldError2("error-hint-chars");
+    markInvalid2(hintCharsEl, false);
     updateHintMeta();
   });
   hintCharsEl.addEventListener("change", commitHintChars);
   hintThemeEl?.addEventListener(
     "change",
-    () => savePatch({ hintTheme: hintThemeEl.value }).then(() => {
+    () => savePatch2({ hintTheme: hintThemeEl.value }).then(() => {
       if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
     })
   );
@@ -2662,8 +2728,8 @@
     })
   );
   clickableSelectorEl?.addEventListener("input", () => {
-    clearFieldError("error-clickable-selector");
-    markInvalid(clickableSelectorEl, false);
+    clearFieldError2("error-clickable-selector");
+    markInvalid2(clickableSelectorEl, false);
   });
   clickableSelectorEl?.addEventListener("change", commitClickableSelector);
   for (const card of Object.values(cards)) {
