@@ -79,86 +79,7 @@
     return String(engine.url).replaceAll("%s", encodeURIComponent(query));
   }
 
-  // shared/url.js
-  var urlSchemes = /* @__PURE__ */ new Set([
-    "http",
-    "https",
-    "file",
-    "about",
-    "chrome",
-    "helium"
-  ]);
-  var blockedUrlSchemes = /* @__PURE__ */ new Set([
-    "javascript",
-    "data",
-    "vbscript",
-    "chrome-extension",
-    "edge",
-    "moz-extension",
-    "view-source"
-  ]);
-  var fileExtensionDenylist = /* @__PURE__ */ new Set([
-    "js",
-    "ts",
-    "jsx",
-    "tsx",
-    "mjs",
-    "cjs",
-    "json",
-    "css",
-    "scss",
-    "less",
-    "html",
-    "htm",
-    "md",
-    "markdown",
-    "txt",
-    "csv",
-    "xml",
-    "yaml",
-    "yml",
-    "toml",
-    "ini",
-    "conf",
-    "config",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "py",
-    "rb",
-    "php",
-    "java",
-    "c",
-    "cpp",
-    "h",
-    "hpp",
-    "cs",
-    "go",
-    "rs",
-    "swift",
-    "kt",
-    "kts",
-    "dart",
-    "vue",
-    "svelte",
-    "astro",
-    "lua",
-    "pl",
-    "pm",
-    "r",
-    "sql",
-    "db",
-    "sqlite",
-    "log",
-    "lock",
-    "env",
-    "gitignore",
-    "dockerignore",
-    "gradle",
-    "makefile",
-    "cmake"
-  ]);
+  // shared/tlds.js
   var knownTlds = new Set(
     `
   aaa aarp abb abbott abbvie abc able abogado abudhabi ac academy accenture
@@ -283,6 +204,87 @@
   yun za zappos zara zero zip zm zone zuerich zw
   `.trim().split(/\s+/)
   );
+
+  // shared/url.js
+  var urlSchemes = /* @__PURE__ */ new Set([
+    "http",
+    "https",
+    "file",
+    "about",
+    "chrome",
+    "helium"
+  ]);
+  var blockedUrlSchemes = /* @__PURE__ */ new Set([
+    "javascript",
+    "data",
+    "vbscript",
+    "chrome-extension",
+    "edge",
+    "moz-extension",
+    "view-source"
+  ]);
+  var fileExtensionDenylist = /* @__PURE__ */ new Set([
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "mjs",
+    "cjs",
+    "json",
+    "css",
+    "scss",
+    "less",
+    "html",
+    "htm",
+    "md",
+    "markdown",
+    "txt",
+    "csv",
+    "xml",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "conf",
+    "config",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "py",
+    "rb",
+    "php",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "cs",
+    "go",
+    "rs",
+    "swift",
+    "kt",
+    "kts",
+    "dart",
+    "vue",
+    "svelte",
+    "astro",
+    "lua",
+    "pl",
+    "pm",
+    "r",
+    "sql",
+    "db",
+    "sqlite",
+    "log",
+    "lock",
+    "env",
+    "gitignore",
+    "dockerignore",
+    "gradle",
+    "makefile",
+    "cmake"
+  ]);
   function isValidHostname(host) {
     if (!host) return false;
     let lower = host.toLowerCase();

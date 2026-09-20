@@ -111,7 +111,7 @@
     };
   }
 
-  // shared/url.js
+  // shared/tlds.js
   var knownTlds = new Set(
     `
   aaa aarp abb abbott abbvie abc able abogado abudhabi ac academy accenture
@@ -236,6 +236,8 @@
   yun za zappos zara zero zip zm zone zuerich zw
   `.trim().split(/\s+/)
   );
+
+  // shared/url.js
   function normalizeHost(raw) {
     let host = raw.trim().toLowerCase();
     if (!host) return "";

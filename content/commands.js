@@ -218,12 +218,16 @@ async function toggleBookmarkPage() {
   ui.toast(res.bookmarked ? "Bookmarked" : "Bookmark removed");
 }
 
+function cmd(name, run) {
+  return { ...COMMAND_CATALOG[name], run };
+}
+
 export const commands = {
 
-  scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
-  scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
-  scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
-  scrollRight: { ...COMMAND_CATALOG.scrollRight, run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }) },
+  scrollDown: cmd("scrollDown", (c) => scrollBy({ y: settings.getScrollStep(), count: c.count })),
+  scrollUp: cmd("scrollUp", (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count })),
+  scrollLeft: cmd("scrollLeft", (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count })),
+  scrollRight: cmd("scrollRight", (c) => scrollBy({ x: settings.getScrollStep(), count: c.count })),
   scrollToTop: {
     ...COMMAND_CATALOG.scrollToTop,
     run: () => {

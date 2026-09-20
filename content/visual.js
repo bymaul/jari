@@ -1,4 +1,4 @@
-/* global CSS, Highlight, NodeFilter, Range */
+/* global NodeFilter */
 import { register, touch } from "./overlays.js";
 import { ui } from "./ui.js";
 import {
@@ -9,19 +9,22 @@ import {
   layoutHints,
 } from "./hint-layer.js";
 import {
-  detectHighlightSupport,
-  clearHighlightNames,
-  unwrapSpans,
-} from "./highlight.js";
-import {
-  getVisibleElements,
-  filterInvisibleElements,
-  filterOverlapElements,
-  filterAncestors,
   getRealRect,
   getLinkAncestor,
 } from "./hints-elements.js";
-import { overlaySelectors } from "./keymap.js";
+import { collectVisualTextElements } from "./visual/collect.js";
+import {
+  clearVisualHighlight as selClear,
+  applyVisualHighlight as selApply,
+} from "./visual/selection.js";
+import {
+  isUsableCaretRect,
+  firstUsableRect,
+  lineHeightForElement,
+  resolveCaretGeometry,
+  readNeighborCharRects,
+} from "./visual/caret-geometry.js";
+import { isWordChar, findNextWordEnd } from "./visual/word.js";
 
 let active = false;
 let mode = "visual"; // "visual" | "line" | "caret"
@@ -59,8 +62,6 @@ let pendingVisualMode = "visual";
 
 let findOpenHandler = null;
 let findNavHandler = null;
-
-let visualFallbackSpans = [];
 
 function isActive() {
   return active || hintActive;
@@ -103,26 +104,8 @@ function hasModify() {
   return sel && typeof sel.modify === "function";
 }
 
-function showBlockCaret() {
-  if (caretEl) return;
-  try {
-    caretHost = document.createElement("div");
-    caretHost.className = "jari-visual-caret-host";
-    caretHost.style.position = "fixed";
-    caretHost.style.left = "0";
-    caretHost.style.top = "0";
-    caretHost.style.width = "0";
-    caretHost.style.height = "0";
-    caretHost.style.pointerEvents = "none";
-    caretHost.style.zIndex = "2147483646";
-    try {
-      caretHost.attachShadow({ mode: "open" });
-    } catch {
-      caretHost.shadowRoot = caretHost;
-    }
-    const shadow = caretHost.shadowRoot;
-    const style = document.createElement("style");
-    style.textContent = `
+function caretCss() {
+  return `
       .jari-visual-caret {
         position: absolute;
         width: 8px;
@@ -140,11 +123,20 @@ function showBlockCaret() {
         .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
       }
     `;
-    shadow.appendChild(style);
+}
+
+function showBlockCaret() {
+  if (caretEl) return;
+  try {
+    const created = ui.createShadowHost(
+      "jari-visual-caret-host",
+      caretCss(),
+    );
+    caretHost = created.host;
+    const shadow = created.shadow;
     caretEl = document.createElement("div");
     caretEl.className = "jari-visual-caret";
     shadow.appendChild(caretEl);
-    (document.documentElement || document.body).appendChild(caretHost);
   } catch {}
 }
 
@@ -161,187 +153,6 @@ function hideBlockCaret() {
     } catch {}
     caretEl = null;
   }
-}
-
-function isUsableCaretRect(rect) {
-  return (
-    !!rect &&
-    Number.isFinite(rect.left) &&
-    Number.isFinite(rect.top) &&
-    typeof rect.height === "number" &&
-    rect.height > 0
-  );
-}
-
-function firstUsableRect(list) {
-  if (!list || typeof list.length !== "number") return null;
-  for (const r of list) {
-    if (isUsableCaretRect(r)) return r;
-  }
-  return null;
-}
-
-function lineHeightForElement(el) {
-  try {
-    if (
-      el &&
-      typeof window !== "undefined" &&
-      typeof window.getComputedStyle === "function"
-    ) {
-      const cs = window.getComputedStyle(el);
-      const lh = parseFloat(cs && cs.lineHeight);
-      if (Number.isFinite(lh) && lh > 0 && lh < 200) return lh;
-      const fs = parseFloat(cs && cs.fontSize);
-      if (Number.isFinite(fs) && fs > 0 && fs < 200)
-        return Math.round(fs * 1.2);
-    }
-  } catch {}
-  return 16;
-}
-
-// Pure geometry pick for the block caret. Priority: collapsed focus rect,
-// then selection client rects, then nearest rendered neighbor char (x taken
-// from its inner edge), then parent position with line height. The parent
-// block rect is only ever used for left/top - never for height - so the
-// caret cannot stretch to full element height on whitespace.
-function resolveCaretGeometry({
-  collapsed,
-  clientRects,
-  before,
-  after,
-  parentRect,
-  fallbackHeight,
-}) {
-  if (isUsableCaretRect(collapsed)) {
-    return {
-      left: collapsed.left,
-      top: collapsed.top,
-      height: collapsed.height,
-      width: collapsed.width || 0,
-    };
-  }
-  const listRect = firstUsableRect(clientRects);
-  if (listRect) {
-    return {
-      left: listRect.left,
-      top: listRect.top,
-      height: listRect.height,
-      width: listRect.width || 0,
-    };
-  }
-  if (isUsableCaretRect(before)) {
-    const left = Number.isFinite(before.right) ? before.right : before.left;
-    return { left, top: before.top, height: before.height, width: 0 };
-  }
-  if (isUsableCaretRect(after)) {
-    const left = Number.isFinite(after.left) ? after.left : after.right;
-    return { left, top: after.top, height: after.height, width: 0 };
-  }
-  if (
-    parentRect &&
-    Number.isFinite(parentRect.left) &&
-    Number.isFinite(parentRect.top)
-  ) {
-    const height =
-      Number.isFinite(fallbackHeight) && fallbackHeight > 0
-        ? fallbackHeight
-        : 16;
-    return {
-      left: parentRect.left,
-      top: parentRect.top,
-      height,
-      width: parentRect.width || 0,
-    };
-  }
-  return null;
-}
-
-function readSingleCharRect(node, start, end) {
-  try {
-    const r = document.createRange();
-    r.setStart(node, start);
-    r.setEnd(node, end);
-    const hit = firstUsableRect(r.getClientRects());
-    if (hit) return hit;
-    const bounds = r.getBoundingClientRect();
-    if (isUsableCaretRect(bounds)) return bounds;
-  } catch {}
-  return null;
-}
-
-// Nearest rendered char before/after the caret offset. Collapsed whitespace
-// (runs of spaces, trailing space, tabs) yields 0-height rects, so scan
-// outward for the closest char that actually renders.
-function readNeighborCharRects(focusNode, focusOffset) {
-  let before = null;
-  let after = null;
-  try {
-    if (
-      !focusNode ||
-      typeof Node === "undefined" ||
-      focusNode.nodeType !== Node.TEXT_NODE
-    ) {
-      return { before, after };
-    }
-    const len = focusNode.nodeValue ? focusNode.nodeValue.length : 0;
-    const off = Math.max(0, Math.min(focusOffset | 0, len));
-    for (let i = off - 1, steps = 0; i >= 0 && steps < 32; i--, steps++) {
-      before = readSingleCharRect(focusNode, i, i + 1);
-      if (before) break;
-    }
-    for (let i = off, steps = 0; i < len && steps < 32; i++, steps++) {
-      after = readSingleCharRect(focusNode, i, i + 1);
-      if (after) break;
-    }
-    if (!before || !after) {
-      const edge = readAdjacentTextCharRect(focusNode, !before, !after);
-      if (!before) before = edge.before;
-      if (!after) after = edge.after;
-    }
-  } catch {}
-  return { before, after };
-}
-
-function readAdjacentTextCharRect(focusNode, wantBefore, wantAfter) {
-  const out = { before: null, after: null };
-  try {
-    if (
-      typeof Node === "undefined" ||
-      typeof NodeFilter === "undefined" ||
-      !document.body
-    ) {
-      return out;
-    }
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-    );
-    walker.currentNode = focusNode;
-    if (wantBefore) {
-      const prev = walker.previousNode();
-      if (prev && prev.nodeValue) {
-        for (
-          let i = prev.nodeValue.length - 1, steps = 0;
-          i >= 0 && steps < 32;
-          i--, steps++
-        ) {
-          out.before = readSingleCharRect(prev, i, i + 1);
-          if (out.before) break;
-        }
-      }
-    }
-    if (wantAfter) {
-      walker.currentNode = focusNode;
-      const next = walker.nextNode();
-      if (next && next.nodeValue) {
-        for (let i = 0, steps = 0; i < next.nodeValue.length && steps < 32; i++, steps++) {
-          out.after = readSingleCharRect(next, i, i + 1);
-          if (out.after) break;
-        }
-      }
-    }
-  } catch {}
-  return out;
 }
 
 function updateBlockCaretImmediate() {
@@ -528,200 +339,10 @@ function disableSelectOverride() {
 }
 
 function clearVisualHighlight() {
-  clearHighlightNames("jari-visual");
-  unwrapSpans(visualFallbackSpans);
+  selClear();
 }
 function applyVisualHighlight() {
-  clearVisualHighlight();
-  if (!active || mode === "caret") return;
-  const sel = getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-  try {
-    const range = sel.getRangeAt(0).cloneRange();
-    try {
-      if (detectHighlightSupport()) {
-        CSS.highlights.set("jari-visual", new Highlight(range));
-        return;
-      }
-    } catch {}
-    try {
-      const span = document.createElement("span");
-      span.className = "jari-visual-highlight";
-      range.surroundContents(span);
-      visualFallbackSpans.push(span);
-    } catch {
-      try {
-        const walker = document.createTreeWalker(
-          document.body,
-          NodeFilter.SHOW_TEXT,
-        );
-        let n = walker.nextNode();
-        while (n) {
-          try {
-            if (!range.intersectsNode || !range.intersectsNode(n)) {
-              n = walker.nextNode();
-              continue;
-            }
-            const nodeRange = document.createRange();
-            nodeRange.selectNodeContents(n);
-            if (
-              range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <= 0 ||
-              range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0
-            ) {
-              n = walker.nextNode();
-              continue;
-            }
-            const startNode =
-              range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0
-                ? n
-                : range.startContainer;
-            const startOffset =
-              range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0
-                ? 0
-                : range.startOffset;
-            const endNode =
-              range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0
-                ? n
-                : range.endContainer;
-            const endOffset =
-              range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0
-                ? n.nodeValue.length
-                : range.endOffset;
-            if (startNode !== n || endNode !== n) {
-              n = walker.nextNode();
-              continue;
-            }
-            const r = document.createRange();
-            r.setStart(
-              n,
-              Math.max(0, Math.min(startOffset, n.nodeValue.length)),
-            );
-            r.setEnd(n, Math.max(0, Math.min(endOffset, n.nodeValue.length)));
-            if (r.collapsed) {
-              n = walker.nextNode();
-              continue;
-            }
-            const s = document.createElement("span");
-            s.className = "jari-visual-highlight";
-            r.surroundContents(s);
-            visualFallbackSpans.push(s);
-          } catch {}
-          n = walker.nextNode();
-        }
-      } catch {}
-    }
-  } catch {}
-}
-
-function collectVisualTextElements() {
-  let elements = getVisibleElements((e, v) => {
-    try {
-      if (e.closest && e.closest(overlaySelectors)) return;
-      if (
-        e.closest &&
-        e.closest(
-          ".jari-visual-caret-host, .jari-visual-caret, .jari-hints-host, .jari-hint",
-        )
-      )
-        return;
-      if (
-        e.closest &&
-        e.closest(
-          "script, style, noscript, template, head, meta, link, svg, canvas, video, audio, iframe",
-        )
-      )
-        return;
-    } catch {}
-    const raw = e.textContent;
-    if (!raw) return;
-    const text = raw.trim();
-    if (!text || text.length < 3 || text.length > 500) return;
-    const tag = e.tagName;
-    if (
-      tag === "HTML" ||
-      tag === "BODY" ||
-      tag === "MAIN" ||
-      tag === "ARTICLE" ||
-      tag === "SECTION"
-    ) {
-      if (text.length > 200) return;
-    }
-    let hasDirectText = false;
-    for (const n of e.childNodes) {
-      if (
-        n.nodeType === Node.TEXT_NODE &&
-        n.nodeValue &&
-        n.nodeValue.trim().length >= 2
-      ) {
-        hasDirectText = true;
-        break;
-      }
-    }
-    const isLeaf = e.children.length === 0;
-    let isBlock = false;
-    try {
-      const style = window.getComputedStyle(e);
-      isBlock =
-        style.display === "block" ||
-        style.display === "flex" ||
-        style.display === "grid" ||
-        style.display === "list-item" ||
-        style.display === "table-cell";
-      if (style.visibility === "hidden" || style.opacity === "0") return;
-    } catch {}
-    if (!isLeaf && !hasDirectText && !isBlock) return;
-    if (!hasDirectText && text.length < 8 && !isLeaf) return;
-    v.push(e);
-  });
-  elements = filterInvisibleElements(elements);
-  elements = elements.filter((e) => {
-    const r = e.getBoundingClientRect();
-    return r.width >= 16 && r.height >= 8 && r.width * r.height >= 80;
-  });
-  elements = filterOverlapElements(elements);
-  elements = filterAncestors(elements);
-  const scored = elements
-    .map((el) => {
-      const text = el.textContent.trim();
-      const rect = el.getBoundingClientRect();
-      const area = rect.width * rect.height;
-      let score = 0;
-      if (text.length >= 10 && text.length <= 140) score += 12;
-      else if (text.length > 200) score -= 8;
-      if (text.split(/\s+/).length >= 2) score += 4;
-      if (area > 0 && area < 40000) score += 6;
-      else if (area >= 100000) score -= 6;
-      try {
-        if (
-          el.closest &&
-          el.closest(
-            "p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd",
-          )
-        )
-          score += 5;
-      } catch {}
-      const hasDirect = Array.from(el.childNodes).some(
-        (n) =>
-          n.nodeType === Node.TEXT_NODE &&
-          n.nodeValue &&
-          n.nodeValue.trim().length >= 3,
-      );
-      if (hasDirect) score += 4;
-      return { el, score, area };
-    })
-    .sort((a, b) => b.score - a.score || a.area - b.area);
-  const seen = new Set();
-  const out = [];
-  for (const { el } of scored) {
-    if (seen.has(el)) continue;
-    seen.add(el);
-    out.push(el);
-    if (out.length >= 350) break;
-  }
-  if (out.length > 250) {
-    return out.filter((e) => e.textContent.trim().length >= 10).slice(0, 250);
-  }
-  return out;
+  selApply({ active, mode, getSelection });
 }
 
 function renderHints() {
@@ -927,9 +548,6 @@ function isCaret() {
   return mode === "caret";
 }
 
-function isWordChar(ch) {
-  return !!ch && /[\p{L}\p{N}_]/u.test(ch);
-}
 function charAtFocus() {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return null;
@@ -1237,69 +855,6 @@ function fallbackFirstNonBlank(forCaret) {
     }
   }
   return fallbackLineBoundary(-1, forCaret);
-}
-function findNextWordEnd(count) {
-  const sel = getSelection();
-  if (!sel || !sel.focusNode) return null;
-  const startNode = sel.focusNode;
-  const startOffset = sel.focusOffset;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) {
-      const p = n.parentElement;
-      if (!p) return NodeFilter.FILTER_REJECT;
-      const tag = p.tagName;
-      if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-  let nodes = [];
-  let n = walker.nextNode();
-  while (n) {
-    nodes.push(n);
-    n = walker.nextNode();
-  }
-  let startIdx = nodes.indexOf(startNode);
-  if (startIdx === -1) return null;
-  let found = 0;
-  for (let i = startIdx; i < nodes.length; i++) {
-    const node = nodes[i];
-    const txt = node.nodeValue || "";
-    let from = 0;
-    if (i === startIdx) from = startOffset;
-    let pos = from;
-    let inWord = false;
-    while (pos < txt.length) {
-      if (!inWord) {
-        while (pos < txt.length && !isWordChar(txt[pos])) pos++;
-        if (pos >= txt.length) break;
-        inWord = true;
-      } else {
-        while (pos < txt.length && isWordChar(txt[pos])) pos++;
-        if (pos >= txt.length) {
-          const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
-          if (nextTxt && isWordChar(nextTxt[0])) break;
-          if (txt.length === 0) break;
-          const wordEnd = txt.length - 1;
-          if (i === startIdx && wordEnd <= from) break;
-          found++;
-          if (found === count) {
-            return { node, offset: wordEnd };
-          }
-          break;
-        }
-        inWord = false;
-        const wordEnd = pos - 1;
-        if (i === startIdx && wordEnd <= from) continue;
-        found++;
-        if (found === count) {
-          return { node, offset: wordEnd };
-        }
-      }
-    }
-  }
-  return null;
 }
 function fallbackMoveWordEnd(count) {
   const pos = findNextWordEnd(count);

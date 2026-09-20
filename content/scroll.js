@@ -2,6 +2,7 @@ import { overlaySelectors, queryAll } from "./keymap.js";
 import { ui } from "./ui.js";
 import { FRAME_SELECTOR, isFrameElement } from "./hints-elements.js";
 import { MIN_SCROLL_AREA_SIZE } from "../shared/constants.js";
+import { settings } from "./settings.js";
 
 let target = null;
 
@@ -419,6 +420,84 @@ function reset() {
   resolved = false;
   releaseFrameFocus();
   showHighlight();
+}
+
+let smoothState = null;
+
+function prefersReducedMotion() {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
+function flushSmoothQueue() {
+  if (!smoothState) return;
+  const { el, x, y } = smoothState;
+  smoothState = null;
+  if (x === 0 && y === 0) return;
+  try {
+    el.scrollBy({ left: x, top: y, behavior: "instant" });
+  } catch {}
+}
+
+export function smoothScrollBy(el, x, y) {
+  if (smoothState === null) {
+    smoothState = { el, x: 0, y: 0, rafId: null };
+  } else if (smoothState.el !== el) {
+    flushSmoothQueue();
+    smoothState = { el, x: 0, y: 0, rafId: null };
+  }
+  smoothState.x += x;
+  smoothState.y += y;
+  if (smoothState.rafId === null) {
+    smoothState.rafId = requestAnimationFrame(smoothScrollStep);
+  }
+}
+
+function smoothScrollStep() {
+  if (!smoothState) return;
+  smoothState.rafId = null;
+  const { el } = smoothState;
+  const pendingX = smoothState.x;
+  const pendingY = smoothState.y;
+  if (pendingX === 0 && pendingY === 0) {
+    smoothState = null;
+    return;
+  }
+  if (Math.abs(pendingX) < 1 && Math.abs(pendingY) < 1) {
+    el.scrollBy({ left: pendingX, top: pendingY, behavior: "instant" });
+    smoothState = null;
+    return;
+  }
+
+  const CAP = 80;
+  const moveX =
+    pendingX !== 0
+      ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4)))
+      : 0;
+  const moveY =
+    pendingY !== 0
+      ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.4)))
+      : 0;
+
+  const before = scrollPosOf(el);
+  el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
+  const after = scrollPosOf(el);
+  const dx = after.x - before.x;
+  const dy = after.y - before.y;
+
+  if (dx !== 0) smoothState.x -= dx;
+  else smoothState.x = 0;
+  if (dy !== 0) smoothState.y -= dy;
+  else smoothState.y = 0;
+
+  smoothState.rafId = requestAnimationFrame(smoothScrollStep);
+}
+
+export function shouldSmooth() {
+  return settings.isSmoothScroll() && !prefersReducedMotion();
 }
 
 export const Scroll = { getTarget, cycle, reset, showHighlight };

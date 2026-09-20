@@ -125,86 +125,7 @@
     };
   }
 
-  // shared/url.js
-  var urlSchemes = /* @__PURE__ */ new Set([
-    "http",
-    "https",
-    "file",
-    "about",
-    "chrome",
-    "helium"
-  ]);
-  var blockedUrlSchemes = /* @__PURE__ */ new Set([
-    "javascript",
-    "data",
-    "vbscript",
-    "chrome-extension",
-    "edge",
-    "moz-extension",
-    "view-source"
-  ]);
-  var fileExtensionDenylist = /* @__PURE__ */ new Set([
-    "js",
-    "ts",
-    "jsx",
-    "tsx",
-    "mjs",
-    "cjs",
-    "json",
-    "css",
-    "scss",
-    "less",
-    "html",
-    "htm",
-    "md",
-    "markdown",
-    "txt",
-    "csv",
-    "xml",
-    "yaml",
-    "yml",
-    "toml",
-    "ini",
-    "conf",
-    "config",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "py",
-    "rb",
-    "php",
-    "java",
-    "c",
-    "cpp",
-    "h",
-    "hpp",
-    "cs",
-    "go",
-    "rs",
-    "swift",
-    "kt",
-    "kts",
-    "dart",
-    "vue",
-    "svelte",
-    "astro",
-    "lua",
-    "pl",
-    "pm",
-    "r",
-    "sql",
-    "db",
-    "sqlite",
-    "log",
-    "lock",
-    "env",
-    "gitignore",
-    "dockerignore",
-    "gradle",
-    "makefile",
-    "cmake"
-  ]);
+  // shared/tlds.js
   var knownTlds = new Set(
     `
   aaa aarp abb abbott abbvie abc able abogado abudhabi ac academy accenture
@@ -329,6 +250,87 @@
   yun za zappos zara zero zip zm zone zuerich zw
   `.trim().split(/\s+/)
   );
+
+  // shared/url.js
+  var urlSchemes = /* @__PURE__ */ new Set([
+    "http",
+    "https",
+    "file",
+    "about",
+    "chrome",
+    "helium"
+  ]);
+  var blockedUrlSchemes = /* @__PURE__ */ new Set([
+    "javascript",
+    "data",
+    "vbscript",
+    "chrome-extension",
+    "edge",
+    "moz-extension",
+    "view-source"
+  ]);
+  var fileExtensionDenylist = /* @__PURE__ */ new Set([
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "mjs",
+    "cjs",
+    "json",
+    "css",
+    "scss",
+    "less",
+    "html",
+    "htm",
+    "md",
+    "markdown",
+    "txt",
+    "csv",
+    "xml",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "conf",
+    "config",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "py",
+    "rb",
+    "php",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "cs",
+    "go",
+    "rs",
+    "swift",
+    "kt",
+    "kts",
+    "dart",
+    "vue",
+    "svelte",
+    "astro",
+    "lua",
+    "pl",
+    "pm",
+    "r",
+    "sql",
+    "db",
+    "sqlite",
+    "log",
+    "lock",
+    "env",
+    "gitignore",
+    "dockerignore",
+    "gradle",
+    "makefile",
+    "cmake"
+  ]);
   function isValidHostname(host5) {
     if (!host5) return false;
     let lower = host5.toLowerCase();
@@ -788,7 +790,7 @@
     return out;
   }
   function keysForCommand(keymap, commandName) {
-    return Object.entries(keymap).filter(([, cmd]) => cmd === commandName).map(([key]) => key);
+    return Object.entries(keymap).filter(([, cmd2]) => cmd2 === commandName).map(([key]) => key);
   }
   function isPrefixKey(keymap, key) {
     if (!key || typeof key !== "string") return false;
@@ -980,7 +982,7 @@
     }
     const used = new Set(Object.values(out));
     for (const [newCombo, command] of [
-      ...FIND_TOGGLE_SWAPS.map(([, combo, cmd]) => [combo, cmd]),
+      ...FIND_TOGGLE_SWAPS.map(([, combo, cmd2]) => [combo, cmd2]),
       ...HALF_PAGE_FILLS
     ]) {
       if (newCombo in out || used.has(command)) continue;
@@ -4601,140 +4603,306 @@
     spans.length = 0;
   }
 
-  // content/visual.js
-  var active4 = false;
-  var mode3 = "visual";
-  var pillEl = null;
-  var pendingCount = "";
-  var pendingG = false;
-  var pendingF = null;
-  var lastF = null;
-  var pendingY = false;
-  var pendingGTimer = null;
-  var pendingYTimer = null;
-  var caretRaf = null;
-  function clearPendingKeyTimers() {
-    if (pendingGTimer !== null) {
-      clearTimeout(pendingGTimer);
-      pendingGTimer = null;
-    }
-    if (pendingYTimer !== null) {
-      clearTimeout(pendingYTimer);
-      pendingYTimer = null;
+  // content/find/matcher.js
+  function hasUpperCase(s) {
+    return /\p{Lu}/u.test(s);
+  }
+  function buildMatcher(query4, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
+    if (!query4) return null;
+    const flags = (caseSensitive ? "g" : "gi") + "mu";
+    const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
+    try {
+      if (regex) return new RegExp(wholeWord ? bounds(query4) : query4, flags);
+      const src = query4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(wholeWord ? bounds(src) : src, flags);
+    } catch {
+      return null;
     }
   }
-  var caretEl = null;
-  var caretHost = null;
-  var hintActive = false;
-  var hintElements = [];
-  var hintPrefix = "";
-  var hintHost = null;
-  var hintHolder = null;
-  var hintMap = /* @__PURE__ */ new Map();
-  var pendingVisualMode = "visual";
-  var findOpenHandler = null;
-  var findNavHandler = null;
+
+  // content/find/collect.js
+  function isOverlayElement(el) {
+    try {
+      return el.closest && el.closest(overlaySelectors);
+    } catch {
+      return false;
+    }
+  }
+  function shouldSkipNode(node) {
+    const parent = node.parentElement;
+    if (!parent) return true;
+    const tag = parent.tagName;
+    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
+    if (isOverlayElement(parent)) return true;
+    if (parent.closest) {
+      try {
+        if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host")) return true;
+        if (parent.closest('[aria-hidden="true"]')) return true;
+        if (parent.closest("[hidden]")) return true;
+      } catch {
+      }
+    }
+    try {
+      if (!isElementDrawn(parent)) return true;
+      const style = window.getComputedStyle(parent);
+      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
+      if (parseFloat(style.opacity) < 0.05) return true;
+    } catch {
+    }
+    return false;
+  }
+  function collectTextNodes() {
+    const out = [];
+    const rootEl = document.body || document.documentElement;
+    if (!rootEl) return out;
+    try {
+      const walker = document.createTreeWalker(
+        rootEl,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode(node2) {
+            if (!node2.nodeValue || !node2.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            if (shouldSkipNode(node2)) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        }
+      );
+      let node = walker.nextNode();
+      while (node) {
+        out.push(node);
+        if (out.length > 5e3) break;
+        node = walker.nextNode();
+      }
+    } catch {
+    }
+    try {
+      const visit = (root) => {
+        let els;
+        try {
+          els = root.querySelectorAll("*");
+        } catch {
+          return;
+        }
+        for (const el of els) {
+          if (el.shadowRoot) {
+            try {
+              const sw = document.createTreeWalker(
+                el.shadowRoot,
+                NodeFilter.SHOW_TEXT,
+                {
+                  acceptNode(n) {
+                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    if (shouldSkipNode(n)) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                  }
+                }
+              );
+              let sn = sw.nextNode();
+              while (sn) {
+                out.push(sn);
+                if (out.length > 5e3) return;
+                sn = sw.nextNode();
+              }
+              visit(el.shadowRoot);
+            } catch {
+            }
+          }
+          if (el.tagName === "IFRAME") {
+            try {
+              const doc = el.contentDocument;
+              if (doc && doc.body) {
+                const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+                  acceptNode(n) {
+                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    const p = n.parentElement;
+                    if (!p) return NodeFilter.FILTER_REJECT;
+                    const tag = p.tagName;
+                    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                  }
+                });
+                let nn = w.nextNode();
+                while (nn) {
+                  out.push(nn);
+                  if (out.length > 5e3) return;
+                  nn = w.nextNode();
+                }
+              }
+            } catch {
+            }
+          }
+        }
+      };
+      visit(document);
+    } catch {
+    }
+    return out;
+  }
+
+  // content/visual/collect.js
+  function collectVisualTextElements() {
+    let elements2 = getVisibleElements((e, v) => {
+      try {
+        if (e.closest && e.closest(overlaySelectors)) return;
+        if (e.closest && e.closest(
+          ".jari-visual-caret-host, .jari-visual-caret, .jari-hints-host, .jari-hint"
+        ))
+          return;
+        if (e.closest && e.closest(
+          "script, style, noscript, template, head, meta, link, svg, canvas, video, audio, iframe"
+        ))
+          return;
+      } catch {
+      }
+      const raw = e.textContent;
+      if (!raw) return;
+      const text = raw.trim();
+      if (!text || text.length < 3 || text.length > 500) return;
+      const tag = e.tagName;
+      if (tag === "HTML" || tag === "BODY" || tag === "MAIN" || tag === "ARTICLE" || tag === "SECTION") {
+        if (text.length > 200) return;
+      }
+      let hasDirectText = false;
+      for (const n of e.childNodes) {
+        if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 2) {
+          hasDirectText = true;
+          break;
+        }
+      }
+      const isLeaf = e.children.length === 0;
+      let isBlock = false;
+      try {
+        const style = window.getComputedStyle(e);
+        isBlock = style.display === "block" || style.display === "flex" || style.display === "grid" || style.display === "list-item" || style.display === "table-cell";
+        if (style.visibility === "hidden" || style.opacity === "0") return;
+      } catch {
+      }
+      if (!isLeaf && !hasDirectText && !isBlock) return;
+      if (!hasDirectText && text.length < 8 && !isLeaf) return;
+      v.push(e);
+    });
+    elements2 = filterInvisibleElements(elements2);
+    elements2 = elements2.filter((e) => {
+      const r = e.getBoundingClientRect();
+      return r.width >= 16 && r.height >= 8 && r.width * r.height >= 80;
+    });
+    elements2 = filterOverlapElements(elements2);
+    elements2 = filterAncestors(elements2);
+    const scored = elements2.map((el) => {
+      const text = el.textContent.trim();
+      const rect = el.getBoundingClientRect();
+      const area = rect.width * rect.height;
+      let score = 0;
+      if (text.length >= 10 && text.length <= 140) score += 12;
+      else if (text.length > 200) score -= 8;
+      if (text.split(/\s+/).length >= 2) score += 4;
+      if (area > 0 && area < 4e4) score += 6;
+      else if (area >= 1e5) score -= 6;
+      try {
+        if (el.closest && el.closest(
+          "p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd"
+        ))
+          score += 5;
+      } catch {
+      }
+      const hasDirect = Array.from(el.childNodes).some(
+        (n) => n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 3
+      );
+      if (hasDirect) score += 4;
+      return { el, score, area };
+    }).sort((a, b) => b.score - a.score || a.area - b.area);
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const { el } of scored) {
+      if (seen.has(el)) continue;
+      seen.add(el);
+      out.push(el);
+      if (out.length >= 350) break;
+    }
+    if (out.length > 250) {
+      return out.filter((e) => e.textContent.trim().length >= 10).slice(0, 250);
+    }
+    return out;
+  }
+
+  // content/visual/selection.js
   var visualFallbackSpans = [];
-  function isActive4() {
-    return active4 || hintActive;
+  function clearVisualHighlight() {
+    clearHighlightNames("jari-visual");
+    unwrapSpans(visualFallbackSpans);
   }
-  function setFindOpen(handler) {
-    findOpenHandler = handler;
-  }
-  function setFindNav(handler) {
-    findNavHandler = handler;
-  }
-  function pillText(m) {
-    if (m === "caret") return "caret";
-    if (m === "line") return "visual line";
-    return "visual";
-  }
-  function showPill() {
-    if (pillEl) return;
+  function applyVisualHighlight({ active: active7, mode: mode4, getSelection: getSelection2 }) {
+    clearVisualHighlight();
+    if (!active7 || mode4 === "caret") return;
+    const sel = getSelection2();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     try {
-      pillEl = document.createElement("div");
-      pillEl.className = "jari-pill";
-      pillEl.textContent = pillText(mode3);
-      ui.statusContainer().appendChild(pillEl);
+      const range = sel.getRangeAt(0).cloneRange();
+      try {
+        if (detectHighlightSupport()) {
+          CSS.highlights.set("jari-visual", new Highlight(range));
+          return;
+        }
+      } catch {
+      }
+      try {
+        const span = document.createElement("span");
+        span.className = "jari-visual-highlight";
+        range.surroundContents(span);
+        visualFallbackSpans.push(span);
+      } catch {
+        try {
+          const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT
+          );
+          let n = walker.nextNode();
+          while (n) {
+            try {
+              if (!range.intersectsNode || !range.intersectsNode(n)) {
+                n = walker.nextNode();
+                continue;
+              }
+              const nodeRange = document.createRange();
+              nodeRange.selectNodeContents(n);
+              if (range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <= 0 || range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0) {
+                n = walker.nextNode();
+                continue;
+              }
+              const startNode = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? n : range.startContainer;
+              const startOffset = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? 0 : range.startOffset;
+              const endNode = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n : range.endContainer;
+              const endOffset = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n.nodeValue.length : range.endOffset;
+              if (startNode !== n || endNode !== n) {
+                n = walker.nextNode();
+                continue;
+              }
+              const r = document.createRange();
+              r.setStart(
+                n,
+                Math.max(0, Math.min(startOffset, n.nodeValue.length))
+              );
+              r.setEnd(n, Math.max(0, Math.min(endOffset, n.nodeValue.length)));
+              if (r.collapsed) {
+                n = walker.nextNode();
+                continue;
+              }
+              const s = document.createElement("span");
+              s.className = "jari-visual-highlight";
+              r.surroundContents(s);
+              visualFallbackSpans.push(s);
+            } catch {
+            }
+            n = walker.nextNode();
+          }
+        } catch {
+        }
+      }
     } catch {
     }
   }
-  function hidePill() {
-    if (!pillEl) return;
-    try {
-      pillEl.remove();
-    } catch {
-    }
-    pillEl = null;
-  }
-  function getSelection() {
-    return window.getSelection();
-  }
-  function hasModify() {
-    const sel = getSelection();
-    return sel && typeof sel.modify === "function";
-  }
-  function showBlockCaret() {
-    if (caretEl) return;
-    try {
-      caretHost = document.createElement("div");
-      caretHost.className = "jari-visual-caret-host";
-      caretHost.style.position = "fixed";
-      caretHost.style.left = "0";
-      caretHost.style.top = "0";
-      caretHost.style.width = "0";
-      caretHost.style.height = "0";
-      caretHost.style.pointerEvents = "none";
-      caretHost.style.zIndex = "2147483646";
-      try {
-        caretHost.attachShadow({ mode: "open" });
-      } catch {
-        caretHost.shadowRoot = caretHost;
-      }
-      const shadow = caretHost.shadowRoot;
-      const style = document.createElement("style");
-      style.textContent = `
-      .jari-visual-caret {
-        position: absolute;
-        width: 8px;
-        height: 1.2em;
-        background: #e0a363;
-        opacity: 0.85;
-        border: 1px solid #c38a22;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-        pointer-events: none;
-        will-change: transform;
-        backface-visibility: hidden;
-        transform: translate3d(0,0,0);
-      }
-      @media (forced-colors: active) {
-        .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
-      }
-    `;
-      shadow.appendChild(style);
-      caretEl = document.createElement("div");
-      caretEl.className = "jari-visual-caret";
-      shadow.appendChild(caretEl);
-      (document.documentElement || document.body).appendChild(caretHost);
-    } catch {
-    }
-  }
-  function hideBlockCaret() {
-    if (caretHost) {
-      try {
-        caretHost.remove();
-      } catch {
-      }
-      caretHost = null;
-      caretEl = null;
-    } else if (caretEl) {
-      try {
-        caretEl.remove();
-      } catch {
-      }
-      caretEl = null;
-    }
-  }
+
+  // content/visual/caret-geometry.js
   function isUsableCaretRect(rect) {
     return !!rect && Number.isFinite(rect.left) && Number.isFinite(rect.top) && typeof rect.height === "number" && rect.height > 0;
   }
@@ -4876,6 +5044,198 @@
     }
     return out;
   }
+
+  // content/visual/word.js
+  function isWordChar(ch) {
+    return !!ch && /[\p{L}\p{N}_]/u.test(ch);
+  }
+  function findNextWordEnd(count) {
+    const sel = window.getSelection();
+    if (!sel || !sel.focusNode) return null;
+    const startNode = sel.focusNode;
+    const startOffset = sel.focusOffset;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(n2) {
+        const p = n2.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        const tag = p.tagName;
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let nodes = [];
+    let n = walker.nextNode();
+    while (n) {
+      nodes.push(n);
+      n = walker.nextNode();
+    }
+    let startIdx = nodes.indexOf(startNode);
+    if (startIdx === -1) return null;
+    let found = 0;
+    for (let i = startIdx; i < nodes.length; i++) {
+      const node = nodes[i];
+      const txt = node.nodeValue || "";
+      let from = 0;
+      if (i === startIdx) from = startOffset;
+      let pos = from;
+      let inWord = false;
+      while (pos < txt.length) {
+        if (!inWord) {
+          while (pos < txt.length && !isWordChar(txt[pos])) pos++;
+          if (pos >= txt.length) break;
+          inWord = true;
+        } else {
+          while (pos < txt.length && isWordChar(txt[pos])) pos++;
+          if (pos >= txt.length) {
+            const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
+            if (nextTxt && isWordChar(nextTxt[0])) break;
+            if (txt.length === 0) break;
+            const wordEnd2 = txt.length - 1;
+            if (i === startIdx && wordEnd2 <= from) break;
+            found++;
+            if (found === count) {
+              return { node, offset: wordEnd2 };
+            }
+            break;
+          }
+          inWord = false;
+          const wordEnd = pos - 1;
+          if (i === startIdx && wordEnd <= from) continue;
+          found++;
+          if (found === count) {
+            return { node, offset: wordEnd };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // content/visual.js
+  var active4 = false;
+  var mode3 = "visual";
+  var pillEl = null;
+  var pendingCount = "";
+  var pendingG = false;
+  var pendingF = null;
+  var lastF = null;
+  var pendingY = false;
+  var pendingGTimer = null;
+  var pendingYTimer = null;
+  var caretRaf = null;
+  function clearPendingKeyTimers() {
+    if (pendingGTimer !== null) {
+      clearTimeout(pendingGTimer);
+      pendingGTimer = null;
+    }
+    if (pendingYTimer !== null) {
+      clearTimeout(pendingYTimer);
+      pendingYTimer = null;
+    }
+  }
+  var caretEl = null;
+  var caretHost = null;
+  var hintActive = false;
+  var hintElements = [];
+  var hintPrefix = "";
+  var hintHost = null;
+  var hintHolder = null;
+  var hintMap = /* @__PURE__ */ new Map();
+  var pendingVisualMode = "visual";
+  var findOpenHandler = null;
+  var findNavHandler = null;
+  function isActive4() {
+    return active4 || hintActive;
+  }
+  function setFindOpen(handler) {
+    findOpenHandler = handler;
+  }
+  function setFindNav(handler) {
+    findNavHandler = handler;
+  }
+  function pillText(m) {
+    if (m === "caret") return "caret";
+    if (m === "line") return "visual line";
+    return "visual";
+  }
+  function showPill() {
+    if (pillEl) return;
+    try {
+      pillEl = document.createElement("div");
+      pillEl.className = "jari-pill";
+      pillEl.textContent = pillText(mode3);
+      ui.statusContainer().appendChild(pillEl);
+    } catch {
+    }
+  }
+  function hidePill() {
+    if (!pillEl) return;
+    try {
+      pillEl.remove();
+    } catch {
+    }
+    pillEl = null;
+  }
+  function getSelection() {
+    return window.getSelection();
+  }
+  function hasModify() {
+    const sel = getSelection();
+    return sel && typeof sel.modify === "function";
+  }
+  function caretCss() {
+    return `
+      .jari-visual-caret {
+        position: absolute;
+        width: 8px;
+        height: 1.2em;
+        background: #e0a363;
+        opacity: 0.85;
+        border: 1px solid #c38a22;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        pointer-events: none;
+        will-change: transform;
+        backface-visibility: hidden;
+        transform: translate3d(0,0,0);
+      }
+      @media (forced-colors: active) {
+        .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
+      }
+    `;
+  }
+  function showBlockCaret() {
+    if (caretEl) return;
+    try {
+      const created = ui.createShadowHost(
+        "jari-visual-caret-host",
+        caretCss()
+      );
+      caretHost = created.host;
+      const shadow = created.shadow;
+      caretEl = document.createElement("div");
+      caretEl.className = "jari-visual-caret";
+      shadow.appendChild(caretEl);
+    } catch {
+    }
+  }
+  function hideBlockCaret() {
+    if (caretHost) {
+      try {
+        caretHost.remove();
+      } catch {
+      }
+      caretHost = null;
+      caretEl = null;
+    } else if (caretEl) {
+      try {
+        caretEl.remove();
+      } catch {
+      }
+      caretEl = null;
+    }
+  }
   function updateBlockCaretImmediate() {
     if (!active4 || !caretEl || !caretHost) return;
     const sel = getSelection();
@@ -4983,7 +5343,7 @@
     } catch {
     }
     updateBlockCaret();
-    applyVisualHighlight();
+    applyVisualHighlight2();
   }
   function attachCaretListeners() {
     try {
@@ -5047,163 +5407,11 @@
     }
     selectOverrideEl = null;
   }
-  function clearVisualHighlight() {
-    clearHighlightNames("jari-visual");
-    unwrapSpans(visualFallbackSpans);
-  }
-  function applyVisualHighlight() {
+  function clearVisualHighlight2() {
     clearVisualHighlight();
-    if (!active4 || mode3 === "caret") return;
-    const sel = getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    try {
-      const range = sel.getRangeAt(0).cloneRange();
-      try {
-        if (detectHighlightSupport()) {
-          CSS.highlights.set("jari-visual", new Highlight(range));
-          return;
-        }
-      } catch {
-      }
-      try {
-        const span = document.createElement("span");
-        span.className = "jari-visual-highlight";
-        range.surroundContents(span);
-        visualFallbackSpans.push(span);
-      } catch {
-        try {
-          const walker = document.createTreeWalker(
-            document.body,
-            NodeFilter.SHOW_TEXT
-          );
-          let n = walker.nextNode();
-          while (n) {
-            try {
-              if (!range.intersectsNode || !range.intersectsNode(n)) {
-                n = walker.nextNode();
-                continue;
-              }
-              const nodeRange = document.createRange();
-              nodeRange.selectNodeContents(n);
-              if (range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <= 0 || range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0) {
-                n = walker.nextNode();
-                continue;
-              }
-              const startNode = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? n : range.startContainer;
-              const startOffset = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? 0 : range.startOffset;
-              const endNode = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n : range.endContainer;
-              const endOffset = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n.nodeValue.length : range.endOffset;
-              if (startNode !== n || endNode !== n) {
-                n = walker.nextNode();
-                continue;
-              }
-              const r = document.createRange();
-              r.setStart(
-                n,
-                Math.max(0, Math.min(startOffset, n.nodeValue.length))
-              );
-              r.setEnd(n, Math.max(0, Math.min(endOffset, n.nodeValue.length)));
-              if (r.collapsed) {
-                n = walker.nextNode();
-                continue;
-              }
-              const s = document.createElement("span");
-              s.className = "jari-visual-highlight";
-              r.surroundContents(s);
-              visualFallbackSpans.push(s);
-            } catch {
-            }
-            n = walker.nextNode();
-          }
-        } catch {
-        }
-      }
-    } catch {
-    }
   }
-  function collectVisualTextElements() {
-    let elements2 = getVisibleElements((e, v) => {
-      try {
-        if (e.closest && e.closest(overlaySelectors)) return;
-        if (e.closest && e.closest(
-          ".jari-visual-caret-host, .jari-visual-caret, .jari-hints-host, .jari-hint"
-        ))
-          return;
-        if (e.closest && e.closest(
-          "script, style, noscript, template, head, meta, link, svg, canvas, video, audio, iframe"
-        ))
-          return;
-      } catch {
-      }
-      const raw = e.textContent;
-      if (!raw) return;
-      const text = raw.trim();
-      if (!text || text.length < 3 || text.length > 500) return;
-      const tag = e.tagName;
-      if (tag === "HTML" || tag === "BODY" || tag === "MAIN" || tag === "ARTICLE" || tag === "SECTION") {
-        if (text.length > 200) return;
-      }
-      let hasDirectText = false;
-      for (const n of e.childNodes) {
-        if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 2) {
-          hasDirectText = true;
-          break;
-        }
-      }
-      const isLeaf = e.children.length === 0;
-      let isBlock = false;
-      try {
-        const style = window.getComputedStyle(e);
-        isBlock = style.display === "block" || style.display === "flex" || style.display === "grid" || style.display === "list-item" || style.display === "table-cell";
-        if (style.visibility === "hidden" || style.opacity === "0") return;
-      } catch {
-      }
-      if (!isLeaf && !hasDirectText && !isBlock) return;
-      if (!hasDirectText && text.length < 8 && !isLeaf) return;
-      v.push(e);
-    });
-    elements2 = filterInvisibleElements(elements2);
-    elements2 = elements2.filter((e) => {
-      const r = e.getBoundingClientRect();
-      return r.width >= 16 && r.height >= 8 && r.width * r.height >= 80;
-    });
-    elements2 = filterOverlapElements(elements2);
-    elements2 = filterAncestors(elements2);
-    const scored = elements2.map((el) => {
-      const text = el.textContent.trim();
-      const rect = el.getBoundingClientRect();
-      const area = rect.width * rect.height;
-      let score = 0;
-      if (text.length >= 10 && text.length <= 140) score += 12;
-      else if (text.length > 200) score -= 8;
-      if (text.split(/\s+/).length >= 2) score += 4;
-      if (area > 0 && area < 4e4) score += 6;
-      else if (area >= 1e5) score -= 6;
-      try {
-        if (el.closest && el.closest(
-          "p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd"
-        ))
-          score += 5;
-      } catch {
-      }
-      const hasDirect = Array.from(el.childNodes).some(
-        (n) => n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim().length >= 3
-      );
-      if (hasDirect) score += 4;
-      return { el, score, area };
-    }).sort((a, b) => b.score - a.score || a.area - b.area);
-    const seen = /* @__PURE__ */ new Set();
-    const out = [];
-    for (const { el } of scored) {
-      if (seen.has(el)) continue;
-      seen.add(el);
-      out.push(el);
-      if (out.length >= 350) break;
-    }
-    if (out.length > 250) {
-      return out.filter((e) => e.textContent.trim().length >= 10).slice(0, 250);
-    }
-    return out;
+  function applyVisualHighlight2() {
+    applyVisualHighlight({ active: active4, mode: mode3, getSelection });
   }
   function renderHints() {
     if (hintHost) {
@@ -5376,7 +5584,7 @@
     clearPendingKeyTimers();
     ensureVisible();
     updateBlockCaret();
-    applyVisualHighlight();
+    applyVisualHighlight2();
   }
   function extendSelection(direction, granularity) {
     const sel = getSelection();
@@ -5404,9 +5612,6 @@
   }
   function isCaret() {
     return mode3 === "caret";
-  }
-  function isWordChar(ch) {
-    return !!ch && /[\p{L}\p{N}_]/u.test(ch);
   }
   function charAtFocus() {
     const sel = getSelection();
@@ -5703,69 +5908,6 @@
       }
     }
     return fallbackLineBoundary(-1, forCaret);
-  }
-  function findNextWordEnd(count) {
-    const sel = getSelection();
-    if (!sel || !sel.focusNode) return null;
-    const startNode = sel.focusNode;
-    const startOffset = sel.focusOffset;
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode(n2) {
-        const p = n2.parentElement;
-        if (!p) return NodeFilter.FILTER_REJECT;
-        const tag = p.tagName;
-        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
-          return NodeFilter.FILTER_REJECT;
-        }
-        return NodeFilter.FILTER_ACCEPT;
-      }
-    });
-    let nodes = [];
-    let n = walker.nextNode();
-    while (n) {
-      nodes.push(n);
-      n = walker.nextNode();
-    }
-    let startIdx = nodes.indexOf(startNode);
-    if (startIdx === -1) return null;
-    let found = 0;
-    for (let i = startIdx; i < nodes.length; i++) {
-      const node = nodes[i];
-      const txt = node.nodeValue || "";
-      let from = 0;
-      if (i === startIdx) from = startOffset;
-      let pos = from;
-      let inWord = false;
-      while (pos < txt.length) {
-        if (!inWord) {
-          while (pos < txt.length && !isWordChar(txt[pos])) pos++;
-          if (pos >= txt.length) break;
-          inWord = true;
-        } else {
-          while (pos < txt.length && isWordChar(txt[pos])) pos++;
-          if (pos >= txt.length) {
-            const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
-            if (nextTxt && isWordChar(nextTxt[0])) break;
-            if (txt.length === 0) break;
-            const wordEnd2 = txt.length - 1;
-            if (i === startIdx && wordEnd2 <= from) break;
-            found++;
-            if (found === count) {
-              return { node, offset: wordEnd2 };
-            }
-            break;
-          }
-          inWord = false;
-          const wordEnd = pos - 1;
-          if (i === startIdx && wordEnd <= from) continue;
-          found++;
-          if (found === count) {
-            return { node, offset: wordEnd };
-          }
-        }
-      }
-    }
-    return null;
   }
   function fallbackMoveWordEnd(count) {
     const pos = findNextWordEnd(count);
@@ -6402,7 +6544,7 @@
     pendingY = false;
     showBlockCaret();
     attachCaretListeners();
-    clearVisualHighlight();
+    clearVisualHighlight2();
     ensureVisible();
     updateBlockCaret();
   }
@@ -6419,7 +6561,7 @@
     active4 = false;
     hidePill();
     hideBlockCaret();
-    clearVisualHighlight();
+    clearVisualHighlight2();
     detachCaretListeners();
     pendingCount = "";
     pendingG = false;
@@ -6854,7 +6996,7 @@
     pendingF = null;
     pendingY = false;
     clearPendingKeyTimers();
-    clearVisualHighlight();
+    clearVisualHighlight2();
   }
 
   // content/find.js
@@ -6894,39 +7036,6 @@
   }
   function isActive5() {
     return active5;
-  }
-  function hasUpperCase(s) {
-    return /\p{Lu}/u.test(s);
-  }
-  function isOverlayElement(el) {
-    try {
-      return el.closest && el.closest(overlaySelectors);
-    } catch {
-      return false;
-    }
-  }
-  function shouldSkipNode(node) {
-    const parent = node.parentElement;
-    if (!parent) return true;
-    const tag = parent.tagName;
-    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
-    if (isOverlayElement(parent)) return true;
-    if (parent.closest) {
-      try {
-        if (parent.closest(".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host")) return true;
-        if (parent.closest('[aria-hidden="true"]')) return true;
-        if (parent.closest("[hidden]")) return true;
-      } catch {
-      }
-    }
-    try {
-      if (!isElementDrawn(parent)) return true;
-      const style = window.getComputedStyle(parent);
-      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
-      if (parseFloat(style.opacity) < 0.05) return true;
-    } catch {
-    }
-    return false;
   }
   function matchesChanged(a, b) {
     if (a.length !== b.length) return true;
@@ -6988,105 +7097,6 @@
       if (!findObserver) startFindObserver();
     } else {
       stopFindObserver();
-    }
-  }
-  function collectTextNodes() {
-    const out = [];
-    const rootEl = document.body || document.documentElement;
-    if (!rootEl) return out;
-    try {
-      const walker = document.createTreeWalker(
-        rootEl,
-        NodeFilter.SHOW_TEXT,
-        {
-          acceptNode(node2) {
-            if (!node2.nodeValue || !node2.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-            if (shouldSkipNode(node2)) return NodeFilter.FILTER_REJECT;
-            return NodeFilter.FILTER_ACCEPT;
-          }
-        }
-      );
-      let node = walker.nextNode();
-      while (node) {
-        out.push(node);
-        if (out.length > 5e3) break;
-        node = walker.nextNode();
-      }
-    } catch {
-    }
-    try {
-      const visit = (root) => {
-        let els;
-        try {
-          els = root.querySelectorAll("*");
-        } catch {
-          return;
-        }
-        for (const el of els) {
-          if (el.shadowRoot) {
-            try {
-              const sw = document.createTreeWalker(
-                el.shadowRoot,
-                NodeFilter.SHOW_TEXT,
-                {
-                  acceptNode(n) {
-                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                    if (shouldSkipNode(n)) return NodeFilter.FILTER_REJECT;
-                    return NodeFilter.FILTER_ACCEPT;
-                  }
-                }
-              );
-              let sn = sw.nextNode();
-              while (sn) {
-                out.push(sn);
-                if (out.length > 5e3) return;
-                sn = sw.nextNode();
-              }
-              visit(el.shadowRoot);
-            } catch {
-            }
-          }
-          if (el.tagName === "IFRAME") {
-            try {
-              const doc = el.contentDocument;
-              if (doc && doc.body) {
-                const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
-                  acceptNode(n) {
-                    if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                    const p = n.parentElement;
-                    if (!p) return NodeFilter.FILTER_REJECT;
-                    const tag = p.tagName;
-                    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
-                    return NodeFilter.FILTER_ACCEPT;
-                  }
-                });
-                let nn = w.nextNode();
-                while (nn) {
-                  out.push(nn);
-                  if (out.length > 5e3) return;
-                  nn = w.nextNode();
-                }
-              }
-            } catch {
-            }
-          }
-        }
-      };
-      visit(document);
-    } catch {
-    }
-    return out;
-  }
-  function buildMatcher(query4, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
-    if (!query4) return null;
-    const flags = (caseSensitive ? "g" : "gi") + "mu";
-    const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
-    try {
-      if (regex) return new RegExp(wholeWord ? bounds(query4) : query4, flags);
-      const src = query4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return new RegExp(wholeWord ? bounds(src) : src, flags);
-    } catch {
-      return null;
     }
   }
   function buildMatches(query4) {
@@ -7796,9 +7806,9 @@
   };
   function findToggleCommandFor(keymap, combo) {
     try {
-      const cmd = keymap ? keymap[combo] : null;
-      if (cmd && Object.prototype.hasOwnProperty.call(FIND_TOGGLE_COMMANDS, cmd)) {
-        return cmd;
+      const cmd2 = keymap ? keymap[combo] : null;
+      if (cmd2 && Object.prototype.hasOwnProperty.call(FIND_TOGGLE_COMMANDS, cmd2)) {
+        return cmd2;
       }
     } catch {
     }
@@ -8106,9 +8116,9 @@
     const table = commandTable;
     close5();
     if (!item || !table) return;
-    const cmd = table[item.name];
-    if (!cmd || typeof cmd.run !== "function") return;
-    cmd.run({ count: 1 });
+    const cmd2 = table[item.name];
+    if (!cmd2 || typeof cmd2.run !== "function") return;
+    cmd2.run({ count: 1 });
   }
   function onKeyDown6(event) {
     let focused;
@@ -8364,11 +8374,14 @@ ${location.href}`;
     }
     ui.toast(res.bookmarked ? "Bookmarked" : "Bookmark removed");
   }
+  function cmd(name, run2) {
+    return { ...COMMAND_CATALOG[name], run: run2 };
+  }
   var commands = {
-    scrollDown: { ...COMMAND_CATALOG.scrollDown, run: (c) => scrollBy({ y: settings.getScrollStep(), count: c.count }) },
-    scrollUp: { ...COMMAND_CATALOG.scrollUp, run: (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count }) },
-    scrollLeft: { ...COMMAND_CATALOG.scrollLeft, run: (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count }) },
-    scrollRight: { ...COMMAND_CATALOG.scrollRight, run: (c) => scrollBy({ x: settings.getScrollStep(), count: c.count }) },
+    scrollDown: cmd("scrollDown", (c) => scrollBy({ y: settings.getScrollStep(), count: c.count })),
+    scrollUp: cmd("scrollUp", (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count })),
+    scrollLeft: cmd("scrollLeft", (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count })),
+    scrollRight: cmd("scrollRight", (c) => scrollBy({ x: settings.getScrollStep(), count: c.count })),
     scrollToTop: {
       ...COMMAND_CATALOG.scrollToTop,
       run: () => {
@@ -8697,12 +8710,12 @@ ${location.href}`;
     timer = setTimeout(clearPending, timeoutMs);
   }
   function run(commandName, count, event) {
-    const cmd = commands[commandName];
-    if (!cmd) return;
+    const cmd2 = commands[commandName];
+    if (!cmd2) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     Clue.hide();
-    cmd.run({ count: cmd.repeatable ? count : 1, event });
+    cmd2.run({ count: cmd2.repeatable ? count : 1, event });
   }
   function setIgnore(on) {
     ignoreMode = on;
