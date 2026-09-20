@@ -4831,10 +4831,10 @@
     clearHighlightNames("jari-visual");
     unwrapSpans(visualFallbackSpans);
   }
-  function applyVisualHighlight({ active: active7, mode: mode4, getSelection: getSelection2 }) {
+  function applyVisualHighlight({ active: active7, mode: mode4, getSelection: getSelection3 }) {
     clearVisualHighlight();
     if (!active7 || mode4 === "caret") return;
-    const sel = getSelection2();
+    const sel = getSelection3();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     try {
       const range = sel.getRangeAt(0).cloneRange();
@@ -5113,505 +5113,9 @@
     return null;
   }
 
-  // content/visual.js
-  var active4 = false;
-  var mode3 = "visual";
-  var pillEl = null;
-  var pendingCount = "";
-  var pendingG = false;
-  var pendingF = null;
-  var lastF = null;
-  var pendingY = false;
-  var pendingGTimer = null;
-  var pendingYTimer = null;
-  var caretRaf = null;
-  function clearPendingKeyTimers() {
-    if (pendingGTimer !== null) {
-      clearTimeout(pendingGTimer);
-      pendingGTimer = null;
-    }
-    if (pendingYTimer !== null) {
-      clearTimeout(pendingYTimer);
-      pendingYTimer = null;
-    }
-  }
-  var caretEl = null;
-  var caretHost = null;
-  var hintActive = false;
-  var hintElements = [];
-  var hintPrefix = "";
-  var hintHost = null;
-  var hintHolder = null;
-  var hintMap = /* @__PURE__ */ new Map();
-  var pendingVisualMode = "visual";
-  var findOpenHandler = null;
-  var findNavHandler = null;
-  function isActive4() {
-    return active4 || hintActive;
-  }
-  function setFindOpen(handler) {
-    findOpenHandler = handler;
-  }
-  function setFindNav(handler) {
-    findNavHandler = handler;
-  }
-  function pillText(m) {
-    if (m === "caret") return "caret";
-    if (m === "line") return "visual line";
-    return "visual";
-  }
-  function showPill() {
-    if (pillEl) return;
-    try {
-      pillEl = document.createElement("div");
-      pillEl.className = "jari-pill";
-      pillEl.textContent = pillText(mode3);
-      ui.statusContainer().appendChild(pillEl);
-    } catch {
-    }
-  }
-  function hidePill() {
-    if (!pillEl) return;
-    try {
-      pillEl.remove();
-    } catch {
-    }
-    pillEl = null;
-  }
+  // content/visual/motion.js
   function getSelection() {
     return window.getSelection();
-  }
-  function hasModify() {
-    const sel = getSelection();
-    return sel && typeof sel.modify === "function";
-  }
-  function caretCss() {
-    return `
-      .jari-visual-caret {
-        position: absolute;
-        width: 8px;
-        height: 1.2em;
-        background: #e0a363;
-        opacity: 0.85;
-        border: 1px solid #c38a22;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-        pointer-events: none;
-        will-change: transform;
-        backface-visibility: hidden;
-        transform: translate3d(0,0,0);
-      }
-      @media (forced-colors: active) {
-        .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
-      }
-    `;
-  }
-  function showBlockCaret() {
-    if (caretEl) return;
-    try {
-      const created = ui.createShadowHost(
-        "jari-visual-caret-host",
-        caretCss()
-      );
-      caretHost = created.host;
-      const shadow = created.shadow;
-      caretEl = document.createElement("div");
-      caretEl.className = "jari-visual-caret";
-      shadow.appendChild(caretEl);
-    } catch {
-    }
-  }
-  function hideBlockCaret() {
-    if (caretHost) {
-      try {
-        caretHost.remove();
-      } catch {
-      }
-      caretHost = null;
-      caretEl = null;
-    } else if (caretEl) {
-      try {
-        caretEl.remove();
-      } catch {
-      }
-      caretEl = null;
-    }
-  }
-  function updateBlockCaretImmediate() {
-    if (!active4 || !caretEl || !caretHost) return;
-    const sel = getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    try {
-      const range = sel.getRangeAt(0);
-      const focusNode = sel.focusNode;
-      const focusOffset = sel.focusOffset;
-      let collapsed = null;
-      let clientRects = null;
-      try {
-        if (focusNode) {
-          const r = document.createRange();
-          r.setStart(focusNode, focusOffset);
-          r.collapse(true);
-          collapsed = r.getBoundingClientRect();
-          if (!isUsableCaretRect(collapsed)) {
-            try {
-              clientRects = range.getClientRects();
-            } catch {
-              clientRects = null;
-            }
-          }
-        } else {
-          collapsed = range.getBoundingClientRect();
-        }
-      } catch {
-        try {
-          collapsed = range.getBoundingClientRect();
-        } catch {
-          collapsed = null;
-        }
-      }
-      let before = null;
-      let after = null;
-      if (!isUsableCaretRect(collapsed) && !firstUsableRect(clientRects)) {
-        const neighbors = readNeighborCharRects(focusNode, focusOffset);
-        before = neighbors.before;
-        after = neighbors.after;
-      }
-      let parentRect = null;
-      let parentEl = null;
-      if (!isUsableCaretRect(collapsed) && !firstUsableRect(clientRects) && !isUsableCaretRect(before) && !isUsableCaretRect(after)) {
-        try {
-          parentEl = focusNode && focusNode.parentElement ? focusNode.parentElement : null;
-          if (parentEl) {
-            const cr = parentEl.getClientRects();
-            parentRect = (cr && cr.length ? cr[0] : null) || parentEl.getBoundingClientRect();
-          }
-        } catch {
-          parentRect = null;
-        }
-      }
-      const geo = resolveCaretGeometry({
-        collapsed,
-        clientRects,
-        before,
-        after,
-        parentRect,
-        fallbackHeight: parentEl ? lineHeightForElement(parentEl) : 16
-      });
-      if (!geo) return;
-      caretEl.style.transform = `translate3d(${geo.left}px, ${geo.top}px, 0)`;
-      caretEl.style.height = `${Math.max(12, geo.height)}px`;
-      if (mode3 === "line") {
-        caretEl.style.width = `${Math.max(20, geo.width || 0)}px`;
-        caretEl.style.opacity = "0.35";
-      } else {
-        caretEl.style.width = `7px`;
-        caretEl.style.opacity = "0.85";
-      }
-    } catch {
-    }
-  }
-  function updateBlockCaret() {
-    if (caretRaf) return;
-    caretRaf = requestAnimationFrame(() => {
-      caretRaf = null;
-      updateBlockCaretImmediate();
-    });
-  }
-  function ensureVisible() {
-    const sel = getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    try {
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      if (!rect || rect.top === 0 && rect.left === 0 && rect.width === 0 && rect.height === 0) {
-        const node = sel.focusNode;
-        if (node && node.parentElement) {
-          node.parentElement.scrollIntoView({
-            block: "nearest",
-            inline: "nearest"
-          });
-        }
-        return;
-      }
-      const vh = window.innerHeight;
-      const vw = window.innerWidth;
-      if (rect.top < 0 || rect.bottom > vh || rect.left < 0 || rect.right > vw) {
-        const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
-        if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
-        else window.scrollBy(0, rect.top - vh / 2);
-      }
-    } catch {
-    }
-    updateBlockCaret();
-    applyVisualHighlight2();
-  }
-  function attachCaretListeners() {
-    try {
-      window.addEventListener("scroll", updateBlockCaret, {
-        passive: true,
-        capture: true
-      });
-      window.addEventListener("resize", updateBlockCaret, { passive: true });
-      document.addEventListener("scroll", updateBlockCaret, {
-        passive: true,
-        capture: true
-      });
-    } catch {
-      try {
-        window.addEventListener("scroll", updateBlockCaret, true);
-        window.addEventListener("resize", updateBlockCaret);
-        document.addEventListener("scroll", updateBlockCaret, true);
-      } catch {
-      }
-    }
-    enableSelectOverride();
-  }
-  function detachCaretListeners() {
-    try {
-      window.removeEventListener("scroll", updateBlockCaret, { capture: true });
-      window.removeEventListener("resize", updateBlockCaret);
-      document.removeEventListener("scroll", updateBlockCaret, { capture: true });
-    } catch {
-      try {
-        window.removeEventListener("scroll", updateBlockCaret, true);
-        window.removeEventListener("resize", updateBlockCaret);
-        document.removeEventListener("scroll", updateBlockCaret, true);
-      } catch {
-      }
-    }
-    if (caretRaf) {
-      try {
-        cancelAnimationFrame(caretRaf);
-      } catch {
-      }
-      caretRaf = null;
-    }
-    if (!active4 && !hintActive) disableSelectOverride();
-  }
-  var selectOverrideEl = null;
-  function enableSelectOverride() {
-    if (selectOverrideEl) return;
-    try {
-      selectOverrideEl = document.createElement("style");
-      selectOverrideEl.id = "jari-select-override";
-      selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; }`;
-      (document.head || document.documentElement).appendChild(selectOverrideEl);
-    } catch {
-    }
-  }
-  function disableSelectOverride() {
-    if (!selectOverrideEl) return;
-    try {
-      selectOverrideEl.remove();
-    } catch {
-    }
-    selectOverrideEl = null;
-  }
-  function clearVisualHighlight2() {
-    clearVisualHighlight();
-  }
-  function applyVisualHighlight2() {
-    applyVisualHighlight({ active: active4, mode: mode3, getSelection });
-  }
-  function renderHints() {
-    if (hintHost) {
-      try {
-        hintHost.remove();
-      } catch {
-      }
-      hintHost = null;
-      hintHolder = null;
-    }
-    const created = createHintsHost("cyan");
-    hintHost = created.host;
-    hintHolder = created.holder;
-    const charset = normalizeCharset();
-    const labels = genLabels(hintElements.length, charset);
-    hintMap.clear();
-    const hintEls = layoutHints(hintHolder, hintElements, labels);
-    for (const link of hintEls) {
-      hintMap.set(link.label, { el: link.link, hintEl: link });
-    }
-    refreshHints();
-  }
-  function refreshHints() {
-    if (!hintActive) return;
-    for (const [label, obj] of hintMap.entries()) {
-      const hintEl = obj.hintEl;
-      if (!hintPrefix) {
-        hintEl.style.opacity = "1";
-        hintEl.style.display = "";
-        hintEl.classList.remove("jari-hint-hidden");
-        updateHintText(hintEl, label, "");
-      } else if (label.startsWith(hintPrefix)) {
-        hintEl.style.opacity = "1";
-        hintEl.style.display = "";
-        updateHintText(hintEl, label, hintPrefix);
-      } else {
-        hintEl.style.opacity = "0";
-        hintEl.style.display = "none";
-      }
-    }
-  }
-  function showVisualHints(requestedMode) {
-    pendingVisualMode = requestedMode || "visual";
-    const elements2 = collectVisualTextElements();
-    if (elements2.length === 0) {
-      ui.toast("No text to select");
-      return;
-    }
-    hintElements = elements2.length > 300 ? elements2.slice(0, 300) : elements2;
-    hintPrefix = "";
-    hintActive = true;
-    enableSelectOverride();
-    renderHints();
-    if (!pillEl) {
-      try {
-        pillEl = document.createElement("div");
-        pillEl.className = "jari-pill";
-        pillEl.textContent = "visual hint";
-        ui.statusContainer().appendChild(pillEl);
-      } catch {
-      }
-    } else {
-      pillEl.textContent = "visual hint";
-    }
-    ui.toast(`Hints: ${hintElements.length} text targets`);
-  }
-  function closeHints() {
-    if (!hintActive) return;
-    hintActive = false;
-    hintPrefix = "";
-    hintElements = [];
-    hintMap.clear();
-    if (hintHost) {
-      try {
-        hintHost.remove();
-      } catch {
-      }
-      hintHost = null;
-      hintHolder = null;
-    }
-    if (!active4 && !hintActive) disableSelectOverride();
-    if (!active4 && pillEl) {
-      try {
-        pillEl.remove();
-      } catch {
-      }
-      pillEl = null;
-    } else if (active4 && pillEl) {
-      pillEl.textContent = pillText(mode3);
-    }
-  }
-  function activateHintByLabel(label) {
-    const entry = hintMap.get(label);
-    if (!entry) return false;
-    const el = entry.el;
-    closeHints();
-    enterAtElement(el, pendingVisualMode);
-    return true;
-  }
-  function enterAtElement(el, newMode) {
-    if (active4) close4(false);
-    mode3 = newMode || "visual";
-    let range;
-    try {
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-        acceptNode(node) {
-          if (!node.nodeValue || !node.nodeValue.trim())
-            return NodeFilter.FILTER_REJECT;
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      });
-      const first = walker.nextNode();
-      if (first) {
-        range = document.createRange();
-        range.setStart(first, 0);
-        range.collapse(true);
-      } else {
-        range = document.createRange();
-        range.selectNodeContents(el);
-        range.collapse(true);
-      }
-    } catch {
-      range = document.createRange();
-      range.selectNodeContents(el);
-      range.collapse(true);
-    }
-    const sel = window.getSelection();
-    if (!sel) return;
-    try {
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch {
-    }
-    if (mode3 !== "line" && sel.isCollapsed) {
-      if (hasModify()) {
-        try {
-          sel.modify("extend", "forward", "character");
-        } catch {
-        }
-      }
-    }
-    if (mode3 !== "line" && sel.isCollapsed) {
-      ui.toast("No text to select");
-    }
-    if (mode3 === "line") {
-      try {
-        if (hasModify()) {
-          sel.modify("extend", "forward", "lineboundary");
-        } else {
-          const r2 = document.createRange();
-          r2.selectNodeContents(el);
-          sel.removeAllRanges();
-          sel.addRange(r2);
-        }
-      } catch {
-        const r2 = document.createRange();
-        r2.selectNodeContents(el);
-        sel.removeAllRanges();
-        sel.addRange(r2);
-      }
-    }
-    active4 = true;
-    showPill();
-    showBlockCaret();
-    attachCaretListeners();
-    pendingCount = "";
-    pendingG = false;
-    pendingF = null;
-    pendingY = false;
-    clearPendingKeyTimers();
-    ensureVisible();
-    updateBlockCaret();
-    applyVisualHighlight2();
-  }
-  function extendSelection(direction, granularity) {
-    const sel = getSelection();
-    if (!sel) return false;
-    if (hasModify()) {
-      try {
-        sel.modify("extend", direction, granularity);
-        return true;
-      } catch {
-      }
-    }
-    return false;
-  }
-  function moveCaret(direction, granularity) {
-    const sel = getSelection();
-    if (!sel) return false;
-    if (hasModify()) {
-      try {
-        sel.modify("move", direction, granularity);
-        return true;
-      } catch {
-      }
-    }
-    return false;
-  }
-  function isCaret() {
-    return mode3 === "caret";
   }
   function charAtFocus() {
     const sel = getSelection();
@@ -5662,19 +5166,6 @@
       el = el.parentElement;
     }
     return node && node.parentElement ? node.parentElement : document.body;
-  }
-  function doMoveChar(dir) {
-    if (isCaret()) {
-      const ok2 = moveCaret(dir < 0 ? "left" : "right", "character");
-      if (!ok2) fallbackMoveCaret(dir);
-      ensureVisible();
-      updateBlockCaret();
-      return;
-    }
-    const ok = extendSelection(dir < 0 ? "left" : "right", "character");
-    if (!ok) fallbackMoveChar(dir);
-    ensureVisible();
-    updateBlockCaret();
   }
   function fallbackMoveChar(dir) {
     const sel = getSelection();
@@ -5852,13 +5343,527 @@
       const prevNode = getSelection().focusNode;
       const prevOff = getSelection().focusOffset;
       fallbackMoveChar(dir);
-      const sel = getSelection();
-      if (sel.focusNode === prevNode && sel.focusOffset === prevOff) return false;
+      const s = getSelection();
+      if (s.focusNode === prevNode && s.focusOffset === prevOff) return false;
     }
     return false;
   }
+
+  // content/visual.js
+  var active4 = false;
+  var mode3 = "visual";
+  var pillEl = null;
+  var pendingCount = "";
+  var pendingG = false;
+  var pendingF = null;
+  var lastF = null;
+  var pendingY = false;
+  var pendingGTimer = null;
+  var pendingYTimer = null;
+  var caretRaf = null;
+  function clearPendingKeyTimers() {
+    if (pendingGTimer !== null) {
+      clearTimeout(pendingGTimer);
+      pendingGTimer = null;
+    }
+    if (pendingYTimer !== null) {
+      clearTimeout(pendingYTimer);
+      pendingYTimer = null;
+    }
+  }
+  var caretEl = null;
+  var caretHost = null;
+  var hintActive = false;
+  var hintElements = [];
+  var hintPrefix = "";
+  var hintHost = null;
+  var hintHolder = null;
+  var hintMap = /* @__PURE__ */ new Map();
+  var pendingVisualMode = "visual";
+  var findOpenHandler = null;
+  var findNavHandler = null;
+  function isActive4() {
+    return active4 || hintActive;
+  }
+  function setFindOpen(handler) {
+    findOpenHandler = handler;
+  }
+  function setFindNav(handler) {
+    findNavHandler = handler;
+  }
+  function pillText(m) {
+    if (m === "caret") return "caret";
+    if (m === "line") return "visual line";
+    return "visual";
+  }
+  function showPill() {
+    if (pillEl) return;
+    try {
+      pillEl = document.createElement("div");
+      pillEl.className = "jari-pill";
+      pillEl.textContent = pillText(mode3);
+      ui.statusContainer().appendChild(pillEl);
+    } catch {
+    }
+  }
+  function hidePill() {
+    if (!pillEl) return;
+    try {
+      pillEl.remove();
+    } catch {
+    }
+    pillEl = null;
+  }
+  function getSelection2() {
+    return window.getSelection();
+  }
+  function hasModify() {
+    const sel = getSelection2();
+    return sel && typeof sel.modify === "function";
+  }
+  function caretCss() {
+    return `
+      .jari-visual-caret {
+        position: absolute;
+        width: 8px;
+        height: 1.2em;
+        background: #e0a363;
+        opacity: 0.85;
+        border: 1px solid #c38a22;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        pointer-events: none;
+        will-change: transform;
+        backface-visibility: hidden;
+        transform: translate3d(0,0,0);
+      }
+      @media (forced-colors: active) {
+        .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
+      }
+    `;
+  }
+  function showBlockCaret() {
+    if (caretEl) return;
+    try {
+      const created = ui.createShadowHost(
+        "jari-visual-caret-host",
+        caretCss()
+      );
+      caretHost = created.host;
+      const shadow = created.shadow;
+      caretEl = document.createElement("div");
+      caretEl.className = "jari-visual-caret";
+      shadow.appendChild(caretEl);
+    } catch {
+    }
+  }
+  function hideBlockCaret() {
+    if (caretHost) {
+      try {
+        caretHost.remove();
+      } catch {
+      }
+      caretHost = null;
+      caretEl = null;
+    } else if (caretEl) {
+      try {
+        caretEl.remove();
+      } catch {
+      }
+      caretEl = null;
+    }
+  }
+  function updateBlockCaretImmediate() {
+    if (!active4 || !caretEl || !caretHost) return;
+    const sel = getSelection2();
+    if (!sel || sel.rangeCount === 0) return;
+    try {
+      const range = sel.getRangeAt(0);
+      const focusNode = sel.focusNode;
+      const focusOffset = sel.focusOffset;
+      let collapsed = null;
+      let clientRects = null;
+      try {
+        if (focusNode) {
+          const r = document.createRange();
+          r.setStart(focusNode, focusOffset);
+          r.collapse(true);
+          collapsed = r.getBoundingClientRect();
+          if (!isUsableCaretRect(collapsed)) {
+            try {
+              clientRects = range.getClientRects();
+            } catch {
+              clientRects = null;
+            }
+          }
+        } else {
+          collapsed = range.getBoundingClientRect();
+        }
+      } catch {
+        try {
+          collapsed = range.getBoundingClientRect();
+        } catch {
+          collapsed = null;
+        }
+      }
+      let before = null;
+      let after = null;
+      if (!isUsableCaretRect(collapsed) && !firstUsableRect(clientRects)) {
+        const neighbors = readNeighborCharRects(focusNode, focusOffset);
+        before = neighbors.before;
+        after = neighbors.after;
+      }
+      let parentRect = null;
+      let parentEl = null;
+      if (!isUsableCaretRect(collapsed) && !firstUsableRect(clientRects) && !isUsableCaretRect(before) && !isUsableCaretRect(after)) {
+        try {
+          parentEl = focusNode && focusNode.parentElement ? focusNode.parentElement : null;
+          if (parentEl) {
+            const cr = parentEl.getClientRects();
+            parentRect = (cr && cr.length ? cr[0] : null) || parentEl.getBoundingClientRect();
+          }
+        } catch {
+          parentRect = null;
+        }
+      }
+      const geo = resolveCaretGeometry({
+        collapsed,
+        clientRects,
+        before,
+        after,
+        parentRect,
+        fallbackHeight: parentEl ? lineHeightForElement(parentEl) : 16
+      });
+      if (!geo) return;
+      caretEl.style.transform = `translate3d(${geo.left}px, ${geo.top}px, 0)`;
+      caretEl.style.height = `${Math.max(12, geo.height)}px`;
+      if (mode3 === "line") {
+        caretEl.style.width = `${Math.max(20, geo.width || 0)}px`;
+        caretEl.style.opacity = "0.35";
+      } else {
+        caretEl.style.width = `7px`;
+        caretEl.style.opacity = "0.85";
+      }
+    } catch {
+    }
+  }
+  function updateBlockCaret() {
+    if (caretRaf) return;
+    caretRaf = requestAnimationFrame(() => {
+      caretRaf = null;
+      updateBlockCaretImmediate();
+    });
+  }
+  function ensureVisible() {
+    const sel = getSelection2();
+    if (!sel || sel.rangeCount === 0) return;
+    try {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (!rect || rect.top === 0 && rect.left === 0 && rect.width === 0 && rect.height === 0) {
+        const node = sel.focusNode;
+        if (node && node.parentElement) {
+          node.parentElement.scrollIntoView({
+            block: "nearest",
+            inline: "nearest"
+          });
+        }
+        return;
+      }
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      if (rect.top < 0 || rect.bottom > vh || rect.left < 0 || rect.right > vw) {
+        const el = sel.focusNode && sel.focusNode.parentElement ? sel.focusNode.parentElement : null;
+        if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+        else window.scrollBy(0, rect.top - vh / 2);
+      }
+    } catch {
+    }
+    updateBlockCaret();
+    applyVisualHighlight2();
+  }
+  function attachCaretListeners() {
+    try {
+      window.addEventListener("scroll", updateBlockCaret, {
+        passive: true,
+        capture: true
+      });
+      window.addEventListener("resize", updateBlockCaret, { passive: true });
+      document.addEventListener("scroll", updateBlockCaret, {
+        passive: true,
+        capture: true
+      });
+    } catch {
+      try {
+        window.addEventListener("scroll", updateBlockCaret, true);
+        window.addEventListener("resize", updateBlockCaret);
+        document.addEventListener("scroll", updateBlockCaret, true);
+      } catch {
+      }
+    }
+    enableSelectOverride();
+  }
+  function detachCaretListeners() {
+    try {
+      window.removeEventListener("scroll", updateBlockCaret, { capture: true });
+      window.removeEventListener("resize", updateBlockCaret);
+      document.removeEventListener("scroll", updateBlockCaret, { capture: true });
+    } catch {
+      try {
+        window.removeEventListener("scroll", updateBlockCaret, true);
+        window.removeEventListener("resize", updateBlockCaret);
+        document.removeEventListener("scroll", updateBlockCaret, true);
+      } catch {
+      }
+    }
+    if (caretRaf) {
+      try {
+        cancelAnimationFrame(caretRaf);
+      } catch {
+      }
+      caretRaf = null;
+    }
+    if (!active4 && !hintActive) disableSelectOverride();
+  }
+  var selectOverrideEl = null;
+  function enableSelectOverride() {
+    if (selectOverrideEl) return;
+    try {
+      selectOverrideEl = document.createElement("style");
+      selectOverrideEl.id = "jari-select-override";
+      selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; }`;
+      (document.head || document.documentElement).appendChild(selectOverrideEl);
+    } catch {
+    }
+  }
+  function disableSelectOverride() {
+    if (!selectOverrideEl) return;
+    try {
+      selectOverrideEl.remove();
+    } catch {
+    }
+    selectOverrideEl = null;
+  }
+  function clearVisualHighlight2() {
+    clearVisualHighlight();
+  }
+  function applyVisualHighlight2() {
+    applyVisualHighlight({ active: active4, mode: mode3, getSelection: getSelection2 });
+  }
+  function renderHints() {
+    if (hintHost) {
+      try {
+        hintHost.remove();
+      } catch {
+      }
+      hintHost = null;
+      hintHolder = null;
+    }
+    const created = createHintsHost("cyan");
+    hintHost = created.host;
+    hintHolder = created.holder;
+    const charset = normalizeCharset();
+    const labels = genLabels(hintElements.length, charset);
+    hintMap.clear();
+    const hintEls = layoutHints(hintHolder, hintElements, labels);
+    for (const link of hintEls) {
+      hintMap.set(link.label, { el: link.link, hintEl: link });
+    }
+    refreshHints();
+  }
+  function refreshHints() {
+    if (!hintActive) return;
+    for (const [label, obj] of hintMap.entries()) {
+      const hintEl = obj.hintEl;
+      if (!hintPrefix) {
+        hintEl.style.opacity = "1";
+        hintEl.style.display = "";
+        hintEl.classList.remove("jari-hint-hidden");
+        updateHintText(hintEl, label, "");
+      } else if (label.startsWith(hintPrefix)) {
+        hintEl.style.opacity = "1";
+        hintEl.style.display = "";
+        updateHintText(hintEl, label, hintPrefix);
+      } else {
+        hintEl.style.opacity = "0";
+        hintEl.style.display = "none";
+      }
+    }
+  }
+  function showVisualHints(requestedMode) {
+    pendingVisualMode = requestedMode || "visual";
+    const elements2 = collectVisualTextElements();
+    if (elements2.length === 0) {
+      ui.toast("No text to select");
+      return;
+    }
+    hintElements = elements2.length > 300 ? elements2.slice(0, 300) : elements2;
+    hintPrefix = "";
+    hintActive = true;
+    enableSelectOverride();
+    renderHints();
+    if (!pillEl) {
+      try {
+        pillEl = document.createElement("div");
+        pillEl.className = "jari-pill";
+        pillEl.textContent = "visual hint";
+        ui.statusContainer().appendChild(pillEl);
+      } catch {
+      }
+    } else {
+      pillEl.textContent = "visual hint";
+    }
+    ui.toast(`Hints: ${hintElements.length} text targets`);
+  }
+  function closeHints() {
+    if (!hintActive) return;
+    hintActive = false;
+    hintPrefix = "";
+    hintElements = [];
+    hintMap.clear();
+    if (hintHost) {
+      try {
+        hintHost.remove();
+      } catch {
+      }
+      hintHost = null;
+      hintHolder = null;
+    }
+    if (!active4 && !hintActive) disableSelectOverride();
+    if (!active4 && pillEl) {
+      try {
+        pillEl.remove();
+      } catch {
+      }
+      pillEl = null;
+    } else if (active4 && pillEl) {
+      pillEl.textContent = pillText(mode3);
+    }
+  }
+  function activateHintByLabel(label) {
+    const entry = hintMap.get(label);
+    if (!entry) return false;
+    const el = entry.el;
+    closeHints();
+    enterAtElement(el, pendingVisualMode);
+    return true;
+  }
+  function enterAtElement(el, newMode) {
+    if (active4) close4(false);
+    mode3 = newMode || "visual";
+    let range;
+    try {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          if (!node.nodeValue || !node.nodeValue.trim())
+            return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      const first = walker.nextNode();
+      if (first) {
+        range = document.createRange();
+        range.setStart(first, 0);
+        range.collapse(true);
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(true);
+      }
+    } catch {
+      range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(true);
+    }
+    const sel = window.getSelection();
+    if (!sel) return;
+    try {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch {
+    }
+    if (mode3 !== "line" && sel.isCollapsed) {
+      if (hasModify()) {
+        try {
+          sel.modify("extend", "forward", "character");
+        } catch {
+        }
+      }
+    }
+    if (mode3 !== "line" && sel.isCollapsed) {
+      ui.toast("No text to select");
+    }
+    if (mode3 === "line") {
+      try {
+        if (hasModify()) {
+          sel.modify("extend", "forward", "lineboundary");
+        } else {
+          const r2 = document.createRange();
+          r2.selectNodeContents(el);
+          sel.removeAllRanges();
+          sel.addRange(r2);
+        }
+      } catch {
+        const r2 = document.createRange();
+        r2.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(r2);
+      }
+    }
+    active4 = true;
+    showPill();
+    showBlockCaret();
+    attachCaretListeners();
+    pendingCount = "";
+    pendingG = false;
+    pendingF = null;
+    pendingY = false;
+    clearPendingKeyTimers();
+    ensureVisible();
+    updateBlockCaret();
+    applyVisualHighlight2();
+  }
+  function extendSelection(direction, granularity) {
+    const sel = getSelection2();
+    if (!sel) return false;
+    if (hasModify()) {
+      try {
+        sel.modify("extend", direction, granularity);
+        return true;
+      } catch {
+      }
+    }
+    return false;
+  }
+  function moveCaret(direction, granularity) {
+    const sel = getSelection2();
+    if (!sel) return false;
+    if (hasModify()) {
+      try {
+        sel.modify("move", direction, granularity);
+        return true;
+      } catch {
+      }
+    }
+    return false;
+  }
+  function isCaret() {
+    return mode3 === "caret";
+  }
+  function doMoveChar(dir) {
+    if (isCaret()) {
+      const ok2 = moveCaret(dir < 0 ? "left" : "right", "character");
+      if (!ok2) fallbackMoveCaret(dir);
+      ensureVisible();
+      updateBlockCaret();
+      return;
+    }
+    const ok = extendSelection(dir < 0 ? "left" : "right", "character");
+    if (!ok) fallbackMoveChar(dir);
+    ensureVisible();
+    updateBlockCaret();
+  }
   function fallbackLineBoundary(dir, forCaret) {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || !sel.focusNode) return false;
     const block = getBlockAncestor(sel.focusNode);
     if (!block) return false;
@@ -5892,7 +5897,7 @@
     return true;
   }
   function fallbackFirstNonBlank(forCaret) {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || !sel.focusNode) return false;
     const block = getBlockAncestor(sel.focusNode);
     if (!block) return false;
@@ -5935,7 +5940,7 @@
     return true;
   }
   function fallbackMoveLine(dir, forCaret) {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || sel.rangeCount === 0) return false;
     try {
       const range = sel.getRangeAt(0);
@@ -5988,7 +5993,7 @@
     } catch {
     }
     try {
-      const curRect = getSelection().getRangeAt(0).getBoundingClientRect();
+      const curRect = getSelection2().getRangeAt(0).getBoundingClientRect();
       const candidates = collectVisualTextElements();
       let best = null;
       let bestDist = Infinity;
@@ -6172,7 +6177,7 @@
     const forCaret = isCaret();
     if (!fallbackFirstNonBlank(forCaret)) {
       doLineBoundary(-1);
-      const sel = getSelection();
+      const sel = getSelection2();
       if (sel && sel.focusNode && sel.focusNode.nodeType === Node.TEXT_NODE) {
         const node = sel.focusNode;
         const off = sel.focusOffset;
@@ -6187,7 +6192,7 @@
     }
   }
   function swapAnchorFocus() {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || sel.rangeCount === 0) return;
     const anchorNode = sel.anchorNode;
     const anchorOffset = sel.anchorOffset;
@@ -6215,7 +6220,7 @@
     }
   }
   function yankSelection() {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel) return;
     const text = sel.toString();
     if (!text) {
@@ -6230,7 +6235,7 @@
     return text.replace(/[\r\n]+$/, "");
   }
   function yankLinesFromCaret(count) {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || !sel.focusNode) {
       ui.toast("No line");
       return;
@@ -6280,7 +6285,7 @@
     );
   }
   function yankLineFromCaret() {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || !sel.focusNode) {
       ui.toast("No line");
       return;
@@ -6333,7 +6338,7 @@
     );
   }
   function getCaretLinkElement() {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || !sel.focusNode) return null;
     const el = sel.focusNode.parentElement || sel.focusNode.parentNode || null;
     return getLinkAncestor(el);
@@ -6351,7 +6356,7 @@
     return true;
   }
   function handleFChar(ch) {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel) return;
     const focusNode = sel.focusNode;
     const focusOffset = sel.focusOffset;
@@ -6438,7 +6443,7 @@
     pendingF = null;
   }
   function moveToPosition(node, offset) {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel) return;
     offset = Math.max(
       0,
@@ -6483,7 +6488,7 @@
     updateBlockCaret();
   }
   function expandSelectionToFullLines() {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !hasModify()) {
       return false;
     }
@@ -6518,7 +6523,7 @@
     return c;
   }
   function collapseToFocus() {
-    const sel = getSelection();
+    const sel = getSelection2();
     if (!sel || sel.rangeCount === 0) return;
     try {
       const focusNode = sel.focusNode;
@@ -6569,7 +6574,7 @@
     pendingY = false;
     clearPendingKeyTimers();
     if (!keepSelection) {
-      const sel = getSelection();
+      const sel = getSelection2();
       if (sel) {
         try {
           sel.removeAllRanges();
@@ -6771,7 +6776,7 @@
       }
       if (key === "v" || key === "V") {
         ui.consume(event);
-        const sel = getSelection();
+        const sel = getSelection2();
         if (key === "v") {
           mode3 = "visual";
           if (pillEl) pillEl.textContent = pillText(mode3);
