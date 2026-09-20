@@ -8,10 +8,7 @@ import {
   createHintsHost,
   layoutHints,
 } from "./hint-layer.js";
-import {
-  getRealRect,
-  getLinkAncestor,
-} from "./hints-elements.js";
+import { getLinkAncestor } from "./hints-elements.js";
 import { collectVisualTextElements } from "./visual/collect.js";
 import {
   clearVisualHighlight as selClear,
@@ -26,11 +23,16 @@ import {
 } from "./visual/caret-geometry.js";
 import { isWordChar, findNextWordEnd } from "./visual/word.js";
 import {
-  getBlockAncestor,
   fallbackMoveChar,
   fallbackMoveCaret,
   fallbackMoveWord,
   fallbackExtendWord,
+  fallbackLineBoundary,
+  fallbackFirstNonBlank,
+  fallbackDocBoundary,
+  fallbackMoveWordEnd,
+  fallbackExtendWordEnd,
+  fallbackMoveLine,
 } from "./visual/motion.js";
 
 let active = false;
@@ -569,201 +571,10 @@ function doMoveChar(dir) {
   updateBlockCaret();
 }
 
-function fallbackLineBoundary(dir, forCaret) {
-  const sel = getSelection();
-  if (!sel || !sel.focusNode) return false;
-  const block = getBlockAncestor(sel.focusNode);
-  if (!block) return false;
-  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) {
-      if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-  let first = null,
-    last = null,
-    node;
-  while ((node = walker.nextNode())) {
-    if (!first) first = node;
-    last = node;
-  }
-  if (!first || !last) return false;
-  let targetNode, targetOffset;
-  if (dir < 0) {
-    targetNode = first;
-    targetOffset = 0;
-    if (!forCaret) {
-      const txt = targetNode.nodeValue;
-      let off = 0;
-      while (off < txt.length && /\s/.test(txt[off])) off++;
-      targetOffset = off;
-    }
-  } else {
-    targetNode = last;
-    targetOffset = last.nodeValue.length;
-  }
-  moveToPosition(targetNode, targetOffset);
-  return true;
-}
-function fallbackFirstNonBlank(forCaret) {
-  const sel = getSelection();
-  if (!sel || !sel.focusNode) return false;
-  const block = getBlockAncestor(sel.focusNode);
-  if (!block) return false;
-  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-  let node;
-  while ((node = walker.nextNode())) {
-    const txt = node.nodeValue;
-    for (let i = 0; i < txt.length; i++) {
-      if (!/\s/.test(txt[i])) {
-        moveToPosition(node, i);
-        return true;
-      }
-    }
-  }
-  return fallbackLineBoundary(-1, forCaret);
-}
-function fallbackMoveWordEnd(count) {
-  const pos = findNextWordEnd(count);
-  if (!pos) return false;
-  moveToPosition(pos.node, pos.offset);
-  return true;
-}
-function fallbackExtendWordEnd(count) {
-  const pos = findNextWordEnd(count);
-  if (!pos) return false;
-  moveToPosition(pos.node, pos.offset + 1);
-  return true;
-}
-function fallbackDocBoundary(dir) {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  let first = null,
-    last = null,
-    n;
-  while ((n = walker.nextNode())) {
-    if (!n.nodeValue.trim()) continue;
-    if (!first) first = n;
-    last = n;
-  }
-  if (!first || !last) return false;
-  if (dir < 0) moveToPosition(first, 0);
-  else moveToPosition(last, last.nodeValue.length);
-  return true;
-}
-function fallbackMoveLine(dir, forCaret) {
-  const sel = getSelection();
-  if (!sel || sel.rangeCount === 0) return false;
-  try {
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    if (!rect) return false;
-    const x = rect.left + 2;
-    const lineH = Math.max(12, rect.height) || 16;
-    const y = dir < 0 ? rect.top - lineH * 0.6 : rect.bottom + lineH * 0.6;
-    let newRange = null;
-    if (document.caretRangeFromPoint) {
-      newRange = document.caretRangeFromPoint(x, y);
-    } else if (document.caretPositionFromPoint) {
-      const pos = document.caretPositionFromPoint(x, y);
-      if (pos) {
-        newRange = document.createRange();
-        newRange.setStart(pos.offsetNode, pos.offset);
-        newRange.collapse(true);
-      }
-    }
-    const origNode = sel.focusNode;
-    const origOff = sel.focusOffset;
-    if (
-      newRange &&
-      !(
-        newRange.startContainer === origNode && newRange.startOffset === origOff
-      )
-    ) {
-      if (forCaret) {
-        newRange.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-      } else {
-        const anchorNode = sel.anchorNode;
-        const anchorOffset = sel.anchorOffset;
-        if (anchorNode && typeof sel.extend === "function") {
-          try {
-            sel.extend(newRange.startContainer, newRange.startOffset);
-            return true;
-          } catch {}
-        }
-        const r = document.createRange();
-        try {
-          r.setStart(anchorNode, anchorOffset);
-          r.setEnd(newRange.startContainer, newRange.startOffset);
-        } catch {
-          r.setStart(newRange.startContainer, newRange.startOffset);
-          r.setEnd(anchorNode, anchorOffset);
-        }
-        sel.removeAllRanges();
-        sel.addRange(r);
-      }
-      return true;
-    }
-  } catch {}
-  try {
-    const curRect = getSelection().getRangeAt(0).getBoundingClientRect();
-    const candidates = collectVisualTextElements();
-    let best = null;
-    let bestDist = Infinity;
-    for (const el of candidates) {
-      const r = getRealRect(el);
-      if (!r || r.width < 5 || r.height < 5) continue;
-      if (dir < 0) {
-        if (r.bottom >= curRect.top - 2) continue;
-        const vDist = curRect.top - r.bottom;
-        const hDist = Math.abs(
-          r.left + r.width / 2 - (curRect.left + curRect.width / 2),
-        );
-        const dist = vDist * 1.2 + hDist * 0.3;
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = el;
-        }
-      } else {
-        if (r.top <= curRect.bottom + 2) continue;
-        const vDist = r.top - curRect.bottom;
-        const hDist = Math.abs(
-          r.left + r.width / 2 - (curRect.left + curRect.width / 2),
-        );
-        const dist = vDist * 1.2 + hDist * 0.3;
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = el;
-        }
-      }
-    }
-    if (best) {
-      const walker = document.createTreeWalker(best, NodeFilter.SHOW_TEXT, {
-        acceptNode(n) {
-          if (!n.nodeValue || !n.nodeValue.trim())
-            return NodeFilter.FILTER_REJECT;
-          return NodeFilter.FILTER_ACCEPT;
-        },
-      });
-      let first = walker.nextNode();
-      if (!first) return false;
-      const targetNode =
-        dir < 0
-          ? (() => {
-              let last = first;
-              let n2;
-              while ((n2 = walker.nextNode())) last = n2;
-              return last;
-            })()
-          : first;
-      const targetOffset = dir < 0 ? targetNode.nodeValue.length : 0;
-      moveToPosition(targetNode, targetOffset);
-      return true;
-    }
-  } catch {}
-  return false;
-}
+
+
+
+
 
 function doMoveLine(dir) {
   if (isCaret()) {
@@ -799,7 +610,7 @@ function doMoveWord(dir) {
 
 function doMoveWordEnd() {
   if (isCaret()) {
-    if (!fallbackMoveWordEnd(1)) {
+    if (!fallbackMoveWordEnd(1, true)) {
       let ok = moveCaret("forward", "word");
       if (ok) {
         if (!moveCaret("backward", "character")) fallbackMoveCaret(-1);
@@ -811,7 +622,7 @@ function doMoveWordEnd() {
     updateBlockCaret();
     return;
   }
-  if (!fallbackExtendWordEnd(1)) {
+  if (!fallbackExtendWordEnd(1, false)) {
     let ok = extendSelection("forward", "word");
     if (ok) {
       if (!extendSelection("backward", "character")) fallbackMoveChar(-1);
@@ -844,13 +655,13 @@ function doDocBoundary(dir) {
   const gran = "documentboundary";
   if (isCaret()) {
     let ok = moveCaret(dir < 0 ? "backward" : "forward", gran);
-    if (!ok) fallbackDocBoundary(dir);
+    if (!ok) fallbackDocBoundary(dir, true);
     ensureVisible();
     updateBlockCaret();
     return;
   }
   let ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
-  if (!ok) fallbackDocBoundary(dir);
+  if (!ok) fallbackDocBoundary(dir, false);
   ensureVisible();
   updateBlockCaret();
 }
