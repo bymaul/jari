@@ -48,6 +48,8 @@ source (repo convention).
   mode orchestrator
 - `content/find/` - find subsystems (`matcher.js` `buildMatcher`/`hasUpperCase`,
   `collect.js` `collectTextNodes`); `content/find.js` is the bar + highlights
+- `content/prompt/` - prompt subsystems (`shared.js` `promptCss`/`renderText`);
+  `content/prompt.js` omnibar + `content/palette.js` command palette share it
 - `content/scroll.js` - scroll target + smooth queue (`smoothScrollBy`,
   `shouldSmooth`, `cycle`/`reset`); `content/commands.js` now imports smooth helpers
 - `background/` - service-worker source (`main.js` + `handlers.js` aggregator,
