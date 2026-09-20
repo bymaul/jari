@@ -50,7 +50,9 @@ source (repo convention).
   `collect.js` `collectTextNodes`); `content/find.js` is the bar + highlights
 - `content/scroll.js` - scroll target + smooth queue (`smoothScrollBy`,
   `shouldSmooth`, `cycle`/`reset`); `content/commands.js` now imports smooth helpers
-- `background/` - service-worker source (`main.js` + `handlers.js`),
+- `background/` - service-worker source (`main.js` + `handlers.js` aggregator,
+  `tabs.js` tab ops, `bookmarks.js` bookmarks, `suggest.js` suggest/search,
+  `windows.js` window focus, `utils.js` `clampCount`/`getStoredSettings`);
   `shared/` - `url.js` (URL parsing, scheme policy) + `tlds.js` (known TLD set) + `constants.js`
 - `options/` - options page (`options.js` main, `engines.js` search engines,
   `pagenav.js` page nav texts); `tests/setup.mjs` - shared chrome/DOM stubs
