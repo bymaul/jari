@@ -1541,12 +1541,151 @@
     );
   }
 
+  // options/pagenav.js
+  var pagenavNextEl = document.querySelector("#pagenav-next");
+  var pagenavPrevEl = document.querySelector("#pagenav-prev");
+  var resetPagenavBtn = document.querySelector("#reset-pagenav");
+  var statusEl2 = document.querySelector("#status");
+  var saveStateEl2 = document.querySelector("#save-state");
+  function setSaveState2(mode, message) {
+    if (!saveStateEl2) return;
+    saveStateEl2.classList.remove("saving", "failed", "warn");
+    if (mode === "saving") {
+      saveStateEl2.classList.add("saving");
+      saveStateEl2.textContent = message || "Saving...";
+    } else if (mode === "failed") {
+      saveStateEl2.classList.add("failed");
+      saveStateEl2.textContent = message || "Save failed \u2014 will retry on next change";
+    } else if (mode === "warn") {
+      saveStateEl2.classList.add("warn");
+      saveStateEl2.textContent = message || "Saved locally";
+    } else {
+      saveStateEl2.textContent = message || "All changes saved";
+    }
+  }
+  function savedState2() {
+    if (settings.isPersistedLocally()) {
+      setSaveState2("warn", "Saved on this device only \u2014 browser sync is full");
+    } else {
+      setSaveState2("saved");
+    }
+  }
+  async function savePatch2(patch) {
+    setSaveState2("saving");
+    try {
+      await settings.update(patch);
+    } catch {
+      setSaveState2("failed");
+      return false;
+    }
+    savedState2();
+    return true;
+  }
+  function status2(message) {
+    if (!statusEl2) return;
+    statusEl2.textContent = message;
+    clearTimeout(statusEl2._timer);
+    statusEl2._timer = setTimeout(() => {
+      statusEl2.textContent = "";
+    }, 2500);
+  }
+  function showFieldError2(id, message) {
+    const el = document.querySelector(`#${id}`);
+    if (!el) return;
+    el.textContent = message;
+    el.hidden = false;
+  }
+  function clearFieldError2(id) {
+    const el = document.querySelector(`#${id}`);
+    if (!el) return;
+    el.textContent = "";
+    el.hidden = true;
+  }
+  function markInvalid2(el, invalid) {
+    if (!el) return;
+    if (invalid) el.setAttribute("aria-invalid", "true");
+    else el.removeAttribute("aria-invalid");
+  }
+  function renderPagenav() {
+    if (pagenavNextEl)
+      pagenavNextEl.value = settings.getPageNavTexts().next.join(", ");
+    if (pagenavPrevEl)
+      pagenavPrevEl.value = settings.getPageNavTexts().prev.join(", ");
+    clearFieldError2("error-pagenav");
+  }
+  function failPagenav(message, badEls) {
+    for (const el of badEls || []) markInvalid2(el, true);
+    showFieldError2("error-pagenav", `${message} (not saved)`);
+    status2(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+  }
+  function parsePagenavField(input, label) {
+    markInvalid2(input, false);
+    const seen = /* @__PURE__ */ new Set();
+    const list = [];
+    for (const part of String(input.value || "").split(",")) {
+      const text = part.trim();
+      if (text === "") continue;
+      if (text.length > PAGE_NAV_TEXT_MAX) {
+        return {
+          error: `Text must be ${PAGE_NAV_TEXT_MAX} characters or fewer`,
+          bad: [input]
+        };
+      }
+      const key = text.toLowerCase();
+      if (seen.has(key)) {
+        return { error: `Duplicate text "${text}"`, bad: [input] };
+      }
+      seen.add(key);
+      list.push(text);
+    }
+    if (list.length === 0) {
+      return { error: `At least one ${label} text is required`, bad: [input] };
+    }
+    if (list.length > MAX_PAGE_NAV_TEXTS) {
+      return { error: `At most ${MAX_PAGE_NAV_TEXTS} texts per field`, bad: [input] };
+    }
+    return { list };
+  }
+  function commitPagenav() {
+    if (!pagenavNextEl || !pagenavPrevEl) return;
+    clearFieldError2("error-pagenav");
+    const next = parsePagenavField(pagenavNextEl, "next page");
+    if (next.error) {
+      failPagenav(next.error, next.bad);
+      return;
+    }
+    const prev = parsePagenavField(pagenavPrevEl, "previous page");
+    if (prev.error) {
+      failPagenav(prev.error, prev.bad);
+      return;
+    }
+    savePatch2({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
+      (ok) => {
+        if (!ok) return;
+        renderPagenav();
+      }
+    );
+  }
+  function resetPagenav() {
+    savePatch2({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
+      if (ok) {
+        renderPagenav();
+        status2("Page navigation texts restored to defaults");
+      }
+    });
+  }
+  function initPagenav() {
+    pagenavNextEl?.addEventListener("change", commitPagenav);
+    pagenavPrevEl?.addEventListener("change", commitPagenav);
+    resetPagenavBtn?.addEventListener("click", resetPagenav);
+  }
+
   // options/options.js
   var tableEl = document.querySelector("#keymap-table");
   var resetBtn = document.querySelector("#reset");
   var resetKeysBtn = document.querySelector("#reset-keys");
-  var statusEl2 = document.querySelector("#status");
-  var saveStateEl2 = document.querySelector("#save-state");
+  var statusEl3 = document.querySelector("#status");
+  var saveStateEl3 = document.querySelector("#save-state");
   var disabledList = document.querySelector("#disabled-list");
   var scrollStepEl = document.querySelector("#scroll-step");
   var smoothScrollEl = document.querySelector("#smooth-scroll");
@@ -1559,9 +1698,6 @@
   var sourceHistoryEl = document.querySelector("#source-history");
   var sourceBookmarkEl = document.querySelector("#source-bookmark");
   var maxResultsEl = document.querySelector("#max-results");
-  var pagenavNextEl = document.querySelector("#pagenav-next");
-  var pagenavPrevEl = document.querySelector("#pagenav-prev");
-  var resetPagenavBtn = document.querySelector("#reset-pagenav");
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
   var hintCharsMetaEl = document.querySelector("#hint-chars-meta");
@@ -1595,54 +1731,54 @@
   var ADD_LABEL = "+";
   var RECORDING_TITLE = "Press a key to bind. Esc cancels. Any letter can start a multi-key sequence \u2014 keep typing keys, then Enter to save.";
   var OPEN_KEY = "jari.options.open";
-  function setSaveState2(mode, message) {
-    if (!saveStateEl2) return;
-    saveStateEl2.classList.remove("saving", "failed", "warn");
+  function setSaveState3(mode, message) {
+    if (!saveStateEl3) return;
+    saveStateEl3.classList.remove("saving", "failed", "warn");
     if (mode === "saving") {
-      saveStateEl2.classList.add("saving");
-      saveStateEl2.textContent = message || "Saving...";
+      saveStateEl3.classList.add("saving");
+      saveStateEl3.textContent = message || "Saving...";
     } else if (mode === "failed") {
-      saveStateEl2.classList.add("failed");
-      saveStateEl2.textContent = message || "Save failed \u2014 will retry on next change";
+      saveStateEl3.classList.add("failed");
+      saveStateEl3.textContent = message || "Save failed \u2014 will retry on next change";
     } else if (mode === "warn") {
-      saveStateEl2.classList.add("warn");
-      saveStateEl2.textContent = message || "Saved locally";
+      saveStateEl3.classList.add("warn");
+      saveStateEl3.textContent = message || "Saved locally";
     } else {
-      saveStateEl2.textContent = message || "All changes saved";
+      saveStateEl3.textContent = message || "All changes saved";
     }
   }
-  function savedState2() {
+  function savedState3() {
     if (settings.isPersistedLocally()) {
-      setSaveState2("warn", "Saved on this device only \u2014 browser sync is full");
+      setSaveState3("warn", "Saved on this device only \u2014 browser sync is full");
     } else {
-      setSaveState2("saved");
+      setSaveState3("saved");
     }
   }
-  async function savePatch2(patch) {
-    setSaveState2("saving");
+  async function savePatch3(patch) {
+    setSaveState3("saving");
     try {
       await settings.update(patch);
     } catch {
-      setSaveState2("failed");
+      setSaveState3("failed");
       return false;
     }
-    savedState2();
+    savedState3();
     updateSummaries();
     return true;
   }
-  function showFieldError2(id, message) {
+  function showFieldError3(id, message) {
     const el = document.querySelector(`#${id}`);
     if (!el) return;
     el.textContent = message;
     el.hidden = false;
   }
-  function clearFieldError2(id) {
+  function clearFieldError3(id) {
     const el = document.querySelector(`#${id}`);
     if (!el) return;
     el.textContent = "";
     el.hidden = true;
   }
-  function markInvalid2(el, invalid) {
+  function markInvalid3(el, invalid) {
     if (!el) return;
     if (invalid) el.setAttribute("aria-invalid", "true");
     else el.removeAttribute("aria-invalid");
@@ -1758,7 +1894,7 @@
       hintFontSizeEl,
       siteInputEl
     ]) {
-      markInvalid2(el, false);
+      markInvalid3(el, false);
     }
     for (const id of [
       "error-scroll-step",
@@ -1771,7 +1907,7 @@
       "error-clickable-selector",
       "error-hint-font-size"
     ]) {
-      clearFieldError2(id);
+      clearFieldError3(id);
     }
     if (siteErrorEl) {
       siteErrorEl.textContent = "";
@@ -1782,7 +1918,7 @@
     renderKeymap();
     renderDisabled();
     updateSummaries();
-    savedState2();
+    savedState3();
     updateAddButton();
   }
   function matchesFilter(name, cmd, filter) {
@@ -2006,7 +2142,7 @@
     if (!activeRecording) return;
     const { button } = activeRecording;
     cancelRecordingSilent();
-    status2("Cancelled \u2014 no changes");
+    status3("Cancelled \u2014 no changes");
     if (button.isConnected) button.focus?.();
   }
   function exitRecording() {
@@ -2040,7 +2176,7 @@
         activeRecording.waitingKeys = [];
         const hint = recordingHintEl(button);
         if (hint) hint.textContent = "Press a key\u2026 Esc cancels.";
-        status2("Sequence cancelled \u2014 press a key, or Esc again to stop");
+        status3("Sequence cancelled \u2014 press a key, or Esc again to stop");
         return;
       }
       cancelRecording();
@@ -2055,13 +2191,13 @@
         if (hint) {
           hint.textContent = keys ? `Next key for ${shown}\u2026 or Enter to save ${shown}` : "Press a key\u2026 Esc cancels.";
         }
-        status2(
+        status3(
           keys ? `Sequence ${shown} \u2014 press the next key, or Enter to save` : "Press a key"
         );
         return;
       }
       cancelRecordingSilent();
-      status2("Cancelled \u2014 no changes (remove bindings with the \xD7 on each key)");
+      status3("Cancelled \u2014 no changes (remove bindings with the \xD7 on each key)");
       if (button.isConnected) button.focus?.();
       return;
     }
@@ -2077,7 +2213,7 @@
       const shown = displayCombo(activeRecording.waitingKeys.join(""));
       const hint = recordingHintEl(button);
       if (hint) hint.textContent = `Next key for ${shown}\u2026 or Enter to save ${shown}`;
-      status2(`Sequence ${shown} \u2014 press the next key, or Enter to save`);
+      status3(`Sequence ${shown} \u2014 press the next key, or Enter to save`);
       return;
     }
     if (isBindablePrefixStarter(combo)) {
@@ -2086,14 +2222,14 @@
       const hint = recordingHintEl(button);
       if (hint)
         hint.textContent = `Next key for ${shown}\u2026 or Enter to save ${shown} alone`;
-      status2(
+      status3(
         `Sequence ${shown} \u2014 press the next key, or Enter to save ${shown} alone`
       );
       return;
     }
     if (isReservedCombo(combo)) {
       exitRecording();
-      status2("Digits 0-9 are reserved for the repeat count");
+      status3("Digits 0-9 are reserved for the repeat count");
       if (button.isConnected) button.focus?.();
       return;
     }
@@ -2112,7 +2248,7 @@
     if (keymap[combo] === name) {
       exitRecording();
       renderKeymap();
-      status2(`${shown} is already bound to ${commandLabel(name)}`);
+      status3(`${shown} is already bound to ${commandLabel(name)}`);
       focusChipFor(name, combo);
       return;
     }
@@ -2124,14 +2260,14 @@
     showConflict(button, name, combo, conflict);
   }
   function persistKeymap() {
-    setSaveState2("saving");
+    setSaveState3("saving");
     return settings.update({ keymap: { ...settings.getKeymap() } }).then(() => {
-      savedState2();
+      savedState3();
       updateSummaries();
       return true;
     }).catch(() => {
-      setSaveState2("failed");
-      status2("Save failed");
+      setSaveState3("failed");
+      status3("Save failed");
       return false;
     });
   }
@@ -2153,15 +2289,15 @@
     const shown = displayCombo(combo);
     const shownPrevious = previous ? displayCombo(previous) : "";
     if (swapped) {
-      status2(
+      status3(
         `Swapped: ${shown} \u2192 ${commandLabel(name)}, ${shownPrevious} \u2192 ${commandLabel(swapWith)}${notes}`
       );
     } else if (swapWith) {
-      status2(
+      status3(
         `Saved ${shown} \u2192 ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${shown})${notes}`
       );
     } else {
-      status2(`Saved ${shown} \u2192 ${commandLabel(name)}${notes}`);
+      status3(`Saved ${shown} \u2192 ${commandLabel(name)}${notes}`);
     }
     focusChipFor(name, combo);
   }
@@ -2191,11 +2327,11 @@
     if (!ok) return;
     if (removed.length === 1) {
       const rest = keysFor(name).length;
-      status2(
+      status3(
         rest > 0 ? `Removed ${removed[0]} from ${commandLabel(name)}` : `Removed ${removed[0]} \u2014 ${commandLabel(name)} now unbound`
       );
     } else {
-      status2(`Cleared ${commandLabel(name)} \u2014 now unbound`);
+      status3(`Cleared ${commandLabel(name)} \u2014 now unbound`);
     }
     focusAddFor(name);
   }
@@ -2265,7 +2401,7 @@
       const hint2 = recordingHintEl(button);
       if (hint2) hint2.textContent = "Press a key\u2026 Esc cancels.";
       button.focus?.();
-      status2("Kept the existing binding");
+      status3("Kept the existing binding");
     });
     actions.appendChild(reassign);
     const previous = keysForCommand(settings.getKeymap(), name).filter((k) => k !== combo)[0] || "";
@@ -2291,7 +2427,7 @@
       }
     });
     cell.appendChild(box);
-    status2(`${shown} is already bound \u2014 choose Reassign or Keep both`);
+    status3(`${shown} is already bound \u2014 choose Reassign or Keep both`);
     cancel.focus();
   }
   function commitNumber(el, errorId, { min, max, fallback, settingKey, label, unit }) {
@@ -2300,18 +2436,18 @@
     const invalid = raw === "" || !Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max;
     if (invalid) {
       el.value = settings[fallback]();
-      markInvalid2(el, true);
-      showFieldError2(
+      markInvalid3(el, true);
+      showFieldError3(
         errorId,
         `Enter ${min}-${max}${unit ? ` ${unit}` : ""} (reset to ${el.value})`
       );
-      status2(`${label}: reset to ${el.value}`);
+      status3(`${label}: reset to ${el.value}`);
       return;
     }
-    markInvalid2(el, false);
-    clearFieldError2(errorId);
+    markInvalid3(el, false);
+    clearFieldError3(errorId);
     el.value = String(parsed);
-    savePatch2({ [settingKey]: parsed });
+    savePatch3({ [settingKey]: parsed });
   }
   function commitHintChars() {
     const raw = hintCharsEl.value;
@@ -2319,22 +2455,22 @@
     const deduped = [...new Set(trimmed.replace(/[^a-z0-9]/g, ""))].join("");
     if (deduped.length < 2) {
       hintCharsEl.value = settings.getHintChars();
-      markInvalid2(hintCharsEl, true);
-      showFieldError2(
+      markInvalid3(hintCharsEl, true);
+      showFieldError3(
         "error-hint-chars",
         "Need at least 2 unique letters or digits (reset to previous)"
       );
-      status2("Hint characters: need at least 2 unique letters or digits");
+      status3("Hint characters: need at least 2 unique letters or digits");
       updateHintMeta();
       return;
     }
-    markInvalid2(hintCharsEl, false);
-    clearFieldError2("error-hint-chars");
+    markInvalid3(hintCharsEl, false);
+    clearFieldError3("error-hint-chars");
     const cleaned = deduped !== trimmed;
     hintCharsEl.value = deduped;
     updateHintMeta();
-    savePatch2({ hintChars: normalizeHintChars(deduped) }).then((ok) => {
-      if (ok && cleaned) status2(`Cleaned up hint characters: ${deduped}`);
+    savePatch3({ hintChars: normalizeHintChars(deduped) }).then((ok) => {
+      if (ok && cleaned) status3(`Cleaned up hint characters: ${deduped}`);
     });
   }
   function isValidSelector(sel) {
@@ -2350,18 +2486,18 @@
     const raw = clickableSelectorEl.value.trim();
     if (raw && !isValidSelector(raw)) {
       clickableSelectorEl.value = settings.getClickableSelector();
-      markInvalid2(clickableSelectorEl, true);
-      showFieldError2(
+      markInvalid3(clickableSelectorEl, true);
+      showFieldError3(
         "error-clickable-selector",
         "Not a valid CSS selector (reset to previous)"
       );
-      status2("Clickable selector: not valid CSS");
+      status3("Clickable selector: not valid CSS");
       return;
     }
-    markInvalid2(clickableSelectorEl, false);
-    clearFieldError2("error-clickable-selector");
+    markInvalid3(clickableSelectorEl, false);
+    clearFieldError3("error-clickable-selector");
     clickableSelectorEl.value = raw;
-    savePatch2({ clickableSelector: raw });
+    savePatch3({ clickableSelector: raw });
   }
   function collectSources() {
     const sources = [];
@@ -2369,74 +2505,6 @@
     if (sourceHistoryEl.checked) sources.push("history");
     if (sourceBookmarkEl.checked) sources.push("bookmark");
     return sources;
-  }
-  function renderPagenav() {
-    if (pagenavNextEl)
-      pagenavNextEl.value = settings.getPageNavTexts().next.join(", ");
-    if (pagenavPrevEl)
-      pagenavPrevEl.value = settings.getPageNavTexts().prev.join(", ");
-    clearFieldError2("error-pagenav");
-  }
-  function failPagenav(message, badEls) {
-    for (const el of badEls || []) markInvalid2(el, true);
-    showFieldError2("error-pagenav", `${message} (not saved)`);
-    status2(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
-  }
-  function parsePagenavField(input, label) {
-    markInvalid2(input, false);
-    const seen = /* @__PURE__ */ new Set();
-    const list = [];
-    for (const part of String(input.value || "").split(",")) {
-      const text = part.trim();
-      if (text === "") continue;
-      if (text.length > PAGE_NAV_TEXT_MAX) {
-        return {
-          error: `Text must be ${PAGE_NAV_TEXT_MAX} characters or fewer`,
-          bad: [input]
-        };
-      }
-      const key = text.toLowerCase();
-      if (seen.has(key)) {
-        return { error: `Duplicate text "${text}"`, bad: [input] };
-      }
-      seen.add(key);
-      list.push(text);
-    }
-    if (list.length === 0) {
-      return { error: `At least one ${label} text is required`, bad: [input] };
-    }
-    if (list.length > MAX_PAGE_NAV_TEXTS) {
-      return { error: `At most ${MAX_PAGE_NAV_TEXTS} texts per field`, bad: [input] };
-    }
-    return { list };
-  }
-  function commitPagenav() {
-    if (!pagenavNextEl || !pagenavPrevEl) return;
-    clearFieldError2("error-pagenav");
-    const next = parsePagenavField(pagenavNextEl, "next page");
-    if (next.error) {
-      failPagenav(next.error, next.bad);
-      return;
-    }
-    const prev = parsePagenavField(pagenavPrevEl, "previous page");
-    if (prev.error) {
-      failPagenav(prev.error, prev.bad);
-      return;
-    }
-    savePatch2({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
-      (ok) => {
-        if (!ok) return;
-        renderPagenav();
-      }
-    );
-  }
-  function resetPagenav() {
-    savePatch2({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
-      if (ok) {
-        renderPagenav();
-        status2("Page navigation texts restored to defaults");
-      }
-    });
   }
   var confirmCount = 0;
   function confirmDialog(message, confirmLabel) {
@@ -2484,10 +2552,10 @@
     cancelRecordingSilent();
     if (!await confirmDialog("Reset all keybindings to defaults?", "Reset keys"))
       return;
-    savePatch2({ keymap: { ...keymapDefaults } }).then((ok) => {
+    savePatch3({ keymap: { ...keymapDefaults } }).then((ok) => {
       if (!ok) return;
       renderKeymap();
-      status2("Keybindings reset to defaults");
+      status3("Keybindings reset to defaults");
     });
   }
   async function reset() {
@@ -2497,7 +2565,7 @@
       "Reset all"
     ))
       return;
-    setSaveState2("saving");
+    setSaveState3("saving");
     settings.update({
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       keymap: { ...keymapDefaults },
@@ -2519,9 +2587,9 @@
       hintTheme: settingsDefaults.hintTheme,
       hintFontSize: settingsDefaults.hintFontSize,
       disabledSites: []
-    }).then(() => load2()).then(() => status2("Reset everything to defaults")).catch(() => {
-      setSaveState2("failed");
-      status2("Save failed");
+    }).then(() => load2()).then(() => status3("Reset everything to defaults")).catch(() => {
+      setSaveState3("failed");
+      status3("Save failed");
     });
   }
   function renderDisabled() {
@@ -2543,11 +2611,11 @@
         btn.title = `Re-enable Jari on ${site}`;
         btn.setAttribute("aria-label", `Re-enable Jari on ${site}`);
         btn.addEventListener("click", async () => {
-          const ok = await savePatch2({
+          const ok = await savePatch3({
             disabledSites: sites.filter((s) => s !== site)
           });
           renderDisabled();
-          if (ok) status2(`Enabled: ${site}`);
+          if (ok) status3(`Enabled: ${site}`);
         });
         li.appendChild(siteSpan);
         li.appendChild(btn);
@@ -2558,18 +2626,18 @@
   }
   function showSiteError(message) {
     if (!siteErrorEl) {
-      status2(message);
+      status3(message);
       return;
     }
     siteErrorEl.textContent = message;
     siteErrorEl.hidden = false;
-    markInvalid2(siteInputEl, true);
+    markInvalid3(siteInputEl, true);
   }
   function clearSiteError() {
     if (!siteErrorEl) return;
     siteErrorEl.textContent = "";
     siteErrorEl.hidden = true;
-    markInvalid2(siteInputEl, false);
+    markInvalid3(siteInputEl, false);
   }
   function updateAddButton() {
     if (!addSiteBtn || !siteInputEl) return;
@@ -2590,18 +2658,18 @@
       return;
     }
     clearSiteError();
-    const ok = await savePatch2({ disabledSites: [...sites, pattern] });
+    const ok = await savePatch3({ disabledSites: [...sites, pattern] });
     siteInputEl.value = "";
     updateAddButton();
     renderDisabled();
-    if (ok) status2(`Disabled: ${pattern}`);
+    if (ok) status3(`Disabled: ${pattern}`);
     siteInputEl.focus();
   }
-  function status2(message) {
-    statusEl2.textContent = message;
-    clearTimeout(statusEl2._timer);
-    statusEl2._timer = setTimeout(() => {
-      statusEl2.textContent = "";
+  function status3(message) {
+    statusEl3.textContent = message;
+    clearTimeout(statusEl3._timer);
+    statusEl3._timer = setTimeout(() => {
+      statusEl3.textContent = "";
     }, 2500);
   }
   resetBtn.addEventListener("click", reset);
@@ -2678,41 +2746,39 @@
   );
   smoothScrollEl.addEventListener(
     "change",
-    () => savePatch2({ smoothScroll: smoothScrollEl.checked })
+    () => savePatch3({ smoothScroll: smoothScrollEl.checked })
   );
   fuzzyMatchingEl.addEventListener(
     "change",
-    () => savePatch2({ fuzzyMatching: fuzzyMatchingEl.checked })
+    () => savePatch3({ fuzzyMatching: fuzzyMatchingEl.checked })
   );
   clueEnabledEl.addEventListener(
     "change",
-    () => savePatch2({ clueEnabled: clueEnabledEl.checked })
+    () => savePatch3({ clueEnabled: clueEnabledEl.checked })
   );
   copyFormatEl.addEventListener(
     "change",
-    () => savePatch2({ copyFormat: copyFormatEl.value }).then(() => {
+    () => savePatch3({ copyFormat: copyFormatEl.value }).then(() => {
       copyFormatEl.value = settings.getCopyFormat();
     })
   );
   for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
     el.addEventListener(
       "change",
-      () => savePatch2({ suggestionSources: collectSources() })
+      () => savePatch3({ suggestionSources: collectSources() })
     );
   }
   initEngines();
-  pagenavNextEl?.addEventListener("change", commitPagenav);
-  pagenavPrevEl?.addEventListener("change", commitPagenav);
-  resetPagenavBtn?.addEventListener("click", resetPagenav);
+  initPagenav();
   hintCharsEl.addEventListener("input", () => {
-    clearFieldError2("error-hint-chars");
-    markInvalid2(hintCharsEl, false);
+    clearFieldError3("error-hint-chars");
+    markInvalid3(hintCharsEl, false);
     updateHintMeta();
   });
   hintCharsEl.addEventListener("change", commitHintChars);
   hintThemeEl?.addEventListener(
     "change",
-    () => savePatch2({ hintTheme: hintThemeEl.value }).then(() => {
+    () => savePatch3({ hintTheme: hintThemeEl.value }).then(() => {
       if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
     })
   );
@@ -2728,8 +2794,8 @@
     })
   );
   clickableSelectorEl?.addEventListener("input", () => {
-    clearFieldError2("error-clickable-selector");
-    markInvalid2(clickableSelectorEl, false);
+    clearFieldError3("error-clickable-selector");
+    markInvalid3(clickableSelectorEl, false);
   });
   clickableSelectorEl?.addEventListener("change", commitClickableSelector);
   for (const card of Object.values(cards)) {

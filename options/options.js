@@ -16,15 +16,12 @@ import {
 } from "../content/keymap.js";
 import { normalizeSitePattern } from "../shared/url.js";
 import { searchEngineDefaults } from "../shared/search-engines.js";
-import {
-  MAX_PAGE_NAV_TEXTS,
-  PAGE_NAV_TEXT_MAX,
-  pageNavTextDefaults,
-} from "../shared/page-nav-texts.js";
+import { pageNavTextDefaults } from "../shared/page-nav-texts.js";
 import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
 import { ui } from "../content/ui.js";
 import { renderEngines, initEngines } from "./engines.js";
+import { renderPagenav, initPagenav } from "./pagenav.js";
 
 const tableEl = document.querySelector("#keymap-table");
 const resetBtn = document.querySelector("#reset");
@@ -43,9 +40,6 @@ const sourceTabEl = document.querySelector("#source-tab");
 const sourceHistoryEl = document.querySelector("#source-history");
 const sourceBookmarkEl = document.querySelector("#source-bookmark");
 const maxResultsEl = document.querySelector("#max-results");
-const pagenavNextEl = document.querySelector("#pagenav-next");
-const pagenavPrevEl = document.querySelector("#pagenav-prev");
-const resetPagenavBtn = document.querySelector("#reset-pagenav");
 const copyFormatEl = document.querySelector("#copy-format");
 const hintCharsEl = document.querySelector("#hint-chars");
 const hintCharsMetaEl = document.querySelector("#hint-chars-meta");
@@ -977,79 +971,6 @@ function collectSources() {
   return sources;
 }
 
-function renderPagenav() {
-  if (pagenavNextEl)
-    pagenavNextEl.value = settings.getPageNavTexts().next.join(", ");
-  if (pagenavPrevEl)
-    pagenavPrevEl.value = settings.getPageNavTexts().prev.join(", ");
-  clearFieldError("error-pagenav");
-}
-
-function failPagenav(message, badEls) {
-  for (const el of badEls || []) markInvalid(el, true);
-  showFieldError("error-pagenav", `${message} (not saved)`);
-  status(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
-}
-
-function parsePagenavField(input, label) {
-  markInvalid(input, false);
-  const seen = new Set();
-  const list = [];
-  for (const part of String(input.value || "").split(",")) {
-    const text = part.trim();
-    if (text === "") continue;
-    if (text.length > PAGE_NAV_TEXT_MAX) {
-      return {
-        error: `Text must be ${PAGE_NAV_TEXT_MAX} characters or fewer`,
-        bad: [input],
-      };
-    }
-    const key = text.toLowerCase();
-    if (seen.has(key)) {
-      return { error: `Duplicate text "${text}"`, bad: [input] };
-    }
-    seen.add(key);
-    list.push(text);
-  }
-  if (list.length === 0) {
-    return { error: `At least one ${label} text is required`, bad: [input] };
-  }
-  if (list.length > MAX_PAGE_NAV_TEXTS) {
-    return { error: `At most ${MAX_PAGE_NAV_TEXTS} texts per field`, bad: [input] };
-  }
-  return { list };
-}
-
-function commitPagenav() {
-  if (!pagenavNextEl || !pagenavPrevEl) return;
-  clearFieldError("error-pagenav");
-  const next = parsePagenavField(pagenavNextEl, "next page");
-  if (next.error) {
-    failPagenav(next.error, next.bad);
-    return;
-  }
-  const prev = parsePagenavField(pagenavPrevEl, "previous page");
-  if (prev.error) {
-    failPagenav(prev.error, prev.bad);
-    return;
-  }
-  savePatch({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
-    (ok) => {
-      if (!ok) return;
-      renderPagenav();
-    },
-  );
-}
-
-function resetPagenav() {
-  savePatch({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
-    if (ok) {
-      renderPagenav();
-      status("Page navigation texts restored to defaults");
-    }
-  });
-}
-
 let confirmCount = 0;
 
 function confirmDialog(message, confirmLabel) {
@@ -1322,9 +1243,7 @@ for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
   );
 }
 initEngines();
-pagenavNextEl?.addEventListener("change", commitPagenav);
-pagenavPrevEl?.addEventListener("change", commitPagenav);
-resetPagenavBtn?.addEventListener("click", resetPagenav);
+initPagenav();
 hintCharsEl.addEventListener("input", () => {
   clearFieldError("error-hint-chars");
   markInvalid(hintCharsEl, false);

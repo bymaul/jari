@@ -52,8 +52,8 @@ source (repo convention).
   `shouldSmooth`, `cycle`/`reset`); `content/commands.js` now imports smooth helpers
 - `background/` - service-worker source (`main.js` + `handlers.js`),
   `shared/` - `url.js` (URL parsing, scheme policy) + `tlds.js` (known TLD set) + `constants.js`
-- `options/` - options page (`options.js` main, `engines.js` search engines);
-  `tests/setup.mjs` - shared chrome/DOM stubs
+- `options/` - options page (`options.js` main, `engines.js` search engines,
+  `pagenav.js` page nav texts); `tests/setup.mjs` - shared chrome/DOM stubs
 
 ## Conventions
 
