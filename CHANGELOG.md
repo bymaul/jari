@@ -4,6 +4,18 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Added
+
+- Screenshot page (`screenshotPage`, unbound by default): captures the
+  visible viewport as PNG via `chrome.tabs.captureVisibleTab` and
+  downloads it as `jari-YYYYMMDD-HHmmss.png`. Jari overlays (hints,
+  prompt, help, pills, toasts) are hidden for the capture and restored
+  after. Needs the `activeTab` permission; restricted pages
+  (`chrome://`, `about:`, etc.) report honestly instead of failing
+  silently.
+
 ## [0.5.0] - 2026-09-14
 
 ### Added

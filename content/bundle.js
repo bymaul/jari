@@ -615,6 +615,7 @@
     editUrl: { category: "page", label: "Edit current URL" },
     copyUrl: { category: "page", label: "Copy page URL" },
     copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
+    screenshotPage: { category: "page", label: "Screenshot page (PNG download)" },
     toggleIgnore: { category: "modes", label: "Ignore mode" },
     passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },
     toggleSiteEnabled: { category: "modes", label: "Enable / disable on this site" },
@@ -1562,6 +1563,45 @@
     }
     return { host: host5, shadow };
   }
+  var CAPTURE_HIDE_SELECTORS = [
+    ".jari-hints-host",
+    ".jari-find-host",
+    ".jari-prompt-host",
+    ".jari-palette-host",
+    ".jari-help-host",
+    ".jari-visual-caret-host",
+    ".jari-status-stack",
+    ".jari-clue",
+    ".jari-scroll-highlight",
+    ".jari-flash"
+  ];
+  function hideOverlaysForCapture() {
+    const hidden = [];
+    for (const sel of CAPTURE_HIDE_SELECTORS) {
+      try {
+        const els = document.querySelectorAll(sel) || [];
+        for (const el of els) {
+          if (!el || !el.style) continue;
+          hidden.push([el, el.style.display]);
+          try {
+            el.style.display = "none";
+          } catch {
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+    return () => {
+      for (const [el, prev] of hidden) {
+        try {
+          if (!el.isConnected) continue;
+          el.style.display = prev;
+        } catch {
+        }
+      }
+    };
+  }
   function buildCategoryTable(cat, headerClass, renderBody) {
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
@@ -1610,7 +1650,8 @@
     safeFocus,
     dispatchClick,
     focusFrameElement,
-    createShadowHost
+    createShadowHost,
+    hideOverlaysForCapture
   };
 
   // content/hints-elements.js
@@ -8478,6 +8519,59 @@ ${location.href}`;
     sendMessage("navigate", { url: target2 });
   }
   var UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
+  var UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
+  function screenshotFilename(date = /* @__PURE__ */ new Date()) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `jari-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.png`;
+  }
+  function downloadScreenshot(dataUrl) {
+    try {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = screenshotFilename();
+      (document.body || document.documentElement).appendChild(a);
+      a.click();
+      a.remove();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async function screenshotPage() {
+    try {
+      if (UNSCREENSHOTABLE_PROTOCOLS.test(location.protocol || "")) {
+        ui.toast("Cannot screenshot this page");
+        return;
+      }
+    } catch {
+    }
+    const restore = ui.hideOverlaysForCapture();
+    try {
+      await new Promise((resolve) => {
+        try {
+          if (typeof requestAnimationFrame !== "function") return resolve();
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        } catch {
+          resolve();
+        }
+      });
+    } catch {
+    }
+    let res;
+    try {
+      res = await sendMessage("captureScreenshot");
+    } finally {
+      try {
+        restore();
+      } catch {
+      }
+    }
+    if (!res || !res.ok || !res.dataUrl) {
+      ui.toast("Screenshot failed");
+      return;
+    }
+    ui.toast(downloadScreenshot(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
+  }
   async function toggleBookmarkPage() {
     const url = location.href || "";
     if (UNBOOKMARKABLE_SCHEMES.test(url)) {
@@ -8602,6 +8696,7 @@ ${location.href}`;
     goForward: { ...COMMAND_CATALOG.goForward, run: () => sendMessage("goForward") },
     copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
     copyTitleAndUrl: { ...COMMAND_CATALOG.copyTitleAndUrl, run: () => copyToClipboard(copyTitleAndUrlText(), "Copied") },
+    screenshotPage: cmd("screenshotPage", () => screenshotPage()),
     toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
     passthroughKeys: { ...COMMAND_CATALOG.passthroughKeys, run: () => passthroughEnter() },
     toggleSiteEnabled: { ...COMMAND_CATALOG.toggleSiteEnabled, run: () => settings.toggleSiteEnabled() },

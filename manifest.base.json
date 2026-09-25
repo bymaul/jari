@@ -28,6 +28,7 @@
   },
   "permissions": [
     "tabs",
+    "activeTab",
     "storage",
     "sessions",
     "clipboardRead",
@@ -38,6 +39,7 @@
     "page": "options/options.html",
     "open_in_tab": true
   },
+  "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

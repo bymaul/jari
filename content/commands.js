@@ -196,6 +196,60 @@ function goTo(urlFn) {
 
 const UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
 
+const UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
+
+export function screenshotFilename(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `jari-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.png`;
+}
+
+function downloadScreenshot(dataUrl) {
+  try {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = screenshotFilename();
+    (document.body || document.documentElement).appendChild(a);
+    a.click();
+    a.remove();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function screenshotPage() {
+  try {
+    if (UNSCREENSHOTABLE_PROTOCOLS.test(location.protocol || "")) {
+      ui.toast("Cannot screenshot this page");
+      return;
+    }
+  } catch {}
+  const restore = ui.hideOverlaysForCapture();
+  try {
+    await new Promise((resolve) => {
+      try {
+        if (typeof requestAnimationFrame !== "function") return resolve();
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      } catch {
+        resolve();
+      }
+    });
+  } catch {}
+  let res;
+  try {
+    res = await sendMessage("captureScreenshot");
+  } finally {
+    try {
+      restore();
+    } catch {}
+  }
+  if (!res || !res.ok || !res.dataUrl) {
+    ui.toast("Screenshot failed");
+    return;
+  }
+  ui.toast(downloadScreenshot(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
+}
+
 async function toggleBookmarkPage() {
   const url = location.href || "";
   if (UNBOOKMARKABLE_SCHEMES.test(url)) {
@@ -326,6 +380,7 @@ export const commands = {
 
   copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
   copyTitleAndUrl: { ...COMMAND_CATALOG.copyTitleAndUrl, run: () => copyToClipboard(copyTitleAndUrlText(), "Copied") },
+  screenshotPage: cmd("screenshotPage", () => screenshotPage()),
 
   toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
   passthroughKeys: { ...COMMAND_CATALOG.passthroughKeys, run: () => passthroughEnter() },

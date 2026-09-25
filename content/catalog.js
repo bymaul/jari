@@ -48,6 +48,7 @@ export const COMMAND_CATALOG = {
   editUrl: { category: "page", label: "Edit current URL" },
   copyUrl: { category: "page", label: "Copy page URL" },
   copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
+  screenshotPage: { category: "page", label: "Screenshot page (PNG download)" },
 
   toggleIgnore: { category: "modes", label: "Ignore mode" },
   passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },

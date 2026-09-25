@@ -326,6 +326,7 @@
     editUrl: { category: "page", label: "Edit current URL" },
     copyUrl: { category: "page", label: "Copy page URL" },
     copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
+    screenshotPage: { category: "page", label: "Screenshot page (PNG download)" },
     toggleIgnore: { category: "modes", label: "Ignore mode" },
     passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },
     toggleSiteEnabled: { category: "modes", label: "Enable / disable on this site" },
@@ -1242,6 +1243,45 @@
     }
     return { host, shadow };
   }
+  var CAPTURE_HIDE_SELECTORS = [
+    ".jari-hints-host",
+    ".jari-find-host",
+    ".jari-prompt-host",
+    ".jari-palette-host",
+    ".jari-help-host",
+    ".jari-visual-caret-host",
+    ".jari-status-stack",
+    ".jari-clue",
+    ".jari-scroll-highlight",
+    ".jari-flash"
+  ];
+  function hideOverlaysForCapture() {
+    const hidden = [];
+    for (const sel of CAPTURE_HIDE_SELECTORS) {
+      try {
+        const els = document.querySelectorAll(sel) || [];
+        for (const el of els) {
+          if (!el || !el.style) continue;
+          hidden.push([el, el.style.display]);
+          try {
+            el.style.display = "none";
+          } catch {
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+    return () => {
+      for (const [el, prev] of hidden) {
+        try {
+          if (!el.isConnected) continue;
+          el.style.display = prev;
+        } catch {
+        }
+      }
+    };
+  }
   function buildCategoryTable(cat, headerClass, renderBody) {
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
@@ -1290,7 +1330,8 @@
     safeFocus,
     dispatchClick,
     focusFrameElement,
-    createShadowHost
+    createShadowHost,
+    hideOverlaysForCapture
   };
 
   // options/engines.js

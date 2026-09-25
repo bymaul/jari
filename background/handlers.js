@@ -32,6 +32,7 @@ export const handlers = {
   zoomBy: tabs.zoomBy,
   openInBackgroundTab: tabs.openInBackgroundTab,
   openInForegroundTab: tabs.openInForegroundTab,
+  captureScreenshot: tabs.captureScreenshot,
   toggleBookmark,
   openSettings: tabs.openSettings,
   openExtensions: tabs.openExtensions,

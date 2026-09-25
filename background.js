@@ -608,6 +608,19 @@
   async function openInForegroundTab(_, { url } = {}) {
     return openTab(url, true);
   }
+  async function captureScreenshot(sender) {
+    const windowId = sender && sender.tab && sender.tab.windowId;
+    if (windowId == null) return { ok: false };
+    try {
+      const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+        format: "png"
+      });
+      if (!dataUrl) return { ok: false };
+      return { ok: true, dataUrl };
+    } catch {
+      return { ok: false };
+    }
+  }
   async function openSettings() {
     await chrome.runtime.openOptionsPage();
     return { ok: true };
@@ -937,6 +950,7 @@
     zoomBy,
     openInBackgroundTab,
     openInForegroundTab,
+    captureScreenshot,
     toggleBookmark,
     openSettings,
     openExtensions

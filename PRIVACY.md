@@ -17,6 +17,7 @@ sent to the developer or any third party.
 | Bookmarks | Omnibox (`t`) suggestions from your bookmarks | Nowhere |
 | Clipboard read | Open a URL from your clipboard (`gp`/`gP`) | Opened as a tab, otherwise discarded |
 | Clipboard write | Copy URL / title (`yy`, `Y`, `yf`) | Your clipboard only |
+| Visible-tab screenshot | Capture the viewport as PNG on your keypress (`screenshotPage`, unbound) | Saved to your downloads, otherwise discarded |
 | Settings (`storage.sync`) | Persist your keybindings and options | Your browser's synced storage, never to us |
 | Find history (`storage.local`) | Recall past `/` queries with `Up`/`Down` | This device only, never synced or sent anywhere |
 
