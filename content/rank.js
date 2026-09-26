@@ -5,8 +5,6 @@ const SCORE_CAMEL = 14;
 const SCORE_GAP = -3;
 const SCORE_LEADING = -1;
 
-const MAX_ALIGNMENT_STARTS = 64;
-
 function normalizeWithMap(s) {
   const src = String(s).toLowerCase();
   let norm = "";
@@ -78,24 +76,14 @@ function extractHost(url) {
   }
 }
 
-function scoreAlignment(indices, t, text, map) {
-  let score = 0;
-  let prev = -1;
-  for (const i of indices) {
-    score += SCORE_BASE;
-    if (prev !== -1) {
-      const gap = i - prev - 1;
-      score += gap === 0 ? SCORE_RUN : SCORE_GAP * gap;
-    }
-    if (isBoundaryAt(t, i)) score += SCORE_BOUNDARY;
-    else {
-      const ch = text[map[i]];
-      if (ch && ch !== ch.toLowerCase()) score += SCORE_CAMEL;
-    }
-    prev = i;
+function charBonus(t, text, map, i) {
+  let s = SCORE_BASE;
+  if (isBoundaryAt(t, i)) s += SCORE_BOUNDARY;
+  else {
+    const ch = text[map[i]];
+    if (ch && ch !== ch.toLowerCase()) s += SCORE_CAMEL;
   }
-  score += SCORE_LEADING * indices[0];
-  return score;
+  return s;
 }
 
 function bestAlignment(term, t, text, map) {
@@ -103,38 +91,70 @@ function bestAlignment(term, t, text, map) {
   const q = term.length;
   if (q === 0 || q > n) return null;
   const toOriginal = (indices) => indices.map((i) => map[i]);
-  let best = null;
+  const bonus = new Array(n);
+  for (let i = 0; i < n; i++) bonus[i] = charBonus(t, text, map, i);
+  let dpPrev = new Array(n).fill(Number.NEGATIVE_INFINITY);
+  for (let i = 0; i < n; i++) {
+    if (t[i] === term[0]) dpPrev[i] = bonus[i] + SCORE_LEADING * i;
+  }
   if (q === 1) {
+    let best = -1;
     for (let i = 0; i < n; i++) {
-      if (t[i] !== term) continue;
-      const score = scoreAlignment([i], t, text, map);
-      if (!best || score > best.score) best = { score, indices: [i] };
+      if (t[i] !== term[0]) continue;
+      if (best === -1 || dpPrev[i] > dpPrev[best]) best = i;
     }
-    if (best) best.indices = toOriginal(best.indices);
-    return best;
+    if (best === -1) return null;
+    return { score: dpPrev[best], indices: toOriginal([best]) };
   }
-  let starts = 0;
-  for (let s = 0; s < n && starts < MAX_ALIGNMENT_STARTS; s++) {
-    if (t[s] !== term[0]) continue;
-    starts++;
-    const indices = [s];
-    let pos = s + 1;
-    let ok = true;
-    for (let j = 1; j < q; j++) {
-      const i = t.indexOf(term[j], pos);
-      if (i === -1) {
-        ok = false;
-        break;
+  const backs = new Array(q).fill(null);
+  for (let j = 1; j < q; j++) {
+    const dpCurr = new Array(n).fill(Number.NEGATIVE_INFINITY);
+    const bp = new Array(n).fill(-1);
+    let bestVal = Number.NEGATIVE_INFINITY;
+    let bestIdx = -1;
+    for (let i = 0; i < n; i++) {
+      const pAdd = i - 2;
+      if (pAdd >= 0 && dpPrev[pAdd] !== Number.NEGATIVE_INFINITY) {
+        const val = dpPrev[pAdd] - SCORE_GAP * pAdd;
+        if (val > bestVal) {
+          bestVal = val;
+          bestIdx = pAdd;
+        }
       }
-      indices.push(i);
-      pos = i + 1;
+      if (t[i] !== term[j]) continue;
+      let bestScore = Number.NEGATIVE_INFINITY;
+      let bestP = -1;
+      if (i > 0 && dpPrev[i - 1] !== Number.NEGATIVE_INFINITY) {
+        bestScore = dpPrev[i - 1] + SCORE_RUN + bonus[i];
+        bestP = i - 1;
+      }
+      if (bestIdx !== -1) {
+        const cand = bonus[i] + SCORE_GAP * i - SCORE_GAP + bestVal;
+        if (cand > bestScore) {
+          bestScore = cand;
+          bestP = bestIdx;
+        }
+      }
+      dpCurr[i] = bestScore;
+      bp[i] = bestP;
     }
-    if (!ok) continue;
-    const score = scoreAlignment(indices, t, text, map);
-    if (!best || score > best.score) best = { score, indices };
+    backs[j] = bp;
+    dpPrev = dpCurr;
   }
-  if (best) best.indices = toOriginal(best.indices);
-  return best;
+  let end = -1;
+  for (let i = 0; i < n; i++) {
+    if (t[i] !== term[q - 1]) continue;
+    if (end === -1 || dpPrev[i] > dpPrev[end]) end = i;
+  }
+  if (end === -1 || dpPrev[end] === Number.NEGATIVE_INFINITY) return null;
+  const indices = new Array(q);
+  let cur = end;
+  for (let j = q - 1; j >= 1; j--) {
+    indices[j] = cur;
+    cur = backs[j][cur];
+  }
+  indices[0] = cur;
+  return { score: dpPrev[end], indices: toOriginal(indices) };
 }
 
 function matchPreamble(query, text) {
@@ -167,14 +187,9 @@ export function fuzzyMatch(query, text) {
   const results = include.map((term) => bestAlignment(term, t, text, map));
   if (results.some((r) => !r)) return null;
   let total = 0;
+  for (const ph of phrases) total += 10 + ph.length * 2;
   const indices = [];
-  for (const ph of phrases) {
-    const idx = t.indexOf(ph);
-    if (idx !== -1) {
-      for (let i = idx; i < idx + ph.length; i++) indices.push(map[i]);
-      total += 10 + ph.length * 2;
-    }
-  }
+  collectPhraseIndices(phrases, t, indices, map);
   results.forEach((r) => {
     total += r.score;
     indices.push(...r.indices);

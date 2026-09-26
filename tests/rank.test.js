@@ -151,6 +151,25 @@ test("bestAlignment still finds distant completions past many same-char starts",
   assert.equal(match.indices[1], 141);
 });
 
+test("fuzzyMatch finds the optimal alignment when a greedy scan fails", () => {
+  assert.deepEqual(fuzzyMatch("aba", "aaabba").indices, [0, 4, 5]);
+  assert.deepEqual(fuzzyMatch("aab", "aaa ab").indices, [0, 4, 5]);
+});
+
+test("fuzzyMatch prefers the tightest end run past the old start cap", () => {
+  const hay = "ax".repeat(70) + "ab";
+  assert.deepEqual(fuzzyMatch("ab", hay).indices, [140, 141]);
+});
+
+test("fuzzyMatch highlights every phrase occurrence like fuzzyIndices", () => {
+  assert.deepEqual(fuzzyMatch('"ab"', "ab ab").indices, [0, 1, 3, 4]);
+  assert.deepEqual(
+    fuzzyMatch('"ab"', "ab ab").indices,
+    fuzzyIndices('"ab"', "ab ab"),
+  );
+  assert.equal(fuzzyMatch('"ab"', "ab ab").score, 14);
+});
+
 test("match indices map back through NFKD expansions", () => {
   assert.deepEqual(fuzzyMatch("fi", "ﬁsh").indices, [0, 0]);
   assert.deepEqual(substringIndices("fi", "ﬁsh"), [0]);
