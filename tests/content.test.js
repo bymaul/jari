@@ -367,8 +367,9 @@ test("counts reach repeatable commands", () => {
   assert.equal(spiedCalls.scrollDown[0].count, 3);
 });
 
-test("a dead key filters the visible clue instead of cancelling", () => {
+test("a dead key cancels the pending prefix instead of filtering", () => {
   settings.set({ clueDelayMs: 0 });
+  spyOn("scrollHalfPageUp");
   const original = commands.goToParent;
   let calls = 0;
   commands.goToParent = { run: () => calls++ };
@@ -379,32 +380,10 @@ test("a dead key filters the visible clue instead of cancelling", () => {
     handleKeydown(ev);
     assertClaimed(ev);
     assert.equal(calls, 0);
-    assert.equal(Clue.isVisible(), true);
-    assert.equal(Clue.hasFilter(), true);
-    handleKeydown(key({ key: "u" }));
-    assert.equal(calls, 1);
     assert.equal(Clue.isVisible(), false);
-  } finally {
-    commands.goToParent = original;
-    settings.set({ clueDelayMs: 300 });
-  }
-});
-test("Backspace pops the clue filter and keeps the prefix", () => {
-  settings.set({ clueDelayMs: 0 });
-  const original = commands.goToParent;
-  let calls = 0;
-  commands.goToParent = { run: () => calls++ };
-  try {
-    handleKeydown(key({ key: "g" }));
-    handleKeydown(key({ key: "x" }));
-    assert.equal(Clue.hasFilter(), true);
-    const ev = key({ key: "Backspace" });
-    handleKeydown(ev);
-    assertClaimed(ev);
-    assert.equal(Clue.hasFilter(), false);
-    assert.equal(Clue.isVisible(), true);
     handleKeydown(key({ key: "u" }));
-    assert.equal(calls, 1);
+    assert.equal(calls, 0);
+    assert.equal(spiedCalls.scrollHalfPageUp.length, 1);
   } finally {
     commands.goToParent = original;
     settings.set({ clueDelayMs: 300 });

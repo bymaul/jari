@@ -7,8 +7,6 @@ let clueTimer = null;
 let activePrefix = null;
 let renderPrefix = null;
 let renderCount = "";
-let filterText = "";
-let pendingFilter = "";
 let listEl = null;
 let titleEl = null;
 
@@ -32,8 +30,6 @@ function hide() {
   activePrefix = null;
   renderPrefix = null;
   renderCount = "";
-  filterText = "";
-  pendingFilter = "";
   listEl = null;
   titleEl = null;
   if (clueEl) {
@@ -51,23 +47,11 @@ function displaySuffix(suffix) {
     : suffix;
 }
 
-function filteredEntries() {
-  const all = getPrefixEntries(settings.getKeymap(), renderPrefix);
-  if (!filterText) return { all, rows: all };
-  const rows = all.filter((entry) =>
-    `${entry.suffix} ${commandLabel(entry.command)}`
-      .toLowerCase()
-      .includes(filterText),
-  );
-  return { all, rows };
-}
-
 function paint() {
   if (!clueEl || !listEl || !titleEl) return;
-  const { all, rows } = filteredEntries();
+  const rows = getPrefixEntries(settings.getKeymap(), renderPrefix);
   titleEl.textContent =
-    `${renderCount || ""}${displayCombo(renderPrefix)} — ${rows.length}/${all.length} bindings` +
-    (filterText ? ` · "${filterText}"` : "");
+    `${renderCount || ""}${displayCombo(renderPrefix)} — ${rows.length} bindings`;
   listEl.textContent = "";
   for (const { suffix, command } of rows) {
     const row = document.createElement("div");
@@ -85,44 +69,6 @@ function paint() {
     row.appendChild(label);
     listEl.appendChild(row);
   }
-}
-
-function hasFilter() {
-  return filterText !== "" || pendingFilter !== "";
-}
-
-function narrowedRows(prefix, filter) {
-  const all = getPrefixEntries(settings.getKeymap(), prefix);
-  if (!filter) return all;
-  return all.filter((entry) =>
-    `${entry.suffix} ${commandLabel(entry.command)}`
-      .toLowerCase()
-      .includes(filter),
-  );
-}
-
-function refilter(ch) {
-  if (!activePrefix) return false;
-  if (!clueEl) {
-    const next = pendingFilter + String(ch).toLowerCase();
-    if (narrowedRows(activePrefix, next).length === 0) return false;
-    pendingFilter = next;
-    return true;
-  }
-  filterText += String(ch).toLowerCase();
-  paint();
-  return true;
-}
-
-function backspaceFilter() {
-  if (!clueEl && activePrefix && pendingFilter) {
-    pendingFilter = pendingFilter.slice(0, -1);
-    return true;
-  }
-  if (!filterText) return false;
-  filterText = filterText.slice(0, -1);
-  paint();
-  return true;
 }
 
 function render(prefix, countStr) {
@@ -152,8 +98,6 @@ function render(prefix, countStr) {
     activePrefix = prefix;
     renderPrefix = prefix;
     renderCount = countStr || "";
-    filterText = pendingFilter;
-    pendingFilter = "";
     paint();
   } catch {}
 }
@@ -183,7 +127,6 @@ function refresh(prefix, countStr = "") {
   }
   renderPrefix = prefix;
   renderCount = countStr || "";
-  filterText = "";
   paint();
 }
 
@@ -197,9 +140,6 @@ export const Clue = {
   hide,
   isVisible,
   getActivePrefix,
-  hasFilter,
-  refilter,
-  backspaceFilter,
 };
 
 export function __resetClueState() {

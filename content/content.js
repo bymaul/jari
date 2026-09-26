@@ -220,11 +220,6 @@ function handleKeydown(event) {
   if (bufferWasPending && !commandName) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (event.key === "Backspace" && Clue.hasFilter()) {
-      Clue.backspaceFilter();
-      restartTimer();
-      return;
-    }
     if (
       !event.ctrlKey &&
       !event.altKey &&
@@ -234,16 +229,6 @@ function handleKeydown(event) {
       pendingKeys = buffer + key;
       ui.showcmd(pendingCount + pendingKeys);
       Clue.refresh(pendingKeys, pendingCount);
-      restartTimer();
-      return;
-    }
-    if (
-      !event.ctrlKey &&
-      !event.altKey &&
-      !event.metaKey &&
-      event.key.length === 1 &&
-      Clue.refilter(event.key)
-    ) {
       restartTimer();
       return;
     }

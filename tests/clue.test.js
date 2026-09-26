@@ -226,51 +226,6 @@ function clueRows(doc) {
   return root.children[1].children;
 }
 
-test("refilter narrows the visible clue and backspace restores it", async () => {
-  const doc = makeDocument();
-  await withDocument(doc, async () => {
-    Clue.schedule("g", "");
-    const full = clueRows(doc).length;
-    assert.ok(full > 1);
-    assert.equal(Clue.hasFilter(), false);
-
-    assert.equal(Clue.refilter("o"), true);
-    assert.equal(Clue.hasFilter(), true);
-    const narrowed = clueRows(doc).length;
-    assert.ok(narrowed > 0 && narrowed < full);
-
-    assert.equal(Clue.backspaceFilter(), true);
-    assert.equal(Clue.hasFilter(), false);
-    assert.equal(clueRows(doc).length, full);
-  });
-});
-
-test("filter keystrokes during the show delay are kept, not dropped", async () => {
-  settings.set({ keymap: { ...keymapDefaults }, clueEnabled: true, clueDelayMs: 30 });
-  const doc = makeDocument();
-  await withDocument(doc, async () => {
-    Clue.schedule("g", "");
-    assert.equal(Clue.isVisible(), false);
-    assert.equal(Clue.refilter("o"), true);
-    assert.equal(Clue.hasFilter(), true);
-    await new Promise((r) => setTimeout(r, 60));
-    assert.equal(Clue.isVisible(), true);
-    assert.equal(Clue.hasFilter(), true);
-    assert.equal(Clue.backspaceFilter(), true);
-    assert.equal(Clue.hasFilter(), false);
-    Clue.hide();
-  });
-});
-
-test("refilter returns false while the clue is hidden", async () => {
-  const doc = makeDocument();
-  await withDocument(doc, async () => {
-    assert.equal(Clue.isVisible(), false);
-    assert.equal(Clue.refilter("a"), false);
-    assert.equal(Clue.backspaceFilter(), false);
-  });
-});
-
 test("multi-char suffixes render as nested chains", async () => {
   settings.set({
     keymap: { gfk: "hintYank", gu: "goToParent" },

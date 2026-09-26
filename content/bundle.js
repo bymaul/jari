@@ -9446,8 +9446,6 @@ ${location.href}`;
   var activePrefix = null;
   var renderPrefix = null;
   var renderCount = "";
-  var filterText = "";
-  var pendingFilter = "";
   var listEl4 = null;
   var titleEl = null;
   function commandLabel(commandName) {
@@ -9467,8 +9465,6 @@ ${location.href}`;
     activePrefix = null;
     renderPrefix = null;
     renderCount = "";
-    filterText = "";
-    pendingFilter = "";
     listEl4 = null;
     titleEl = null;
     if (clueEl) {
@@ -9483,18 +9479,10 @@ ${location.href}`;
     if (suffix === " ") return "<Space>";
     return suffix.length > 1 ? `${suffix[0]} \u25B8 ${suffix.slice(1)}` : suffix;
   }
-  function filteredEntries() {
-    const all = getPrefixEntries(settings.getKeymap(), renderPrefix);
-    if (!filterText) return { all, rows: all };
-    const rows = all.filter(
-      (entry) => `${entry.suffix} ${commandLabel(entry.command)}`.toLowerCase().includes(filterText)
-    );
-    return { all, rows };
-  }
   function paint2() {
     if (!clueEl || !listEl4 || !titleEl) return;
-    const { all, rows } = filteredEntries();
-    titleEl.textContent = `${renderCount || ""}${displayCombo(renderPrefix)} \u2014 ${rows.length}/${all.length} bindings` + (filterText ? ` \xB7 "${filterText}"` : "");
+    const rows = getPrefixEntries(settings.getKeymap(), renderPrefix);
+    titleEl.textContent = `${renderCount || ""}${displayCombo(renderPrefix)} \u2014 ${rows.length} bindings`;
     listEl4.textContent = "";
     for (const { suffix, command } of rows) {
       const row = document.createElement("div");
@@ -9509,38 +9497,6 @@ ${location.href}`;
       row.appendChild(label);
       listEl4.appendChild(row);
     }
-  }
-  function hasFilter() {
-    return filterText !== "" || pendingFilter !== "";
-  }
-  function narrowedRows(prefix2, filter) {
-    const all = getPrefixEntries(settings.getKeymap(), prefix2);
-    if (!filter) return all;
-    return all.filter(
-      (entry) => `${entry.suffix} ${commandLabel(entry.command)}`.toLowerCase().includes(filter)
-    );
-  }
-  function refilter(ch) {
-    if (!activePrefix) return false;
-    if (!clueEl) {
-      const next2 = pendingFilter + String(ch).toLowerCase();
-      if (narrowedRows(activePrefix, next2).length === 0) return false;
-      pendingFilter = next2;
-      return true;
-    }
-    filterText += String(ch).toLowerCase();
-    paint2();
-    return true;
-  }
-  function backspaceFilter() {
-    if (!clueEl && activePrefix && pendingFilter) {
-      pendingFilter = pendingFilter.slice(0, -1);
-      return true;
-    }
-    if (!filterText) return false;
-    filterText = filterText.slice(0, -1);
-    paint2();
-    return true;
   }
   function render4(prefix2, countStr) {
     const keymap = settings.getKeymap();
@@ -9564,8 +9520,6 @@ ${location.href}`;
       activePrefix = prefix2;
       renderPrefix = prefix2;
       renderCount = countStr || "";
-      filterText = pendingFilter;
-      pendingFilter = "";
       paint2();
     } catch {
     }
@@ -9594,7 +9548,6 @@ ${location.href}`;
     }
     renderPrefix = prefix2;
     renderCount = countStr || "";
-    filterText = "";
     paint2();
   }
   function getActivePrefix() {
@@ -9605,10 +9558,7 @@ ${location.href}`;
     refresh: refresh2,
     hide,
     isVisible,
-    getActivePrefix,
-    hasFilter,
-    refilter,
-    backspaceFilter
+    getActivePrefix
   };
   function __resetClueState() {
     hide();
@@ -9792,19 +9742,10 @@ ${location.href}`;
     if (bufferWasPending && !commandName) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (event.key === "Backspace" && Clue.hasFilter()) {
-        Clue.backspaceFilter();
-        restartTimer();
-        return;
-      }
       if (!event.ctrlKey && !event.altKey && !event.metaKey && isPrefixKey(settings.getKeymap(), buffer + key)) {
         pendingKeys = buffer + key;
         ui.showcmd(pendingCount3 + pendingKeys);
         Clue.refresh(pendingKeys, pendingCount3);
-        restartTimer();
-        return;
-      }
-      if (!event.ctrlKey && !event.altKey && !event.metaKey && event.key.length === 1 && Clue.refilter(event.key)) {
         restartTimer();
         return;
       }
