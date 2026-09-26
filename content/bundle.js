@@ -616,6 +616,8 @@
     copyUrl: { category: "page", label: "Copy page URL" },
     copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
     screenshotPage: { category: "page", label: "Screenshot page (PNG download)" },
+    screenshotRegion: { category: "page", label: "Screenshot region (crop to marks)" },
+    screenshotFullPage: { category: "page", label: "Screenshot full page (scroll and stitch)" },
     toggleIgnore: { category: "modes", label: "Ignore mode" },
     passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },
     toggleSiteEnabled: { category: "modes", label: "Enable / disable on this site" },
@@ -2356,8 +2358,8 @@
   }
   function releaseFrameFocus() {
     try {
-      const active7 = document.activeElement;
-      if (active7 && isFrame(active7)) active7.blur();
+      const active8 = document.activeElement;
+      if (active8 && isFrame(active8)) active8.blur();
     } catch {
     }
     try {
@@ -2528,6 +2530,69 @@
     resolved = false;
     releaseFrameFocus();
     showHighlight();
+  }
+  var smoothState = null;
+  function prefersReducedMotion() {
+    try {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      return false;
+    }
+  }
+  function flushSmoothQueue() {
+    if (!smoothState) return;
+    const { el, x, y } = smoothState;
+    smoothState = null;
+    if (x === 0 && y === 0) return;
+    try {
+      el.scrollBy({ left: x, top: y, behavior: "instant" });
+    } catch {
+    }
+  }
+  function smoothScrollBy(el, x, y) {
+    if (smoothState === null) {
+      smoothState = { el, x: 0, y: 0, rafId: null };
+    } else if (smoothState.el !== el) {
+      flushSmoothQueue();
+      smoothState = { el, x: 0, y: 0, rafId: null };
+    }
+    smoothState.x += x;
+    smoothState.y += y;
+    if (smoothState.rafId === null) {
+      smoothState.rafId = requestAnimationFrame(smoothScrollStep);
+    }
+  }
+  function smoothScrollStep() {
+    if (!smoothState) return;
+    smoothState.rafId = null;
+    const { el } = smoothState;
+    const pendingX = smoothState.x;
+    const pendingY2 = smoothState.y;
+    if (pendingX === 0 && pendingY2 === 0) {
+      smoothState = null;
+      return;
+    }
+    if (Math.abs(pendingX) < 1 && Math.abs(pendingY2) < 1) {
+      el.scrollBy({ left: pendingX, top: pendingY2, behavior: "instant" });
+      smoothState = null;
+      return;
+    }
+    const CAP = 80;
+    const moveX = pendingX !== 0 ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4))) : 0;
+    const moveY = pendingY2 !== 0 ? Math.sign(pendingY2) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY2) * 0.4))) : 0;
+    const before = scrollPosOf(el);
+    el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
+    const after = scrollPosOf(el);
+    const dx = after.x - before.x;
+    const dy = after.y - before.y;
+    if (dx !== 0) smoothState.x -= dx;
+    else smoothState.x = 0;
+    if (dy !== 0) smoothState.y -= dy;
+    else smoothState.y = 0;
+    smoothState.rafId = requestAnimationFrame(smoothScrollStep);
+  }
+  function shouldSmooth() {
+    return settings.isSmoothScroll() && !prefersReducedMotion();
   }
   var Scroll = { getTarget, cycle, reset, showHighlight };
   function handleCycleMessage(event) {
@@ -3958,9 +4023,9 @@
     clearHighlightNames("jari-visual");
     unwrapSpans(visualFallbackSpans);
   }
-  function applyVisualHighlight({ active: active7, mode: mode4, getSelection: getSelection3 }) {
+  function applyVisualHighlight({ active: active8, mode: mode4, getSelection: getSelection3 }) {
     clearVisualHighlight();
-    if (!active7 || mode4 === "caret") return;
+    if (!active8 || mode4 === "caret") return;
     const sel = getSelection3();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     try {
@@ -4098,10 +4163,10 @@
     }
     return null;
   }
-  function readSingleCharRect(node, start, end) {
+  function readSingleCharRect(node, start2, end) {
     try {
       const r = document.createRange();
-      r.setStart(node, start);
+      r.setStart(node, start2);
       r.setEnd(node, end);
       const hit = firstUsableRect(r.getClientRects());
       if (hit) return hit;
@@ -8357,6 +8422,721 @@
   };
   register("palette", { close: close5, onKeyDown: onKeyDown6, isActive: isActive6 });
 
+  // content/screenshot.js
+  var UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
+  function isScreenshotable() {
+    try {
+      return !UNSCREENSHOTABLE_PROTOCOLS.test(location.protocol || "");
+    } catch {
+      return true;
+    }
+  }
+  function sanitizeHostForFilename(host5) {
+    const s = String(host5 || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return s.slice(0, 40);
+  }
+  function screenshotFilename(date = /* @__PURE__ */ new Date(), host5 = "") {
+    const pad = (n) => String(n).padStart(2, "0");
+    const stamp = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+    const h = sanitizeHostForFilename(host5);
+    return h ? `jari-${h}-${stamp}.png` : `jari-${stamp}.png`;
+  }
+  function pageHost() {
+    try {
+      return location.hostname || "";
+    } catch {
+      return "";
+    }
+  }
+  function pageScreenshotFilename(date = /* @__PURE__ */ new Date()) {
+    return screenshotFilename(date, pageHost());
+  }
+  function downloadUrl(url, filename = pageScreenshotFilename()) {
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      (document.body || document.documentElement).appendChild(a);
+      a.click();
+      a.remove();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async function waitForPaint() {
+    try {
+      await new Promise((resolve) => {
+        try {
+          if (typeof requestAnimationFrame !== "function") return resolve();
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        } catch {
+          resolve();
+        }
+      });
+    } catch {
+    }
+  }
+  function downloadBlob(blob, filename = pageScreenshotFilename()) {
+    let url;
+    try {
+      url = URL.createObjectURL(blob);
+    } catch {
+      return false;
+    }
+    if (!url) return false;
+    const ok = downloadUrl(url, filename);
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+    }
+    return ok;
+  }
+  async function waitForMediaReady({ timeoutMs = 1500 } = {}) {
+    const cap = Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : 1500;
+    const deadline = Date.now() + cap;
+    try {
+      const fontsReady = document.fonts && typeof document.fonts.ready?.then === "function" ? document.fonts.ready : null;
+      if (fontsReady) {
+        await Promise.race([
+          fontsReady,
+          new Promise((r) => setTimeout(r, cap))
+        ]);
+      }
+    } catch {
+    }
+    for (; ; ) {
+      let pending = false;
+      try {
+        const vh = window.innerHeight || 0;
+        const imgs = document.images ? [...document.images] : [];
+        for (const img of imgs) {
+          try {
+            if (img.complete) continue;
+          } catch {
+            continue;
+          }
+          let rect = null;
+          try {
+            rect = img.getBoundingClientRect();
+          } catch {
+            continue;
+          }
+          if (!rect || rect.bottom < 0 || rect.top > vh) continue;
+          pending = true;
+          break;
+        }
+      } catch {
+      }
+      if (!pending) return;
+      if (Date.now() >= deadline) return;
+      try {
+        await new Promise((r) => setTimeout(r, 100));
+      } catch {
+        return;
+      }
+    }
+  }
+  function computeSlices(totalH, vh, maxSlices = 8, maxH = 8e3) {
+    const h = Math.max(0, Math.min(totalH || 0, maxH));
+    const step = Math.max(1, vh || 1);
+    const cap = Math.max(1, maxSlices || 1);
+    const slices = [];
+    let y = 0;
+    while (y < h && slices.length < cap) {
+      slices.push(y);
+      y += step;
+    }
+    if (slices.length === 0) slices.push(0);
+    return { slices, truncated: (totalH || 0) > h };
+  }
+  function normalizeRect(a, b, vw, vh) {
+    const left = Math.max(0, Math.min(a.x, b.x));
+    const top = Math.max(0, Math.min(a.y, b.y));
+    const right = Math.min(vw, Math.max(a.x, b.x));
+    const bottom = Math.min(vh, Math.max(a.y, b.y));
+    return {
+      left,
+      top,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top)
+    };
+  }
+  function scaleRect(rect, dpr) {
+    const s = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+    return {
+      x: Math.round(rect.left * s),
+      y: Math.round(rect.top * s),
+      w: Math.max(1, Math.round(rect.width * s)),
+      h: Math.max(1, Math.round(rect.height * s))
+    };
+  }
+  function cropDataUrl(dataUrl, rect) {
+    return new Promise((resolve) => {
+      try {
+        const dpr = typeof window !== "undefined" && window.devicePixelRatio || 1;
+        const src = scaleRect(rect, dpr);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = src.w;
+            canvas.height = src.h;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return resolve(null);
+            ctx.drawImage(img, src.x, src.y, src.w, src.h, 0, 0, src.w, src.h);
+            if (typeof canvas.toBlob === "function") {
+              canvas.toBlob((blob) => resolve(blob || null));
+            } else {
+              resolve(null);
+            }
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  // content/shot.js
+  var STEP2 = 16;
+  var SHIFT_STEP = 1;
+  var PENDING_G_MS = 1500;
+  var active7 = false;
+  var cursor = { x: 0, y: 0 };
+  var start = null;
+  var pendingCount2 = "";
+  var pendingG2 = false;
+  var pendingGTimer2 = null;
+  var cursorEl = null;
+  var markEl = null;
+  var rectEl = null;
+  var pillEl2 = null;
+  function isActive7() {
+    return active7;
+  }
+  function viewport() {
+    return {
+      w: window.innerWidth || 0,
+      h: window.innerHeight || 0
+    };
+  }
+  function showPill2(text) {
+    try {
+      if (!pillEl2) {
+        pillEl2 = document.createElement("div");
+        pillEl2.className = "jari-pill";
+        ui.statusContainer().appendChild(pillEl2);
+      }
+      pillEl2.textContent = text;
+    } catch {
+    }
+  }
+  function hidePill2() {
+    if (!pillEl2) return;
+    try {
+      pillEl2.remove();
+    } catch {
+    }
+    pillEl2 = null;
+  }
+  function clearPendingGTimer() {
+    if (pendingGTimer2 !== null) {
+      clearTimeout(pendingGTimer2);
+      pendingGTimer2 = null;
+    }
+  }
+  function styleEl(el, styles) {
+    try {
+      for (const [prop, value] of Object.entries(styles)) {
+        el.style[prop] = value;
+      }
+    } catch {
+    }
+  }
+  var BASE_EL_STYLE = {
+    position: "fixed",
+    pointerEvents: "none",
+    zIndex: "2147483646"
+  };
+  function appendLayer(el) {
+    try {
+      (document.body || document.documentElement).appendChild(el);
+    } catch {
+    }
+  }
+  function makeLayer() {
+    try {
+      cursorEl = document.createElement("div");
+      cursorEl.className = "jari-shot-cursor";
+      styleEl(cursorEl, {
+        ...BASE_EL_STYLE,
+        width: "12px",
+        height: "12px",
+        border: "2px solid #e0a363",
+        background: "rgba(224, 163, 99, 0.35)"
+      });
+      appendLayer(cursorEl);
+    } catch {
+      cursorEl = null;
+    }
+    try {
+      markEl = document.createElement("div");
+      markEl.className = "jari-shot-mark";
+      styleEl(markEl, {
+        ...BASE_EL_STYLE,
+        width: "8px",
+        height: "8px",
+        background: "#e0a363",
+        border: "1px solid #c38a22",
+        display: "none"
+      });
+      appendLayer(markEl);
+    } catch {
+      markEl = null;
+    }
+    try {
+      rectEl = document.createElement("div");
+      rectEl.className = "jari-shot-rect";
+      styleEl(rectEl, {
+        ...BASE_EL_STYLE,
+        border: "2px solid #e0a363",
+        background: "rgba(224, 163, 99, 0.12)",
+        boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.35)",
+        display: "none"
+      });
+      appendLayer(rectEl);
+    } catch {
+      rectEl = null;
+    }
+  }
+  function removeLayer() {
+    for (const el of [cursorEl, markEl, rectEl]) {
+      if (!el) continue;
+      try {
+        el.remove();
+      } catch {
+      }
+    }
+    cursorEl = null;
+    markEl = null;
+    rectEl = null;
+  }
+  function paintCursor() {
+    if (!cursorEl) return;
+    try {
+      cursorEl.style.left = `${cursor.x - 6}px`;
+      cursorEl.style.top = `${cursor.y - 6}px`;
+    } catch {
+    }
+  }
+  function paintMark() {
+    if (!markEl) return;
+    try {
+      if (!start) {
+        markEl.style.display = "none";
+        return;
+      }
+      markEl.style.display = "";
+      markEl.style.left = `${start.x - 4}px`;
+      markEl.style.top = `${start.y - 4}px`;
+    } catch {
+    }
+  }
+  function paintRect() {
+    if (!rectEl) return;
+    try {
+      if (!start) {
+        rectEl.style.display = "none";
+        showPill2("shot: mark start");
+        return;
+      }
+      const { w, h } = viewport();
+      const r = normalizeRect(start, cursor, w, h);
+      rectEl.style.display = "";
+      rectEl.style.left = `${r.left}px`;
+      rectEl.style.top = `${r.top}px`;
+      rectEl.style.width = `${Math.max(r.width, 2)}px`;
+      rectEl.style.height = `${Math.max(r.height, 2)}px`;
+      showPill2(`shot: ${r.width}x${r.height}`);
+    } catch {
+    }
+  }
+  function paint() {
+    paintCursor();
+    paintMark();
+    paintRect();
+  }
+  function open5() {
+    if (active7) return;
+    active7 = true;
+    touch("shot");
+    const { w, h } = viewport();
+    cursor = { x: Math.floor(w / 2), y: Math.floor(h / 2) };
+    start = null;
+    pendingCount2 = "";
+    pendingG2 = false;
+    clearPendingGTimer();
+    makeLayer();
+    showPill2("shot: mark start");
+    paint();
+  }
+  function close6() {
+    if (!active7) return;
+    active7 = false;
+    start = null;
+    pendingCount2 = "";
+    pendingG2 = false;
+    clearPendingGTimer();
+    removeLayer();
+    hidePill2();
+  }
+  function clampCursor() {
+    const { w, h } = viewport();
+    cursor.x = Math.max(0, Math.min(Math.max(0, w - 1), cursor.x));
+    cursor.y = Math.max(0, Math.min(Math.max(0, h - 1), cursor.y));
+  }
+  function move4(dx, dy, step) {
+    const n = pendingCount2 ? parseInt(pendingCount2, 10) || 1 : 1;
+    pendingCount2 = "";
+    cursor.x += dx * step * n;
+    cursor.y += dy * step * n;
+    clampCursor();
+    paint();
+  }
+  function jumpTo(x, y) {
+    pendingCount2 = "";
+    pendingG2 = false;
+    clearPendingGTimer();
+    if (x !== null) cursor.x = x;
+    if (y !== null) cursor.y = y;
+    clampCursor();
+    paint();
+  }
+  async function finish() {
+    const { w, h } = viewport();
+    const rect = normalizeRect(start, cursor, w, h);
+    close6();
+    if (rect.width < 2 || rect.height < 2) {
+      ui.toast("Empty region");
+      return;
+    }
+    await waitForPaint();
+    const res = await sendMessage("captureScreenshot");
+    if (!res || !res.ok || !res.dataUrl) {
+      ui.toast("Screenshot failed");
+      return;
+    }
+    const blob = await cropDataUrl(res.dataUrl, rect);
+    if (!blob) {
+      ui.toast("Screenshot failed");
+      return;
+    }
+    ui.toast(downloadBlob(blob) ? "Saved screenshot" : "Screenshot failed");
+  }
+  function armPendingG() {
+    pendingG2 = true;
+    clearPendingGTimer();
+    try {
+      pendingGTimer2 = setTimeout(() => {
+        pendingGTimer2 = null;
+        pendingG2 = false;
+      }, PENDING_G_MS);
+    } catch {
+    }
+  }
+  function onKeyDown7(event) {
+    if (!active7) return false;
+    const key = event.key;
+    if (key === "Escape") {
+      ui.consume(event);
+      close6();
+      return true;
+    }
+    if (key === "g" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      ui.consume(event);
+      if (pendingG2) {
+        jumpTo(null, 0);
+      } else {
+        armPendingG();
+      }
+      return true;
+    }
+    pendingG2 = false;
+    clearPendingGTimer();
+    if (key === "0" && pendingCount2 === "") {
+      ui.consume(event);
+      jumpTo(0, null);
+      return true;
+    }
+    if (/^[0-9]$/.test(key)) {
+      ui.consume(event);
+      if (pendingCount2.length < 9) pendingCount2 += key;
+      return true;
+    }
+    if (key === "Enter") {
+      ui.consume(event);
+      if (!start) {
+        start = { ...cursor };
+        paint();
+      } else {
+        finish();
+      }
+      return true;
+    }
+    if (key === "Backspace") {
+      ui.consume(event);
+      start = null;
+      pendingCount2 = "";
+      paint();
+      return true;
+    }
+    if (key === "$") {
+      ui.consume(event);
+      const { w } = viewport();
+      jumpTo(Math.max(0, w - 1), null);
+      return true;
+    }
+    if (key === "G") {
+      ui.consume(event);
+      const { h } = viewport();
+      jumpTo(null, Math.max(0, h - 1));
+      return true;
+    }
+    if (key === "M") {
+      ui.consume(event);
+      const { w, h } = viewport();
+      jumpTo(Math.floor(w / 2), Math.floor(h / 2));
+      return true;
+    }
+    const big = key === "H" || key === "J" || key === "K" || key === "L";
+    const dirs = {
+      h: [-1, 0],
+      j: [0, 1],
+      k: [0, -1],
+      l: [1, 0],
+      H: [-1, 0],
+      J: [0, 1],
+      K: [0, -1],
+      L: [1, 0],
+      ArrowLeft: [-1, 0],
+      ArrowDown: [0, 1],
+      ArrowUp: [0, -1],
+      ArrowRight: [1, 0]
+    };
+    if (key in dirs) {
+      ui.consume(event);
+      const [dx, dy] = dirs[key];
+      const step = big || key.startsWith("Arrow") && event.shiftKey ? SHIFT_STEP : STEP2;
+      move4(dx, dy, step);
+      return true;
+    }
+    ui.consume(event);
+    return true;
+  }
+  var Shot = {
+    open: open5,
+    close: close6,
+    onKeyDown: onKeyDown7,
+    isActive: isActive7
+  };
+  register("shot", { close: close6, onKeyDown: onKeyDown7, isActive: isActive7 });
+
+  // content/scrollshot.js
+  var SETTLE_MS = 120;
+  function computedPosition(el) {
+    try {
+      const view = el.ownerDocument && el.ownerDocument.defaultView || window;
+      return view.getComputedStyle(el).position;
+    } catch {
+      return "";
+    }
+  }
+  function collectFrameDocs() {
+    const docs = [];
+    try {
+      const frames = document.querySelectorAll("iframe, frame") || [];
+      for (const frame of frames) {
+        try {
+          const doc = frame.contentDocument;
+          if (doc) docs.push(doc);
+        } catch {
+        }
+      }
+    } catch {
+    }
+    return docs;
+  }
+  function hideFixedElements(seen = /* @__PURE__ */ new Set()) {
+    const hidden = [];
+    const hideIn = (els) => {
+      for (const el of els || []) {
+        if (seen.has(el)) continue;
+        let pos;
+        try {
+          pos = computedPosition(el);
+        } catch {
+          continue;
+        }
+        if (pos !== "fixed" && pos !== "sticky") continue;
+        if (!el.style) continue;
+        seen.add(el);
+        hidden.push([el, el.style.visibility]);
+        try {
+          el.style.visibility = "hidden";
+        } catch {
+        }
+      }
+    };
+    try {
+      hideIn(queryAll("*"));
+    } catch {
+    }
+    for (const doc of collectFrameDocs()) {
+      try {
+        hideIn(doc.querySelectorAll("*"));
+      } catch {
+      }
+    }
+    return () => {
+      for (const [el, prev] of hidden) {
+        try {
+          if (!el.isConnected) continue;
+          el.style.visibility = prev;
+        } catch {
+        }
+      }
+    };
+  }
+  function loadImage(src) {
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+  function scrollTo(x, y) {
+    try {
+      window.scrollTo(x, y);
+    } catch {
+    }
+  }
+  async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
+    if (!isScreenshotable()) {
+      ui.toast("Cannot screenshot this page");
+      return;
+    }
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    if (!(vw > 0 && vh > 0)) {
+      ui.toast("Screenshot failed");
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const scroller = document.scrollingElement || document.documentElement;
+    const totalH = scroller && Number.isFinite(scroller.scrollHeight) ? scroller.scrollHeight : vh;
+    const { slices, truncated } = computeSlices(totalH, vh);
+    const restoreOverlays = ui.hideOverlaysForCapture();
+    const seenFixed = /* @__PURE__ */ new Set();
+    const fixedRestores = [hideFixedElements(seenFixed)];
+    const rootEl = document.documentElement;
+    let prevBehavior;
+    try {
+      prevBehavior = rootEl && rootEl.style ? rootEl.style.scrollBehavior : void 0;
+      if (rootEl && rootEl.style) rootEl.style.scrollBehavior = "auto";
+    } catch {
+    }
+    const startX = window.scrollX || 0;
+    const startY = window.scrollY || 0;
+    try {
+      scrollTo(0, 0);
+      await waitForPaint();
+      const canvas = document.createElement("canvas");
+      const capH = Math.min(totalH, slices.length * vh);
+      canvas.width = Math.round(vw * dpr);
+      canvas.height = Math.max(1, Math.round(capH * dpr));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        ui.toast("Screenshot failed");
+        return;
+      }
+      for (const y of slices) {
+        scrollTo(0, y);
+        await waitForPaint();
+        await waitForMediaReady({ timeoutMs: settleMs });
+        try {
+          fixedRestores.push(hideFixedElements(seenFixed));
+        } catch {
+        }
+        let actualY = y;
+        try {
+          actualY = window.scrollY || 0;
+        } catch {
+        }
+        const res = await sendMessage("captureScreenshot");
+        if (!res || !res.ok || !res.dataUrl) {
+          ui.toast("Screenshot failed");
+          return;
+        }
+        const img = await loadImage(res.dataUrl);
+        if (!img) {
+          ui.toast("Screenshot failed");
+          return;
+        }
+        try {
+          ctx.drawImage(img, 0, Math.round(actualY * dpr));
+        } catch {
+          ui.toast("Screenshot failed");
+          return;
+        }
+      }
+      const blob = await new Promise((resolve) => {
+        try {
+          if (typeof canvas.toBlob === "function") {
+            canvas.toBlob((b) => resolve(b || null));
+          } else {
+            resolve(null);
+          }
+        } catch {
+          resolve(null);
+        }
+      });
+      if (!blob) {
+        ui.toast("Screenshot failed");
+        return;
+      }
+      const ok = downloadBlob(blob);
+      if (!ok) ui.toast("Screenshot failed");
+      else if (truncated) ui.toast("Saved partial screenshot");
+      else ui.toast("Saved screenshot");
+    } finally {
+      scrollTo(startX, startY);
+      try {
+        if (rootEl && rootEl.style) rootEl.style.scrollBehavior = prevBehavior;
+      } catch {
+      }
+      for (const restore of fixedRestores.splice(0).reverse()) {
+        try {
+          restore();
+        } catch {
+        }
+      }
+      try {
+        restoreOverlays();
+      } catch {
+      }
+    }
+  }
+
   // content/commands.js
   var PAGE_RATIO = 0.9;
   var HALF_RATIO = 0.5;
@@ -8370,69 +9150,6 @@
   }
   function getScrollElement() {
     return Scroll.getTarget();
-  }
-  var smoothState = null;
-  function prefersReducedMotion() {
-    try {
-      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    } catch {
-      return false;
-    }
-  }
-  function flushSmoothQueue() {
-    if (!smoothState) return;
-    const { el, x, y } = smoothState;
-    smoothState = null;
-    if (x === 0 && y === 0) return;
-    try {
-      el.scrollBy({ left: x, top: y, behavior: "instant" });
-    } catch {
-    }
-  }
-  function smoothScrollBy(el, x, y) {
-    if (smoothState === null) {
-      smoothState = { el, x: 0, y: 0, rafId: null };
-    } else if (smoothState.el !== el) {
-      flushSmoothQueue();
-      smoothState = { el, x: 0, y: 0, rafId: null };
-    }
-    smoothState.x += x;
-    smoothState.y += y;
-    if (smoothState.rafId === null) {
-      smoothState.rafId = requestAnimationFrame(smoothScrollStep);
-    }
-  }
-  function smoothScrollStep() {
-    if (!smoothState) return;
-    smoothState.rafId = null;
-    const { el } = smoothState;
-    const pendingX = smoothState.x;
-    const pendingY2 = smoothState.y;
-    if (pendingX === 0 && pendingY2 === 0) {
-      smoothState = null;
-      return;
-    }
-    if (Math.abs(pendingX) < 1 && Math.abs(pendingY2) < 1) {
-      el.scrollBy({ left: pendingX, top: pendingY2, behavior: "instant" });
-      smoothState = null;
-      return;
-    }
-    const CAP = 80;
-    const moveX = pendingX !== 0 ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4))) : 0;
-    const moveY = pendingY2 !== 0 ? Math.sign(pendingY2) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY2) * 0.4))) : 0;
-    const before = scrollPosOf(el);
-    el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
-    const after = scrollPosOf(el);
-    const dx = after.x - before.x;
-    const dy = after.y - before.y;
-    if (dx !== 0) smoothState.x -= dx;
-    else smoothState.x = 0;
-    if (dy !== 0) smoothState.y -= dy;
-    else smoothState.y = 0;
-    smoothState.rafId = requestAnimationFrame(smoothScrollStep);
-  }
-  function shouldSmooth() {
-    return settings.isSmoothScroll() && !prefersReducedMotion();
   }
   function scrollFrame(frame, apply) {
     const w = frameWindow(frame);
@@ -8519,44 +9236,13 @@ ${location.href}`;
     sendMessage("navigate", { url: target2 });
   }
   var UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
-  var UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
-  function screenshotFilename(date = /* @__PURE__ */ new Date()) {
-    const pad = (n) => String(n).padStart(2, "0");
-    return `jari-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.png`;
-  }
-  function downloadScreenshot(dataUrl) {
-    try {
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = screenshotFilename();
-      (document.body || document.documentElement).appendChild(a);
-      a.click();
-      a.remove();
-      return true;
-    } catch {
-      return false;
-    }
-  }
   async function screenshotPage() {
-    try {
-      if (UNSCREENSHOTABLE_PROTOCOLS.test(location.protocol || "")) {
-        ui.toast("Cannot screenshot this page");
-        return;
-      }
-    } catch {
+    if (!isScreenshotable()) {
+      ui.toast("Cannot screenshot this page");
+      return;
     }
     const restore = ui.hideOverlaysForCapture();
-    try {
-      await new Promise((resolve) => {
-        try {
-          if (typeof requestAnimationFrame !== "function") return resolve();
-          requestAnimationFrame(() => requestAnimationFrame(resolve));
-        } catch {
-          resolve();
-        }
-      });
-    } catch {
-    }
+    await waitForPaint();
     let res;
     try {
       res = await sendMessage("captureScreenshot");
@@ -8570,7 +9256,7 @@ ${location.href}`;
       ui.toast("Screenshot failed");
       return;
     }
-    ui.toast(downloadScreenshot(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
+    ui.toast(downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
   }
   async function toggleBookmarkPage() {
     const url = location.href || "";
@@ -8697,6 +9383,14 @@ ${location.href}`;
     copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
     copyTitleAndUrl: { ...COMMAND_CATALOG.copyTitleAndUrl, run: () => copyToClipboard(copyTitleAndUrlText(), "Copied") },
     screenshotPage: cmd("screenshotPage", () => screenshotPage()),
+    screenshotFullPage: cmd("screenshotFullPage", () => captureFullPage()),
+    screenshotRegion: cmd("screenshotRegion", () => {
+      if (!isScreenshotable()) {
+        ui.toast("Cannot screenshot this page");
+        return;
+      }
+      Shot.open();
+    }),
     toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
     passthroughKeys: { ...COMMAND_CATALOG.passthroughKeys, run: () => passthroughEnter() },
     toggleSiteEnabled: { ...COMMAND_CATALOG.toggleSiteEnabled, run: () => settings.toggleSiteEnabled() },
@@ -8781,7 +9475,7 @@ ${location.href}`;
     );
     return { all, rows };
   }
-  function paint() {
+  function paint2() {
     if (!clueEl || !listEl4 || !titleEl) return;
     const { all, rows } = filteredEntries();
     titleEl.textContent = `${renderCount || ""}${displayCombo(renderPrefix)} \u2014 ${rows.length}/${all.length} bindings` + (filterText ? ` \xB7 "${filterText}"` : "");
@@ -8819,7 +9513,7 @@ ${location.href}`;
       return true;
     }
     filterText += String(ch).toLowerCase();
-    paint();
+    paint2();
     return true;
   }
   function backspaceFilter() {
@@ -8829,7 +9523,7 @@ ${location.href}`;
     }
     if (!filterText) return false;
     filterText = filterText.slice(0, -1);
-    paint();
+    paint2();
     return true;
   }
   function render4(prefix2, countStr) {
@@ -8856,7 +9550,7 @@ ${location.href}`;
       renderCount = countStr || "";
       filterText = pendingFilter;
       pendingFilter = "";
-      paint();
+      paint2();
     } catch {
     }
   }
@@ -8885,7 +9579,7 @@ ${location.href}`;
     renderPrefix = prefix2;
     renderCount = countStr || "";
     filterText = "";
-    paint();
+    paint2();
   }
   function getActivePrefix() {
     return activePrefix;
@@ -8905,7 +9599,7 @@ ${location.href}`;
   }
 
   // content/content.js
-  var pendingCount2 = "";
+  var pendingCount3 = "";
   var pendingKeys = "";
   var timer = null;
   var ignoreMode = false;
@@ -8917,7 +9611,7 @@ ${location.href}`;
     return "passthrough (" + settings.getPassthroughMs() + "ms)";
   }
   function clearPending() {
-    pendingCount2 = "";
+    pendingCount3 = "";
     pendingKeys = "";
     ui.showcmd(null);
     Clue.hide();
@@ -8942,9 +9636,9 @@ ${location.href}`;
     clearPending();
     if (on) {
       Overlays.closeAll();
-      showPill2("ignore", PILL_IGNORE_TEXT);
+      showPill3("ignore", PILL_IGNORE_TEXT);
     } else {
-      hidePill2("ignore");
+      hidePill3("ignore");
     }
   }
   function toggleIgnore() {
@@ -8957,7 +9651,7 @@ ${location.href}`;
     clearPending();
     Overlays.closeAll();
     passthroughMode = true;
-    showPill2("passthrough", pillPassthroughText());
+    showPill3("passthrough", pillPassthroughText());
     clearTimeout(passthroughTimer);
     passthroughTimer = null;
     const passthroughMs = settings.getPassthroughMs();
@@ -8969,12 +9663,12 @@ ${location.href}`;
     if (!passthroughMode) return;
     clearTimeout(passthroughTimer);
     passthroughMode = false;
-    hidePill2("passthrough");
+    hidePill3("passthrough");
   }
   function isFullscreen() {
     return !!document.fullscreenElement;
   }
-  function showPill2(name, text) {
+  function showPill3(name, text) {
     if (pills[name] || isFullscreen()) return;
     const el = document.createElement("div");
     el.className = "jari-pill";
@@ -8982,7 +9676,7 @@ ${location.href}`;
     ui.statusContainer().appendChild(el);
     pills[name] = el;
   }
-  function hidePill2(name) {
+  function hidePill3(name) {
     const el = pills[name];
     if (el) {
       el.remove();
@@ -8993,11 +9687,11 @@ ${location.href}`;
     Clue.hide();
     if (!ignoreMode && !passthroughMode) return;
     if (isFullscreen()) {
-      hidePill2("ignore");
-      hidePill2("passthrough");
+      hidePill3("ignore");
+      hidePill3("passthrough");
     } else {
-      if (ignoreMode) showPill2("ignore", PILL_IGNORE_TEXT);
-      if (passthroughMode) showPill2("passthrough", pillPassthroughText());
+      if (ignoreMode) showPill3("ignore", PILL_IGNORE_TEXT);
+      if (passthroughMode) showPill3("passthrough", pillPassthroughText());
     }
   }
   function isJariUiTarget(event) {
@@ -9054,7 +9748,7 @@ ${location.href}`;
       const key2 = canonicalKey(event);
       if (settings.getKeymap()[key2] === "toggleSiteEnabled")
         run("toggleSiteEnabled", 1, event);
-      else if (pendingKeys || pendingCount2) clearPending();
+      else if (pendingKeys || pendingCount3) clearPending();
       return;
     }
     const key = canonicalKey(event);
@@ -9076,7 +9770,7 @@ ${location.href}`;
         event.stopImmediatePropagation();
         activeEl.blur();
         clearPending();
-      } else if (pendingKeys || pendingCount2) clearPending();
+      } else if (pendingKeys || pendingCount3) clearPending();
       return;
     }
     if (bufferWasPending && !commandName) {
@@ -9089,8 +9783,8 @@ ${location.href}`;
       }
       if (!event.ctrlKey && !event.altKey && !event.metaKey && isPrefixKey(settings.getKeymap(), buffer + key)) {
         pendingKeys = buffer + key;
-        ui.showcmd(pendingCount2 + pendingKeys);
-        Clue.refresh(pendingKeys, pendingCount2);
+        ui.showcmd(pendingCount3 + pendingKeys);
+        Clue.refresh(pendingKeys, pendingCount3);
         restartTimer();
         return;
       }
@@ -9103,7 +9797,7 @@ ${location.href}`;
       bufferWasPending = false;
     }
     if (event.key === "Escape") {
-      if (pendingCount2) {
+      if (pendingCount3) {
         event.preventDefault();
         event.stopImmediatePropagation();
         clearPending();
@@ -9121,8 +9815,8 @@ ${location.href}`;
       if (Find.handleGlobalEnter(event)) return;
     }
     if (!commandName && /^[0-9]$/.test(key)) {
-      if (pendingCount2.length < 9) pendingCount2 += key;
-      ui.showcmd(pendingCount2);
+      if (pendingCount3.length < 9) pendingCount3 += key;
+      ui.showcmd(pendingCount3);
       event.preventDefault();
       event.stopImmediatePropagation();
       restartTimer();
@@ -9130,8 +9824,8 @@ ${location.href}`;
     }
     if (!commandName && isPrefixKey(settings.getKeymap(), key)) {
       pendingKeys = key;
-      ui.showcmd(pendingCount2 + key);
-      Clue.schedule(key, pendingCount2);
+      ui.showcmd(pendingCount3 + key);
+      Clue.schedule(key, pendingCount3);
       event.preventDefault();
       event.stopImmediatePropagation();
       restartTimer();
@@ -9142,10 +9836,10 @@ ${location.href}`;
       clearPending();
       return;
     }
-    const countStr = pendingCount2;
-    const count = parseRepeatCount(pendingCount2);
+    const countStr = pendingCount3;
+    const count = parseRepeatCount(pendingCount3);
     const hadCount = countStr !== "";
-    pendingCount2 = "";
+    pendingCount3 = "";
     if (hadCount || bufferWasPending)
       ui.flash(countStr + buffer + key);
     restartTimer();
@@ -9173,12 +9867,12 @@ ${location.href}`;
     clearTimeout(passthroughTimer);
     timer = null;
     passthroughTimer = null;
-    pendingCount2 = "";
+    pendingCount3 = "";
     pendingKeys = "";
     ignoreMode = false;
     passthroughMode = false;
-    if (pills.ignore) hidePill2("ignore");
-    if (pills.passthrough) hidePill2("passthrough");
+    if (pills.ignore) hidePill3("ignore");
+    if (pills.passthrough) hidePill3("passthrough");
     try {
       __resetClueState();
     } catch {

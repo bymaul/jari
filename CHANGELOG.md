@@ -10,11 +10,22 @@ versioned for the extension manifest (`manifest.base.json`).
 
 - Screenshot page (`screenshotPage`, unbound by default): captures the
   visible viewport as PNG via `chrome.tabs.captureVisibleTab` and
-  downloads it as `jari-YYYYMMDD-HHmmss.png`. Jari overlays (hints,
+  downloads it as `jari-<host>-YYYYMMDD-HHmmss.png`. Jari overlays (hints,
   prompt, help, pills, toasts) are hidden for the capture and restored
   after. Needs the `activeTab` permission; restricted pages
   (`chrome://`, `about:`, etc.) report honestly instead of failing
   silently.
+- Screenshot region (`screenshotRegion`, unbound by default): keyboard
+  cursor (`hjkl`/arrows at 16px, `Shift` for 1px, counts, `0`/`$`/`gg`/`G`
+  edge jumps, `M` center) marks two corners with `Enter` (a start dot and
+  outline stay visible even at zero area), then captures and crops to
+  the rectangle (`Escape` cancels, `Backspace` clears the start mark).
+- Screenshot full page (`screenshotFullPage`, unbound by default):
+  scrolls the page capturing viewport slices and stitches them into one
+  PNG (fixed/sticky elements hidden so they don't repeat, scroll and
+  overlays restored after, capped at 8 slices / 8000px with an honest
+  partial toast). Each slice waits for fonts and in-viewport images
+  instead of a fixed delay.
 
 ## [0.5.0] - 2026-09-14
 

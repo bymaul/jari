@@ -37,7 +37,8 @@ Bindings chain into sequences of any length.
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
 newTab, newIncognitoTab, duplicateTab, togglePin,
-toggleMute, hintOpenCurrent, toggleBookmark.
+toggleMute, hintOpenCurrent, toggleBookmark,
+screenshotPage, screenshotRegion, screenshotFullPage.
 
 ## Settings (`;e`)
 
@@ -71,6 +72,7 @@ Or build from source (below) and load this folder the same way. The checked-in
 | `storage`                   | Persist your settings via the browser's synced storage                                |
 | `clipboardRead`             | Open a URL from your clipboard (`gp`/`gP`)                                            |
 | `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API |
+| `activeTab`, host `<all_urls>` | Capture the visible tab for screenshots (`screenshotPage`, region, full page)         |
 | `<all_urls>` content script | Link hints, scrolling, find, and visual mode on the pages you visit                   |
 
 Jari makes no network requests of its own and sends nothing anywhere.

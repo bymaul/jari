@@ -1,7 +1,7 @@
 import { Url } from "../shared/url.js";
 import { settings } from "./settings.js";
 import { sendMessage, ui } from "./ui.js";
-import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, focusTarget } from "./scroll.js";
+import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.js";
 import { Prompt } from "./prompt.js";
 import { Help } from "./help.js";
 import { Hints } from "./hints.js";
@@ -10,6 +10,9 @@ import { Visual } from "./visual.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 import { goPage } from "./page-nav.js";
 import { Palette } from "./palette.js";
+import { Shot } from "./shot.js";
+import { captureFullPage } from "./scrollshot.js";
+import { downloadUrl, waitForPaint, isScreenshotable } from "./screenshot.js";
 
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;
@@ -23,84 +26,6 @@ export function setModeActions({ ignore, passthrough } = {}) {
 
 function getScrollElement() {
   return Scroll.getTarget();
-}
-
-let smoothState = null;
-
-function prefersReducedMotion() {
-  try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
-}
-
-function flushSmoothQueue() {
-  if (!smoothState) return;
-  const { el, x, y } = smoothState;
-  smoothState = null;
-  if (x === 0 && y === 0) return;
-  try {
-    el.scrollBy({ left: x, top: y, behavior: "instant" });
-  } catch {}
-}
-
-function smoothScrollBy(el, x, y) {
-  if (smoothState === null) {
-    smoothState = { el, x: 0, y: 0, rafId: null };
-  } else if (smoothState.el !== el) {
-    flushSmoothQueue();
-    smoothState = { el, x: 0, y: 0, rafId: null };
-  }
-  smoothState.x += x;
-  smoothState.y += y;
-  if (smoothState.rafId === null) {
-    smoothState.rafId = requestAnimationFrame(smoothScrollStep);
-  }
-}
-
-function smoothScrollStep() {
-  if (!smoothState) return;
-  smoothState.rafId = null;
-  const { el } = smoothState;
-  const pendingX = smoothState.x;
-  const pendingY = smoothState.y;
-  if (pendingX === 0 && pendingY === 0) {
-    smoothState = null;
-    return;
-  }
-  if (Math.abs(pendingX) < 1 && Math.abs(pendingY) < 1) {
-    el.scrollBy({ left: pendingX, top: pendingY, behavior: "instant" });
-    smoothState = null;
-    return;
-  }
-
-  const CAP = 80;
-  const moveX =
-    pendingX !== 0
-      ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4)))
-      : 0;
-  const moveY =
-    pendingY !== 0
-      ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.4)))
-      : 0;
-
-  const before = scrollPosOf(el);
-  el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
-  const after = scrollPosOf(el);
-  const dx = after.x - before.x;
-  const dy = after.y - before.y;
-
-  if (dx !== 0) smoothState.x -= dx;
-  else smoothState.x = 0;
-  if (dy !== 0) smoothState.y -= dy;
-  else smoothState.y = 0;
-
-  smoothState.rafId = requestAnimationFrame(smoothScrollStep);
-}
-
-function shouldSmooth() {
-  return settings.isSmoothScroll() && !prefersReducedMotion();
 }
 
 function scrollFrame(frame, apply) {
@@ -196,45 +121,13 @@ function goTo(urlFn) {
 
 const UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
 
-const UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
-
-export function screenshotFilename(date = new Date()) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `jari-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.png`;
-}
-
-function downloadScreenshot(dataUrl) {
-  try {
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = screenshotFilename();
-    (document.body || document.documentElement).appendChild(a);
-    a.click();
-    a.remove();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function screenshotPage() {
-  try {
-    if (UNSCREENSHOTABLE_PROTOCOLS.test(location.protocol || "")) {
-      ui.toast("Cannot screenshot this page");
-      return;
-    }
-  } catch {}
+  if (!isScreenshotable()) {
+    ui.toast("Cannot screenshot this page");
+    return;
+  }
   const restore = ui.hideOverlaysForCapture();
-  try {
-    await new Promise((resolve) => {
-      try {
-        if (typeof requestAnimationFrame !== "function") return resolve();
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
-      } catch {
-        resolve();
-      }
-    });
-  } catch {}
+  await waitForPaint();
   let res;
   try {
     res = await sendMessage("captureScreenshot");
@@ -247,7 +140,7 @@ async function screenshotPage() {
     ui.toast("Screenshot failed");
     return;
   }
-  ui.toast(downloadScreenshot(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
+  ui.toast(downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
 }
 
 async function toggleBookmarkPage() {
@@ -381,6 +274,14 @@ export const commands = {
   copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
   copyTitleAndUrl: { ...COMMAND_CATALOG.copyTitleAndUrl, run: () => copyToClipboard(copyTitleAndUrlText(), "Copied") },
   screenshotPage: cmd("screenshotPage", () => screenshotPage()),
+  screenshotFullPage: cmd("screenshotFullPage", () => captureFullPage()),
+  screenshotRegion: cmd("screenshotRegion", () => {
+    if (!isScreenshotable()) {
+      ui.toast("Cannot screenshot this page");
+      return;
+    }
+    Shot.open();
+  }),
 
   toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
   passthroughKeys: { ...COMMAND_CATALOG.passthroughKeys, run: () => passthroughEnter() },

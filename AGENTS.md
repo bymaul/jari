@@ -51,6 +51,9 @@ source (repo convention).
 - `content/prompt/` - prompt subsystems (`shared.js` `promptCss`/`renderText`,
   `list.js` `renderTitleUrl`/`renderList`); `content/prompt.js` omnibar +
   `content/palette.js` command palette share it
+- `content/screenshot.js` - screenshot helpers (`screenshotFilename`,
+  `downloadUrl`, `normalizeRect`, `cropDataUrl`); `content/shot.js` is the
+  region-mark mode, `content/scrollshot.js` the full-page stitch
 - `content/scroll.js` - scroll target + smooth queue (`smoothScrollBy`,
   `shouldSmooth`, `cycle`/`reset`); `content/commands.js` now imports smooth helpers
 - `background/` - service-worker source (`main.js` + `handlers.js` aggregator,
