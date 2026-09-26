@@ -4,7 +4,7 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
-## [Unreleased]
+## [0.6.0] - 2026-09-27
 
 ### Added
 
@@ -26,6 +26,20 @@ versioned for the extension manifest (`manifest.base.json`).
   overlays restored after, capped at 8 slices / 8000px with an honest
   partial toast). Each slice waits for fonts and in-viewport images
   instead of a fixed delay.
+
+### Changed
+
+- Which-key clue popup no longer filters entries by typed text; it
+  always lists every binding under the pending prefix.
+
+### Fixed
+
+- Omnibox ranking scores every alignment with an optimal dynamic
+  program (replacing the greedy first-64-starts search) and uses
+  unified indices for multi-word phrase matches.
+- Find highlights are visible inside the help popup, find skips help
+  overlay text when collecting matches, and help search supports
+  `Ctrl+Backspace` to delete the last word.
 
 ## [0.5.0] - 2026-09-14
 
