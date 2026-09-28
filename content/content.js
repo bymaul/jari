@@ -69,13 +69,7 @@ function toggleIgnore() {
   return ignoreMode;
 }
 
-function enterPassthrough() {
-  setIgnore(false);
-  clearPending();
-
-  Overlays.closeAll();
-  passthroughMode = true;
-  showPill("passthrough", pillPassthroughText());
+function restartPassthroughTimer() {
   clearTimeout(passthroughTimer);
   passthroughTimer = null;
   const passthroughMs = settings.getPassthroughMs();
@@ -84,9 +78,20 @@ function enterPassthrough() {
   }
 }
 
+function enterPassthrough() {
+  setIgnore(false);
+  clearPending();
+
+  Overlays.closeAll();
+  passthroughMode = true;
+  showPill("passthrough", pillPassthroughText());
+  restartPassthroughTimer();
+}
+
 function exitPassthrough() {
   if (!passthroughMode) return;
   clearTimeout(passthroughTimer);
+  passthroughTimer = null;
   passthroughMode = false;
   hidePill("passthrough");
 }
@@ -167,6 +172,8 @@ function handleKeydown(event) {
       event.preventDefault();
       event.stopImmediatePropagation();
       exitPassthrough();
+    } else {
+      restartPassthroughTimer();
     }
     return;
   }

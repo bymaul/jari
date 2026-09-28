@@ -9612,12 +9612,7 @@ ${location.href}`;
     setIgnore(!ignoreMode);
     return ignoreMode;
   }
-  function enterPassthrough() {
-    setIgnore(false);
-    clearPending();
-    Overlays.closeAll();
-    passthroughMode = true;
-    showPill3("passthrough", pillPassthroughText());
+  function restartPassthroughTimer() {
     clearTimeout(passthroughTimer);
     passthroughTimer = null;
     const passthroughMs = settings.getPassthroughMs();
@@ -9625,9 +9620,18 @@ ${location.href}`;
       passthroughTimer = setTimeout(exitPassthrough, passthroughMs);
     }
   }
+  function enterPassthrough() {
+    setIgnore(false);
+    clearPending();
+    Overlays.closeAll();
+    passthroughMode = true;
+    showPill3("passthrough", pillPassthroughText());
+    restartPassthroughTimer();
+  }
   function exitPassthrough() {
     if (!passthroughMode) return;
     clearTimeout(passthroughTimer);
+    passthroughTimer = null;
     passthroughMode = false;
     hidePill3("passthrough");
   }
@@ -9698,6 +9702,8 @@ ${location.href}`;
         event.preventDefault();
         event.stopImmediatePropagation();
         exitPassthrough();
+      } else {
+        restartPassthroughTimer();
       }
       return;
     }

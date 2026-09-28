@@ -269,6 +269,22 @@ test("passthrough exits when the timeout expires", async () => {
   assert.equal(spiedCalls.scrollDown.length, 1);
 });
 
+test("passthrough stays alive while keys keep coming", async () => {
+  settings.set({ passthroughMs: 40 });
+  spyOn("scrollDown");
+  handleKeydown(key({ key: "p" }));
+  for (let i = 0; i < 4; i++) {
+    await new Promise((r) => setTimeout(r, 20));
+    const pass = key({ key: "l" });
+    handleKeydown(pass);
+    assert.equal(spiedCalls.scrollDown.length, 0);
+    assertUnclaimed(pass);
+  }
+  await new Promise((r) => setTimeout(r, 60));
+  handleKeydown(key({ key: "j" }));
+  assert.equal(spiedCalls.scrollDown.length, 1);
+});
+
 test("disabled sites pass every key through except the toggle", () => {
   settings.set({ disabledSites: ["test.example"] });
   spyOn("scrollDown");
