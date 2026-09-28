@@ -1346,6 +1346,33 @@
       }
     });
   }
+  var CAPTURE_MESSAGE_TIMEOUT_MS = 8e3;
+  function sendMessageWithTimeout(action, payload = {}, timeoutMs = CAPTURE_MESSAGE_TIMEOUT_MS) {
+    const cap = Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : CAPTURE_MESSAGE_TIMEOUT_MS;
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer2 = null;
+      const done = (value) => {
+        if (settled) return;
+        settled = true;
+        try {
+          if (timer2 !== null) clearTimeout(timer2);
+        } catch {
+        }
+        resolve(value);
+      };
+      try {
+        timer2 = setTimeout(() => done(null), cap);
+      } catch {
+        return done(null);
+      }
+      try {
+        sendMessage(action, payload).then(done, () => done(null));
+      } catch {
+        done(null);
+      }
+    });
+  }
   var statusStack = null;
   function statusContainer() {
     if (!statusStack) {
@@ -8440,20 +8467,30 @@
 
   // content/screenshot.js
   var UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
+  var PNG_DATA_URL_PREFIX = "data:image/png;base64,";
+  var IMAGE_LOAD_TIMEOUT_MS = 5e3;
+  var PAINT_TIMEOUT_MS = 500;
+  var MAX_CANVAS_SIDE = 8e3;
+  var MAX_CANVAS_PIXELS = 16e6;
+  var FILENAME_PATTERN = /^jari-[a-z0-9-]{0,64}\.png$/;
   function isScreenshotable() {
     try {
       return !UNSCREENSHOTABLE_PROTOCOLS.test(location.protocol || "");
     } catch {
-      return true;
+      return false;
     }
+  }
+  function isScreenshotDataUrl(value) {
+    return typeof value === "string" && value.startsWith(PNG_DATA_URL_PREFIX);
   }
   function sanitizeHostForFilename(host5) {
     const s = String(host5 || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     return s.slice(0, 40);
   }
   function screenshotFilename(date = /* @__PURE__ */ new Date(), host5 = "") {
+    const d = date instanceof Date && Number.isFinite(date.getTime()) ? date : /* @__PURE__ */ new Date();
     const pad = (n) => String(n).padStart(2, "0");
-    const stamp = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+    const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
     const h = sanitizeHostForFilename(host5);
     return h ? `jari-${h}-${stamp}.png` : `jari-${stamp}.png`;
   }
@@ -8468,32 +8505,58 @@
     return screenshotFilename(date, pageHost());
   }
   function downloadUrl(url, filename = pageScreenshotFilename()) {
+    if (typeof url !== "string" || !url.startsWith("blob:") && !url.startsWith("data:image/")) {
+      return false;
+    }
+    const name = typeof filename === "string" && FILENAME_PATTERN.test(filename) ? filename : pageScreenshotFilename();
+    let a = null;
     try {
-      const a = document.createElement("a");
+      a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = name;
       (document.body || document.documentElement).appendChild(a);
       a.click();
-      a.remove();
       return true;
     } catch {
       return false;
+    } finally {
+      try {
+        if (a) a.remove();
+      } catch {
+      }
     }
   }
-  async function waitForPaint() {
+  async function waitForPaint({ timeoutMs = PAINT_TIMEOUT_MS } = {}) {
+    const cap = Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : PAINT_TIMEOUT_MS;
     try {
       await new Promise((resolve) => {
-        try {
-          if (typeof requestAnimationFrame !== "function") return resolve();
-          requestAnimationFrame(() => requestAnimationFrame(resolve));
-        } catch {
+        let done = false;
+        let timer2 = null;
+        const finish2 = () => {
+          if (done) return;
+          done = true;
+          try {
+            if (timer2 !== null) clearTimeout(timer2);
+          } catch {
+          }
           resolve();
+        };
+        try {
+          if (typeof requestAnimationFrame !== "function") return finish2();
+          try {
+            timer2 = setTimeout(finish2, cap);
+          } catch {
+          }
+          requestAnimationFrame(() => requestAnimationFrame(finish2));
+        } catch {
+          finish2();
         }
       });
     } catch {
     }
   }
   function downloadBlob(blob, filename = pageScreenshotFilename()) {
+    if (!blob || typeof blob !== "object") return false;
     let url;
     try {
       url = URL.createObjectURL(blob);
@@ -8503,8 +8566,17 @@
     if (!url) return false;
     const ok = downloadUrl(url, filename);
     try {
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+        }
+      }, 5e3);
     } catch {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+      }
     }
     return ok;
   }
@@ -8524,9 +8596,11 @@
     for (; ; ) {
       let pending = false;
       try {
-        const vh = window.innerHeight || 0;
-        const imgs = document.images ? [...document.images] : [];
-        for (const img of imgs) {
+        const vh = Number.isFinite(window.innerHeight) ? window.innerHeight : 0;
+        const imgs = document.images || [];
+        const count = Math.min(imgs.length || 0, 500);
+        for (let i = 0; i < count; i++) {
+          const img = imgs[i];
           try {
             if (img.complete) continue;
           } catch {
@@ -8554,9 +8628,11 @@
     }
   }
   function computeSlices(totalH, vh, maxSlices = 8, maxH = 8e3) {
-    const h = Math.max(0, Math.min(totalH || 0, maxH));
-    const step = Math.max(1, vh || 1);
-    const cap = Math.max(1, maxSlices || 1);
+    const total = Number.isFinite(totalH) && totalH > 0 ? totalH : 0;
+    const limit = Number.isFinite(maxH) && maxH > 0 ? Math.min(maxH, 8e3) : 8e3;
+    const step = Number.isFinite(vh) && vh > 0 ? vh : 1;
+    const cap = Number.isFinite(maxSlices) && maxSlices > 0 ? Math.min(Math.floor(maxSlices), 8) : 8;
+    const h = Math.max(0, Math.min(total, limit));
     const slices = [];
     let y = 0;
     while (y < h && slices.length < cap) {
@@ -8564,13 +8640,24 @@
       y += step;
     }
     if (slices.length === 0) slices.push(0);
-    return { slices, truncated: (totalH || 0) > h };
+    return { slices, truncated: total > h };
   }
+  var ZERO_RECT = { left: 0, top: 0, width: 0, height: 0 };
   function normalizeRect(a, b, vw, vh) {
-    const left = Math.max(0, Math.min(a.x, b.x));
-    const top = Math.max(0, Math.min(a.y, b.y));
-    const right = Math.min(vw, Math.max(a.x, b.x));
-    const bottom = Math.min(vh, Math.max(a.y, b.y));
+    const coords = [
+      a ? a.x : NaN,
+      a ? a.y : NaN,
+      b ? b.x : NaN,
+      b ? b.y : NaN,
+      vw,
+      vh
+    ].map(Number);
+    if (!coords.every(Number.isFinite)) return { ...ZERO_RECT };
+    const [ax, ay, bx, by, w, hh] = coords;
+    const left = Math.max(0, Math.min(ax, bx));
+    const top = Math.max(0, Math.min(ay, by));
+    const right = Math.min(w, Math.max(ax, bx));
+    const bottom = Math.min(hh, Math.max(ay, by));
     return {
       left,
       top,
@@ -8580,40 +8667,114 @@
   }
   function scaleRect(rect, dpr) {
     const s = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+    const parts = rect ? [rect.left, rect.top, rect.width, rect.height].map(Number) : [NaN, NaN, NaN, NaN];
+    if (!parts.every(Number.isFinite)) return { x: 0, y: 0, w: 1, h: 1 };
+    const [left, top, width, height] = parts;
     return {
-      x: Math.round(rect.left * s),
-      y: Math.round(rect.top * s),
-      w: Math.max(1, Math.round(rect.width * s)),
-      h: Math.max(1, Math.round(rect.height * s))
+      x: Math.round(left * s),
+      y: Math.round(top * s),
+      w: Math.max(1, Math.round(width * s)),
+      h: Math.max(1, Math.round(height * s))
     };
   }
-  function cropDataUrl(dataUrl, rect) {
+  function cropDataUrl(dataUrl, rect, { timeoutMs = IMAGE_LOAD_TIMEOUT_MS } = {}) {
     return new Promise((resolve) => {
+      let settled = false;
+      let timer2 = null;
+      const done = (value) => {
+        if (settled) return;
+        settled = true;
+        try {
+          if (timer2 !== null) clearTimeout(timer2);
+        } catch {
+        }
+        resolve(value);
+      };
       try {
+        if (!isScreenshotDataUrl(dataUrl)) return done(null);
+        const w = rect ? Number(rect.width) : NaN;
+        const h = rect ? Number(rect.height) : NaN;
+        if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0 || w > MAX_CANVAS_SIDE || h > MAX_CANVAS_SIDE) {
+          return done(null);
+        }
         const dpr = typeof window !== "undefined" && window.devicePixelRatio || 1;
         const src = scaleRect(rect, dpr);
+        if (src.w > MAX_CANVAS_SIDE || src.h > MAX_CANVAS_SIDE || src.w * src.h > MAX_CANVAS_PIXELS) {
+          return done(null);
+        }
+        const cap = Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : IMAGE_LOAD_TIMEOUT_MS;
         const img = new Image();
-        img.onload = () => {
+        const cleanup = () => {
+          img.onload = null;
+          img.onerror = null;
           try {
-            const canvas = document.createElement("canvas");
-            canvas.width = src.w;
-            canvas.height = src.h;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return resolve(null);
-            ctx.drawImage(img, src.x, src.y, src.w, src.h, 0, 0, src.w, src.h);
-            if (typeof canvas.toBlob === "function") {
-              canvas.toBlob((blob) => resolve(blob || null));
-            } else {
-              resolve(null);
-            }
+            img.src = "";
           } catch {
-            resolve(null);
           }
         };
-        img.onerror = () => resolve(null);
+        img.onload = () => {
+          try {
+            let naturalW;
+            let naturalH;
+            try {
+              naturalW = img.naturalWidth;
+              naturalH = img.naturalHeight;
+            } catch {
+              naturalW = void 0;
+              naturalH = void 0;
+            }
+            let sx = src.x;
+            let sy = src.y;
+            let sw = src.w;
+            let sh = src.h;
+            if (Number.isFinite(naturalW) && naturalW > 0 && Number.isFinite(naturalH) && naturalH > 0) {
+              sx = Math.min(Math.max(0, src.x), Math.max(0, naturalW - 1));
+              sy = Math.min(Math.max(0, src.y), Math.max(0, naturalH - 1));
+              sw = Math.min(sw, Math.max(1, naturalW - sx));
+              sh = Math.min(sh, Math.max(1, naturalH - sy));
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = sw;
+            canvas.height = sh;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              cleanup();
+              return done(null);
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+            if (typeof canvas.toBlob === "function") {
+              canvas.toBlob((blob) => {
+                cleanup();
+                done(blob || null);
+              });
+            } else {
+              cleanup();
+              done(null);
+            }
+          } catch {
+            try {
+              img.onload = null;
+              img.onerror = null;
+            } catch {
+            }
+            done(null);
+          }
+        };
+        img.onerror = () => {
+          try {
+            img.onload = null;
+            img.onerror = null;
+          } catch {
+          }
+          done(null);
+        };
+        try {
+          timer2 = setTimeout(done, cap, null);
+        } catch {
+        }
         img.src = dataUrl;
       } catch {
-        resolve(null);
+        done(null);
       }
     });
   }
@@ -8632,6 +8793,7 @@
   var markEl = null;
   var rectEl = null;
   var pillEl2 = null;
+  var finishing = false;
   function isActive7() {
     return active7;
   }
@@ -8834,25 +8996,31 @@
     paint();
   }
   async function finish() {
-    const { w, h } = viewport();
-    const rect = normalizeRect(start, cursor, w, h);
-    close6();
-    if (rect.width < 2 || rect.height < 2) {
-      ui.toast("Empty region");
-      return;
+    if (finishing) return;
+    finishing = true;
+    try {
+      const { w, h } = viewport();
+      const rect = normalizeRect(start, cursor, w, h);
+      close6();
+      if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width < 2 || rect.height < 2) {
+        ui.toast("Empty region");
+        return;
+      }
+      await waitForPaint();
+      const res = await sendMessageWithTimeout("captureScreenshot");
+      if (!res || !res.ok || !isScreenshotDataUrl(res.dataUrl)) {
+        ui.toast("Screenshot failed");
+        return;
+      }
+      const blob = await cropDataUrl(res.dataUrl, rect);
+      if (!blob) {
+        ui.toast("Screenshot failed");
+        return;
+      }
+      ui.toast(downloadBlob(blob) ? "Saved screenshot" : "Screenshot failed");
+    } finally {
+      finishing = false;
     }
-    await waitForPaint();
-    const res = await sendMessage("captureScreenshot");
-    if (!res || !res.ok || !res.dataUrl) {
-      ui.toast("Screenshot failed");
-      return;
-    }
-    const blob = await cropDataUrl(res.dataUrl, rect);
-    if (!blob) {
-      ui.toast("Screenshot failed");
-      return;
-    }
-    ui.toast(downloadBlob(blob) ? "Saved screenshot" : "Screenshot failed");
   }
   function armPendingG() {
     pendingG2 = true;
@@ -8964,6 +9132,11 @@
 
   // content/scrollshot.js
   var SETTLE_MS = 120;
+  var IMAGE_LOAD_TIMEOUT_MS2 = 5e3;
+  var BLOB_TIMEOUT_MS = 5e3;
+  var MAX_CAPTURE_SIDE = 8e3;
+  var MAX_CAPTURE_PIXELS = 16e6;
+  var capturing = false;
   function computedPosition(el) {
     try {
       const view = el.ownerDocument && el.ownerDocument.defaultView || window;
@@ -9028,15 +9201,55 @@
       }
     };
   }
-  function loadImage(src) {
+  function loadImage(src, { timeoutMs = IMAGE_LOAD_TIMEOUT_MS2 } = {}) {
     return new Promise((resolve) => {
+      let settled = false;
+      let timer2 = null;
+      const done = (value) => {
+        if (settled) return;
+        settled = true;
+        try {
+          if (timer2 !== null) clearTimeout(timer2);
+        } catch {
+        }
+        resolve(value);
+      };
       try {
+        if (typeof src !== "string" || !src.startsWith("data:image/")) {
+          return done(null);
+        }
+        const cap = Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : IMAGE_LOAD_TIMEOUT_MS2;
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
+        img.onload = () => {
+          const out = img;
+          img.onload = null;
+          img.onerror = null;
+          done(out);
+        };
+        img.onerror = () => {
+          img.onload = null;
+          img.onerror = null;
+          try {
+            img.src = "";
+          } catch {
+          }
+          done(null);
+        };
+        try {
+          timer2 = setTimeout(() => {
+            img.onload = null;
+            img.onerror = null;
+            try {
+              img.src = "";
+            } catch {
+            }
+            done(null);
+          }, cap);
+        } catch {
+        }
         img.src = src;
       } catch {
-        resolve(null);
+        done(null);
       }
     });
   }
@@ -9051,105 +9264,170 @@
       ui.toast("Cannot screenshot this page");
       return;
     }
-    const vw = window.innerWidth || 0;
-    const vh = window.innerHeight || 0;
-    if (!(vw > 0 && vh > 0)) {
-      ui.toast("Screenshot failed");
+    if (capturing) {
+      ui.toast("Already capturing");
       return;
     }
-    const dpr = window.devicePixelRatio || 1;
-    const scroller = document.scrollingElement || document.documentElement;
-    const totalH = scroller && Number.isFinite(scroller.scrollHeight) ? scroller.scrollHeight : vh;
-    const { slices, truncated } = computeSlices(totalH, vh);
-    const restoreOverlays = ui.hideOverlaysForCapture();
-    const seenFixed = /* @__PURE__ */ new Set();
-    const fixedRestores = [hideFixedElements(seenFixed)];
-    const rootEl = document.documentElement;
-    let prevBehavior;
+    capturing = true;
     try {
-      prevBehavior = rootEl && rootEl.style ? rootEl.style.scrollBehavior : void 0;
-      if (rootEl && rootEl.style) rootEl.style.scrollBehavior = "auto";
-    } catch {
-    }
-    const startX = window.scrollX || 0;
-    const startY = window.scrollY || 0;
-    try {
-      scrollTo(0, 0);
-      await waitForPaint();
-      const canvas = document.createElement("canvas");
-      const capH = Math.min(totalH, slices.length * vh);
-      canvas.width = Math.round(vw * dpr);
-      canvas.height = Math.max(1, Math.round(capH * dpr));
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
+      const vw = Number.isFinite(window.innerWidth) ? window.innerWidth : 0;
+      const vh = Number.isFinite(window.innerHeight) ? window.innerHeight : 0;
+      if (!(vw > 0 && vh > 0)) {
         ui.toast("Screenshot failed");
         return;
       }
-      for (const y of slices) {
-        scrollTo(0, y);
-        await waitForPaint();
-        await waitForMediaReady({ timeoutMs: settleMs });
-        try {
-          fixedRestores.push(hideFixedElements(seenFixed));
-        } catch {
-        }
-        let actualY = y;
-        try {
-          actualY = window.scrollY || 0;
-        } catch {
-        }
-        const res = await sendMessage("captureScreenshot");
-        if (!res || !res.ok || !res.dataUrl) {
-          ui.toast("Screenshot failed");
-          return;
-        }
-        const img = await loadImage(res.dataUrl);
-        if (!img) {
-          ui.toast("Screenshot failed");
-          return;
-        }
-        try {
-          ctx.drawImage(img, 0, Math.round(actualY * dpr));
-        } catch {
-          ui.toast("Screenshot failed");
-          return;
-        }
+      const rawDpr = typeof window !== "undefined" ? window.devicePixelRatio : void 0;
+      const dpr = Number.isFinite(rawDpr) && rawDpr > 0 ? rawDpr : 1;
+      const scroller = document.scrollingElement || document.documentElement;
+      const totalH = scroller && Number.isFinite(scroller.scrollHeight) ? scroller.scrollHeight : vh;
+      const { slices, truncated } = computeSlices(totalH, vh);
+      const canvasWidth = Math.round(vw * dpr);
+      const captureHeight = Math.min(totalH, slices.length * vh);
+      const canvasHeight = Math.max(1, Math.round(captureHeight * dpr));
+      if (!(canvasWidth >= 1 && canvasHeight >= 1) || canvasWidth > MAX_CAPTURE_SIDE || canvasHeight > MAX_CAPTURE_SIDE || canvasWidth * canvasHeight > MAX_CAPTURE_PIXELS) {
+        ui.toast("Screenshot too large");
+        return;
       }
-      const blob = await new Promise((resolve) => {
+      const restoreOverlays = ui.hideOverlaysForCapture();
+      const seenFixed = /* @__PURE__ */ new Set();
+      const fixedRestores = [hideFixedElements(seenFixed)];
+      const rootEl = document.documentElement;
+      let prevBehavior;
+      try {
+        prevBehavior = rootEl && rootEl.style ? rootEl.style.scrollBehavior : void 0;
+        if (rootEl && rootEl.style) rootEl.style.scrollBehavior = "auto";
+      } catch {
+      }
+      const startX = window.scrollX || 0;
+      const startY = window.scrollY || 0;
+      try {
+        scrollTo(0, 0);
+        await waitForPaint();
+        const canvas = document.createElement("canvas");
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          ui.toast("Screenshot failed");
+          return;
+        }
+        let prevActualY = null;
+        for (const y of slices) {
+          scrollTo(0, y);
+          await waitForPaint();
+          await waitForMediaReady({ timeoutMs: settleMs });
+          try {
+            fixedRestores.push(hideFixedElements(seenFixed));
+          } catch {
+          }
+          let actualY = y;
+          try {
+            actualY = window.scrollY || 0;
+          } catch {
+          }
+          if (prevActualY !== null && y !== prevActualY && actualY === prevActualY) {
+            ui.toast("Screenshot failed");
+            return;
+          }
+          prevActualY = actualY;
+          const res = await sendMessageWithTimeout("captureScreenshot");
+          if (!res || !res.ok || !isScreenshotDataUrl(res.dataUrl)) {
+            ui.toast("Screenshot failed");
+            return;
+          }
+          const img = await loadImage(res.dataUrl);
+          if (!img) {
+            ui.toast("Screenshot failed");
+            return;
+          }
+          try {
+            const destY = Math.round(actualY * dpr);
+            let naturalW;
+            let naturalH;
+            try {
+              naturalW = img.naturalWidth;
+              naturalH = img.naturalHeight;
+            } catch {
+              naturalW = void 0;
+              naturalH = void 0;
+            }
+            const expectedH = Math.round(vh * dpr);
+            if (Number.isFinite(naturalW) && naturalW > 0 && Number.isFinite(naturalH) && naturalH > 0 && (naturalW !== canvasWidth || naturalH !== expectedH)) {
+              const scale = canvasWidth / naturalW;
+              const destH = Math.max(1, Math.round(naturalH * scale));
+              ctx.drawImage(img, 0, 0, naturalW, naturalH, 0, destY, canvasWidth, destH);
+            } else {
+              ctx.drawImage(img, 0, destY);
+            }
+          } catch {
+            ui.toast("Screenshot failed");
+            return;
+          } finally {
+            try {
+              img.src = "";
+            } catch {
+            }
+          }
+        }
+        const blob = await new Promise((resolve) => {
+          let timer2 = null;
+          let settled = false;
+          const done = (value) => {
+            if (settled) return;
+            settled = true;
+            try {
+              if (timer2 !== null) clearTimeout(timer2);
+            } catch {
+            }
+            resolve(value);
+          };
+          try {
+            timer2 = setTimeout(() => done(null), BLOB_TIMEOUT_MS);
+          } catch {
+          }
+          try {
+            if (typeof canvas.toBlob === "function") {
+              canvas.toBlob((b) => done(b || null));
+            } else {
+              done(null);
+            }
+          } catch {
+            done(null);
+          }
+        });
+        if (!blob) {
+          ui.toast("Screenshot failed");
+          return;
+        }
+        const ok = downloadBlob(blob);
+        if (!ok) ui.toast("Screenshot failed");
+        else if (truncated) ui.toast("Saved partial screenshot");
+        else ui.toast("Saved screenshot");
+      } finally {
+        scrollTo(startX, startY);
         try {
-          if (typeof canvas.toBlob === "function") {
-            canvas.toBlob((b) => resolve(b || null));
-          } else {
-            resolve(null);
+          if (rootEl && rootEl.style) {
+            if ((prevBehavior === void 0 || prevBehavior === null || prevBehavior === "") && typeof rootEl.style.removeProperty === "function") {
+              rootEl.style.removeProperty("scroll-behavior");
+            } else {
+              rootEl.style.scrollBehavior = prevBehavior;
+            }
           }
         } catch {
-          resolve(null);
         }
-      });
-      if (!blob) {
-        ui.toast("Screenshot failed");
-        return;
-      }
-      const ok = downloadBlob(blob);
-      if (!ok) ui.toast("Screenshot failed");
-      else if (truncated) ui.toast("Saved partial screenshot");
-      else ui.toast("Saved screenshot");
-    } finally {
-      scrollTo(startX, startY);
-      try {
-        if (rootEl && rootEl.style) rootEl.style.scrollBehavior = prevBehavior;
-      } catch {
-      }
-      for (const restore of fixedRestores.splice(0).reverse()) {
+        for (const restore of fixedRestores.splice(0).reverse()) {
+          try {
+            restore();
+          } catch {
+          }
+        }
         try {
-          restore();
+          restoreOverlays();
         } catch {
         }
       }
-      try {
-        restoreOverlays();
-      } catch {
-      }
+    } finally {
+      capturing = false;
     }
   }
 
@@ -9252,27 +9530,37 @@ ${location.href}`;
     sendMessage("navigate", { url: target2 });
   }
   var UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
+  var screenshotCapturing = false;
   async function screenshotPage() {
     if (!isScreenshotable()) {
       ui.toast("Cannot screenshot this page");
       return;
     }
+    if (screenshotCapturing) {
+      ui.toast("Already capturing");
+      return;
+    }
+    screenshotCapturing = true;
     const restore = ui.hideOverlaysForCapture();
     await waitForPaint();
     let res;
     try {
-      res = await sendMessage("captureScreenshot");
+      res = await sendMessageWithTimeout("captureScreenshot");
     } finally {
       try {
         restore();
       } catch {
       }
     }
-    if (!res || !res.ok || !res.dataUrl) {
-      ui.toast("Screenshot failed");
-      return;
+    try {
+      if (!res || !res.ok || !isScreenshotDataUrl(res.dataUrl)) {
+        ui.toast("Screenshot failed");
+        return;
+      }
+      ui.toast(downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
+    } finally {
+      screenshotCapturing = false;
     }
-    ui.toast(downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
   }
   async function toggleBookmarkPage() {
     const url = location.href || "";

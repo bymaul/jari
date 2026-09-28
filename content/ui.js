@@ -13,6 +13,41 @@ export function sendMessage(action, payload = {}) {
   });
 }
 
+const CAPTURE_MESSAGE_TIMEOUT_MS = 8000;
+
+export function sendMessageWithTimeout(
+  action,
+  payload = {},
+  timeoutMs = CAPTURE_MESSAGE_TIMEOUT_MS,
+) {
+  const cap =
+    Number.isFinite(timeoutMs) && timeoutMs >= 0
+      ? timeoutMs
+      : CAPTURE_MESSAGE_TIMEOUT_MS;
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      try {
+        if (timer !== null) clearTimeout(timer);
+      } catch {}
+      resolve(value);
+    };
+    try {
+      timer = setTimeout(() => done(null), cap);
+    } catch {
+      return done(null);
+    }
+    try {
+      sendMessage(action, payload).then(done, () => done(null));
+    } catch {
+      done(null);
+    }
+  });
+}
+
 let statusStack = null;
 function statusContainer() {
   if (!statusStack) {

@@ -16,7 +16,12 @@ const {
   cropDataUrl,
   computeSlices,
   waitForMediaReady,
+  waitForPaint,
+  downloadUrl,
+  isScreenshotable,
+  isScreenshotDataUrl,
 } = await import("../content/screenshot.js");
+const { sendMessageWithTimeout } = await import("../content/ui.js");
 const { Shot, __shotTest } = await import("../content/shot.js");
 const { captureFullPage, hideFixedElements } = await import("../content/scrollshot.js");
 const { ui } = await import("../content/ui.js");
@@ -898,6 +903,267 @@ test("captureFullPage hides headers that stick mid-capture", async () => {
     assert.deepEqual(seenAtCapture, ["", "hidden"]);
     assert.equal(header.style.visibility, "");
     assert.deepEqual(stub.toasts, ["Saved screenshot"]);
+  } finally {
+    stub.restore();
+  }
+});
+
+test("isScreenshotable fails closed when the protocol is unreadable", () => {
+  const saved = globalThis.location;
+  globalThis.location = {
+    get protocol() {
+      throw new Error("denied");
+    },
+  };
+  try {
+    assert.equal(isScreenshotable(), false);
+  } finally {
+    globalThis.location = saved;
+  }
+});
+
+test("isScreenshotDataUrl accepts only PNG data URLs", () => {
+  assert.equal(isScreenshotDataUrl("data:image/png;base64,xxx"), true);
+  assert.equal(isScreenshotDataUrl("data:image/jpeg;base64,xxx"), false);
+  assert.equal(isScreenshotDataUrl("http://example.com/x.png"), false);
+  assert.equal(isScreenshotDataUrl(""), false);
+  assert.equal(isScreenshotDataUrl(null), false);
+});
+
+test("screenshotFilename falls back on invalid dates", () => {
+  assert.match(screenshotFilename(new Date(NaN)), /^jari-\d{8}-\d{6}\.png$/);
+  assert.match(screenshotFilename("tomorrow"), /^jari-\d{8}-\d{6}\.png$/);
+});
+
+test("downloadUrl rejects non-download URLs and bad filenames", () => {
+  const savedCreate = globalThis.document.createElement;
+  let created = 0;
+  globalThis.document.createElement = () => {
+    created++;
+    return { click() {}, remove() {} };
+  };
+  try {
+    assert.equal(downloadUrl("http://example.com/x.png"), false);
+    assert.equal(downloadUrl(null), false);
+    assert.equal(created, 0);
+  } finally {
+    globalThis.document.createElement = savedCreate;
+  }
+});
+
+test("waitForPaint resolves when rAF never fires", async () => {
+  const savedRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => {};
+  try {
+    await waitForPaint({ timeoutMs: 30 });
+  } finally {
+    if (savedRaf === undefined) delete globalThis.requestAnimationFrame;
+    else globalThis.requestAnimationFrame = savedRaf;
+  }
+});
+
+test("computeSlices clamps non-finite inputs", () => {
+  assert.deepEqual(computeSlices(NaN, 600), { slices: [0], truncated: false });
+  assert.deepEqual(computeSlices(1600, 600, Infinity), {
+    slices: [0, 600, 1200],
+    truncated: false,
+  });
+  const zeroStep = computeSlices(1600, 0);
+  assert.equal(zeroStep.slices.length, 8);
+  assert.equal(zeroStep.truncated, false);
+  const tall = computeSlices(20000, Infinity);
+  assert.equal(tall.slices.length, 8);
+  assert.equal(tall.truncated, true);
+});
+
+test("normalizeRect returns a zero rect for invalid inputs", () => {
+  const zero = { left: 0, top: 0, width: 0, height: 0 };
+  assert.deepEqual(normalizeRect(null, { x: 1, y: 1 }, 800, 600), zero);
+  assert.deepEqual(
+    normalizeRect({ x: NaN, y: 0 }, { x: 1, y: 1 }, 800, 600),
+    zero,
+  );
+  assert.deepEqual(
+    normalizeRect({ x: 0, y: 0 }, { x: 1, y: 1 }, NaN, 600),
+    zero,
+  );
+});
+
+test("scaleRect falls back on invalid rects and ratios", () => {
+  assert.deepEqual(scaleRect(null, 2), { x: 0, y: 0, w: 1, h: 1 });
+  assert.deepEqual(
+    scaleRect({ left: 10, top: 20, width: 30, height: 40 }, -1),
+    { x: 10, y: 20, w: 30, h: 40 },
+  );
+});
+
+test("cropDataUrl rejects bad data URLs and oversized rects", async () => {
+  const rect = { left: 0, top: 0, width: 10, height: 10 };
+  assert.equal(await cropDataUrl("http://example.com/x.png", rect), null);
+  assert.equal(await cropDataUrl(null, rect), null);
+  assert.equal(
+    await cropDataUrl("data:image/png;base64,xxx", {
+      left: 0,
+      top: 0,
+      width: 0,
+      height: 10,
+    }),
+    null,
+  );
+  assert.equal(
+    await cropDataUrl("data:image/png;base64,xxx", {
+      left: 0,
+      top: 0,
+      width: 9000,
+      height: 10,
+    }),
+    null,
+  );
+});
+
+test("cropDataUrl times out when the image never loads", async () => {
+  const savedImage = globalThis.Image;
+  globalThis.Image = class {
+    set src(v) {
+      this._src = v;
+    }
+  };
+  try {
+    assert.equal(
+      await cropDataUrl(
+        "data:image/png;base64,xxx",
+        { left: 0, top: 0, width: 10, height: 10 },
+        { timeoutMs: 30 },
+      ),
+      null,
+    );
+  } finally {
+    if (savedImage === undefined) delete globalThis.Image;
+    else globalThis.Image = savedImage;
+  }
+});
+
+test("sendMessageWithTimeout resolves null when the background hangs", async () => {
+  const savedSend = globalThis.chrome.runtime.sendMessage;
+  globalThis.chrome.runtime.sendMessage = () => {};
+  try {
+    assert.equal(await sendMessageWithTimeout("captureScreenshot", {}, 30), null);
+  } finally {
+    globalThis.chrome.runtime.sendMessage = savedSend;
+  }
+});
+
+test("captureScreenshot rejects non-integer window IDs", async () => {
+  const saved = globalThis.chrome.tabs.captureVisibleTab;
+  let called = 0;
+  globalThis.chrome.tabs.captureVisibleTab = async () => {
+    called++;
+    return "data:image/png;base64,xxx";
+  };
+  try {
+    assert.deepEqual(await captureScreenshot({ tab: { windowId: "7" } }), {
+      ok: false,
+    });
+    assert.deepEqual(await captureScreenshot({ tab: { windowId: 1.5 } }), {
+      ok: false,
+    });
+    assert.equal(called, 0);
+  } finally {
+    if (saved === undefined) delete globalThis.chrome.tabs.captureVisibleTab;
+    else globalThis.chrome.tabs.captureVisibleTab = saved;
+  }
+});
+
+test("captureScreenshot rejects non-data-URL captures", async () => {
+  const saved = globalThis.chrome.tabs.captureVisibleTab;
+  globalThis.chrome.tabs.captureVisibleTab = async () => "http://example.com/x.png";
+  try {
+    assert.deepEqual(await captureScreenshot({ tab: { windowId: 7 } }), {
+      ok: false,
+    });
+  } finally {
+    if (saved === undefined) delete globalThis.chrome.tabs.captureVisibleTab;
+    else globalThis.chrome.tabs.captureVisibleTab = saved;
+  }
+});
+
+test("screenshotPage runs sequential captures after a success", async () => {
+  const stub = stubDownload({
+    response: { ok: true, dataUrl: "data:image/png;base64,xxx" },
+  });
+  try {
+    await commands.screenshotPage.run({});
+    await commands.screenshotPage.run({});
+    assert.equal(stub.clicked(), 2);
+    assert.deepEqual(stub.toasts, ["Saved screenshot", "Saved screenshot"]);
+  } finally {
+    stub.restore();
+  }
+});
+
+test("screenshotPage rejects a second overlapping capture", async () => {
+  const savedSend = globalThis.chrome.runtime.sendMessage;
+  const savedCreate = globalThis.document.createElement;
+  const savedToast = ui.toast;
+  const toasts = [];
+  let release;
+  const gate = new Promise((r) => {
+    release = r;
+  });
+  globalThis.chrome.runtime.sendMessage = (msg, cb) => {
+    gate.then(() => cb({ ok: true, dataUrl: "data:image/png;base64,xxx" }));
+  };
+  globalThis.document.createElement = (tag) => {
+    if (tag !== "a") return savedCreate(tag);
+    return { href: "", download: "", click() {}, remove() {} };
+  };
+  ui.toast = (msg) => toasts.push(msg);
+  try {
+    const first = commands.screenshotPage.run({});
+    await new Promise((r) => setTimeout(r, 10));
+    await commands.screenshotPage.run({});
+    assert.deepEqual(toasts, ["Already capturing"]);
+    release();
+    await first;
+    assert.deepEqual(toasts, ["Already capturing", "Saved screenshot"]);
+  } finally {
+    globalThis.chrome.runtime.sendMessage = savedSend;
+    globalThis.document.createElement = savedCreate;
+    ui.toast = savedToast;
+  }
+});
+
+test("captureFullPage refuses pages that exceed the canvas budget", async () => {
+  const stub = stubScrollshot({
+    scrollHeight: 600,
+    response: { ok: true, dataUrl: "data:image/png;base64,xxx" },
+  });
+  const savedWidth = globalThis.window.innerWidth;
+  globalThis.window.innerWidth = 9000;
+  try {
+    await captureFullPage({ settleMs: 5 });
+    assert.deepEqual(stub.sent, []);
+    assert.deepEqual(stub.toasts, ["Screenshot too large"]);
+    assert.equal(stub.downloads.length, 0);
+  } finally {
+    globalThis.window.innerWidth = savedWidth;
+    stub.restore();
+  }
+});
+
+test("captureFullPage aborts when the page will not scroll", async () => {
+  const stub = stubScrollshot({
+    scrollHeight: 1600,
+    response: { ok: true, dataUrl: "data:image/png;base64,xxx" },
+  });
+  globalThis.window.scrollTo = (x, y) => {
+    stub.scrolled.push([x, y]);
+  };
+  try {
+    await captureFullPage({ settleMs: 5 });
+    assert.deepEqual(stub.toasts, ["Screenshot failed"]);
+    assert.deepEqual(stub.scrolled.slice(-1), [[0, 0]]);
+    assert.equal(stub.downloads.length, 0);
   } finally {
     stub.restore();
   }

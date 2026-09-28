@@ -1,6 +1,6 @@
 import { Url } from "../shared/url.js";
 import { settings } from "./settings.js";
-import { sendMessage, ui } from "./ui.js";
+import { sendMessage, sendMessageWithTimeout, ui } from "./ui.js";
 import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.js";
 import { Prompt } from "./prompt.js";
 import { Help } from "./help.js";
@@ -12,7 +12,7 @@ import { goPage } from "./page-nav.js";
 import { Palette } from "./palette.js";
 import { Shot } from "./shot.js";
 import { captureFullPage } from "./scrollshot.js";
-import { downloadUrl, waitForPaint, isScreenshotable } from "./screenshot.js";
+import { downloadUrl, waitForPaint, isScreenshotable, isScreenshotDataUrl } from "./screenshot.js";
 
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;
@@ -121,26 +121,37 @@ function goTo(urlFn) {
 
 const UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
 
+let screenshotCapturing = false;
+
 async function screenshotPage() {
   if (!isScreenshotable()) {
     ui.toast("Cannot screenshot this page");
     return;
   }
+  if (screenshotCapturing) {
+    ui.toast("Already capturing");
+    return;
+  }
+  screenshotCapturing = true;
   const restore = ui.hideOverlaysForCapture();
   await waitForPaint();
   let res;
   try {
-    res = await sendMessage("captureScreenshot");
+    res = await sendMessageWithTimeout("captureScreenshot");
   } finally {
     try {
       restore();
     } catch {}
   }
-  if (!res || !res.ok || !res.dataUrl) {
-    ui.toast("Screenshot failed");
-    return;
+  try {
+    if (!res || !res.ok || !isScreenshotDataUrl(res.dataUrl)) {
+      ui.toast("Screenshot failed");
+      return;
+    }
+    ui.toast(downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
+  } finally {
+    screenshotCapturing = false;
   }
-  ui.toast(downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
 }
 
 async function toggleBookmarkPage() {

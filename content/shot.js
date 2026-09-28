@@ -1,10 +1,11 @@
-import { sendMessage, ui } from "./ui.js";
+import { sendMessageWithTimeout, ui } from "./ui.js";
 import { register, touch } from "./overlays.js";
 import {
   normalizeRect,
   cropDataUrl,
   downloadBlob,
   waitForPaint,
+  isScreenshotDataUrl,
 } from "./screenshot.js";
 
 const STEP = 16;
@@ -21,6 +22,7 @@ let cursorEl = null;
 let markEl = null;
 let rectEl = null;
 let pillEl = null;
+let finishing = false;
 
 function isActive() {
   return active;
@@ -237,25 +239,36 @@ function jumpTo(x, y) {
 }
 
 async function finish() {
-  const { w, h } = viewport();
-  const rect = normalizeRect(start, cursor, w, h);
-  close();
-  if (rect.width < 2 || rect.height < 2) {
-    ui.toast("Empty region");
-    return;
+  if (finishing) return;
+  finishing = true;
+  try {
+    const { w, h } = viewport();
+    const rect = normalizeRect(start, cursor, w, h);
+    close();
+    if (
+      !Number.isFinite(rect.width) ||
+      !Number.isFinite(rect.height) ||
+      rect.width < 2 ||
+      rect.height < 2
+    ) {
+      ui.toast("Empty region");
+      return;
+    }
+    await waitForPaint();
+    const res = await sendMessageWithTimeout("captureScreenshot");
+    if (!res || !res.ok || !isScreenshotDataUrl(res.dataUrl)) {
+      ui.toast("Screenshot failed");
+      return;
+    }
+    const blob = await cropDataUrl(res.dataUrl, rect);
+    if (!blob) {
+      ui.toast("Screenshot failed");
+      return;
+    }
+    ui.toast(downloadBlob(blob) ? "Saved screenshot" : "Screenshot failed");
+  } finally {
+    finishing = false;
   }
-  await waitForPaint();
-  const res = await sendMessage("captureScreenshot");
-  if (!res || !res.ok || !res.dataUrl) {
-    ui.toast("Screenshot failed");
-    return;
-  }
-  const blob = await cropDataUrl(res.dataUrl, rect);
-  if (!blob) {
-    ui.toast("Screenshot failed");
-    return;
-  }
-  ui.toast(downloadBlob(blob) ? "Saved screenshot" : "Screenshot failed");
 }
 
 function armPendingG() {
@@ -375,6 +388,7 @@ export const __shotTest = {
       active,
       cursor: { ...cursor },
       start: start ? { ...start } : null,
+      finishing,
     };
   },
 };

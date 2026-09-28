@@ -610,12 +610,14 @@
   }
   async function captureScreenshot(sender) {
     const windowId = sender && sender.tab && sender.tab.windowId;
-    if (windowId == null) return { ok: false };
+    if (!Number.isInteger(windowId)) return { ok: false };
     try {
       const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
         format: "png"
       });
-      if (!dataUrl) return { ok: false };
+      if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
+        return { ok: false };
+      }
       return { ok: true, dataUrl };
     } catch {
       return { ok: false };
