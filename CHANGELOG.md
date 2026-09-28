@@ -4,6 +4,21 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [0.6.1] - 2026-09-28
+
+### Changed
+
+- Passthrough mode expires after inactivity instead of a fixed duration.
+
+### Fixed
+
+- Screenshot captures time out instead of hanging (background reply,
+  image load, paint, blob), canvases are capped before allocation with
+  an honest too-large toast, full-page captures abort when the page
+  will not scroll, and overlapping captures are rejected.
+- An invalid prefix completion (e.g. `g x`) is swallowed instead of
+  reinterpreting the second key as a fresh binding.
+
 ## [0.6.0] - 2026-09-27
 
 ### Added
