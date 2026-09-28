@@ -406,6 +406,18 @@ test("a dead key cancels the pending prefix instead of filtering", () => {
   }
 });
 
+test("an invalid prefix completion never runs a single-key command", () => {
+  spyOn("closeTab");
+  spyOn("scrollDown");
+  handleKeydown(key({ key: "g" }));
+  const ev = key({ key: "x" });
+  handleKeydown(ev);
+  assertClaimed(ev);
+  assert.equal(spiedCalls.closeTab.length, 0);
+  handleKeydown(key({ key: "j" }));
+  assert.equal(spiedCalls.scrollDown.length, 1);
+});
+
 test("a three-key sequence composes a binding and takes a count", () => {
   const saved = { ...settings.getKeymap() };
   settings.set({ keymap: { ...saved, qfk: "scrollDown" } });

@@ -240,8 +240,7 @@ function handleKeydown(event) {
       return;
     }
     clearPending();
-    buffer = "";
-    bufferWasPending = false;
+    return;
   }
 
   if (event.key === "Escape") {

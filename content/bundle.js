@@ -10044,8 +10044,7 @@ ${location.href}`;
         return;
       }
       clearPending();
-      buffer = "";
-      bufferWasPending = false;
+      return;
     }
     if (event.key === "Escape") {
       if (pendingCount3) {
