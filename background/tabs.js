@@ -287,15 +287,26 @@ export async function openSettings() {
   return { ok: true };
 }
 
-export async function openExtensions() {
-  const urls = ["chrome://extensions", "about:addons", "edge://extensions"];
-  for (const url of urls) {
-    try {
-      await chrome.tabs.create({ url });
-      return { ok: true };
-    } catch (err) {
-      console.debug(`[jari] openExtensions ${url} failed:`, err);
-    }
+function extensionsPageUrl() {
+  let ua;
+  try {
+    ua = navigator.userAgent || "";
+  } catch {
+    return "chrome://extensions";
   }
-  return { ok: false, reason: "blocked" };
+  if (/firefox/i.test(ua)) return null;
+  if (/edg/i.test(ua)) return "edge://extensions";
+  return "chrome://extensions";
+}
+
+export async function openExtensions() {
+  const url = extensionsPageUrl();
+  if (!url) return { ok: false, reason: "blocked" };
+  try {
+    await chrome.tabs.create({ url });
+    return { ok: true };
+  } catch (err) {
+    console.debug(`[jari] openExtensions ${url} failed:`, err);
+    return { ok: false, reason: "blocked" };
+  }
 }

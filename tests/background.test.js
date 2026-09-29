@@ -331,7 +331,7 @@ test("openExtensions opens the first creatable URL", async () => {
   }
 });
 
-test("openExtensions reports blocked when every URL is rejected", async () => {
+test("openExtensions reports blocked when the URL is rejected", async () => {
   const tried = [];
   const savedCreate = globalThis.chrome.tabs.create;
   globalThis.chrome.tabs.create = async (opts) => {
@@ -343,14 +343,71 @@ test("openExtensions reports blocked when every URL is rejected", async () => {
       ok: false,
       reason: "blocked",
     });
-    assert.deepEqual(tried, [
-      "chrome://extensions",
-      "about:addons",
-      "edge://extensions",
-    ]);
+    assert.deepEqual(tried, ["chrome://extensions"]);
   } finally {
     if (savedCreate === undefined) delete globalThis.chrome.tabs.create;
     else globalThis.chrome.tabs.create = savedCreate;
+  }
+});
+
+function stubNavigator(userAgent) {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", {
+    value: { userAgent },
+    writable: true,
+    configurable: true,
+  });
+  return () => {
+    if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);
+    else delete globalThis.navigator;
+  };
+}
+
+function stubTabsCreate(impl) {
+  const savedCreate = globalThis.chrome.tabs.create;
+  globalThis.chrome.tabs.create = impl;
+  return () => {
+    if (savedCreate === undefined) delete globalThis.chrome.tabs.create;
+    else globalThis.chrome.tabs.create = savedCreate;
+  };
+}
+
+test("openExtensions on Firefox attempts nothing and reports blocked", async () => {
+  const restoreNavigator = stubNavigator(
+    "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0",
+  );
+  let calls = 0;
+  const restoreCreate = stubTabsCreate(async () => {
+    calls++;
+    return { id: 9 };
+  });
+  try {
+    assert.deepEqual(await handlers.openExtensions({}, {}), {
+      ok: false,
+      reason: "blocked",
+    });
+    assert.equal(calls, 0);
+  } finally {
+    restoreCreate();
+    restoreNavigator();
+  }
+});
+
+test("openExtensions on Edge opens only edge://extensions", async () => {
+  const restoreNavigator = stubNavigator(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36 Edg/120.0",
+  );
+  const created = [];
+  const restoreCreate = stubTabsCreate(async (opts) => {
+    created.push(opts);
+    return { id: 9 };
+  });
+  try {
+    assert.deepEqual(await handlers.openExtensions({}, {}), { ok: true });
+    assert.deepEqual(created, [{ url: "edge://extensions" }]);
+  } finally {
+    restoreCreate();
+    restoreNavigator();
   }
 });
 
