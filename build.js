@@ -90,6 +90,19 @@ function buildDist(target) {
   }
 }
 
+function crxKeyPem() {
+  const raw = String(process.env.CRX_PRIVATE_KEY || "");
+  if (!raw.trim()) return null;
+  const decoded = Buffer.from(raw.replace(/\s+/g, ""), "base64").toString(
+    "utf8",
+  );
+  if (decoded.includes("PRIVATE KEY")) return decoded;
+  if (raw.includes("PRIVATE KEY")) return raw;
+  throw new Error(
+    "CRX_PRIVATE_KEY must be the base64 output of `base64 -w0 key.pem` (or the .pem text itself)",
+  );
+}
+
 function runNodeBin(bin, args) {
   execFileSync(process.execPath, [bin, ...args], { stdio: "inherit" });
 }
@@ -121,15 +134,13 @@ function buildChromeZip(stage, version) {
 }
 
 function packChromeCrx(stage, version) {
-  const keyB64 = process.env.CRX_PRIVATE_KEY;
-  if (!keyB64) {
+  const pem = crxKeyPem();
+  if (!pem) {
     console.log("Skipping CRX pack (CRX_PRIVATE_KEY not set)");
     return;
   }
   const keyFile = join(tmpdir(), `jari-crx-key-${process.pid}.pem`);
-  writeFileSync(keyFile, Buffer.from(String(keyB64), "base64"), {
-    mode: 0o600,
-  });
+  writeFileSync(keyFile, pem, { mode: 0o600 });
   try {
     const crx = join(root, "dist", `jari-chrome-${version}.crx`);
     rmSync(crx, { force: true });
