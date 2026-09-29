@@ -11,6 +11,8 @@ npm run lint          # eslint, must be clean
 npm test              # node --test, 71 unit tests
 npm run build:chrome  # rebuild bundles + manifest.json for Chrome
 npm run build:firefox # rebuild bundles + manifest.json for Firefox
+npm run dist          # zips + firefox xpi (+ chrome crx with CRX_PRIVATE_KEY)
+npm run sign:firefox  # AMO sign (unlisted) via WEB_EXT_API_KEY/SECRET
 ```
 
 E2E (needs Chromium + fresh profile, see `tests/e2e/README.md`):

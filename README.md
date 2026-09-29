@@ -52,13 +52,17 @@ custom `keyword query` engines (`g`, `yt`, `gh`, `wiki`, `r` built in).
 
 ## Install
 
-Download the latest `jari-chrome-<version>.zip` or `jari-firefox-<version>.zip`
-from [Releases](https://github.com/bymaul/jari/releases), unzip it, then:
+Download the latest release from
+[Releases](https://github.com/bymaul/jari/releases):
 
-- Chrome/Edge: `chrome://extensions` → Developer mode → Load unpacked.
-- Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on →
-  select `manifest.json` (temporary add-ons vanish on restart; signed store
-  builds are planned.)
+- Firefox: install `jari-firefox-<version>.xpi` (signed, installs directly).
+- Chrome/Edge: unzip `jari-chrome-<version>.zip`, then
+  `chrome://extensions` → Developer mode → Load unpacked.
+  (`jari-chrome-<version>.crx` is also attached for policy-based installs.)
+
+For Firefox development without a release build, use
+`about:debugging#/runtime/this-firefox` → Load Temporary Add-on →
+select `manifest.json` (temporary add-ons vanish on restart).
 
 Or build from source (below) and load this folder the same way. The checked-in
 `manifest.json` targets Chrome - run `npm run build:firefox` first for Firefox.
@@ -85,8 +89,14 @@ npm install
 npm run lint          # eslint, must be clean
 npm test              # node --test
 npm run build:chrome  # or: npm run build:firefox
-npm run dist          # release zips for both targets under dist/
+npm run dist          # zips + firefox xpi (+ chrome crx with CRX_PRIVATE_KEY)
+npm run sign:firefox  # AMO sign (unlisted) via WEB_EXT_API_KEY/SECRET
 ```
+
+Tagging `vX.Y.Z` (matching `package.json` + `manifest.base.json`) runs
+`.github/workflows/release.yml`: lint, test, dist, AMO sign, and a GitHub
+Release with the xpi/zip/crx attached. Secrets: `AMO_JWT_ISSUER`,
+`AMO_JWT_SECRET`, `CRX_PRIVATE_KEY` (base64 `.pem`).
 
 Source in `content/`, `options/`, `background/`, `shared/` is bundled by
 esbuild into `content/bundle.js`, `options/options.bundle.js`,

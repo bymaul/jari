@@ -1,0 +1,55 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: tag matches package and manifest versions
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          man=$(node -p "require('./manifest.base.json').version")
+          test "$ver" = "$pkg" && test "$ver" = "$man" || { echo "tag $GITHUB_REF_NAME matches neither package.json ($pkg) nor manifest.base.json ($man)"; exit 1; }
+      - name: build dist (packs CRX when the key secret exists)
+        run: npm run dist
+        env:
+          CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
+      - name: sign firefox add-on (unlisted)
+        if: ${{ secrets.AMO_JWT_ISSUER != '' }}
+        run: npm run sign:firefox
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      - name: create github release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          notes=$(mktemp)
+          awk -v ver="$ver" '
+            $0 ~ "^## \\[" ver "\\]" { in_section = 1; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md > "$notes"
+          if [ ! -s "$notes" ]; then echo "Release $GITHUB_REF_NAME" > "$notes"; fi
+          files="dist/jari-firefox-${ver}.xpi dist/jari-chrome-${ver}.zip"
+          if [ -f "dist/jari-chrome-${ver}.crx" ]; then files="$files dist/jari-chrome-${ver}.crx"; fi
+          if [ -d dist/signed ]; then
+            for signed in dist/signed/*.xpi; do
+              if [ -e "$signed" ]; then files="$files $signed"; fi
+            done
+          fi
+          # shellcheck disable=SC2086
+          gh release create "$GITHUB_REF_NAME" --title "Jari $ver" --notes-file "$notes" $files

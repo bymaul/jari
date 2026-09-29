@@ -6,6 +6,14 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
+### Added
+
+- Release automation: tagging `vX.Y.Z` builds dist artifacts, signs the
+  Firefox build unlisted via AMO, and attaches the signed xpi plus the
+  Chrome zip/crx to the GitHub Release (`.github/workflows/release.yml`).
+  Firefox dist is now packaged with `web-ext` (linted, `.xpi`); Chrome
+  packs `.crx` (CRX3) when `CRX_PRIVATE_KEY` is set.
+
 ### Fixed
 
 - `;x` on Firefox reports honestly instead of failing silently: Firefox
