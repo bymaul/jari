@@ -26,9 +26,13 @@ jobs:
         run: npm run dist
         env:
           CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
-      - name: sign firefox add-on (unlisted)
-        if: ${{ secrets.AMO_JWT_ISSUER != '' }}
-        run: npm run sign:firefox
+      - name: sign firefox add-on (unlisted, skipped without AMO credentials)
+        run: |
+          if [ -z "$WEB_EXT_API_KEY" ] || [ -z "$WEB_EXT_API_SECRET" ]; then
+            echo "Skipping AMO sign (AMO_JWT_ISSUER/AMO_JWT_SECRET not set)"
+          else
+            npm run sign:firefox
+          fi
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
