@@ -113,6 +113,26 @@ async function openClipboardWith(action) {
   if (res && !res.ok) ui.toast("Not a URL");
 }
 
+function isFirefox() {
+  try {
+    return /firefox/i.test(navigator.userAgent || "");
+  } catch {
+    return false;
+  }
+}
+
+function addonsBlockedHint() {
+  let mac = false;
+  try {
+    mac =
+      /mac/i.test(navigator.platform || "") ||
+      /mac/i.test(navigator.userAgent || "");
+  } catch {}
+  return mac
+    ? "Firefox blocks this - press Cmd+Shift+A for Add-ons Manager"
+    : "Firefox blocks this - press Ctrl+Shift+A for Add-ons Manager";
+}
+
 function goTo(urlFn) {
   const target = urlFn(location.href);
   if (Url.isSamePath(target, location.href)) return ui.toast("Already at root");
@@ -326,7 +346,8 @@ export const commands = {
     ...COMMAND_CATALOG.openExtensions,
     run: async () => {
       const res = await sendMessage("openExtensions");
-      if (!res || !res.ok) ui.toast("Cannot open extensions page");
+      if (res && res.ok) return;
+      ui.toast(isFirefox() ? addonsBlockedHint() : "Cannot open extensions page");
     },
   },
 };

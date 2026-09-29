@@ -4,6 +4,14 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Fixed
+
+- `;x` on Firefox reports honestly instead of failing silently: Firefox
+  blocks extensions from opening `about:addons`, so Jari now toasts the
+  `Ctrl+Shift+A` (`Cmd+Shift+A` on macOS) shortcut.
+
 ## [0.6.1] - 2026-09-28
 
 ### Changed

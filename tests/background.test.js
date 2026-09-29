@@ -315,6 +315,45 @@ test("restoreTab reports failure when sessions are unavailable", async () => {
   assert.deepEqual(await handlers.restoreTab({}, {}), { ok: false });
 });
 
+test("openExtensions opens the first creatable URL", async () => {
+  const created = [];
+  const savedCreate = globalThis.chrome.tabs.create;
+  globalThis.chrome.tabs.create = async (opts) => {
+    created.push(opts);
+    return { id: 9 };
+  };
+  try {
+    assert.deepEqual(await handlers.openExtensions({}, {}), { ok: true });
+    assert.deepEqual(created, [{ url: "chrome://extensions" }]);
+  } finally {
+    if (savedCreate === undefined) delete globalThis.chrome.tabs.create;
+    else globalThis.chrome.tabs.create = savedCreate;
+  }
+});
+
+test("openExtensions reports blocked when every URL is rejected", async () => {
+  const tried = [];
+  const savedCreate = globalThis.chrome.tabs.create;
+  globalThis.chrome.tabs.create = async (opts) => {
+    tried.push(opts.url);
+    throw new Error("Illegal URL");
+  };
+  try {
+    assert.deepEqual(await handlers.openExtensions({}, {}), {
+      ok: false,
+      reason: "blocked",
+    });
+    assert.deepEqual(tried, [
+      "chrome://extensions",
+      "about:addons",
+      "edge://extensions",
+    ]);
+  } finally {
+    if (savedCreate === undefined) delete globalThis.chrome.tabs.create;
+    else globalThis.chrome.tabs.create = savedCreate;
+  }
+});
+
 function stubSuggestChrome(maxResults) {
   const saved = {
     query: globalThis.chrome.tabs.query,

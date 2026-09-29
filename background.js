@@ -633,10 +633,11 @@
       try {
         await chrome.tabs.create({ url });
         return { ok: true };
-      } catch {
+      } catch (err) {
+        console.debug(`[jari] openExtensions ${url} failed:`, err);
       }
     }
-    return { ok: false };
+    return { ok: false, reason: "blocked" };
   }
 
   // background/bookmarks.js
