@@ -109,6 +109,28 @@ function rectOf(left, top, width, height) {
   return { left, top, right: left + width, bottom: top + height, width, height };
 }
 
+function makeDialog({ clientWidth, clientHeight, scrollHeight, rect }) {
+  const el = makeDiv({ clientWidth, clientHeight, scrollHeight, rect });
+  el.getAttribute = (name) => (name === "role" ? "dialog" : null);
+  return el;
+}
+
+function dialogFixture() {
+  return makeDialog({
+    clientWidth: 400,
+    clientHeight: 600,
+    scrollHeight: 1500,
+    rect: rectOf(520, 200, 400, 600),
+  });
+}
+
+async function fireDocumentMutations() {
+  const docs = documentObservers();
+  assert.ok(docs.length > 0, "expected the document to be observed");
+  for (const observer of docs) observer.callback([], observer);
+  await new Promise((r) => setTimeout(r, 250));
+}
+
 let current = [];
 globalThis.document.querySelectorAll = () => current;
 
@@ -373,4 +395,64 @@ test("reset from a frame forwards without a local highlight", () => {
     created.filter((el) => el.tagName === "div"),
     [],
   );
+});
+
+test("a newly opened dialog becomes the target while on the page", async () => {
+  const { feed, junk } = tiktokFixtures();
+  useFixtures([feed, junk], VH + 800);
+  assert.equal(Scroll.getTarget(), globalThis.window);
+
+  const dialog = dialogFixture();
+  useFixturesWithoutReset([feed, junk, dialog]);
+  await fireDocumentMutations();
+
+  assert.equal(Scroll.getTarget(), dialog);
+  assert.ok(
+    labels().includes("dialog scroll area"),
+    "expected the highlight to name the dialog",
+  );
+});
+
+test("a late non-dialog panel leaves the page target alone", async () => {
+  const { feed, junk, comments } = tiktokFixtures();
+  useFixtures([feed, junk], VH + 800);
+  assert.equal(Scroll.getTarget(), globalThis.window);
+
+  useFixturesWithoutReset([feed, junk, comments]);
+  await fireDocumentMutations();
+
+  assert.equal(Scroll.getTarget(), globalThis.window);
+});
+
+test("a newly opened dialog does not steal an explicitly chosen area", async () => {
+  const { feed, junk } = tiktokFixtures();
+  useFixtures([feed, junk], VH + 800);
+  Scroll.cycle();
+  const chosen = Scroll.getTarget();
+  assert.notEqual(chosen, globalThis.window);
+
+  const dialog = dialogFixture();
+  useFixturesWithoutReset([feed, junk, dialog]);
+  await fireDocumentMutations();
+
+  assert.equal(Scroll.getTarget(), chosen);
+});
+
+test("auto-pick prefers a dialog when the page does not scroll", () => {
+  const { feed } = tiktokFixtures();
+  const dialog = dialogFixture();
+  useFixtures([feed, dialog]);
+  assert.equal(Scroll.getTarget(), dialog);
+});
+
+test("backward cycle wraps feed -> comments -> sidebar -> feed", () => {
+  const { feed, junk, comments } = tiktokFixtures();
+  useFixtures([feed, junk, comments]);
+  assert.equal(Scroll.getTarget(), feed);
+  Scroll.cycle(-1);
+  assert.equal(Scroll.getTarget(), comments);
+  Scroll.cycle(-1);
+  assert.equal(Scroll.getTarget(), junk);
+  Scroll.cycle(-1);
+  assert.equal(Scroll.getTarget(), feed);
 });

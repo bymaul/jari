@@ -10,7 +10,8 @@ export const COMMAND_CATALOG = {
   scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
   scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
   scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-  cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
+  cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame", repeatable: true },
+  cycleScrollFrameBack: { category: "scrolling", label: "Cycle scroll area / frame backward", repeatable: true },
   resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
 
   zoomIn: { category: "zoom", label: "Zoom in" },

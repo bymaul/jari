@@ -26,13 +26,12 @@ const { Shot, __shotTest } = await import("../content/shot.js");
 const { captureFullPage, hideFixedElements } = await import("../content/scrollshot.js");
 const { ui } = await import("../content/ui.js");
 
-test("screenshotPage is a page command, unbound by default", () => {
+test("screenshotPage is a page command, bound to gsp by default", () => {
   assert.equal(COMMAND_CATALOG.screenshotPage.category, "page");
   assert.ok(COMMAND_CATALOG.screenshotPage.label.length > 0);
   assert.ok(commands.screenshotPage, "expected the command to be registered");
   assert.equal(typeof commands.screenshotPage.run, "function");
-  const bound = Object.values(keymapDefaults).includes("screenshotPage");
-  assert.equal(bound, false);
+  assert.equal(keymapDefaults.gsp, "screenshotPage");
 });
 
 test("screenshotFilename formats a local timestamp", () => {
@@ -278,12 +277,11 @@ test("screenshotPage hides overlays around the capture", async () => {
   }
 });
 
-test("screenshotRegion is a page command, unbound by default", () => {
+test("screenshotRegion is a page command, bound to gsr by default", () => {
   assert.equal(COMMAND_CATALOG.screenshotRegion.category, "page");
   assert.ok(commands.screenshotRegion, "expected the command to be registered");
   assert.equal(typeof commands.screenshotRegion.run, "function");
-  const bound = Object.values(keymapDefaults).includes("screenshotRegion");
-  assert.equal(bound, false);
+  assert.equal(keymapDefaults.gsr, "screenshotRegion");
 });
 
 test("normalizeRect orders corners and clamps to the viewport", () => {
@@ -627,12 +625,11 @@ test("shot captures only after two paint frames", async () => {
   }
 });
 
-test("screenshotFullPage is a page command, unbound by default", () => {
+test("screenshotFullPage is a page command, bound to gss by default", () => {
   assert.equal(COMMAND_CATALOG.screenshotFullPage.category, "page");
   assert.ok(commands.screenshotFullPage, "expected the command to be registered");
   assert.equal(typeof commands.screenshotFullPage.run, "function");
-  const bound = Object.values(keymapDefaults).includes("screenshotFullPage");
-  assert.equal(bound, false);
+  assert.equal(keymapDefaults.gss, "screenshotFullPage");
 });
 
 test("computeSlices pages short content in one slice", () => {

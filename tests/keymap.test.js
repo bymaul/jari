@@ -308,12 +308,12 @@ test("migrateYankBindings leaves custom rebinds and occupied targets alone", () 
   assert.deepEqual(Jari.migrateYankBindings([]), []);
 });
 
-test("v5 stored keymaps migrate yank binds through v8", () => {
+test("v5 stored keymaps migrate yank binds through v9", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 5,
     keymap: { yfa: "hintYank", yft: "hintYankText" },
   });
-  assert.equal(s.schemaVersion, 8);
+  assert.equal(s.schemaVersion, 9);
   assert.equal(s.keymap.yf, "hintYank");
   assert.equal(s.keymap.yF, "hintYankText");
   assert.equal(s.keymap.yfa, undefined);
@@ -322,9 +322,9 @@ test("v5 stored keymaps migrate yank binds through v8", () => {
   assert.equal(s.keymap["]]"], "nextPage");
 });
 
-test("stored keymaps without yank binds keep them unbound through v8", () => {
+test("stored keymaps without yank binds keep them unbound through v9", () => {
   const s = Jari.normalizeSettings({ schemaVersion: 5, keymap: { j: "scrollDown" } });
-  assert.equal(s.schemaVersion, 8);
+  assert.equal(s.schemaVersion, 9);
   assert.equal(s.keymap.j, "scrollDown");
   for (const combo of ["yf", "yF", "yfa", "yft"]) {
     assert.equal(s.keymap[combo], undefined);
@@ -428,12 +428,12 @@ test("migrateFindToggleBindings leaves custom rebinds and occupied combos alone"
   assert.deepEqual(Jari.migrateFindToggleBindings([]), []);
 });
 
-test("v6 stored keymaps migrate to the new toggle binds and stamp v8", () => {
+test("v6 stored keymaps migrate to the new toggle binds and stamp v9", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 6,
     keymap: { "alt+r": "toggleFindRegex" },
   });
-  assert.equal(s.schemaVersion, 8);
+  assert.equal(s.schemaVersion, 9);
   assert.equal(s.keymap["alt+1"], "toggleFindRegex");
   assert.equal(s.keymap["alt+r"], undefined);
   assert.equal(s.keymap.d, "scrollHalfPageDown");
@@ -485,12 +485,12 @@ test("migratePageNavBindings leaves custom rebinds and occupied combos alone", (
   assert.deepEqual(Jari.migratePageNavBindings([]), []);
 });
 
-test("v7 stored keymaps gain page-nav binds and texts, stamp v8", () => {
+test("v7 stored keymaps gain page-nav binds and texts, stamp v9", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 7,
     keymap: { j: "scrollDown" },
   });
-  assert.equal(s.schemaVersion, 8);
+  assert.equal(s.schemaVersion, 9);
   assert.equal(s.keymap["[["], "prevPage");
   assert.equal(s.keymap["]]"], "nextPage");
   assert.equal(s.keymap[":"], "showCommandPalette");
@@ -504,9 +504,42 @@ test("v7 stored keymaps keep custom page-nav texts", () => {
     keymap: {},
     pageNavTexts: { next: ["Weiter"], prev: [] },
   });
-  assert.equal(s.schemaVersion, 8);
+  assert.equal(s.schemaVersion, 9);
   assert.deepEqual(s.pageNavTexts.next, ["Weiter"]);
   assert.ok(s.pageNavTexts.prev.length > 0);
+});
+
+test("moveTabToWindow stays on W, cycle uses [w/]w, w stays free", () => {
+  assert.equal(Jari.keymapDefaults.W, "moveTabToWindow");
+  assert.equal(Jari.keymapDefaults.gw, undefined);
+  assert.deepEqual(Jari.keysForCommand(Jari.keymapDefaults, "moveTabToWindow"), ["W"]);
+  assert.equal(Jari.keymapDefaults.w, undefined);
+  assert.deepEqual(Jari.keysForCommand(Jari.keymapDefaults, "cycleScrollFrame"), ["]w"]);
+  assert.deepEqual(Jari.keysForCommand(Jari.keymapDefaults, "cycleScrollFrameBack"), ["[w"]);
+  assert.equal(COMMAND_CATALOG.cycleScrollFrameBack.category, "scrolling");
+  assert.equal(COMMAND_CATALOG.cycleScrollFrameBack.repeatable, true);
+  assert.equal(COMMAND_CATALOG.cycleScrollFrame.repeatable, true);
+  for (const [combo, command] of [
+    ["[w", "cycleScrollFrameBack"],
+    ["]w", "cycleScrollFrame"],
+    ["gss", "screenshotFullPage"],
+    ["gsp", "screenshotPage"],
+    ["gsr", "screenshotRegion"],
+  ]) {
+    assert.equal(Jari.findBindingConflict(Jari.keymapDefaults, combo, command), null);
+    assert.deepEqual(Jari.findOverlapConflicts(Jari.keymapDefaults, combo), []);
+    assert.equal(Jari.isBrowserTrapped(combo), false);
+  }
+});
+
+test("screenshot defaults bind the full/visible/region captures", () => {
+  assert.equal(Jari.keymapDefaults.gss, "screenshotFullPage");
+  assert.equal(Jari.keymapDefaults.gsp, "screenshotPage");
+  assert.equal(Jari.keymapDefaults.gsr, "screenshotRegion");
+  assert.equal(COMMAND_CATALOG.screenshotFullPage.category, "page");
+  assert.equal(COMMAND_CATALOG.screenshotPage.category, "page");
+  assert.equal(COMMAND_CATALOG.screenshotRegion.category, "page");
+  assert.deepEqual(Jari.keysForCommand(Jari.keymapDefaults, "screenshotPage"), ["gsp"]);
 });
 
 test("normalizeSettings falls back to default page-nav texts on corrupt input", () => {

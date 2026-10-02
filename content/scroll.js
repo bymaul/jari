@@ -18,11 +18,9 @@ function getTarget() {
   if (target === null && !resolved) {
     resolved = true;
     if (!pageCanScroll()) {
-      const areas = findScrollableElements();
-      const frames = findFrameElements();
-      const stops = [...areas, ...frames];
+      const stops = currentStops();
       if (stops.length > 0) {
-        target = nearestArea(stops) || stops[0];
+        target = nearestArea(preferDialog(stops)) || stops[0];
       }
     }
   }
@@ -51,9 +49,11 @@ function invalidateScrollCache() {
   if (mutationTimeout) return;
 
   mutationTimeout = setTimeout(() => {
+    const prevStops = lastStops;
     scanEpoch++;
     resolved = false;
     mutationTimeout = null;
+    lastStops = adoptNewDialog(prevStops);
   }, 150);
 }
 
@@ -242,9 +242,9 @@ function releaseFrameFocus() {
   } catch {}
 }
 
-function forwardCycleToTop() {
+function forwardCycleToTop(dir) {
   try {
-    window.top.postMessage({ type: CYCLE_FROM_FRAME }, "*");
+    window.top.postMessage({ type: CYCLE_FROM_FRAME, dir }, "*");
   } catch {}
   try {
     if (
@@ -272,6 +272,58 @@ function pageCanScroll() {
     if (bodyY === "hidden" || bodyY === "clip") return false;
   }
   return true;
+}
+
+const DIALOG_SELECTOR = 'dialog[open], [role="dialog"], [aria-modal="true"]';
+
+function isDialogStop(el) {
+  if (!el || el === window) return false;
+  try {
+    if (el.tagName === "DIALOG") return true;
+    if (typeof el.getAttribute === "function") {
+      if (el.getAttribute("role") === "dialog") return true;
+      if (el.getAttribute("aria-modal") === "true") return true;
+    }
+    if (typeof el.closest === "function" && el.closest(DIALOG_SELECTOR))
+      return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function currentStops() {
+  const areas = findScrollableElements();
+  const frames = findFrameElements();
+  const pageScrolls = pageCanScroll();
+  return [
+    ...new Set(
+      pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames],
+    ),
+  ];
+}
+
+function preferDialog(stops) {
+  const dialogs = stops.filter(isDialogStop);
+  return dialogs.length > 0 ? dialogs : stops;
+}
+
+let lastStops = [];
+
+function adoptNewDialog(prevStops) {
+  const stops = currentStops();
+  if (target === null) {
+    const prev = new Set(prevStops);
+    const fresh = stops.filter(
+      (s) => s !== null && !prev.has(s) && isDialogStop(s),
+    );
+    if (fresh.length > 0) {
+      target = nearestArea(fresh) || fresh[0];
+      focusTarget(target);
+      showHighlight();
+    }
+  }
+  return stops;
 }
 
 function nearestArea(areas) {
@@ -304,30 +356,35 @@ function nearestArea(areas) {
   return best;
 }
 
-function cycle() {
+function cycle(steps = 1) {
   if (!isTopFrame()) {
-    forwardCycleToTop();
+    forwardCycleToTop(steps < 0 ? -1 : 1);
     return;
   }
-  const areas = findScrollableElements();
-  const frames = findFrameElements();
-  const pageScrolls = pageCanScroll();
-  const stops = [
-    ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames]),
-  ];
+  const stops = currentStops();
+  // currentStops() leads with null exactly when the page itself scrolls.
+  const pageScrolls = stops.length > 0 && stops[0] === null;
   if (stops.length === 0) {
     target = null;
     ui.toast("No scroll areas");
     return;
   }
+  const dir = steps < 0 ? -1 : 1;
+  const count = Math.max(1, Math.abs(Math.floor(steps)) || 1);
   const idx = stops.indexOf(target);
   if (idx === -1) {
-    target = pageScrolls ? null : nearestArea(stops) || stops[0];
+    target = pageScrolls ? null : nearestArea(preferDialog(stops)) || stops[0];
   } else if (pageScrolls && idx === 0) {
-    const ranked = stops.filter((s) => s !== null);
-    target = nearestArea(ranked) || areas[0] || frames[0] || null;
+    if (dir < 0) {
+      target = stops[stops.length - 1];
+    } else {
+      const ranked = stops.filter((s) => s !== null);
+      target = nearestArea(preferDialog(ranked)) || ranked[0] || null;
+    }
   } else {
-    target = stops[(idx + 1) % stops.length];
+    const next =
+      (((idx + dir * count) % stops.length) + stops.length) % stops.length;
+    target = stops[next];
   }
   focusTarget(target);
   if (!isFrame(target)) releaseFrameFocus();
@@ -355,18 +412,14 @@ let highlightTimer = null;
 
 function showHighlight() {
   let area = getTarget();
-  const areas = findScrollableElements();
-  const frames = findFrameElements();
   const pageScrolls = pageCanScroll();
   if (area === window && !pageScrolls) {
-    const stops = [...areas, ...frames];
+    const stops = currentStops();
     if (stops.length === 0) return;
-    target = nearestArea(stops) || stops[0];
+    target = nearestArea(preferDialog(stops)) || stops[0];
     area = target;
   }
-  const stops = [
-    ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames]),
-  ];
+  const stops = currentStops();
   const pos = stops.indexOf(area === window ? null : area);
   const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
   if (!document.body) return;
@@ -398,7 +451,11 @@ function showHighlight() {
   el.style.height = rect.height + "px";
   const label = document.createElement("span");
   label.className = "jari-scroll-highlight-label";
-  label.textContent = area === window ? "global scroll" : isFrame(area) ? "frame" : "current scroll area";
+  let kind = "current scroll area";
+  if (area === window) kind = "global scroll";
+  else if (isFrame(area)) kind = "frame";
+  else if (isDialogStop(area)) kind = "dialog scroll area";
+  label.textContent = kind;
   el.appendChild(label);
   if (count) ui.toast(`${label.textContent} ${count}`);
   document.body.appendChild(el);
@@ -509,6 +566,7 @@ export function __resetScrollCache() {
   }
   scanEpoch++;
   resolved = false;
+  lastStops = [];
 }
 
 function handleCycleMessage(event) {
@@ -516,7 +574,7 @@ function handleCycleMessage(event) {
   const data = event && event.data;
   if (!data || data.type !== CYCLE_FROM_FRAME) return;
   if (!isChildFrameWindow(event.source)) return;
-  cycle();
+  cycle(data.dir === -1 ? -1 : 1);
 }
 
 function isChildFrameWindow(win) {

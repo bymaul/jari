@@ -132,6 +132,26 @@ test("w cycles global -> area -> frame -> global", () => {
   assert.equal(Scroll.getTarget(), globalThis.window);
 });
 
+test("W cycles backward global -> frame -> area -> global", () => {
+  rotateTo(globalThis.window);
+  Scroll.cycle(-1);
+  assert.equal(Scroll.getTarget(), frame);
+  Scroll.cycle(-1);
+  assert.equal(Scroll.getTarget(), area);
+  Scroll.cycle(-1);
+  assert.equal(Scroll.getTarget(), globalThis.window);
+});
+
+test("a repeat count skips stops in either direction", () => {
+  rotateTo(area);
+  Scroll.cycle(2);
+  assert.equal(Scroll.getTarget(), globalThis.window);
+  Scroll.cycle(-1);
+  assert.equal(Scroll.getTarget(), frame);
+  Scroll.cycle(-2);
+  assert.equal(Scroll.getTarget(), globalThis.window);
+});
+
 test("cycling onto a frame focuses it, cycling off releases focus", () => {
   rotateTo(globalThis.window);
   Scroll.cycle();
@@ -183,6 +203,37 @@ test("the top frame advances its cycle on a subframe request", () => {
   globalThis.document.activeElement = frame;
 
   onMessage({ data: { type: "jari-cycle-scroll" }, source: frame.contentWindow });
+
+  assert.equal(Scroll.getTarget(), globalThis.window);
+});
+
+test("W inside a frame forwards the direction to the top frame", () => {
+  rotateTo(frame);
+  const posted = [];
+  const top = {
+    postMessage: (msg) => posted.push(msg),
+    focus: () => {},
+  };
+  globalThis.window.top = top;
+  globalThis.document.activeElement = null;
+  const focusBefore = frame.focusCalls;
+
+  Scroll.cycle(-1);
+
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].type, "jari-cycle-scroll");
+  assert.equal(posted[0].dir, -1);
+  assert.equal(Scroll.getTarget(), frame);
+  assert.equal(frame.focusCalls, focusBefore);
+});
+
+test("the top frame cycles backward on a directed subframe request", () => {
+  assert.ok(messageHandlers.length > 0, "expected a message listener");
+  const onMessage = messageHandlers[messageHandlers.length - 1];
+  rotateTo(area);
+  globalThis.document.activeElement = area;
+
+  onMessage({ data: { type: "jari-cycle-scroll", dir: -1 }, source: frame.contentWindow });
 
   assert.equal(Scroll.getTarget(), globalThis.window);
 });

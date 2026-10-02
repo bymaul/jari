@@ -292,7 +292,8 @@
     scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
+    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame", repeatable: true },
+    cycleScrollFrameBack: { category: "scrolling", label: "Cycle scroll area / frame backward", repeatable: true },
     resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
     zoomIn: { category: "zoom", label: "Zoom in" },
     zoomOut: { category: "zoom", label: "Zoom out" },
@@ -354,7 +355,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 8;
+  var SETTINGS_SCHEMA_VERSION = 9;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -370,7 +371,8 @@
     h: "scrollLeft",
     l: "scrollRight",
     G: "scrollToBottom",
-    w: "cycleScrollFrame",
+    "[w": "cycleScrollFrameBack",
+    "]w": "cycleScrollFrame",
     d: "scrollHalfPageDown",
     u: "scrollHalfPageUp",
     "+": "zoomIn",
@@ -420,6 +422,9 @@
     yy: "copyUrl",
     yf: "hintYank",
     yF: "hintYankText",
+    gss: "screenshotFullPage",
+    gsp: "screenshotPage",
+    gsr: "screenshotRegion",
     "[[": "prevPage",
     "]]": "nextPage",
     ":": "showCommandPalette"
@@ -604,6 +609,10 @@
       d.keymap = migratePageNavBindings(d.keymap);
       version = 8;
     }
+    if (version < 9) {
+      d.keymap = migrateV9Bindings(d.keymap);
+      version = 9;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -685,6 +694,25 @@
       if (findOverlapConflicts(out, combo).length > 0) continue;
       out[combo] = command;
       used.add(command);
+    }
+    return out;
+  }
+  var V9_DEFAULT_FILLS = [
+    ["[w", "cycleScrollFrameBack"],
+    ["]w", "cycleScrollFrame"],
+    ["gss", "screenshotFullPage"],
+    ["gsp", "screenshotPage"],
+    ["gsr", "screenshotRegion"]
+  ];
+  function migrateV9Bindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    for (const [combo, command] of V9_DEFAULT_FILLS) {
+      if (combo in out) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
     }
     return out;
   }

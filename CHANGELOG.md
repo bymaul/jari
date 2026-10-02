@@ -4,6 +4,23 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Changed
+
+- Scroll-area cycle goes both ways on bracket binds: `]w` forward, `[w`
+  back; both take repeat counts (`3]w` skips two stops). Bare `w` is
+  unbound again.
+- Screenshots gain default binds: `gss` full page (scroll and stitch),
+  `gsp` visible page, `gsr` region. Fresh installs get them; stored
+  keymaps stay untouched, bind them in settings if wanted.
+
+### Added
+
+- The scroll target follows newly opened dialogs: when a `<dialog>`,
+  `role=dialog`, or `aria-modal` panel with its own scroll area appears
+  while the target is the page, `j`/`k` apply to it immediately.
+
 ## [0.6.2] - 2026-09-29
 
 ### Added

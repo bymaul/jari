@@ -16,7 +16,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
-export const SETTINGS_SCHEMA_VERSION = 8;
+export const SETTINGS_SCHEMA_VERSION = 9;
 
 export const Events = {
   listeners: {},
@@ -34,7 +34,8 @@ export const keymapDefaults = {
   h: "scrollLeft",
   l: "scrollRight",
   G: "scrollToBottom",
-  w: "cycleScrollFrame",
+  "[w": "cycleScrollFrameBack",
+  "]w": "cycleScrollFrame",
   d: "scrollHalfPageDown",
   u: "scrollHalfPageUp",
   "+": "zoomIn",
@@ -94,6 +95,10 @@ export const keymapDefaults = {
   yy: "copyUrl",
   yf: "hintYank",
   yF: "hintYankText",
+
+  gss: "screenshotFullPage",
+  gsp: "screenshotPage",
+  gsr: "screenshotRegion",
 
   "[[": "prevPage",
   "]]": "nextPage",
@@ -413,6 +418,14 @@ export function migrateSettings(data) {
     d.keymap = migratePageNavBindings(d.keymap);
     version = 8;
   }
+  // v8 -> v9: scroll-area cycle gains [w (backward) and ]w (forward),
+  // screenshots gain gss/gsp/gsr. Combos fill only where free, so
+  // custom rebinds are never clobbered. A stored w bind is kept and
+  // ]w lands next to it as an alias.
+  if (version < 9) {
+    d.keymap = migrateV9Bindings(d.keymap);
+    version = 9;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -502,6 +515,27 @@ export function migratePageNavBindings(keymap) {
     if (findOverlapConflicts(out, combo).length > 0) continue;
     out[combo] = command;
     used.add(command);
+  }
+  return out;
+}
+
+const V9_DEFAULT_FILLS = [
+  ["[w", "cycleScrollFrameBack"],
+  ["]w", "cycleScrollFrame"],
+  ["gss", "screenshotFullPage"],
+  ["gsp", "screenshotPage"],
+  ["gsr", "screenshotRegion"],
+];
+
+export function migrateV9Bindings(keymap) {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap;
+  }
+  const out = { ...keymap };
+  for (const [combo, command] of V9_DEFAULT_FILLS) {
+    if (combo in out) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
   }
   return out;
 }

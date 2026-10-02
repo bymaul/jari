@@ -581,7 +581,8 @@
     scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame" },
+    cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame", repeatable: true },
+    cycleScrollFrameBack: { category: "scrolling", label: "Cycle scroll area / frame backward", repeatable: true },
     resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
     zoomIn: { category: "zoom", label: "Zoom in" },
     zoomOut: { category: "zoom", label: "Zoom out" },
@@ -643,7 +644,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 8;
+  var SETTINGS_SCHEMA_VERSION = 9;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -659,7 +660,8 @@
     h: "scrollLeft",
     l: "scrollRight",
     G: "scrollToBottom",
-    w: "cycleScrollFrame",
+    "[w": "cycleScrollFrameBack",
+    "]w": "cycleScrollFrame",
     d: "scrollHalfPageDown",
     u: "scrollHalfPageUp",
     "+": "zoomIn",
@@ -709,6 +711,9 @@
     yy: "copyUrl",
     yf: "hintYank",
     yF: "hintYankText",
+    gss: "screenshotFullPage",
+    gsp: "screenshotPage",
+    gsr: "screenshotRegion",
     "[[": "prevPage",
     "]]": "nextPage",
     ":": "showCommandPalette"
@@ -930,6 +935,10 @@
       d.keymap = migratePageNavBindings(d.keymap);
       version = 8;
     }
+    if (version < 9) {
+      d.keymap = migrateV9Bindings(d.keymap);
+      version = 9;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -1011,6 +1020,25 @@
       if (findOverlapConflicts(out, combo).length > 0) continue;
       out[combo] = command;
       used.add(command);
+    }
+    return out;
+  }
+  var V9_DEFAULT_FILLS = [
+    ["[w", "cycleScrollFrameBack"],
+    ["]w", "cycleScrollFrame"],
+    ["gss", "screenshotFullPage"],
+    ["gsp", "screenshotPage"],
+    ["gsr", "screenshotRegion"]
+  ];
+  function migrateV9Bindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    for (const [combo, command] of V9_DEFAULT_FILLS) {
+      if (combo in out) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
     }
     return out;
   }
@@ -2208,11 +2236,9 @@
     if (target === null && !resolved) {
       resolved = true;
       if (!pageCanScroll()) {
-        const areas = findScrollableElements();
-        const frames = findFrameElements();
-        const stops = [...areas, ...frames];
+        const stops = currentStops();
         if (stops.length > 0) {
-          target = nearestArea(stops) || stops[0];
+          target = nearestArea(preferDialog(stops)) || stops[0];
         }
       }
     }
@@ -2234,9 +2260,11 @@
     resolved = false;
     if (mutationTimeout) return;
     mutationTimeout = setTimeout(() => {
+      const prevStops = lastStops;
       scanEpoch++;
       resolved = false;
       mutationTimeout = null;
+      lastStops = adoptNewDialog(prevStops);
     }, 150);
   }
   var observedRoots = /* @__PURE__ */ new Set();
@@ -2394,9 +2422,9 @@
     } catch {
     }
   }
-  function forwardCycleToTop() {
+  function forwardCycleToTop(dir) {
     try {
-      window.top.postMessage({ type: CYCLE_FROM_FRAME }, "*");
+      window.top.postMessage({ type: CYCLE_FROM_FRAME, dir }, "*");
     } catch {
     }
     try {
@@ -2424,6 +2452,52 @@
       if (bodyY === "hidden" || bodyY === "clip") return false;
     }
     return true;
+  }
+  var DIALOG_SELECTOR = 'dialog[open], [role="dialog"], [aria-modal="true"]';
+  function isDialogStop(el) {
+    if (!el || el === window) return false;
+    try {
+      if (el.tagName === "DIALOG") return true;
+      if (typeof el.getAttribute === "function") {
+        if (el.getAttribute("role") === "dialog") return true;
+        if (el.getAttribute("aria-modal") === "true") return true;
+      }
+      if (typeof el.closest === "function" && el.closest(DIALOG_SELECTOR))
+        return true;
+    } catch {
+      return false;
+    }
+    return false;
+  }
+  function currentStops() {
+    const areas = findScrollableElements();
+    const frames = findFrameElements();
+    const pageScrolls = pageCanScroll();
+    return [
+      ...new Set(
+        pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames]
+      )
+    ];
+  }
+  function preferDialog(stops) {
+    const dialogs = stops.filter(isDialogStop);
+    return dialogs.length > 0 ? dialogs : stops;
+  }
+  var lastStops = [];
+  function adoptNewDialog(prevStops) {
+    const stops = currentStops();
+    if (target === null) {
+      const prev = new Set(prevStops);
+      const fresh = stops.filter(
+        (s) => s !== null && !prev.has(s) && isDialogStop(s)
+      );
+      if (fresh.length > 0) {
+        target = nearestArea(fresh) || fresh[0];
+        focusTarget(target);
+        showHighlight();
+      }
+    }
+    return stops;
   }
   function nearestArea(areas) {
     const vw = window.innerWidth || 0;
@@ -2453,30 +2527,33 @@
     }
     return best;
   }
-  function cycle() {
+  function cycle(steps = 1) {
     if (!isTopFrame()) {
-      forwardCycleToTop();
+      forwardCycleToTop(steps < 0 ? -1 : 1);
       return;
     }
-    const areas = findScrollableElements();
-    const frames = findFrameElements();
-    const pageScrolls = pageCanScroll();
-    const stops = [
-      ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames])
-    ];
+    const stops = currentStops();
+    const pageScrolls = stops.length > 0 && stops[0] === null;
     if (stops.length === 0) {
       target = null;
       ui.toast("No scroll areas");
       return;
     }
+    const dir = steps < 0 ? -1 : 1;
+    const count = Math.max(1, Math.abs(Math.floor(steps)) || 1);
     const idx = stops.indexOf(target);
     if (idx === -1) {
-      target = pageScrolls ? null : nearestArea(stops) || stops[0];
+      target = pageScrolls ? null : nearestArea(preferDialog(stops)) || stops[0];
     } else if (pageScrolls && idx === 0) {
-      const ranked = stops.filter((s) => s !== null);
-      target = nearestArea(ranked) || areas[0] || frames[0] || null;
+      if (dir < 0) {
+        target = stops[stops.length - 1];
+      } else {
+        const ranked = stops.filter((s) => s !== null);
+        target = nearestArea(preferDialog(ranked)) || ranked[0] || null;
+      }
     } else {
-      target = stops[(idx + 1) % stops.length];
+      const next2 = ((idx + dir * count) % stops.length + stops.length) % stops.length;
+      target = stops[next2];
     }
     focusTarget(target);
     if (!isFrame(target)) releaseFrameFocus();
@@ -2495,18 +2572,14 @@
   var highlightTimer = null;
   function showHighlight() {
     let area = getTarget();
-    const areas = findScrollableElements();
-    const frames = findFrameElements();
     const pageScrolls = pageCanScroll();
     if (area === window && !pageScrolls) {
-      const stops2 = [...areas, ...frames];
+      const stops2 = currentStops();
       if (stops2.length === 0) return;
-      target = nearestArea(stops2) || stops2[0];
+      target = nearestArea(preferDialog(stops2)) || stops2[0];
       area = target;
     }
-    const stops = [
-      ...new Set(pageScrolls ? [null, ...areas, ...frames] : [...areas, ...frames])
-    ];
+    const stops = currentStops();
     const pos = stops.indexOf(area === window ? null : area);
     const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
     if (!document.body) return;
@@ -2536,7 +2609,11 @@
     el.style.height = rect.height + "px";
     const label = document.createElement("span");
     label.className = "jari-scroll-highlight-label";
-    label.textContent = area === window ? "global scroll" : isFrame(area) ? "frame" : "current scroll area";
+    let kind = "current scroll area";
+    if (area === window) kind = "global scroll";
+    else if (isFrame(area)) kind = "frame";
+    else if (isDialogStop(area)) kind = "dialog scroll area";
+    label.textContent = kind;
     el.appendChild(label);
     if (count) ui.toast(`${label.textContent} ${count}`);
     document.body.appendChild(el);
@@ -2627,7 +2704,7 @@
     const data = event && event.data;
     if (!data || data.type !== CYCLE_FROM_FRAME) return;
     if (!isChildFrameWindow(event.source)) return;
-    cycle();
+    cycle(data.dir === -1 ? -1 : 1);
   }
   function isChildFrameWindow(win) {
     if (!win || win === window) return false;
@@ -9647,7 +9724,8 @@ ${location.href}`;
     scrollPageUp: { ...COMMAND_CATALOG.scrollPageUp, run: scrollPageBy(PAGE_RATIO, -1) },
     scrollHalfPageDown: { ...COMMAND_CATALOG.scrollHalfPageDown, run: scrollPageBy(HALF_RATIO, 1) },
     scrollHalfPageUp: { ...COMMAND_CATALOG.scrollHalfPageUp, run: scrollPageBy(HALF_RATIO, -1) },
-    cycleScrollFrame: { ...COMMAND_CATALOG.cycleScrollFrame, run: () => Scroll.cycle() },
+    cycleScrollFrame: { ...COMMAND_CATALOG.cycleScrollFrame, run: (c) => Scroll.cycle(c.count) },
+    cycleScrollFrameBack: { ...COMMAND_CATALOG.cycleScrollFrameBack, run: (c) => Scroll.cycle(-c.count) },
     resetScrollTarget: { ...COMMAND_CATALOG.resetScrollTarget, run: () => Scroll.reset() },
     zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },

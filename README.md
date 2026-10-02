@@ -16,15 +16,16 @@ see [PRIVACY.md](PRIVACY.md).
 Commands take a repeat count (`3j`, `2x`); `0-9` are reserved for it.
 Bindings chain into sequences of any length.
 
-- Scroll: `j`/`k`/`h`/`l`, `d`/`u` half page, `gg`/`G` top/bottom, `w` cycle scroll area,
-  `;w` reset scroll area
+- Scroll: `j`/`k`/`h`/`l`, `d`/`u` half page, `gg`/`G` top/bottom, `]w` cycle scroll area
+  forward, `[w` back (`3]w` skips ahead), `;w` reset scroll area
 - Zoom: `+`/`=`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
   `J`/`K` prev/next, `g0`/`g$` first/last, `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
 - History: `H`/`L` back/forward
 - Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
-  `yy` copy URL, `Y` copy title + URL, `[[`/`]]` previous/next page
+  `yy` copy URL, `Y` copy title + URL, `gss`/`gsp`/`gsr` screenshot full/page/region,
+  `[[`/`]]` previous/next page
   (customizable link texts in settings)
 - Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
@@ -37,8 +38,7 @@ Bindings chain into sequences of any length.
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
 newTab, newIncognitoTab, duplicateTab, togglePin,
-toggleMute, hintOpenCurrent, toggleBookmark,
-screenshotPage, screenshotRegion, screenshotFullPage.
+toggleMute, hintOpenCurrent, toggleBookmark.
 
 ## Settings (`;e`)
 
