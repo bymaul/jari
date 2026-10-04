@@ -6,6 +6,8 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-04
+
 ### Changed
 
 - Scroll-area cycle goes both ways on bracket binds: `]w` forward, `[w`
@@ -14,12 +16,23 @@ versioned for the extension manifest (`manifest.base.json`).
 - Screenshots gain default binds: `gss` full page (scroll and stitch),
   `gsp` visible page, `gsr` region. Fresh installs get them; stored
   keymaps stay untouched, bind them in settings if wanted.
+- Selection and overlay highlights share the accent theme; edit-URL
+  (`ge`) selects the full URL on open.
 
 ### Added
 
 - The scroll target follows newly opened dialogs: when a `<dialog>`,
   `role=dialog`, or `aria-modal` panel with its own scroll area appears
   while the target is the page, `j`/`k` apply to it immediately.
+
+### Fixed
+
+- `;x` opens only the native extensions page: Edge uses
+  `edge://extensions`, Firefox reports blocked without opening a dead
+  tab.
+- Visual mode re-syncs on mouse clicks (collapsed selection drops back
+  to caret mode, clicks in editable fields exit) and uses the native
+  selection highlight instead of a custom overlay.
 
 ## [0.6.2] - 2026-09-29
 
