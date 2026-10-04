@@ -55,7 +55,7 @@ custom `keyword query` engines (`g`, `yt`, `gh`, `wiki`, `r` built in).
 Download the latest release from
 [Releases](https://github.com/bymaul/jari/releases):
 
-- Firefox: install `jari-firefox-<version>.xpi` (signed, installs directly).
+- Firefox: install `jari-firefox-<version>-signed.xpi` (signed, installs directly).
 - Chrome/Edge: unzip `jari-chrome-<version>.zip`, then
   `chrome://extensions` → Developer mode → Load unpacked.
   (`jari-chrome-<version>.crx` is also attached for policy-based installs.)
@@ -94,8 +94,12 @@ npm run sign:firefox  # AMO sign (unlisted) via WEB_EXT_API_KEY/SECRET
 ```
 
 Tagging `vX.Y.Z` (matching `package.json` + `manifest.base.json`) runs
-`.github/workflows/release.yml`: lint, test, dist, AMO sign, and a GitHub
-Release with the xpi/zip/crx attached. Secrets: `AMO_JWT_ISSUER`,
+`.github/workflows/release.yml`: lint, test, version match, an AMO
+version-availability check (fails fast if AMO already has the version,
+since AMO never reuses version strings), dist, AMO sign, and a GitHub
+Release titled `Jari vX.Y.Z` with standardized
+`jari-<target>-<version>[-signed].{xpi,zip,crx}` assets attached.
+Secrets: `AMO_JWT_ISSUER`,
 `AMO_JWT_SECRET`, `CRX_PRIVATE_KEY` (base64 `.pem`).
 
 Source in `content/`, `options/`, `background/`, `shared/` is bundled by

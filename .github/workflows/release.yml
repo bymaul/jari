@@ -22,6 +22,59 @@ jobs:
           pkg=$(node -p "require('./package.json').version")
           man=$(node -p "require('./manifest.base.json').version")
           test "$ver" = "$pkg" && test "$ver" = "$man" || { echo "tag $GITHUB_REF_NAME matches neither package.json ($pkg) nor manifest.base.json ($man)"; exit 1; }
+      - name: amo version is free (fail fast on reuse)
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if [ -z "$WEB_EXT_API_KEY" ] || [ -z "$WEB_EXT_API_SECRET" ]; then
+            echo "Skipping AMO version check (AMO_JWT_ISSUER/AMO_JWT_SECRET not set)"
+            exit 0
+          fi
+          ver="${GITHUB_REF_NAME#v}"
+          code=$(python3 - "$ver" <<'EOF'
+          import base64, hashlib, hmac, json, os, sys, time, urllib.error, urllib.parse, urllib.request
+
+          def b64url(data: bytes) -> str:
+              return base64.urlsafe_b64encode(data).decode().rstrip("=")
+
+          now = int(time.time())
+          header = b64url(json.dumps({"typ": "JWT", "alg": "HS256"}, separators=(",", ":")).encode())
+          payload = b64url(json.dumps({"iss": os.environ["WEB_EXT_API_KEY"], "iat": now, "exp": now + 300}, separators=(",", ":")).encode())
+          sig = b64url(hmac.new(os.environ["WEB_EXT_API_SECRET"].encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest())
+
+          with open("manifest.base.json", encoding="utf-8") as f:
+              guid = json.load(f)["browser_specific_settings"]["gecko"]["id"]
+          addon = urllib.parse.quote(guid, safe="")
+          version = urllib.parse.quote(sys.argv[1], safe="")
+          req = urllib.request.Request(
+              f"https://addons.mozilla.org/api/v5/addons/addon/{addon}/versions/{version}/",
+              headers={"Authorization": f"JWT {header}.{payload}.{sig}"},
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as res:
+                  print(res.status)
+          except urllib.error.HTTPError as e:
+              print(e.code)
+          except Exception as e:
+              print(f"check failed: {e}", file=sys.stderr)
+              print("000")
+          EOF
+          )
+          case "$code" in
+            200)
+              echo "::error::AMO already has version $ver (uploaded before, even if deleted: AMO never reuses version strings). Bump the version and re-tag."
+              exit 1
+              ;;
+            401|403)
+              echo "::error::AMO rejected the API credentials (HTTP $code). Check AMO_JWT_ISSUER/AMO_JWT_SECRET."
+              exit 1
+              ;;
+            404) echo "AMO version $ver is free, proceeding" ;;
+            *)
+              echo "::warning::AMO version check inconclusive (HTTP $code); proceeding, the sign step remains the backstop"
+              ;;
+          esac
       - name: build dist (packs CRX when the key secret exists)
         run: npm run dist
         env:
@@ -48,12 +101,16 @@ jobs:
             in_section { print }
           ' CHANGELOG.md > "$notes"
           if [ ! -s "$notes" ]; then echo "Release $GITHUB_REF_NAME" > "$notes"; fi
-          files="dist/jari-firefox-${ver}.xpi dist/jari-chrome-${ver}.zip"
+          files="dist/jari-firefox-${ver}-unsigned.xpi dist/jari-chrome-${ver}.zip"
           if [ -f "dist/jari-chrome-${ver}.crx" ]; then files="$files dist/jari-chrome-${ver}.crx"; fi
           if [ -d dist/signed ]; then
             for signed in dist/signed/*.xpi; do
-              if [ -e "$signed" ]; then files="$files $signed"; fi
+              if [ -e "$signed" ]; then
+                std="dist/jari-firefox-${ver}-signed.xpi"
+                mv "$signed" "$std"
+                files="$files $std"
+              fi
             done
           fi
           # shellcheck disable=SC2086
-          gh release create "$GITHUB_REF_NAME" --title "Jari $ver" --notes-file "$notes" $files
+          gh release create "$GITHUB_REF_NAME" --title "Jari v$ver" --notes-file "$notes" $files

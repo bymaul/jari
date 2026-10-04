@@ -120,7 +120,7 @@ function buildFirefoxXpi(stage, version) {
     join(root, "dist"),
     "--overwrite-dest",
   ]);
-  const xpi = join(root, "dist", `jari-firefox-${version}.xpi`);
+  const xpi = join(root, "dist", `jari-firefox-${version}-unsigned.xpi`);
   rmSync(xpi, { force: true });
   renameSync(zip, xpi);
   console.log(`Wrote ${xpi}`);

@@ -6,6 +6,15 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
+### Changed
+
+- Release assets use standardized names
+  (`jari-firefox-<version>-signed.xpi` for the AMO-signed build,
+  `jari-firefox-<version>-unsigned.xpi` for the local build) and
+  releases are titled `Jari vX.Y.Z`. The workflow checks AMO for the
+  version before building and fails fast if it is taken, since AMO
+  never reuses version strings, not even deleted ones.
+
 ## [0.6.4] - 2026-10-05
 
 ### Changed
