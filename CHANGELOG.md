@@ -6,7 +6,7 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
-## [0.6.3] - 2026-10-04
+## [0.6.4] - 2026-10-05
 
 ### Changed
 
