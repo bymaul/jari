@@ -36,6 +36,10 @@
 
   --jari-of-fg: #cdcdcd;
   --jari-of-bg: #333738;
+
+  --jari-accent: #e0a363;
+  --jari-accent-border: #c38a22;
+  --jari-accent-rgb: 224, 163, 99;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -73,6 +77,11 @@
   font-size: var(--jari-cmplt-font-size) !important;
   font-family: var(--jari-cmplt-font-family) !important;
   outline: none !important;
+}
+
+.jari-overlay ::selection {
+  background: var(--jari-accent);
+  color: #1a1a1a;
 }
 
 .jari-prompt input {
@@ -159,7 +168,7 @@
 
 .jari-prompt-list li .jari-match,
 .jari-prompt-list li.selected .jari-match {
-  color: #e0a363;
+  color: var(--jari-accent);
   font-weight: bold !important;
 }
 
@@ -375,12 +384,12 @@
   border-radius: 8px;
   background: linear-gradient(
     180deg,
-    rgba(224, 163, 99, 0.22),
-    rgba(224, 163, 99, 0.07)
+    rgba(var(--jari-accent-rgb), 0.22),
+    rgba(var(--jari-accent-rgb), 0.07)
   );
-  border: 1.5px solid rgba(224, 163, 99, 0.8);
+  border: 1.5px solid rgba(var(--jari-accent-rgb), 0.8);
   box-shadow:
-    0 0 18px rgba(224, 163, 99, 0.35),
+    0 0 18px rgba(var(--jari-accent-rgb), 0.35),
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
@@ -389,8 +398,8 @@
   z-index: 2147483646 !important;
   box-sizing: border-box;
   pointer-events: none;
-  border: 2px solid #e0a363;
-  box-shadow: 0 0 4px 2px rgba(224, 163, 99, 0.6);
+  border: 2px solid var(--jari-accent);
+  box-shadow: 0 0 4px 2px rgba(var(--jari-accent-rgb), 0.6);
 }
 
 .jari-scroll-highlight-label {
@@ -400,13 +409,13 @@
   text-transform: uppercase;
   letter-spacing: 0.1em !important;
   white-space: nowrap;
-  color: #e0a363;
+  color: var(--jari-accent);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   padding: 0.4ex 1.2ex;
   background: rgba(20, 16, 8, 0.78);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  border: 1px solid rgba(224, 163, 99, 0.65);
+  border: 1px solid rgba(var(--jari-accent-rgb), 0.65);
   border-radius: 999px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
@@ -434,7 +443,7 @@
   line-height: 1 !important;
   letter-spacing: 0.02em !important;
   padding: 1px 3px !important;
-  border: 1px solid #c38a22 !important;
+  border: 1px solid var(--jari-accent-border) !important;
   border-radius: 3px !important;
   background: linear-gradient(#fff785, #ffc542) !important;
   color: #1a1a1a !important;
@@ -474,7 +483,7 @@
 }
 
 .jari-find-label {
-  color: #e0a363;
+  color: var(--jari-accent);
   font-weight: bold !important;
   flex: 0 0 auto;
 }
@@ -517,8 +526,8 @@
 }
 
 .jari-find-toggle-on {
-  color: #e0a363;
-  border-color: #c38a22;
+  color: var(--jari-accent);
+  border-color: var(--jari-accent-border);
 }
 
 .jari-find-status {
@@ -533,56 +542,46 @@
 }
 
 ::highlight(jari-find) {
-  background: rgba(224, 163, 99, 0.45);
+  background: rgba(var(--jari-accent-rgb), 0.45);
   color: #1a1a1a;
 }
 
 ::highlight(jari-find-current) {
-  background: #e0a363;
+  background: var(--jari-accent);
   color: #1a1a1a;
 }
 
 .jari-find-hit {
-  background: rgba(224, 163, 99, 0.35) !important;
+  background: rgba(var(--jari-accent-rgb), 0.35) !important;
   color: #1a1a1a !important;
   border-radius: 2px;
   padding: 0 1px;
 }
 
 .jari-find-current {
-  background: #e0a363 !important;
+  background: var(--jari-accent) !important;
   color: #1a1a1a !important;
   border-radius: 2px;
   padding: 0 1px;
-  outline: 1px solid #c38a22;
+  outline: 1px solid var(--jari-accent-border);
 }
 
-::highlight(jari-visual) {
-  background: rgba(0, 180, 216, 0.45);
-  color: #0a1a22;
-}
-
-.jari-visual-highlight {
-  background: rgba(0, 180, 216, 0.35) !important;
-  color: #0a1a22 !important;
-  border-radius: 2px;
-  padding: 0 1px;
-  outline: 1px solid rgba(0, 180, 216, 0.6);
-}
 @media (forced-colors: active) {
   ::highlight(jari-find),
-  ::highlight(jari-find-current),
-  ::highlight(jari-visual) {
+  ::highlight(jari-find-current) {
     background: Highlight !important;
     color: HighlightText !important;
   }
   .jari-find-hit,
-  .jari-find-current,
-  .jari-visual-highlight {
+  .jari-find-current {
     background: Highlight !important;
     color: HighlightText !important;
     outline: 1px solid HighlightText !important;
     forced-color-adjust: none !important;
+  }
+  .jari-overlay ::selection {
+    background: Highlight !important;
+    color: HighlightText !important;
   }
 }
 
@@ -601,9 +600,9 @@
   position: absolute !important;
   width: 7px !important;
   height: 1.2em !important;
-  background: #e0a363 !important;
+  background: var(--jari-accent) !important;
   opacity: 0.85 !important;
-  border: 1px solid #c38a22 !important;
+  border: 1px solid var(--jari-accent-border) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
   pointer-events: none !important;
   will-change: transform !important;

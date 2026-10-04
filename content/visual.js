@@ -8,12 +8,8 @@ import {
   createHintsHost,
   layoutHints,
 } from "./hint-layer.js";
-import { getLinkAncestor } from "./hints-elements.js";
+import { getLinkAncestor, isEditable } from "./hints-elements.js";
 import { collectVisualTextElements } from "./visual/collect.js";
-import {
-  clearVisualHighlight as selClear,
-  applyVisualHighlight as selApply,
-} from "./visual/selection.js";
 import {
   isUsableCaretRect,
   firstUsableRect,
@@ -119,9 +115,9 @@ function caretCss() {
         position: absolute;
         width: 8px;
         height: 1.2em;
-        background: #e0a363;
+        background: var(--jari-accent, #e0a363);
         opacity: 0.85;
-        border: 1px solid #c38a22;
+        border: 1px solid var(--jari-accent-border, #c38a22);
         box-shadow: 0 1px 3px rgba(0,0,0,0.4);
         pointer-events: none;
         will-change: transform;
@@ -286,7 +282,6 @@ function ensureVisible() {
     }
   } catch {}
   updateBlockCaret();
-  applyVisualHighlight();
 }
 
 function attachCaretListeners() {
@@ -308,6 +303,7 @@ function attachCaretListeners() {
     } catch {}
   }
   enableSelectOverride();
+  attachMouseListeners();
 }
 function detachCaretListeners() {
   try {
@@ -328,6 +324,7 @@ function detachCaretListeners() {
     caretRaf = null;
   }
   if (!active && !hintActive) disableSelectOverride();
+  if (!active && !hintActive) detachMouseListeners();
 }
 let selectOverrideEl = null;
 function enableSelectOverride() {
@@ -335,7 +332,7 @@ function enableSelectOverride() {
   try {
     selectOverrideEl = document.createElement("style");
     selectOverrideEl.id = "jari-select-override";
-    selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; }`;
+    selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; } :root ::selection{background:var(--jari-accent, #e0a363) !important;color:#1a1a1a !important;} :root ::-moz-selection{background:var(--jari-accent, #e0a363) !important;color:#1a1a1a !important;}`;
     (document.head || document.documentElement).appendChild(selectOverrideEl);
   } catch {}
 }
@@ -347,11 +344,70 @@ function disableSelectOverride() {
   selectOverrideEl = null;
 }
 
-function clearVisualHighlight() {
-  selClear();
+function mouseTarget(event) {
+  try {
+    if (typeof event.composedPath === "function") {
+      const path = event.composedPath();
+      if (Array.isArray(path) && path.length > 0 && path[0]) return path[0];
+    }
+  } catch {}
+  return event.target || null;
 }
-function applyVisualHighlight() {
-  selApply({ active, mode, getSelection });
+
+function isJariUiEvent(event) {
+  let path = null;
+  try {
+    if (typeof event.composedPath === "function") path = event.composedPath();
+  } catch {}
+  const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
+  for (const node of nodes) {
+    try {
+      const cls = node && node.className;
+      if (typeof cls === "string" && cls.includes("jari-")) return true;
+    } catch {}
+  }
+  return false;
+}
+
+function onMouseDown(event) {
+  if (!active && !hintActive) return;
+  if (isJariUiEvent(event)) return;
+  if (hintActive) closeHints();
+  if (!active) return;
+  if (isEditable(mouseTarget(event))) close(true);
+}
+
+function onSelectionChange() {
+  if (!active || hintActive) return;
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  if (sel.isCollapsed && (mode === "visual" || mode === "line")) {
+    mode = "caret";
+    if (pillEl) pillEl.textContent = pillText(mode);
+  }
+  updateBlockCaret();
+}
+
+function attachMouseListeners() {
+  try {
+    window.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("selectionchange", onSelectionChange);
+  } catch {
+    try {
+      window.addEventListener("mousedown", onMouseDown, true);
+    } catch {}
+  }
+}
+
+function detachMouseListeners() {
+  try {
+    window.removeEventListener("mousedown", onMouseDown, true);
+    document.removeEventListener("selectionchange", onSelectionChange);
+  } catch {
+    try {
+      window.removeEventListener("mousedown", onMouseDown, true);
+    } catch {}
+  }
 }
 
 function renderHints() {
@@ -408,6 +464,7 @@ function showVisualHints(requestedMode) {
   hintPrefix = "";
   hintActive = true;
   enableSelectOverride();
+  attachMouseListeners();
   renderHints();
   if (!pillEl) {
     try {
@@ -436,6 +493,7 @@ function closeHints() {
     hintHolder = null;
   }
   if (!active && !hintActive) disableSelectOverride();
+  if (!active && !hintActive) detachMouseListeners();
   if (!active && pillEl) {
     try {
       pillEl.remove();
@@ -526,7 +584,6 @@ function enterAtElement(el, newMode) {
   clearPendingKeyTimers();
   ensureVisible();
   updateBlockCaret();
-  applyVisualHighlight();
 }
 
 function extendSelection(direction, granularity) {
@@ -1095,7 +1152,6 @@ function enterCaretAtFocus() {
   pendingY = false;
   showBlockCaret();
   attachCaretListeners();
-  clearVisualHighlight();
   ensureVisible();
   updateBlockCaret();
 }
@@ -1114,7 +1170,6 @@ function close(keepSelection = false) {
   active = false;
   hidePill();
   hideBlockCaret();
-  clearVisualHighlight();
   detachCaretListeners();
   pendingCount = "";
   pendingG = false;
@@ -1577,5 +1632,4 @@ export function __resetVisualState() {
   pendingF = null;
   pendingY = false;
   clearPendingKeyTimers();
-  clearVisualHighlight();
 }

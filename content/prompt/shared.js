@@ -100,8 +100,12 @@ export function promptCss() {  return `
     }
     .jari-prompt-list li .jari-match,
     .jari-prompt-list li.selected .jari-match {
-      color: #e0a363;
+      color: var(--jari-accent, #e0a363);
       font-weight: bold !important;
+    }
+    .jari-overlay ::selection {
+      background: var(--jari-accent, #e0a363);
+      color: #1a1a1a;
     }
   `;
 }

@@ -108,7 +108,7 @@ export function updateHintText(hintEl, label, typed) {
 
 const HINT_THEMES = {
   yellow: {
-    border: "#c38a22",
+    border: "var(--jari-accent-border, #c38a22)",
     background: "linear-gradient(#fff785, #ffc542)",
     color: "#1a1a1a",
     matched: "#6a6a6a",
@@ -120,7 +120,7 @@ const HINT_THEMES = {
     matched: "#3a6a7a",
   },
   dark: {
-    border: "#e0a363",
+    border: "var(--jari-accent, #e0a363)",
     background: "linear-gradient(#2b2b38, #1c1c24)",
     color: "#f5f0e6",
     matched: "#8a8a99",

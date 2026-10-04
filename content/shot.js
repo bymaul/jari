@@ -89,8 +89,8 @@ function makeLayer() {
       ...BASE_EL_STYLE,
       width: "12px",
       height: "12px",
-      border: "2px solid #e0a363",
-      background: "rgba(224, 163, 99, 0.35)",
+      border: "2px solid var(--jari-accent, #e0a363)",
+      background: "rgba(var(--jari-accent-rgb, 224, 163, 99), 0.35)",
     });
     appendLayer(cursorEl);
   } catch {
@@ -103,8 +103,8 @@ function makeLayer() {
       ...BASE_EL_STYLE,
       width: "8px",
       height: "8px",
-      background: "#e0a363",
-      border: "1px solid #c38a22",
+      background: "var(--jari-accent, #e0a363)",
+      border: "1px solid var(--jari-accent-border, #c38a22)",
       display: "none",
     });
     appendLayer(markEl);
@@ -116,8 +116,8 @@ function makeLayer() {
     rectEl.className = "jari-shot-rect";
     styleEl(rectEl, {
       ...BASE_EL_STYLE,
-      border: "2px solid #e0a363",
-      background: "rgba(224, 163, 99, 0.12)",
+      border: "2px solid var(--jari-accent, #e0a363)",
+      background: "rgba(var(--jari-accent-rgb, 224, 163, 99), 0.12)",
       boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.35)",
       display: "none",
     });

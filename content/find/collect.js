@@ -35,7 +35,7 @@ function shouldSkipNode(node) {
     try {
       if (
         parent.closest(
-          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay",
+          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay",
         )
       )
         return true;

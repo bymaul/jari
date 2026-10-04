@@ -140,17 +140,21 @@ function helpCss() {
       border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
     }
     .jari-find-hit {
-      background: rgba(224, 163, 99, 0.35) !important;
+      background: rgba(var(--jari-accent-rgb, 224, 163, 99), 0.35) !important;
       color: #1a1a1a !important;
       border-radius: 2px;
       padding: 0 1px;
     }
     .jari-find-current {
-      background: #e0a363 !important;
+      background: var(--jari-accent, #e0a363) !important;
       color: #1a1a1a !important;
       border-radius: 2px;
       padding: 0 1px;
-      outline: 1px solid #c38a22;
+      outline: 1px solid var(--jari-accent-border, #c38a22);
+    }
+    .jari-overlay ::selection {
+      background: var(--jari-accent, #e0a363);
+      color: #1a1a1a;
     }
   `;
 }

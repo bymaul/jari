@@ -64,6 +64,10 @@ function openEditUrl() {
   active = true;
   render("Edit URL", "Search or type URL");
   inputEl.value = location.href;
+  inputEl.focus();
+  try {
+    inputEl.select();
+  } catch {}
   handleOpenInput(inputEl.value);
 }
 

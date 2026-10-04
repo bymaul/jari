@@ -504,7 +504,7 @@ function findCss() {
       text-align: left !important;
     }
     .jari-find-label {
-      color: #e0a363;
+      color: var(--jari-accent, #e0a363);
       font-weight: bold !important;
       flex: 0 0 auto;
     }
@@ -546,8 +546,8 @@ function findCss() {
       cursor: pointer;
     }
     .jari-find-toggle-on {
-      color: #e0a363;
-      border-color: #c38a22;
+      color: var(--jari-accent, #e0a363);
+      border-color: var(--jari-accent-border, #c38a22);
     }
     .jari-find-status {
       flex: 0 0 auto;
@@ -557,6 +557,10 @@ function findCss() {
     }
     .jari-find-status.jari-find-no-match {
       color: #e06c75;
+    }
+    .jari-overlay ::selection {
+      background: var(--jari-accent, #e0a363);
+      color: #1a1a1a;
     }
   `;
 }

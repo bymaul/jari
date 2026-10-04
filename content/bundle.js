@@ -3116,8 +3116,12 @@
     }
     .jari-prompt-list li .jari-match,
     .jari-prompt-list li.selected .jari-match {
-      color: #e0a363;
+      color: var(--jari-accent, #e0a363);
       font-weight: bold !important;
+    }
+    .jari-overlay ::selection {
+      background: var(--jari-accent, #e0a363);
+      color: #1a1a1a;
     }
   `;
   }
@@ -3333,6 +3337,11 @@
     active = true;
     render("Edit URL", "Search or type URL");
     inputEl.value = location.href;
+    inputEl.focus();
+    try {
+      inputEl.select();
+    } catch {
+    }
     handleOpenInput(inputEl.value);
   }
   function chooseWindow(data) {
@@ -3632,20 +3641,6 @@
     } catch {
     }
   }
-  function unwrapSpans(spans) {
-    for (const span of spans) {
-      try {
-        const parent = span.parentNode;
-        if (!parent) continue;
-        const text = span.textContent;
-        const tn = document.createTextNode(text);
-        parent.replaceChild(tn, span);
-        parent.normalize();
-      } catch {
-      }
-    }
-    spans.length = 0;
-  }
 
   // content/find/matcher.js
   function hasUpperCase(s) {
@@ -3690,7 +3685,7 @@
     if (parent.closest) {
       try {
         if (parent.closest(
-          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-visual-highlight, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay"
+          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay"
         ))
           return true;
         if (parent.closest('[aria-hidden="true"]')) return true;
@@ -3886,7 +3881,7 @@
   }
   var HINT_THEMES2 = {
     yellow: {
-      border: "#c38a22",
+      border: "var(--jari-accent-border, #c38a22)",
       background: "linear-gradient(#fff785, #ffc542)",
       color: "#1a1a1a",
       matched: "#6a6a6a"
@@ -3898,7 +3893,7 @@
       matched: "#3a6a7a"
     },
     dark: {
-      border: "#e0a363",
+      border: "var(--jari-accent, #e0a363)",
       background: "linear-gradient(#2b2b38, #1c1c24)",
       color: "#f5f0e6",
       matched: "#8a8a99"
@@ -4135,83 +4130,6 @@
       return out.filter((e) => e.textContent.trim().length >= 10).slice(0, 250);
     }
     return out;
-  }
-
-  // content/visual/selection.js
-  var visualFallbackSpans = [];
-  function clearVisualHighlight() {
-    clearHighlightNames("jari-visual");
-    unwrapSpans(visualFallbackSpans);
-  }
-  function applyVisualHighlight({ active: active8, mode: mode4, getSelection: getSelection3 }) {
-    clearVisualHighlight();
-    if (!active8 || mode4 === "caret") return;
-    const sel = getSelection3();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    try {
-      const range = sel.getRangeAt(0).cloneRange();
-      try {
-        if (detectHighlightSupport()) {
-          CSS.highlights.set("jari-visual", new Highlight(range));
-          return;
-        }
-      } catch {
-      }
-      try {
-        const span = document.createElement("span");
-        span.className = "jari-visual-highlight";
-        range.surroundContents(span);
-        visualFallbackSpans.push(span);
-      } catch {
-        try {
-          const walker = document.createTreeWalker(
-            document.body,
-            NodeFilter.SHOW_TEXT
-          );
-          let n = walker.nextNode();
-          while (n) {
-            try {
-              if (!range.intersectsNode || !range.intersectsNode(n)) {
-                n = walker.nextNode();
-                continue;
-              }
-              const nodeRange = document.createRange();
-              nodeRange.selectNodeContents(n);
-              if (range.compareBoundaryPoints(Range.START_TO_END, nodeRange) <= 0 || range.compareBoundaryPoints(Range.END_TO_START, nodeRange) >= 0) {
-                n = walker.nextNode();
-                continue;
-              }
-              const startNode = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? n : range.startContainer;
-              const startOffset = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 ? 0 : range.startOffset;
-              const endNode = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n : range.endContainer;
-              const endOffset = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0 ? n.nodeValue.length : range.endOffset;
-              if (startNode !== n || endNode !== n) {
-                n = walker.nextNode();
-                continue;
-              }
-              const r = document.createRange();
-              r.setStart(
-                n,
-                Math.max(0, Math.min(startOffset, n.nodeValue.length))
-              );
-              r.setEnd(n, Math.max(0, Math.min(endOffset, n.nodeValue.length)));
-              if (r.collapsed) {
-                n = walker.nextNode();
-                continue;
-              }
-              const s = document.createElement("span");
-              s.className = "jari-visual-highlight";
-              r.surroundContents(s);
-              visualFallbackSpans.push(s);
-            } catch {
-            }
-            n = walker.nextNode();
-          }
-        } catch {
-        }
-      }
-    } catch {
-    }
   }
 
   // content/visual/caret-geometry.js
@@ -4969,9 +4887,9 @@
         position: absolute;
         width: 8px;
         height: 1.2em;
-        background: #e0a363;
+        background: var(--jari-accent, #e0a363);
         opacity: 0.85;
-        border: 1px solid #c38a22;
+        border: 1px solid var(--jari-accent-border, #c38a22);
         box-shadow: 0 1px 3px rgba(0,0,0,0.4);
         pointer-events: none;
         will-change: transform;
@@ -5121,7 +5039,6 @@
     } catch {
     }
     updateBlockCaret();
-    applyVisualHighlight2();
   }
   function attachCaretListeners() {
     try {
@@ -5143,6 +5060,7 @@
       }
     }
     enableSelectOverride();
+    attachMouseListeners();
   }
   function detachCaretListeners() {
     try {
@@ -5165,6 +5083,7 @@
       caretRaf = null;
     }
     if (!active2 && !hintActive) disableSelectOverride();
+    if (!active2 && !hintActive) detachMouseListeners();
   }
   var selectOverrideEl = null;
   function enableSelectOverride() {
@@ -5172,7 +5091,7 @@
     try {
       selectOverrideEl = document.createElement("style");
       selectOverrideEl.id = "jari-select-override";
-      selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; }`;
+      selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; } :root ::selection{background:var(--jari-accent, #e0a363) !important;color:#1a1a1a !important;} :root ::-moz-selection{background:var(--jari-accent, #e0a363) !important;color:#1a1a1a !important;}`;
       (document.head || document.documentElement).appendChild(selectOverrideEl);
     } catch {
     }
@@ -5185,11 +5104,70 @@
     }
     selectOverrideEl = null;
   }
-  function clearVisualHighlight2() {
-    clearVisualHighlight();
+  function mouseTarget(event) {
+    try {
+      if (typeof event.composedPath === "function") {
+        const path = event.composedPath();
+        if (Array.isArray(path) && path.length > 0 && path[0]) return path[0];
+      }
+    } catch {
+    }
+    return event.target || null;
   }
-  function applyVisualHighlight2() {
-    applyVisualHighlight({ active: active2, mode: mode2, getSelection: getSelection2 });
+  function isJariUiEvent(event) {
+    let path = null;
+    try {
+      if (typeof event.composedPath === "function") path = event.composedPath();
+    } catch {
+    }
+    const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
+    for (const node of nodes) {
+      try {
+        const cls = node && node.className;
+        if (typeof cls === "string" && cls.includes("jari-")) return true;
+      } catch {
+      }
+    }
+    return false;
+  }
+  function onMouseDown(event) {
+    if (!active2 && !hintActive) return;
+    if (isJariUiEvent(event)) return;
+    if (hintActive) closeHints();
+    if (!active2) return;
+    if (isEditable(mouseTarget(event))) close2(true);
+  }
+  function onSelectionChange() {
+    if (!active2 || hintActive) return;
+    const sel = getSelection2();
+    if (!sel || sel.rangeCount === 0) return;
+    if (sel.isCollapsed && (mode2 === "visual" || mode2 === "line")) {
+      mode2 = "caret";
+      if (pillEl) pillEl.textContent = pillText(mode2);
+    }
+    updateBlockCaret();
+  }
+  function attachMouseListeners() {
+    try {
+      window.addEventListener("mousedown", onMouseDown, true);
+      document.addEventListener("selectionchange", onSelectionChange);
+    } catch {
+      try {
+        window.addEventListener("mousedown", onMouseDown, true);
+      } catch {
+      }
+    }
+  }
+  function detachMouseListeners() {
+    try {
+      window.removeEventListener("mousedown", onMouseDown, true);
+      document.removeEventListener("selectionchange", onSelectionChange);
+    } catch {
+      try {
+        window.removeEventListener("mousedown", onMouseDown, true);
+      } catch {
+      }
+    }
   }
   function renderHints() {
     if (hintHost) {
@@ -5242,6 +5220,7 @@
     hintPrefix = "";
     hintActive = true;
     enableSelectOverride();
+    attachMouseListeners();
     renderHints();
     if (!pillEl) {
       try {
@@ -5271,6 +5250,7 @@
       hintHolder = null;
     }
     if (!active2 && !hintActive) disableSelectOverride();
+    if (!active2 && !hintActive) detachMouseListeners();
     if (!active2 && pillEl) {
       try {
         pillEl.remove();
@@ -5362,7 +5342,6 @@
     clearPendingKeyTimers();
     ensureVisible();
     updateBlockCaret();
-    applyVisualHighlight2();
   }
   function extendSelection(direction, granularity) {
     const sel = getSelection2();
@@ -5905,7 +5884,6 @@
     pendingY = false;
     showBlockCaret();
     attachCaretListeners();
-    clearVisualHighlight2();
     ensureVisible();
     updateBlockCaret();
   }
@@ -5922,7 +5900,6 @@
     active2 = false;
     hidePill();
     hideBlockCaret();
-    clearVisualHighlight2();
     detachCaretListeners();
     pendingCount = "";
     pendingG = false;
@@ -6357,7 +6334,6 @@
     pendingF = null;
     pendingY = false;
     clearPendingKeyTimers();
-    clearVisualHighlight2();
   }
 
   // content/find.js
@@ -6827,7 +6803,7 @@
       text-align: left !important;
     }
     .jari-find-label {
-      color: #e0a363;
+      color: var(--jari-accent, #e0a363);
       font-weight: bold !important;
       flex: 0 0 auto;
     }
@@ -6869,8 +6845,8 @@
       cursor: pointer;
     }
     .jari-find-toggle-on {
-      color: #e0a363;
-      border-color: #c38a22;
+      color: var(--jari-accent, #e0a363);
+      border-color: var(--jari-accent-border, #c38a22);
     }
     .jari-find-status {
       flex: 0 0 auto;
@@ -6880,6 +6856,10 @@
     }
     .jari-find-status.jari-find-no-match {
       color: #e06c75;
+    }
+    .jari-overlay ::selection {
+      background: var(--jari-accent, #e0a363);
+      color: #1a1a1a;
     }
   `;
   }
@@ -7443,17 +7423,21 @@
       border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
     }
     .jari-find-hit {
-      background: rgba(224, 163, 99, 0.35) !important;
+      background: rgba(var(--jari-accent-rgb, 224, 163, 99), 0.35) !important;
       color: #1a1a1a !important;
       border-radius: 2px;
       padding: 0 1px;
     }
     .jari-find-current {
-      background: #e0a363 !important;
+      background: var(--jari-accent, #e0a363) !important;
       color: #1a1a1a !important;
       border-radius: 2px;
       padding: 0 1px;
-      outline: 1px solid #c38a22;
+      outline: 1px solid var(--jari-accent-border, #c38a22);
+    }
+    .jari-overlay ::selection {
+      background: var(--jari-accent, #e0a363);
+      color: #1a1a1a;
     }
   `;
   }
@@ -8932,8 +8916,8 @@
         ...BASE_EL_STYLE,
         width: "12px",
         height: "12px",
-        border: "2px solid #e0a363",
-        background: "rgba(224, 163, 99, 0.35)"
+        border: "2px solid var(--jari-accent, #e0a363)",
+        background: "rgba(var(--jari-accent-rgb, 224, 163, 99), 0.35)"
       });
       appendLayer(cursorEl);
     } catch {
@@ -8946,8 +8930,8 @@
         ...BASE_EL_STYLE,
         width: "8px",
         height: "8px",
-        background: "#e0a363",
-        border: "1px solid #c38a22",
+        background: "var(--jari-accent, #e0a363)",
+        border: "1px solid var(--jari-accent-border, #c38a22)",
         display: "none"
       });
       appendLayer(markEl);
@@ -8959,8 +8943,8 @@
       rectEl.className = "jari-shot-rect";
       styleEl(rectEl, {
         ...BASE_EL_STYLE,
-        border: "2px solid #e0a363",
-        background: "rgba(224, 163, 99, 0.12)",
+        border: "2px solid var(--jari-accent, #e0a363)",
+        background: "rgba(var(--jari-accent-rgb, 224, 163, 99), 0.12)",
         boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.35)",
         display: "none"
       });
