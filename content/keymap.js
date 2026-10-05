@@ -411,7 +411,7 @@ export function migrateSettings(data) {
   // next/previous texts are seeded. Combos fill only where free and
   // only for commands bound nowhere, so custom rebinds are never
   // clobbered. Like the v4 backfill, an intentionally unbound command
-  // may gain the new bind. toggleBookmark stays unbound by design.
+  // may gain the new bind.
   if (version < 8) {
     if (d.pageNavTexts === undefined)
       d.pageNavTexts = pageNavTextDefaults();

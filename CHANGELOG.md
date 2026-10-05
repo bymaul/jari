@@ -48,6 +48,16 @@ versioned for the extension manifest (`manifest.base.json`).
   version before building and fails fast if it is taken, since AMO
   never reuses version strings, not even deleted ones.
 
+### Removed
+
+- The standalone `newTab`, `newIncognitoTab`, `duplicateTab`,
+  `togglePin`, `toggleMute`, and `toggleBookmark` commands are gone.
+  All six were unbound by default and the tab manager supersedes them:
+  it duplicates (`y`), pins (`p`), mutes (`m`), and bookmarks (`b`)
+  any marked set of tabs rather than only the current one. Blank tabs
+  still open from the omnibar — `t`/`T` then `Enter` on empty input.
+  Stored binds for these commands are pruned on load.
+
 ## [0.6.4] - 2026-10-05
 
 ### Changed

@@ -358,40 +358,6 @@
     if (folders.length > 0) return folders[0].id;
     return "1";
   }
-  async function toggleBookmark(_, { url = "", title = "" } = {}) {
-    const target = String(url || "");
-    if (!/^(https?|file):\/\//i.test(target)) return { ok: false };
-    let found;
-    try {
-      found = await chrome.bookmarks.search(target);
-    } catch {
-      return { ok: false };
-    }
-    const existing = (found || []).filter(
-      (node) => node && node.url === target
-    );
-    if (existing.length > 0) {
-      try {
-        await Promise.all(
-          existing.map((node) => chrome.bookmarks.remove(node.id))
-        );
-      } catch {
-        return { ok: false };
-      }
-      return { ok: true, bookmarked: false };
-    }
-    const parentId = await findBookmarkBarId();
-    try {
-      await chrome.bookmarks.create({
-        parentId,
-        title: String(title || target),
-        url: target
-      });
-    } catch {
-      return { ok: false };
-    }
-    return { ok: true, bookmarked: true };
-  }
   function bookmarkUrlKey(url) {
     return String(url || "").split("#", 1)[0].replace(/\/+$/, "");
   }
@@ -630,30 +596,6 @@
   }
   async function goToLastTab() {
     return activateTabByIndex(-1);
-  }
-  async function duplicateTab(sender) {
-    if (sender.tab && sender.tab.id) {
-      await chrome.tabs.duplicate(sender.tab.id);
-      return { ok: true };
-    }
-    return { ok: false };
-  }
-  async function togglePin(sender) {
-    const tab = sender.tab;
-    if (tab && tab.id) {
-      await chrome.tabs.update(tab.id, { pinned: !tab.pinned });
-      return { ok: true };
-    }
-    return { ok: false };
-  }
-  async function toggleMute(sender) {
-    const tab = sender.tab;
-    if (tab && tab.id) {
-      const muted = !!(tab.mutedInfo && tab.mutedInfo.muted);
-      await chrome.tabs.update(tab.id, { muted: !muted });
-      return { ok: true };
-    }
-    return { ok: false };
   }
   async function reloadTab(sender, { bypassCache = false } = {}) {
     if (sender.tab && sender.tab.id) {
@@ -1272,9 +1214,6 @@
     goToFirstTab,
     goToLastTab,
     moveTabRight,
-    duplicateTab,
-    togglePin,
-    toggleMute,
     reloadTab,
     goBack,
     goForward,
@@ -1298,7 +1237,6 @@
     openInBackgroundTab,
     openInForegroundTab,
     captureScreenshot,
-    toggleBookmark,
     openSettings,
     openExtensions
   };

@@ -17,8 +17,6 @@ export const COMMAND_CATALOG = {
   zoomIn: { category: "zoom", label: "Zoom in" },
   zoomOut: { category: "zoom", label: "Zoom out" },
 
-  newTab: { category: "tabs", label: "New tab" },
-  newIncognitoTab: { category: "tabs", label: "New incognito tab" },
   closeTab: { category: "tabs", label: "Close tab", repeatable: true },
   restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
   previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
@@ -29,11 +27,8 @@ export const COMMAND_CATALOG = {
   openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
   openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
   openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
-  duplicateTab: { category: "tabs", label: "Duplicate tab" },
   moveTabLeft: { category: "tabs", label: "Move tab left" },
   moveTabRight: { category: "tabs", label: "Move tab right" },
-  togglePin: { category: "tabs", label: "Pin / unpin tab" },
-  toggleMute: { category: "tabs", label: "Mute / unmute tab" },
   moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
   openTabManager: { category: "tabs", label: "Open tab manager" },
 
@@ -46,7 +41,6 @@ export const COMMAND_CATALOG = {
   goToRoot: { category: "page", label: "Go to site root" },
   nextPage: { category: "page", label: "Go to next page" },
   prevPage: { category: "page", label: "Go to previous page" },
-  toggleBookmark: { category: "page", label: "Bookmark / unbookmark page" },
   editUrl: { category: "page", label: "Edit current URL" },
   copyUrl: { category: "page", label: "Copy page URL" },
   copyTitleAndUrl: { category: "page", label: "Copy title + URL" },

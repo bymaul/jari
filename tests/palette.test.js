@@ -10,7 +10,7 @@ test("command source covers the catalog with keys and unbound marks", () => {
   assert.equal(items.length, Object.keys(COMMAND_CATALOG).length);
   const byName = new Map(items.map((item) => [item.name, item]));
   assert.equal(byName.get("scrollDown").detail, "j");
-  assert.equal(byName.get("toggleBookmark").detail, "unbound");
+  assert.equal(byName.get("hintOpenCurrent").detail, "unbound");
   assert.equal(byName.get("showCommandPalette").detail, ":");
   assert.ok(byName.get("hintYank").title.includes("hintYank"));
 });
@@ -23,9 +23,9 @@ test("empty query returns every command", () => {
 
 test("fuzzy filter finds commands by label or name", () => {
   const items = buildCommandSource(keymapDefaults);
-  const results = filterCommands(items, "bookmark");
+  const results = filterCommands(items, "reopen");
   assert.ok(results.length > 0);
-  assert.equal(results[0].name, "toggleBookmark");
+  assert.equal(results[0].name, "restoreTab");
 });
 
 test("fuzzy filter finds commands by bound keys", () => {

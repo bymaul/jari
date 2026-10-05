@@ -586,8 +586,6 @@
     resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
     zoomIn: { category: "zoom", label: "Zoom in" },
     zoomOut: { category: "zoom", label: "Zoom out" },
-    newTab: { category: "tabs", label: "New tab" },
-    newIncognitoTab: { category: "tabs", label: "New incognito tab" },
     closeTab: { category: "tabs", label: "Close tab", repeatable: true },
     restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
     previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
@@ -598,11 +596,8 @@
     openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
     openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
     openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
-    duplicateTab: { category: "tabs", label: "Duplicate tab" },
     moveTabLeft: { category: "tabs", label: "Move tab left" },
     moveTabRight: { category: "tabs", label: "Move tab right" },
-    togglePin: { category: "tabs", label: "Pin / unpin tab" },
-    toggleMute: { category: "tabs", label: "Mute / unmute tab" },
     moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
     openTabManager: { category: "tabs", label: "Open tab manager" },
     goBack: { category: "history", label: "Go back in history" },
@@ -613,7 +608,6 @@
     goToRoot: { category: "page", label: "Go to site root" },
     nextPage: { category: "page", label: "Go to next page" },
     prevPage: { category: "page", label: "Go to previous page" },
-    toggleBookmark: { category: "page", label: "Bookmark / unbookmark page" },
     editUrl: { category: "page", label: "Edit current URL" },
     copyUrl: { category: "page", label: "Copy page URL" },
     copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
@@ -10691,7 +10685,6 @@ ${location.href}`;
     if (Url.isSamePath(target2, location.href)) return ui.toast("Already at root");
     sendMessage("navigate", { url: target2 });
   }
-  var UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
   var screenshotCapturing = false;
   async function screenshotPage() {
     if (!isScreenshotable()) {
@@ -10723,27 +10716,6 @@ ${location.href}`;
     } finally {
       screenshotCapturing = false;
     }
-  }
-  async function toggleBookmarkPage() {
-    const url = location.href || "";
-    if (UNBOOKMARKABLE_SCHEMES.test(url)) {
-      ui.toast("Cannot bookmark this page");
-      return;
-    }
-    let res;
-    try {
-      res = await sendMessage("toggleBookmark", {
-        url,
-        title: document.title || url
-      });
-    } catch {
-      res = null;
-    }
-    if (!res || !res.ok) {
-      ui.toast("Bookmark failed");
-      return;
-    }
-    ui.toast(res.bookmarked ? "Bookmarked" : "Bookmark removed");
   }
   function cmd(name, run2) {
     return { ...COMMAND_CATALOG[name], run: run2 };
@@ -10799,8 +10771,6 @@ ${location.href}`;
     resetScrollTarget: { ...COMMAND_CATALOG.resetScrollTarget, run: () => Scroll.reset() },
     zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
     zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
-    newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
-    newIncognitoTab: { ...COMMAND_CATALOG.newIncognitoTab, run: () => sendMessage("openIncognitoTab") },
     closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
     restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
     openClipboard: { ...COMMAND_CATALOG.openClipboard, run: () => openClipboardWith("navigate") },
@@ -10830,9 +10800,6 @@ ${location.href}`;
     moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
     moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
     openTabManager: { ...COMMAND_CATALOG.openTabManager, run: () => TabManager.open() },
-    duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
-    togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
-    toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
     openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
     openOmnibarIncognito: { ...COMMAND_CATALOG.openOmnibarIncognito, run: () => Prompt.openIncognito() },
     reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
@@ -10841,7 +10808,6 @@ ${location.href}`;
     goToRoot: { ...COMMAND_CATALOG.goToRoot, run: () => goTo(Url.rootUrlOf) },
     nextPage: { ...COMMAND_CATALOG.nextPage, run: () => goPage("next") },
     prevPage: { ...COMMAND_CATALOG.prevPage, run: () => goPage("prev") },
-    toggleBookmark: { ...COMMAND_CATALOG.toggleBookmark, run: () => toggleBookmarkPage() },
     editUrl: {
       ...COMMAND_CATALOG.editUrl,
       run: () => Prompt.openEditUrl()

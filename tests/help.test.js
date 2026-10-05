@@ -232,8 +232,8 @@ test("unbound commands are listed as unbound", async () => {
     );
     assert.ok(unbound.length > 0, "expected unbound rows");
     assert.ok(
-      unbound.some((tr) => tr.children[1].textContent === "Duplicate tab"),
-      "expected Duplicate tab to be unbound by default",
+      unbound.some((tr) => tr.children[1].textContent === "Open link in this tab"),
+      "expected Open link in this tab to be unbound by default",
     );
   });
 });

@@ -253,9 +253,6 @@ test("stored settings prefer newer sync when sync is fresher", async () => {
 });
 
 test("tab actions report failure without a sender tab", async () => {
-  assert.deepEqual(await handlers.duplicateTab({}, {}), { ok: false });
-  assert.deepEqual(await handlers.togglePin({}, {}), { ok: false });
-  assert.deepEqual(await handlers.toggleMute({}, {}), { ok: false });
   assert.deepEqual(await handlers.reloadTab({}, {}), { ok: false });
   assert.deepEqual(await handlers.goBack({}, {}), { ok: false });
   assert.deepEqual(await handlers.moveTabLeft({}, {}), { ok: false });
@@ -266,12 +263,6 @@ test("tab actions succeed with a sender tab", async () => {
   const savedTabs = globalThis.chrome.tabs;
   globalThis.chrome.tabs = {
     ...savedTabs,
-    duplicate: async (id) => {
-      calls.push(["duplicate", id]);
-    },
-    update: async (id, props) => {
-      calls.push(["update", id, props]);
-    },
     reload: async (id, opts) => {
       calls.push(["reload", id, opts]);
     },
@@ -284,18 +275,13 @@ test("tab actions succeed with a sender tab", async () => {
     },
   };
   try {
-    assert.deepEqual(await handlers.duplicateTab({ tab: { id: 7 } }, {}), { ok: true });
-    assert.deepEqual(
-      await handlers.togglePin({ tab: { id: 7, pinned: false } }, {}),
-      { ok: true },
-    );
     assert.deepEqual(await handlers.reloadTab({ tab: { id: 7 } }, {}), { ok: true });
     assert.deepEqual(await handlers.goBack({ tab: { id: 7 } }, {}), { ok: true });
     assert.deepEqual(
       await handlers.moveTabLeft({ tab: { id: 7, index: 2 } }, {}),
       { ok: true },
     );
-    assert.deepEqual(calls[0], ["duplicate", 7]);
+    assert.deepEqual(calls[0], ["reload", 7, { bypassCache: false }]);
   } finally {
     globalThis.chrome.tabs = savedTabs;
   }
@@ -561,17 +547,13 @@ test("suggest reads settings from local storage when sync is empty", async () =>
   }
 });
 
-function stubBookmarks({ tree, found = [], created = [], removed = [] }) {
+function stubBookmarks({ tree, created = [] }) {
   const saved = globalThis.chrome.bookmarks;
   globalThis.chrome.bookmarks = {
     getTree: async () => tree,
-    search: async () => found,
     create: async (entry) => {
       created.push(entry);
       return { id: "100", ...entry };
-    },
-    remove: async (id) => {
-      removed.push(id);
     },
   };
   return () => {
@@ -580,23 +562,26 @@ function stubBookmarks({ tree, found = [], created = [], removed = [] }) {
   };
 }
 
-const BAR_TREE = [
-  {
-    id: "0",
-    title: "",
-    children: [{ id: "1", title: "Bookmarks bar", children: [] }],
-  },
-];
+const TAB = { url: "https://example.com/", title: "Example" };
 
-test("toggleBookmark creates a bookmark on the bar", async () => {
+test("bookmarkManagerTabs creates a bookmark on the bar", async () => {
   const created = [];
-  const restore = stubBookmarks({ tree: BAR_TREE, created });
+  const restore = stubBookmarks({
+    tree: [
+      {
+        id: "0",
+        title: "",
+        children: [{ id: "1", title: "Bookmarks bar", children: [] }],
+      },
+    ],
+    created,
+  });
   try {
-    const res = await handlers.toggleBookmark(
-      {},
-      { url: "https://example.com/", title: "Example" },
-    );
-    assert.deepEqual(res, { ok: true, bookmarked: true });
+    assert.deepEqual(await handlers.bookmarkManagerTabs({}, { tabs: [TAB] }), {
+      ok: true,
+      saved: 1,
+      skipped: 0,
+    });
     assert.deepEqual(created, [
       { parentId: "1", title: "Example", url: "https://example.com/" },
     ]);
@@ -605,30 +590,7 @@ test("toggleBookmark creates a bookmark on the bar", async () => {
   }
 });
 
-test("toggleBookmark removes every node already saved for the URL", async () => {
-  const removed = [];
-  const restore = stubBookmarks({
-    tree: BAR_TREE,
-    found: [
-      { id: "7", url: "https://example.com/" },
-      { id: "8", url: "https://example.com/" },
-      { id: "9", url: "https://example.com/other" },
-    ],
-    removed,
-  });
-  try {
-    const res = await handlers.toggleBookmark(
-      {},
-      { url: "https://example.com/", title: "Example" },
-    );
-    assert.deepEqual(res, { ok: true, bookmarked: false });
-    assert.deepEqual(removed, ["7", "8"]);
-  } finally {
-    restore();
-  }
-});
-
-test("toggleBookmark falls back to Other bookmarks without a bar", async () => {
+test("bookmarkManagerTabs falls back to Other bookmarks without a bar", async () => {
   const created = [];
   const restore = stubBookmarks({
     tree: [
@@ -641,18 +603,18 @@ test("toggleBookmark falls back to Other bookmarks without a bar", async () => {
     created,
   });
   try {
-    const res = await handlers.toggleBookmark(
-      {},
-      { url: "https://example.com/", title: "Example" },
-    );
-    assert.deepEqual(res, { ok: true, bookmarked: true });
+    assert.deepEqual(await handlers.bookmarkManagerTabs({}, { tabs: [TAB] }), {
+      ok: true,
+      saved: 1,
+      skipped: 0,
+    });
     assert.equal(created[0].parentId, "2");
   } finally {
     restore();
   }
 });
 
-test("toggleBookmark understands the Firefox toolbar title", async () => {
+test("bookmarkManagerTabs understands the Firefox toolbar title", async () => {
   const created = [];
   const restore = stubBookmarks({
     tree: [
@@ -667,33 +629,42 @@ test("toggleBookmark understands the Firefox toolbar title", async () => {
     created,
   });
   try {
-    const res = await handlers.toggleBookmark(
-      {},
-      { url: "https://example.com/", title: "Example" },
-    );
-    assert.deepEqual(res, { ok: true, bookmarked: true });
+    assert.deepEqual(await handlers.bookmarkManagerTabs({}, { tabs: [TAB] }), {
+      ok: true,
+      saved: 1,
+      skipped: 0,
+    });
     assert.equal(created[0].parentId, "toolbar_____");
   } finally {
     restore();
   }
 });
 
-test("toggleBookmark rejects unbookmarkable URLs and API failures", async () => {
+test("bookmarkManagerTabs skips unbookmarkable urls and empty input", async () => {
   const created = [];
-  const restore = stubBookmarks({ tree: BAR_TREE, created });
+  const restore = stubBookmarks({
+    tree: [
+      {
+        id: "0",
+        title: "",
+        children: [{ id: "1", title: "Bookmarks bar", children: [] }],
+      },
+    ],
+    created,
+  });
   try {
     assert.deepEqual(
-      await handlers.toggleBookmark({}, { url: "chrome://extensions" }),
+      await handlers.bookmarkManagerTabs({}, { tabs: [] }),
       { ok: false },
+    );
+    assert.deepEqual(
+      await handlers.bookmarkManagerTabs(
+        {},
+        { tabs: [{ url: "chrome://extensions", title: "Extensions" }] },
+      ),
+      { ok: false, saved: 0, skipped: 1 },
     );
     assert.deepEqual(created, []);
-    globalThis.chrome.bookmarks.search = async () => {
-      throw new Error("denied");
-    };
-    assert.deepEqual(
-      await handlers.toggleBookmark({}, { url: "https://example.com/" }),
-      { ok: false },
-    );
   } finally {
     restore();
   }

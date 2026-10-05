@@ -140,8 +140,6 @@ function goTo(urlFn) {
   sendMessage("navigate", { url: target });
 }
 
-const UNBOOKMARKABLE_SCHEMES = /^(chrome|about|edge|javascript|data|view-source|brave|opera):/i;
-
 let screenshotCapturing = false;
 
 async function screenshotPage() {
@@ -173,28 +171,6 @@ async function screenshotPage() {
   } finally {
     screenshotCapturing = false;
   }
-}
-
-async function toggleBookmarkPage() {
-  const url = location.href || "";
-  if (UNBOOKMARKABLE_SCHEMES.test(url)) {
-    ui.toast("Cannot bookmark this page");
-    return;
-  }
-  let res;
-  try {
-    res = await sendMessage("toggleBookmark", {
-      url,
-      title: document.title || url,
-    });
-  } catch {
-    res = null;
-  }
-  if (!res || !res.ok) {
-    ui.toast("Bookmark failed");
-    return;
-  }
-  ui.toast(res.bookmarked ? "Bookmarked" : "Bookmark removed");
 }
 
 function cmd(name, run) {
@@ -254,8 +230,6 @@ export const commands = {
   zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
   zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
 
-  newTab: { ...COMMAND_CATALOG.newTab, run: () => sendMessage("createTab") },
-  newIncognitoTab: { ...COMMAND_CATALOG.newIncognitoTab, run: () => sendMessage("openIncognitoTab") },
   closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
   restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
   openClipboard: { ...COMMAND_CATALOG.openClipboard, run: () => openClipboardWith("navigate") },
@@ -285,9 +259,6 @@ export const commands = {
   moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
   moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
   openTabManager: { ...COMMAND_CATALOG.openTabManager, run: () => TabManager.open() },
-  duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
-  togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
-  toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
   openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
   openOmnibarIncognito: { ...COMMAND_CATALOG.openOmnibarIncognito, run: () => Prompt.openIncognito() },
   reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
@@ -296,7 +267,6 @@ export const commands = {
   goToRoot: { ...COMMAND_CATALOG.goToRoot, run: () => goTo(Url.rootUrlOf) },
   nextPage: { ...COMMAND_CATALOG.nextPage, run: () => goPage("next") },
   prevPage: { ...COMMAND_CATALOG.prevPage, run: () => goPage("prev") },
-  toggleBookmark: { ...COMMAND_CATALOG.toggleBookmark, run: () => toggleBookmarkPage() },
   editUrl: {
     ...COMMAND_CATALOG.editUrl,
     run: () => Prompt.openEditUrl(),

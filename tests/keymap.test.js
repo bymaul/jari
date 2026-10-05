@@ -459,11 +459,6 @@ test("page navigation binds default to [[/]] without conflicts", () => {
   }
 });
 
-test("toggleBookmark stays unbound by design", () => {
-  assert.equal(COMMAND_CATALOG.toggleBookmark.category, "page");
-  assert.deepEqual(Jari.keysForCommand(Jari.keymapDefaults, "toggleBookmark"), []);
-});
-
 test("migratePageNavBindings fills free combos for unused commands", () => {
   const filled = Jari.migratePageNavBindings({ j: "scrollDown" });
   assert.equal(filled["[["], "prevPage");

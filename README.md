@@ -38,8 +38,7 @@ Bindings chain into sequences of any length.
 - Help: `?` cheatsheet, `:` command palette, `;e` settings, `;x` extensions page
 
 Unbound by default (bind them in settings): scrollPageDown/Up,
-newTab, newIncognitoTab, duplicateTab, togglePin,
-toggleMute, hintOpenCurrent, toggleBookmark.
+hintOpenCurrent.
 
 ## Settings (`;e`)
 

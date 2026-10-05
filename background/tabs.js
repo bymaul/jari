@@ -120,33 +120,6 @@ export async function goToLastTab() {
   return activateTabByIndex(-1);
 }
 
-export async function duplicateTab(sender) {
-  if (sender.tab && sender.tab.id) {
-    await chrome.tabs.duplicate(sender.tab.id);
-    return { ok: true };
-  }
-  return { ok: false };
-}
-
-export async function togglePin(sender) {
-  const tab = sender.tab;
-  if (tab && tab.id) {
-    await chrome.tabs.update(tab.id, { pinned: !tab.pinned });
-    return { ok: true };
-  }
-  return { ok: false };
-}
-
-export async function toggleMute(sender) {
-  const tab = sender.tab;
-  if (tab && tab.id) {
-    const muted = !!(tab.mutedInfo && tab.mutedInfo.muted);
-    await chrome.tabs.update(tab.id, { muted: !muted });
-    return { ok: true };
-  }
-  return { ok: false };
-}
-
 export async function reloadTab(sender, { bypassCache = false } = {}) {
   if (sender.tab && sender.tab.id) {
     await chrome.tabs.reload(sender.tab.id, { bypassCache });
