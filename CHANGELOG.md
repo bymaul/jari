@@ -41,6 +41,17 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Changed
 
+- The help sheet (`?`) filters through a plain text field instead of a
+  `/` prompt that swallowed keystrokes, matching the tab manager's
+  field and reusing its prompt styling, so the sheet is now the same
+  dark palette as the omnibar instead of a light panel with a dark
+  input in it. The sheet still opens with no field and focus on the
+  list; `/` opens the field (prefilled and selected), which highlights
+  matches live as you type (native editing, so undo and
+  `Ctrl+Backspace` work) and counts matches in the footer (`3/12`,
+  `no match for x`). `Enter` closes the field and keeps the query and
+  highlights, handing `j/k`, `n/N`, `gg`, and `G` back to the list;
+  `Esc` clears the query. `Up`/`Down` step matches while typing.
 - Release assets use standardized names
   (`jari-firefox-<version>-signed.xpi` for the AMO-signed build,
   `jari-firefox-<version>-unsigned.xpi` for the local build) and

@@ -8379,14 +8379,17 @@
   var host4 = null;
   var overlay4 = null;
   var listEl3 = null;
-  var footerBar = null;
+  var barEl = null;
+  var statusEl2 = null;
+  var inputEl3 = null;
+  var restoreFocus4 = null;
   var entries = [];
-  var searching = false;
   var query3 = "";
   var matches2 = [];
   var currentIdx2 = 0;
   var gPending = false;
-  var FOOTER_DEFAULT = "j/k scroll | / search | esc close";
+  var HINTS_FILTER = "Enter done | Esc cancel";
+  var HINTS_NAV = "j/k scroll | / filter | n/N jump | esc close";
   function isActive5() {
     return active5;
   }
@@ -8398,53 +8401,73 @@
       if (Find.hasHighlights()) Find.hideHighlights();
     } catch {
     }
+    restoreFocus4 = document.activeElement;
     render2();
     overlay4.tabIndex = -1;
     overlay4.focus();
+    updateStatus2();
+  }
+  function filterFocused() {
+    if (!inputEl3) return false;
+    try {
+      return deepActiveElement() === inputEl3;
+    } catch {
+      return document.activeElement === inputEl3;
+    }
+  }
+  function focusOverlay() {
+    if (!overlay4) return;
+    try {
+      overlay4.focus();
+    } catch {
+    }
+  }
+  function openFilter() {
+    if (inputEl3) return;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "jari-prompt-input";
+    input.placeholder = "Filter keys and commands";
+    input.value = query3;
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("spellcheck", "false");
+    input.setAttribute("maxlength", "200");
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        stepMatch(event.key === "ArrowDown" ? 1 : -1);
+      }
+    });
+    input.addEventListener("input", () => {
+      query3 = input.value;
+      applySearch();
+    });
+    inputEl3 = input;
+    barEl.insertBefore(input, statusEl2);
+    input.focus();
+    try {
+      input.select();
+    } catch {
+    }
+    updateStatus2();
+  }
+  function closeFilter() {
+    if (!inputEl3) return;
+    try {
+      inputEl3.remove();
+    } catch {
+    }
+    try {
+      inputEl3.blur();
+    } catch {
+    }
+    inputEl3 = null;
+    focusOverlay();
+    updateStatus2();
   }
   function helpCss() {
-    return `
-    :host { all: initial !important; }
-    .jari-overlay {
-      all: initial;
-      display: block;
-      position: fixed !important;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 2147483646 !important;
-      box-sizing: border-box;
-      background: var(--jari-cmplt-bg, #f5f5f7) !important;
-      color: var(--jari-cmplt-fg, #333738) !important;
-      font-family: var(--jari-cmplt-font-family, monospace) !important;
-      font-size: var(--jari-cmplt-font-size, 9pt) !important;
-      max-height: 75vh;
-      overflow: hidden;
-      text-align: left !important;
-      pointer-events: auto;
-    }
-    .jari-help {
-      background: var(--jari-cmplt-bg, #f5f5f7);
-      color: var(--jari-cmplt-fg, #333738);
-      font-size: var(--jari-cmplt-font-size, 9pt) !important;
-      font-family: var(--jari-cmplt-font-family, monospace) !important;
-      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
-      outline: none;
-    }
-    .jari-help:focus { outline: none; }
-    .jari-help-title {
-      display: block;
-      background: var(--jari-header-bg, #e8e8ec);
-      color: var(--jari-fg, #333738);
-      font-size: var(--jari-header-font-size, 9pt) !important;
-      font-weight: var(--jari-header-font-weight, bold) !important;
-      border-bottom: var(--jari-header-border-bottom, 1px solid #c5c5cf);
-      padding: 0 0.5ex;
-      margin: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-align: left !important;
-    }
+    return promptCss() + `
     .jari-help-list {
       display: block;
       max-height: 60vh;
@@ -8465,12 +8488,12 @@
       margin-top: 0;
     }
     .jari-help tr.jari-help-cat-header th {
-      background: var(--jari-header-bg, #e8e8ec);
+      background: #252530;
       font-size: var(--jari-header-font-size, 9pt) !important;
       font-weight: var(--jari-header-font-weight, bold) !important;
-      color: var(--jari-fg, #333738);
+      color: #cdcdcd;
       text-align: left;
-      border-bottom: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      border-bottom: 1px solid #333738;
       padding: 0.25ex 0.5ex;
     }
     .jari-help td {
@@ -8485,22 +8508,61 @@
     .jari-help td.jari-help-key {
       width: 40%;
       font-weight: bold !important;
-      color: var(--jari-fg, #333738);
-      text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
+      color: #cdcdcd;
     }
     .jari-help td.jari-help-key.jari-unbound {
       font-weight: normal !important;
       font-style: italic;
-      color: var(--jari-muted, #606079);
-      text-shadow: none;
+      color: #878787;
     }
-    .jari-help-footer {
+    .jari-prompt-footer {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      align-items: baseline;
       gap: 1ex;
+      background: #252530;
+      color: #cdcdcd;
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5);
+      border-top: 1px solid #333738;
       padding: 0.25ex 0.5ex;
-      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      margin: 0;
+      white-space: normal;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-help-status {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .jari-prompt-input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      color: #cdcdcd;
+      background: #1c1c24;
+      border: none !important;
+      border-top: 1px solid #333738;
+      outline: none !important;
+      box-shadow: none !important;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      font-weight: normal !important;
+      text-align: left !important;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+    }
+    .jari-prompt-input::placeholder {
+      color: #878787;
+    }
+    .jari-prompt-footer .jari-prompt-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+      padding: 0;
+      background: transparent;
+      line-height: inherit !important;
     }
     .jari-find-hit {
       background: rgba(var(--jari-accent-rgb, 224, 163, 99), 0.35) !important;
@@ -8526,13 +8588,12 @@
     host4 = created.host;
     const shadow = created.shadow;
     overlay4 = document.createElement("div");
-    overlay4.className = "jari-overlay jari-help";
+    overlay4.className = "jari-overlay jari-prompt jari-help";
     const title = document.createElement("div");
-    title.className = "jari-help-title";
+    title.className = "jari-prompt-header";
     title.textContent = "Jari keybindings";
     overlay4.appendChild(title);
     entries = [];
-    searching = false;
     query3 = "";
     matches2 = [];
     currentIdx2 = 0;
@@ -8584,23 +8645,24 @@
       })
     );
     overlay4.appendChild(listEl3);
-    const footer = document.createElement("div");
-    footer.className = "jari-help-footer";
-    footerBar = document.createElement("span");
-    footerBar.textContent = FOOTER_DEFAULT;
-    footer.appendChild(footerBar);
-    overlay4.appendChild(footer);
+    barEl = document.createElement("div");
+    barEl.className = "jari-prompt-footer";
+    statusEl2 = document.createElement("span");
+    statusEl2.className = "jari-help-status";
+    barEl.appendChild(statusEl2);
+    overlay4.appendChild(barEl);
     shadow.appendChild(overlay4);
   }
-  function updateFooter() {
-    if (!footerBar) return;
-    if (searching) {
-      footerBar.textContent = matches2.length === 0 ? `/${query3} \u2014 No match` : `/${query3} ${currentIdx2 + 1}/${matches2.length} (Enter done)`;
-    } else if (matches2.length > 0) {
-      footerBar.textContent = `${currentIdx2 + 1}/${matches2.length} (n/N jump) | / search | esc close`;
-    } else {
-      footerBar.textContent = FOOTER_DEFAULT;
+  function updateStatus2() {
+    if (!statusEl2) return;
+    const hints2 = inputEl3 ? HINTS_FILTER : HINTS_NAV;
+    const q = (query3 || "").trim();
+    if (!q) {
+      statusEl2.textContent = hints2;
+      return;
     }
+    const count = matches2.length === 0 ? `no match for ${q}` : `${currentIdx2 + 1}/${matches2.length}`;
+    statusEl2.textContent = `${count} | ${hints2}`;
   }
   function saveOriginal(td) {
     if (td._jariOrig === void 0) td._jariOrig = td.textContent;
@@ -8687,7 +8749,7 @@
     }
     currentIdx2 = 0;
     markCurrent();
-    updateFooter();
+    updateStatus2();
     scrollMatchIntoView();
   }
   function stepMatch(delta) {
@@ -8695,109 +8757,78 @@
     const len = matches2.length;
     currentIdx2 = ((currentIdx2 + delta) % len + len) % len;
     markCurrent();
-    updateFooter();
+    updateStatus2();
     scrollMatchIntoView();
   }
+  function clearFilter() {
+    query3 = "";
+    if (inputEl3) inputEl3.value = "";
+    clearSearchHighlights();
+  }
   function onKeyDown5(event) {
+    if (!active5) return false;
     const key = event.key;
     if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
       return false;
     }
-    if (searching) {
+    if (filterFocused()) {
       if (key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        searching = false;
-        query3 = "";
-        clearSearchHighlights();
-        updateFooter();
-        return;
+        clearFilter();
+        closeFilter();
+        return true;
       }
       if (key === "Enter") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        searching = false;
-        updateFooter();
-        return;
+        closeFilter();
+        return true;
       }
-      if (key === "Backspace") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        if (event.ctrlKey || event.metaKey) {
-          const trimmed = query3.trimEnd();
-          if (!trimmed) {
-            query3 = "";
-          } else {
-            const words = trimmed.split(/\s+/);
-            words.pop();
-            query3 = words.join(" ");
-          }
-        } else {
-          query3 = query3.slice(0, -1);
-        }
-        applySearch();
-        return;
-      }
-      if (key.length === 1 && !event.altKey && !event.metaKey) {
-        if (event.ctrlKey) return false;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        query3 += key;
-        applySearch();
-        return;
-      }
-      if (key.length === 1 || key === "Backspace" || key === "Escape" || key === "Enter") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        return;
-      }
-    } else {
-      const hasMod = event.ctrlKey || event.altKey || event.metaKey;
-      const scrollOnly = event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
-      if (hasMod && !scrollOnly) return false;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (key === "Escape") {
-        gPending = false;
-        if (matches2.length > 0) {
-          clearSearchHighlights();
-          updateFooter();
-          return;
-        }
-        close4();
-        return;
-      }
-      if (key === "/" && !hasMod) {
-        gPending = false;
-        searching = true;
-        query3 = "";
-        clearSearchHighlights();
-        updateFooter();
-        return;
-      }
-      if ((key === "n" || key === "N") && !hasMod && matches2.length > 0) {
-        gPending = false;
-        stepMatch(key === "n" ? 1 : -1);
-        return;
-      }
+      return false;
     }
-    if (event.key === "g" && !gPending) {
+    const hasMod = event.ctrlKey || event.altKey || event.metaKey;
+    const scrollOnly = event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
+    if (hasMod && !scrollOnly) return false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (key === "Escape") {
+      gPending = false;
+      if (matches2.length > 0) {
+        clearFilter();
+        updateStatus2();
+        return;
+      }
+      close4();
+      return;
+    }
+    if (key === "/") {
+      gPending = false;
+      openFilter();
+      return;
+    }
+    if ((key === "n" || key === "N") && matches2.length > 0) {
+      gPending = false;
+      stepMatch(key === "n" ? 1 : -1);
+      return;
+    }
+    if (key === "g" && !gPending) {
       gPending = true;
       return;
     }
     if (gPending) {
       gPending = false;
-      if (event.key === "g") listEl3.scrollTo(0, 0);
+      if (key === "g") listEl3.scrollTo(0, 0);
       return;
     }
     if (event.ctrlKey) {
-      if (event.key === "d") listEl3.scrollBy(0, listEl3.clientHeight * 0.5);
-      else if (event.key === "u") listEl3.scrollBy(0, -listEl3.clientHeight * 0.5);
-      else if (event.key === "f") listEl3.scrollBy(0, listEl3.clientHeight * 0.9);
-      else if (event.key === "b") listEl3.scrollBy(0, -listEl3.clientHeight * 0.9);
+      if (key === "d") listEl3.scrollBy(0, listEl3.clientHeight * 0.5);
+      else if (key === "u") listEl3.scrollBy(0, -listEl3.clientHeight * 0.5);
+      else if (key === "f") listEl3.scrollBy(0, listEl3.clientHeight * 0.9);
+      else if (key === "b") listEl3.scrollBy(0, -listEl3.clientHeight * 0.9);
       return;
     }
-    switch (event.key) {
+    switch (key) {
       case "G":
         listEl3.scrollTo(0, listEl3.scrollHeight);
         break;
@@ -8825,14 +8856,22 @@
     }
     overlay4 = null;
     listEl3 = null;
-    footerBar = null;
+    barEl = null;
+    statusEl2 = null;
+    inputEl3 = null;
     entries = [];
-    searching = false;
     query3 = "";
     matches2 = [];
     currentIdx2 = 0;
     gPending = false;
     active5 = false;
+    if (restoreFocus4 && restoreFocus4.isConnected && document.activeElement !== restoreFocus4) {
+      try {
+        restoreFocus4.focus();
+      } catch {
+      }
+    }
+    restoreFocus4 = null;
   }
   var Help = { open: open3, close: close4, onKeyDown: onKeyDown5, isActive: isActive5 };
   register("help", { close: close4, onKeyDown: onKeyDown5, isActive: isActive5 });
@@ -9419,13 +9458,13 @@
   var active7 = false;
   var host5 = null;
   var overlay5 = null;
-  var inputEl3 = null;
+  var inputEl4 = null;
   var listEl4 = null;
   var source = [];
   var filtered3 = [];
   var selected3 = 0;
   var query4 = "";
-  var restoreFocus4 = null;
+  var restoreFocus5 = null;
   var commandTable = null;
   function isActive7() {
     return active7;
@@ -9463,18 +9502,18 @@
     const shadow = created.shadow;
     overlay5 = document.createElement("div");
     overlay5.className = "jari-overlay jari-prompt";
-    inputEl3 = document.createElement("input");
-    inputEl3.type = "text";
-    inputEl3.placeholder = "Run command...";
-    inputEl3.setAttribute("autocomplete", "off");
-    inputEl3.setAttribute("spellcheck", "false");
-    inputEl3.addEventListener("input", () => {
-      query4 = inputEl3.value.trim();
+    inputEl4 = document.createElement("input");
+    inputEl4.type = "text";
+    inputEl4.placeholder = "Run command...";
+    inputEl4.setAttribute("autocomplete", "off");
+    inputEl4.setAttribute("spellcheck", "false");
+    inputEl4.addEventListener("input", () => {
+      query4 = inputEl4.value.trim();
       filtered3 = filterCommands(source, query4, settings.isFuzzyMatching());
       selected3 = 0;
       renderList4();
     });
-    inputEl3.addEventListener("keydown", (event) => event.stopPropagation());
+    inputEl4.addEventListener("keydown", (event) => event.stopPropagation());
     listEl4 = document.createElement("ul");
     listEl4.className = "jari-prompt-list";
     const header = document.createElement("div");
@@ -9482,11 +9521,11 @@
     header.textContent = "Command";
     overlay5.appendChild(listEl4);
     overlay5.appendChild(header);
-    overlay5.appendChild(inputEl3);
+    overlay5.appendChild(inputEl4);
     shadow.appendChild(overlay5);
     renderList4();
-    restoreFocus4 = document.activeElement;
-    inputEl3.focus();
+    restoreFocus5 = document.activeElement;
+    inputEl4.focus();
   }
   function renderRow2(item) {
     const li = document.createElement("li");
@@ -9542,7 +9581,7 @@
     } catch {
       focused = document.activeElement;
     }
-    if (focused === inputEl3) {
+    if (focused === inputEl4) {
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -9585,7 +9624,7 @@
       host5 = null;
     }
     overlay5 = null;
-    inputEl3 = null;
+    inputEl4 = null;
     listEl4 = null;
     source = [];
     filtered3 = [];
@@ -9593,10 +9632,10 @@
     query4 = "";
     commandTable = null;
     active7 = false;
-    if (restoreFocus4 && restoreFocus4.isConnected && document.activeElement !== restoreFocus4) {
-      restoreFocus4.focus();
+    if (restoreFocus5 && restoreFocus5.isConnected && document.activeElement !== restoreFocus5) {
+      restoreFocus5.focus();
     }
-    restoreFocus4 = null;
+    restoreFocus5 = null;
   }
   var Palette = {
     open: open5,

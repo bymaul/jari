@@ -1,8 +1,9 @@
 import { settings } from "./settings.js";
 import { ui, createShadowHost } from "./ui.js";
 import { COMMAND_CATALOG } from "./catalog.js";
-import { displayCombo } from "./keymap.js";
+import { deepActiveElement, displayCombo } from "./keymap.js";
 import { register, touch } from "./overlays.js";
+import { promptCss } from "./prompt/shared.js";
 import { Find } from "./find.js";
 
 const STEP = 50;
@@ -12,15 +13,18 @@ let active = false;
 let host = null;
 let overlay = null;
 let listEl = null;
-let footerBar = null;
+let barEl = null;
+let statusEl = null;
+let inputEl = null;
+let restoreFocus = null;
 let entries = [];
-let searching = false;
 let query = '';
 let matches = [];
 let currentIdx = 0;
 let gPending = false;
 
-const FOOTER_DEFAULT = 'j/k scroll | / search | esc close';
+const HINTS_FILTER = 'Enter done | Esc cancel';
+const HINTS_NAV = 'j/k scroll | / filter | n/N jump | esc close';
 
 function isActive() {
   return active;
@@ -33,55 +37,76 @@ function open() {
   try {
     if (Find.hasHighlights()) Find.hideHighlights();
   } catch {}
+  restoreFocus = document.activeElement;
   render();
-
   overlay.tabIndex = -1;
   overlay.focus();
+  updateStatus();
+}
+
+function filterFocused() {
+  if (!inputEl) return false;
+  try {
+    return deepActiveElement() === inputEl;
+  } catch {
+    return document.activeElement === inputEl;
+  }
+}
+
+function focusOverlay() {
+  if (!overlay) return;
+  try {
+    overlay.focus();
+  } catch {}
+}
+
+function openFilter() {
+  if (inputEl) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'jari-prompt-input';
+  input.placeholder = 'Filter keys and commands';
+  input.value = query;
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('spellcheck', 'false');
+  input.setAttribute('maxlength', '200');
+  input.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      stepMatch(event.key === 'ArrowDown' ? 1 : -1);
+    }
+  });
+  input.addEventListener('input', () => {
+    query = input.value;
+    applySearch();
+  });
+  inputEl = input;
+  barEl.insertBefore(input, statusEl);
+  input.focus();
+  try {
+    input.select();
+  } catch {}
+  updateStatus();
+}
+
+function closeFilter() {
+  if (!inputEl) return;
+  try {
+    inputEl.remove();
+  } catch {}
+  try {
+    inputEl.blur();
+  } catch {}
+  inputEl = null;
+  focusOverlay();
+  updateStatus();
 }
 
 function helpCss() {
-  return `
-    :host { all: initial !important; }
-    .jari-overlay {
-      all: initial;
-      display: block;
-      position: fixed !important;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 2147483646 !important;
-      box-sizing: border-box;
-      background: var(--jari-cmplt-bg, #f5f5f7) !important;
-      color: var(--jari-cmplt-fg, #333738) !important;
-      font-family: var(--jari-cmplt-font-family, monospace) !important;
-      font-size: var(--jari-cmplt-font-size, 9pt) !important;
-      max-height: 75vh;
-      overflow: hidden;
-      text-align: left !important;
-      pointer-events: auto;
-    }
-    .jari-help {
-      background: var(--jari-cmplt-bg, #f5f5f7);
-      color: var(--jari-cmplt-fg, #333738);
-      font-size: var(--jari-cmplt-font-size, 9pt) !important;
-      font-family: var(--jari-cmplt-font-family, monospace) !important;
-      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
-      outline: none;
-    }
-    .jari-help:focus { outline: none; }
-    .jari-help-title {
-      display: block;
-      background: var(--jari-header-bg, #e8e8ec);
-      color: var(--jari-fg, #333738);
-      font-size: var(--jari-header-font-size, 9pt) !important;
-      font-weight: var(--jari-header-font-weight, bold) !important;
-      border-bottom: var(--jari-header-border-bottom, 1px solid #c5c5cf);
-      padding: 0 0.5ex;
-      margin: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-align: left !important;
-    }
+  return (
+    promptCss() +
+    `
     .jari-help-list {
       display: block;
       max-height: 60vh;
@@ -102,12 +127,12 @@ function helpCss() {
       margin-top: 0;
     }
     .jari-help tr.jari-help-cat-header th {
-      background: var(--jari-header-bg, #e8e8ec);
+      background: #252530;
       font-size: var(--jari-header-font-size, 9pt) !important;
       font-weight: var(--jari-header-font-weight, bold) !important;
-      color: var(--jari-fg, #333738);
+      color: #cdcdcd;
       text-align: left;
-      border-bottom: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      border-bottom: 1px solid #333738;
       padding: 0.25ex 0.5ex;
     }
     .jari-help td {
@@ -122,22 +147,61 @@ function helpCss() {
     .jari-help td.jari-help-key {
       width: 40%;
       font-weight: bold !important;
-      color: var(--jari-fg, #333738);
-      text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
+      color: #cdcdcd;
     }
     .jari-help td.jari-help-key.jari-unbound {
       font-weight: normal !important;
       font-style: italic;
-      color: var(--jari-muted, #606079);
-      text-shadow: none;
+      color: #878787;
     }
-    .jari-help-footer {
+    .jari-prompt-footer {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      align-items: baseline;
       gap: 1ex;
+      background: #252530;
+      color: #cdcdcd;
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5);
+      border-top: 1px solid #333738;
       padding: 0.25ex 0.5ex;
-      border-top: var(--jari-cmplt-border-top, 1px solid #c5c5cf);
+      margin: 0;
+      white-space: normal;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-help-status {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .jari-prompt-input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      color: #cdcdcd;
+      background: #1c1c24;
+      border: none !important;
+      border-top: 1px solid #333738;
+      outline: none !important;
+      box-shadow: none !important;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      font-weight: normal !important;
+      text-align: left !important;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+    }
+    .jari-prompt-input::placeholder {
+      color: #878787;
+    }
+    .jari-prompt-footer .jari-prompt-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+      padding: 0;
+      background: transparent;
+      line-height: inherit !important;
     }
     .jari-find-hit {
       background: rgba(var(--jari-accent-rgb, 224, 163, 99), 0.35) !important;
@@ -156,7 +220,8 @@ function helpCss() {
       background: var(--jari-accent, #e0a363);
       color: #1a1a1a;
     }
-  `;
+  `
+  );
 }
 
 function render() {
@@ -164,15 +229,14 @@ function render() {
   host = created.host;
   const shadow = created.shadow;
   overlay = document.createElement('div');
-  overlay.className = 'jari-overlay jari-help';
+  overlay.className = 'jari-overlay jari-prompt jari-help';
 
   const title = document.createElement('div');
-  title.className = 'jari-help-title';
+  title.className = 'jari-prompt-header';
   title.textContent = 'Jari keybindings';
   overlay.appendChild(title);
 
   entries = [];
-  searching = false;
   query = '';
   matches = [];
   currentIdx = 0;
@@ -228,28 +292,27 @@ function render() {
   );
   overlay.appendChild(listEl);
 
-  const footer = document.createElement('div');
-  footer.className = 'jari-help-footer';
-  footerBar = document.createElement('span');
-  footerBar.textContent = FOOTER_DEFAULT;
-  footer.appendChild(footerBar);
-  overlay.appendChild(footer);
+  barEl = document.createElement('div');
+  barEl.className = 'jari-prompt-footer';
+  statusEl = document.createElement('span');
+  statusEl.className = 'jari-help-status';
+  barEl.appendChild(statusEl);
+  overlay.appendChild(barEl);
 
   shadow.appendChild(overlay);
 }
 
-function updateFooter() {
-  if (!footerBar) return;
-  if (searching) {
-    footerBar.textContent =
-      matches.length === 0
-        ? `/${query} — No match`
-        : `/${query} ${currentIdx + 1}/${matches.length} (Enter done)`;
-  } else if (matches.length > 0) {
-    footerBar.textContent = `${currentIdx + 1}/${matches.length} (n/N jump) | / search | esc close`;
-  } else {
-    footerBar.textContent = FOOTER_DEFAULT;
+function updateStatus() {
+  if (!statusEl) return;
+  const hints = inputEl ? HINTS_FILTER : HINTS_NAV;
+  const q = (query || '').trim();
+  if (!q) {
+    statusEl.textContent = hints;
+    return;
   }
+  const count =
+    matches.length === 0 ? `no match for ${q}` : `${currentIdx + 1}/${matches.length}`;
+  statusEl.textContent = `${count} | ${hints}`;
 }
 
 function saveOriginal(td) {
@@ -340,7 +403,7 @@ function applySearch() {
   }
   currentIdx = 0;
   markCurrent();
-  updateFooter();
+  updateStatus();
   scrollMatchIntoView();
 }
 
@@ -349,111 +412,83 @@ function stepMatch(delta) {
   const len = matches.length;
   currentIdx = (((currentIdx + delta) % len) + len) % len;
   markCurrent();
-  updateFooter();
+  updateStatus();
   scrollMatchIntoView();
 }
 
+function clearFilter() {
+  query = '';
+  if (inputEl) inputEl.value = '';
+  clearSearchHighlights();
+}
+
 function onKeyDown(event) {
+  if (!active) return false;
   const key = event.key;
   if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
     return false;
   }
-  if (searching) {
+
+  if (filterFocused()) {
     if (key === 'Escape') {
       event.preventDefault();
       event.stopImmediatePropagation();
-      searching = false;
-      query = '';
-      clearSearchHighlights();
-      updateFooter();
-      return;
+      clearFilter();
+      closeFilter();
+      return true;
     }
     if (key === 'Enter') {
       event.preventDefault();
       event.stopImmediatePropagation();
-      searching = false;
-      updateFooter();
-      return;
+      closeFilter();
+      return true;
     }
-    if (key === 'Backspace') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (event.ctrlKey || event.metaKey) {
-        const trimmed = query.trimEnd();
-        if (!trimmed) {
-          query = "";
-        } else {
-          const words = trimmed.split(/\s+/);
-          words.pop();
-          query = words.join(" ");
-        }
-      } else {
-        query = query.slice(0, -1);
-      }
-      applySearch();
-      return;
-    }
-    if (key.length === 1 && !event.altKey && !event.metaKey) {
-      if (event.ctrlKey) return false;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      query += key;
-      applySearch();
-      return;
-    }
-    if (key.length === 1 || key === 'Backspace' || key === 'Escape' || key === 'Enter') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      return;
-    }
-  } else {
+    return false;
+  }
+
   const hasMod = event.ctrlKey || event.altKey || event.metaKey;
   const scrollOnly =
     event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
   if (hasMod && !scrollOnly) return false;
   event.preventDefault();
   event.stopImmediatePropagation();
-    if (key === 'Escape') {
-      gPending = false;
-      if (matches.length > 0) {
-        clearSearchHighlights();
-        updateFooter();
-        return;
-      }
-      close();
+  if (key === 'Escape') {
+    gPending = false;
+    if (matches.length > 0) {
+      clearFilter();
+      updateStatus();
       return;
     }
-    if (key === '/' && !hasMod) {
-      gPending = false;
-      searching = true;
-      query = '';
-      clearSearchHighlights();
-      updateFooter();
-      return;
-    }
-    if ((key === 'n' || key === 'N') && !hasMod && matches.length > 0) {
-      gPending = false;
-      stepMatch(key === 'n' ? 1 : -1);
-      return;
-    }
+    close();
+    return;
   }
-  if (event.key === 'g' && !gPending) {
+  if (key === '/') {
+    gPending = false;
+    openFilter();
+    return;
+  }
+  if ((key === 'n' || key === 'N') && matches.length > 0) {
+    gPending = false;
+    stepMatch(key === 'n' ? 1 : -1);
+    return;
+  }
+  if (key === 'g' && !gPending) {
     gPending = true;
     return;
   }
   if (gPending) {
     gPending = false;
-    if (event.key === 'g') listEl.scrollTo(0, 0);
+    if (key === 'g') listEl.scrollTo(0, 0);
     return;
   }
   if (event.ctrlKey) {
-    if (event.key === 'd') listEl.scrollBy(0, listEl.clientHeight * 0.5);
-    else if (event.key === 'u') listEl.scrollBy(0, -listEl.clientHeight * 0.5);
-    else if (event.key === 'f') listEl.scrollBy(0, listEl.clientHeight * 0.9);
-    else if (event.key === 'b') listEl.scrollBy(0, -listEl.clientHeight * 0.9);
+    if (key === 'd') listEl.scrollBy(0, listEl.clientHeight * 0.5);
+    else if (key === 'u') listEl.scrollBy(0, -listEl.clientHeight * 0.5);
+    else if (key === 'f') listEl.scrollBy(0, listEl.clientHeight * 0.9);
+    else if (key === 'b') listEl.scrollBy(0, -listEl.clientHeight * 0.9);
     return;
   }
-  switch (event.key) {
+  switch (key) {
     case 'G':
       listEl.scrollTo(0, listEl.scrollHeight);
       break;
@@ -480,14 +515,25 @@ function close() {
   }
   overlay = null;
   listEl = null;
-  footerBar = null;
+  barEl = null;
+  statusEl = null;
+  inputEl = null;
   entries = [];
-  searching = false;
   query = '';
   matches = [];
   currentIdx = 0;
   gPending = false;
   active = false;
+  if (
+    restoreFocus &&
+    restoreFocus.isConnected &&
+    document.activeElement !== restoreFocus
+  ) {
+    try {
+      restoreFocus.focus();
+    } catch {}
+  }
+  restoreFocus = null;
 }
 
 export const Help = { open, close, onKeyDown, isActive };
