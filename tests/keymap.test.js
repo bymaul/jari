@@ -308,12 +308,12 @@ test("migrateYankBindings leaves custom rebinds and occupied targets alone", () 
   assert.deepEqual(Jari.migrateYankBindings([]), []);
 });
 
-test("v5 stored keymaps migrate yank binds through v9", () => {
+test("v5 stored keymaps migrate yank binds through v10", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 5,
     keymap: { yfa: "hintYank", yft: "hintYankText" },
   });
-  assert.equal(s.schemaVersion, 9);
+  assert.equal(s.schemaVersion, 10);
   assert.equal(s.keymap.yf, "hintYank");
   assert.equal(s.keymap.yF, "hintYankText");
   assert.equal(s.keymap.yfa, undefined);
@@ -322,9 +322,9 @@ test("v5 stored keymaps migrate yank binds through v9", () => {
   assert.equal(s.keymap["]]"], "nextPage");
 });
 
-test("stored keymaps without yank binds keep them unbound through v9", () => {
+test("stored keymaps without yank binds keep them unbound through v10", () => {
   const s = Jari.normalizeSettings({ schemaVersion: 5, keymap: { j: "scrollDown" } });
-  assert.equal(s.schemaVersion, 9);
+  assert.equal(s.schemaVersion, 10);
   assert.equal(s.keymap.j, "scrollDown");
   for (const combo of ["yf", "yF", "yfa", "yft"]) {
     assert.equal(s.keymap[combo], undefined);
@@ -428,12 +428,12 @@ test("migrateFindToggleBindings leaves custom rebinds and occupied combos alone"
   assert.deepEqual(Jari.migrateFindToggleBindings([]), []);
 });
 
-test("v6 stored keymaps migrate to the new toggle binds and stamp v9", () => {
+test("v6 stored keymaps migrate to the new toggle binds and stamp v10", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 6,
     keymap: { "alt+r": "toggleFindRegex" },
   });
-  assert.equal(s.schemaVersion, 9);
+  assert.equal(s.schemaVersion, 10);
   assert.equal(s.keymap["alt+1"], "toggleFindRegex");
   assert.equal(s.keymap["alt+r"], undefined);
   assert.equal(s.keymap.d, "scrollHalfPageDown");
@@ -485,12 +485,12 @@ test("migratePageNavBindings leaves custom rebinds and occupied combos alone", (
   assert.deepEqual(Jari.migratePageNavBindings([]), []);
 });
 
-test("v7 stored keymaps gain page-nav binds and texts, stamp v9", () => {
+test("v7 stored keymaps gain page-nav binds and texts, stamp v10", () => {
   const s = Jari.normalizeSettings({
     schemaVersion: 7,
     keymap: { j: "scrollDown" },
   });
-  assert.equal(s.schemaVersion, 9);
+  assert.equal(s.schemaVersion, 10);
   assert.equal(s.keymap["[["], "prevPage");
   assert.equal(s.keymap["]]"], "nextPage");
   assert.equal(s.keymap[":"], "showCommandPalette");
@@ -504,7 +504,7 @@ test("v7 stored keymaps keep custom page-nav texts", () => {
     keymap: {},
     pageNavTexts: { next: ["Weiter"], prev: [] },
   });
-  assert.equal(s.schemaVersion, 9);
+  assert.equal(s.schemaVersion, 10);
   assert.deepEqual(s.pageNavTexts.next, ["Weiter"]);
   assert.ok(s.pageNavTexts.prev.length > 0);
 });
@@ -628,4 +628,39 @@ test("displayCombo names the space key", () => {
   assert.equal(Jari.displayCombo("ctrl+t"), "ctrl+t");
   assert.equal(Jari.displayCombo(""), "");
   assert.equal(Jari.displayCombo(null), null);
+});
+
+test("tab manager defaults to gt without conflicts", () => {
+  assert.equal(Jari.keymapDefaults.gt, "openTabManager");
+  assert.equal(COMMAND_CATALOG.openTabManager.category, "tabs");
+  assert.equal(
+    Jari.findBindingConflict(Jari.keymapDefaults, "gt", "openTabManager"),
+    null,
+  );
+  assert.deepEqual(Jari.findOverlapConflicts(Jari.keymapDefaults, "gt"), []);
+  assert.equal(Jari.isBrowserTrapped("gt"), false);
+});
+
+test("migrateV10Bindings fills gt where free and leaves customs alone", () => {
+  const filled = Jari.migrateV10Bindings({ j: "scrollDown" });
+  assert.equal(filled.gt, "openTabManager");
+  assert.equal(filled.j, "scrollDown");
+  const custom = { gt: "closeTab", j: "scrollDown" };
+  assert.deepEqual(Jari.migrateV10Bindings(custom), custom);
+  assert.equal(Jari.migrateV10Bindings(null), null);
+  assert.deepEqual(Jari.migrateV10Bindings([]), []);
+});
+
+test("v9 stored keymaps gain gt and stamp v10", () => {
+  const s = Jari.normalizeSettings({
+    schemaVersion: 9,
+    keymap: { j: "scrollDown" },
+  });
+  assert.equal(s.schemaVersion, 10);
+  assert.equal(s.keymap.gt, "openTabManager");
+  const taken = Jari.normalizeSettings({
+    schemaVersion: 9,
+    keymap: { gt: "closeTab" },
+  });
+  assert.equal(taken.keymap.gt, "closeTab");
 });

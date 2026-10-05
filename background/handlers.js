@@ -1,6 +1,6 @@
 import { clampCount } from "./utils.js";
 import * as tabs from "./tabs.js";
-import { toggleBookmark } from "./bookmarks.js";
+import { bookmarkManagerTabs, toggleBookmark, unbookmarkManagerTabs } from "./bookmarks.js";
 import { suggest, search } from "./suggest.js";
 
 export { clampCount };
@@ -26,6 +26,18 @@ export const handlers = {
   goBack: tabs.goBack,
   goForward: tabs.goForward,
   listTabs: tabs.listTabs,
+  managerList: tabs.managerList,
+  closeManagerTabs: tabs.closeManagerTabs,
+  setTabsPinned: tabs.setTabsPinned,
+  setTabsMuted: tabs.setTabsMuted,
+  moveManagerTabs: tabs.moveManagerTabs,
+  duplicateManagerTabs: tabs.duplicateManagerTabs,
+  editManagerTab: tabs.editManagerTab,
+  groupManagerTabs: tabs.groupManagerTabs,
+  ungroupManagerTabs: tabs.ungroupManagerTabs,
+  renameGroup: tabs.renameGroup,
+  bookmarkManagerTabs,
+  unbookmarkManagerTabs,
   suggest,
   search,
   activateTab: tabs.activateTab,

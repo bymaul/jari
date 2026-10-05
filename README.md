@@ -20,7 +20,8 @@ Bindings chain into sequences of any length.
   forward, `[w` back (`3]w` skips ahead), `;w` reset scroll area
 - Zoom: `+`/`=`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
-  `J`/`K` prev/next, `g0`/`g$` first/last, `<<`/`>>` move, `W` move to window,
+  `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder),
+  `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
 - History: `H`/`L` back/forward
 - Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
@@ -71,8 +72,8 @@ Or build from source (below) and load this folder the same way. The checked-in
 
 | Permission                  | Used for                                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------- |
-| `tabs`, `sessions`          | Switch, close, reopen, move, duplicate tabs                                           |
-| `history`, `bookmarks`      | Omnibox (`t`) suggestions from your history and bookmarks                             |
+| `tabs`, `tabGroups` (Chrome only), `sessions` | Switch, close, reopen, move, group, duplicate tabs                     |
+| `history`, `bookmarks`      | Omnibox (`t`) suggestions; tab manager (`gt`) bulk bookmark to the bar  |
 | `storage`                   | Persist your settings via the browser's synced storage                                |
 | `clipboardRead`             | Open a URL from your clipboard (`gp`/`gP`)                                            |
 | `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API |

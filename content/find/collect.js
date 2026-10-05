@@ -25,6 +25,7 @@ function shouldSkipNode(node) {
         host.classList.contains("jari-help-host") ||
         host.classList.contains("jari-find-host") ||
         host.classList.contains("jari-prompt-host") ||
+        host.classList.contains("jari-tab-manager-host") ||
         host.classList.contains("jari-hints-host") ||
         host.classList.contains("jari-visual-caret-host")
       )

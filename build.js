@@ -66,6 +66,11 @@ function manifestFor(target) {
   if (target === "chrome") {
     manifest.background = { service_worker: "background.js" };
     delete manifest.browser_specific_settings;
+    // Tab grouping is Chrome-only; Firefox builds omit it and the tab
+    // manager falls back with an honest toast.
+    if (!manifest.permissions.includes("tabGroups")) {
+      manifest.permissions.push("tabGroups");
+    }
   } else {
     manifest.background = { scripts: ["background.js"] };
     manifest.permissions.push("clipboardWrite");

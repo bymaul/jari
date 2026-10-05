@@ -35,6 +35,7 @@ export const COMMAND_CATALOG = {
   togglePin: { category: "tabs", label: "Pin / unpin tab" },
   toggleMute: { category: "tabs", label: "Mute / unmute tab" },
   moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
+  openTabManager: { category: "tabs", label: "Open tab manager" },
 
   goBack: { category: "history", label: "Go back in history" },
   goForward: { category: "history", label: "Go forward in history" },

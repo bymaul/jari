@@ -150,7 +150,10 @@ export async function suggest(_, { query = "" } = {}) {
   return items.slice(0, maxResults);
 }
 
-export async function search(sender, { query = "", newTab = true, incognito = false } = {}) {
+export async function search(
+  sender,
+  { query = "", newTab = true, incognito = false, background = false } = {},
+) {
   const text = query.trim();
   if (!text) return { ok: false };
   const url = await getDefaultSearchUrl(text);
@@ -158,7 +161,7 @@ export async function search(sender, { query = "", newTab = true, incognito = fa
     return openInIncognito(url);
   }
   if (newTab) {
-    await chrome.tabs.create({ url });
+    await chrome.tabs.create(background ? { url, active: false } : { url });
   } else if (sender.tab && sender.tab.id) {
     await chrome.tabs.update(sender.tab.id, { url });
   }

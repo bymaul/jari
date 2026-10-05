@@ -74,18 +74,18 @@
     if (list.some((e) => e && e.keyword === keyword)) return keyword;
     return list[0].keyword;
   }
-  function parseEngineKeyword(query4, engines) {
-    const m = String(query4 || "").trim().match(/^(\w+)\s+(.*\S)/);
+  function parseEngineKeyword(query5, engines) {
+    const m = String(query5 || "").trim().match(/^(\w+)\s+(.*\S)/);
     if (!m) return null;
     const url = buildEngineUrl(engines, m[1], m[2]);
     if (!url) return null;
     return { keyword: m[1].toLowerCase(), rest: m[2], url };
   }
-  function buildEngineUrl(engines, keyword, query4) {
+  function buildEngineUrl(engines, keyword, query5) {
     const kw = String(keyword || "").toLowerCase();
     const engine = (engines || []).find((e) => e && e.keyword === kw);
     if (!engine) return null;
-    return String(engine.url).replaceAll("%s", encodeURIComponent(query4));
+    return String(engine.url).replaceAll("%s", encodeURIComponent(query5));
   }
 
   // shared/page-nav-texts.js
@@ -331,9 +331,9 @@
     "makefile",
     "cmake"
   ]);
-  function isValidHostname(host5) {
-    if (!host5) return false;
-    let lower = host5.toLowerCase();
+  function isValidHostname(host6) {
+    if (!host6) return false;
+    let lower = host6.toLowerCase();
     if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
@@ -361,9 +361,9 @@
     if (tld.length < 2 || !/^[a-z]{2,63}$/.test(tld)) return false;
     return true;
   }
-  function isBareNavigableHostname(host5) {
-    if (!isValidHostname(host5)) return false;
-    let lower = host5.toLowerCase();
+  function isBareNavigableHostname(host6) {
+    if (!isValidHostname(host6)) return false;
+    let lower = host6.toLowerCase();
     if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
     if (lower === "localhost") return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) return true;
@@ -480,11 +480,11 @@
             }
             return true;
           }
-          const host5 = u.hostname;
-          if (!host5) return false;
-          if (host5 === "localhost" || /^127\.0\.0\.1$/.test(host5) || /^0\.0\.0\.0$/.test(host5)) return true;
-          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host5)) return isBareNavigableHostname(host5);
-          return isBareNavigableHostname(host5);
+          const host6 = u.hostname;
+          if (!host6) return false;
+          if (host6 === "localhost" || /^127\.0\.0\.1$/.test(host6) || /^0\.0\.0\.0$/.test(host6)) return true;
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host6)) return isBareNavigableHostname(host6);
+          return isBareNavigableHostname(host6);
         } catch {
           return false;
         }
@@ -521,26 +521,26 @@
         return false;
       }
     },
-    suggestionTerm(query4) {
-      const idx = query4.search(/\s/);
-      if (idx === -1) return query4;
-      return Url.looksLikeUrl(query4.slice(0, idx)) ? query4.slice(idx).trim() : query4;
+    suggestionTerm(query5) {
+      const idx = query5.search(/\s/);
+      if (idx === -1) return query5;
+      return Url.looksLikeUrl(query5.slice(0, idx)) ? query5.slice(idx).trim() : query5;
     }
   };
   function normalizeHost(raw) {
-    let host5 = raw.trim().toLowerCase();
-    if (!host5) return "";
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host5)) {
+    let host6 = raw.trim().toLowerCase();
+    if (!host6) return "";
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host6)) {
       try {
-        host5 = new URL(host5).hostname;
+        host6 = new URL(host6).hostname;
       } catch {
         return "";
       }
     }
-    host5 = host5.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
+    host6 = host6.split(/[/?#:]/)[0].replace(/^\.+|\.+$/g, "");
     return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(
-      host5
-    ) ? host5 : "";
+      host6
+    ) ? host6 : "";
   }
   function normalizeSitePattern(raw) {
     if (typeof raw !== "string") return "";
@@ -555,18 +555,18 @@
   }
   function matchesSitePattern(hostname, pattern, protocol = "") {
     if (!pattern) return false;
-    const host5 = (hostname || "").toLowerCase();
+    const host6 = (hostname || "").toLowerCase();
     if (pattern === "file://") return protocol === "file:";
     if (pattern.startsWith("*.")) {
       const base = pattern.slice(2);
-      return host5 === base || host5.endsWith(`.${base}`);
+      return host6 === base || host6.endsWith(`.${base}`);
     }
-    return host5 === pattern.toLowerCase();
+    return host6 === pattern.toLowerCase();
   }
   function pageSiteKey(hostname, protocol = "") {
-    const host5 = hostname || "";
-    if (!host5 && protocol === "file:") return "file://";
-    return host5;
+    const host6 = hostname || "";
+    if (!host6 && protocol === "file:") return "file://";
+    return host6;
   }
 
   // content/catalog.js
@@ -604,6 +604,7 @@
     togglePin: { category: "tabs", label: "Pin / unpin tab" },
     toggleMute: { category: "tabs", label: "Mute / unmute tab" },
     moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
+    openTabManager: { category: "tabs", label: "Open tab manager" },
     goBack: { category: "history", label: "Go back in history" },
     goForward: { category: "history", label: "Go forward in history" },
     reloadTab: { category: "page", label: "Reload tab" },
@@ -644,7 +645,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 9;
+  var SETTINGS_SCHEMA_VERSION = 10;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -705,6 +706,7 @@
     ge: "editUrl",
     g0: "goToFirstTab",
     g$: "goToLastTab",
+    gt: "openTabManager",
     ";e": "openSettings",
     ";x": "openExtensions",
     ";w": "resetScrollTarget",
@@ -839,7 +841,7 @@
     const n = parseInt(raw, 10);
     return Number.isNaN(n) ? 1 : Math.max(1, n);
   }
-  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host";
+  var overlaySelectors = ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host, .jari-tab-manager-host";
   function deepActiveElement() {
     let el = document.activeElement;
     while (el && el.shadowRoot && el.shadowRoot.activeElement) {
@@ -939,6 +941,10 @@
       d.keymap = migrateV9Bindings(d.keymap);
       version = 9;
     }
+    if (version < 10) {
+      d.keymap = migrateV10Bindings(d.keymap);
+      version = 10;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -1036,6 +1042,19 @@
     }
     const out = { ...keymap };
     for (const [combo, command] of V9_DEFAULT_FILLS) {
+      if (combo in out) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
+    }
+    return out;
+  }
+  var V10_DEFAULT_FILLS = [["gt", "openTabManager"]];
+  function migrateV10Bindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    for (const [combo, command] of V10_DEFAULT_FILLS) {
       if (combo in out) continue;
       if (findOverlapConflicts(out, combo).length > 0) continue;
       out[combo] = command;
@@ -1251,10 +1270,10 @@
     return state.keymap;
   }
   function isDisabled() {
-    const host5 = location.hostname || "";
+    const host6 = location.hostname || "";
     const protocol = location.protocol || "";
     return state.disabledSites.some(
-      (pattern) => matchesSitePattern(host5, pattern, protocol)
+      (pattern) => matchesSitePattern(host6, pattern, protocol)
     );
   }
   function getDisabledSites() {
@@ -1592,22 +1611,22 @@
     }
   }
   function createShadowHost(hostClass, cssText, zIndex = "2147483646") {
-    const host5 = document.createElement("div");
-    if (hostClass) host5.className = hostClass;
-    host5.style.position = "fixed";
-    host5.style.left = "0";
-    host5.style.top = "0";
-    host5.style.width = "0";
-    host5.style.height = "0";
-    host5.style.overflow = "visible";
-    host5.style.pointerEvents = "none";
-    host5.style.zIndex = zIndex;
+    const host6 = document.createElement("div");
+    if (hostClass) host6.className = hostClass;
+    host6.style.position = "fixed";
+    host6.style.left = "0";
+    host6.style.top = "0";
+    host6.style.width = "0";
+    host6.style.height = "0";
+    host6.style.overflow = "visible";
+    host6.style.pointerEvents = "none";
+    host6.style.zIndex = zIndex;
     try {
-      host5.attachShadow({ mode: "open" });
+      host6.attachShadow({ mode: "open" });
     } catch {
-      host5.shadowRoot = host5;
+      host6.shadowRoot = host6;
     }
-    const shadow = host5.shadowRoot || host5;
+    const shadow = host6.shadowRoot || host6;
     try {
       const style = document.createElement("style");
       style.textContent = cssText || "";
@@ -1615,10 +1634,10 @@
     } catch {
     }
     try {
-      (document.body || document.documentElement).appendChild(host5);
+      (document.body || document.documentElement).appendChild(host6);
     } catch {
     }
-    return { host: host5, shadow };
+    return { host: host6, shadow };
   }
   var CAPTURE_HIDE_SELECTORS = [
     ".jari-hints-host",
@@ -1626,6 +1645,7 @@
     ".jari-prompt-host",
     ".jari-palette-host",
     ".jari-help-host",
+    ".jari-tab-manager-host",
     ".jari-visual-caret-host",
     ".jari-status-stack",
     ".jari-clue",
@@ -2413,8 +2433,8 @@
   }
   function releaseFrameFocus() {
     try {
-      const active8 = document.activeElement;
-      if (active8 && isFrame(active8)) active8.blur();
+      const active9 = document.activeElement;
+      if (active9 && isFrame(active9)) active9.blur();
     } catch {
     }
     try {
@@ -2759,8 +2779,8 @@
       return String(s).toLowerCase();
     }
   }
-  function parseQuery(query4) {
-    const normalized = normalizeForMatch(query4);
+  function parseQuery(query5) {
+    const normalized = normalizeForMatch(query5);
     const phrases = [];
     const exclude = [];
     const withoutExcludedPhrases = normalized.replace(/-"([^"]+)"/g, (_, p) => {
@@ -2881,8 +2901,8 @@
     indices[0] = cur;
     return { score: dpPrev[end], indices: toOriginal(indices) };
   }
-  function matchPreamble(query4, text) {
-    const { include, exclude, phrases } = parseQuery(query4);
+  function matchPreamble(query5, text) {
+    const { include, exclude, phrases } = parseQuery(query5);
     const { norm: t, map } = normalizeWithMap(text);
     if (exclude.some((ex) => t.includes(ex))) return null;
     return { include, exclude, phrases, t, map };
@@ -2898,8 +2918,8 @@
     }
     return true;
   }
-  function fuzzyMatch(query4, text) {
-    const pre = matchPreamble(query4, text);
+  function fuzzyMatch(query5, text) {
+    const pre = matchPreamble(query5, text);
     if (!pre) return null;
     const { include, exclude, phrases, t, map } = pre;
     if (include.length === 0 && phrases.length === 0) {
@@ -2919,8 +2939,8 @@
     indices.sort((a, b) => a - b);
     return { score: total, indices };
   }
-  function fuzzyIndices(query4, text) {
-    const pre = matchPreamble(query4, text);
+  function fuzzyIndices(query5, text) {
+    const pre = matchPreamble(query5, text);
     if (!pre) return [];
     const { include, phrases, t, map } = pre;
     const indices = [];
@@ -2929,16 +2949,16 @@
     for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
   }
-  function substringMatch(query4, text) {
-    const pre = matchPreamble(query4, text);
+  function substringMatch(query5, text) {
+    const pre = matchPreamble(query5, text);
     if (!pre) return false;
     const { include, exclude, phrases, t } = pre;
     if (include.length === 0 && phrases.length === 0) return exclude.length > 0;
     if (phrases.some((ph) => !t.includes(ph))) return false;
     return include.every((term) => t.includes(term));
   }
-  function substringIndices(query4, text) {
-    const pre = matchPreamble(query4, text);
+  function substringIndices(query5, text) {
+    const pre = matchPreamble(query5, text);
     if (!pre) return [];
     const { include, phrases, t, map } = pre;
     if (include.length === 0 && phrases.length === 0) return [];
@@ -2954,16 +2974,16 @@
     }
     return [...new Set(indices)].sort((a, b) => a - b);
   }
-  function fieldBoost(query4, field, base, weight) {
-    if (!field) return 0;
-    const m = fuzzyMatch(query4, field);
+  function fieldBoost(query5, field2, base, weight) {
+    if (!field2) return 0;
+    const m = fuzzyMatch(query5, field2);
     return m ? base + m.score * weight : 0;
   }
-  function titleBoost(query4, item) {
-    return fieldBoost(query4, item.title, 8, 0.15);
+  function titleBoost(query5, item) {
+    return fieldBoost(query5, item.title, 8, 0.15);
   }
-  function hostBoost(query4, item) {
-    return fieldBoost(query4, extractHost(item.url || ""), 6, 0.1);
+  function hostBoost(query5, item) {
+    return fieldBoost(query5, extractHost(item.url || ""), 6, 0.1);
   }
   function recencyScore(item) {
     const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
@@ -2982,8 +3002,8 @@
     return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
   }
   var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
-  function rankMatches(query4, list, fuzzy = true) {
-    const q = String(query4).trim();
+  function rankMatches(query5, list, fuzzy = true) {
+    const q = String(query5).trim();
     if (!q) return [...list];
     if (!fuzzy) {
       return list.filter(
@@ -3183,7 +3203,7 @@
     li.appendChild(url);
     return li;
   }
-  function renderSuggestionRow(row, query4, tabUrlMap2) {
+  function renderSuggestionRow(row, query5, tabUrlMap2) {
     const li = document.createElement("li");
     let titleText;
     if (row.kind === "search") {
@@ -3208,22 +3228,22 @@
       li,
       titleText,
       urlText,
-      row.kind === "suggestion" ? query4 : ""
+      row.kind === "suggestion" ? query5 : ""
     );
   }
-  function renderTabRow(tab, winLabel, query4) {
+  function renderTabRow(tab, winLabel, query5) {
     const li = document.createElement("li");
     const win = makeSpan("jari-win-tag");
     win.textContent = "#" + winLabel;
     li.appendChild(win);
-    return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query4);
+    return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query5);
   }
-  function renderList({ listEl: listEl5, filtered: filtered3, query: query4, mode: mode4, tabUrlMap: tabUrlMap2, selected: selected3 = 0 }) {
-    const rows = filtered3.slice(0, settings.getMaxResults());
-    listEl5.textContent = "";
+  function renderList({ listEl: listEl6, filtered: filtered4, query: query5, mode: mode4, tabUrlMap: tabUrlMap2, selected: selected4 = 0 }) {
+    const rows = filtered4.slice(0, settings.getMaxResults());
+    listEl6.textContent = "";
     if (mode4 === "open" || mode4 === "edit" || mode4 === "incognito") {
-      for (const row of rows) listEl5.appendChild(renderSuggestionRow(row, query4, tabUrlMap2));
-      highlight({ listEl: listEl5, selected: selected3 });
+      for (const row of rows) listEl6.appendChild(renderSuggestionRow(row, query5, tabUrlMap2));
+      highlight({ listEl: listEl6, selected: selected4 });
       return;
     }
     const winLabels = /* @__PURE__ */ new Map();
@@ -3232,21 +3252,21 @@
       if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
     }
     for (const tab of rows)
-      listEl5.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query4));
-    highlight({ listEl: listEl5, selected: selected3 });
+      listEl6.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query5));
+    highlight({ listEl: listEl6, selected: selected4 });
   }
-  function highlight({ listEl: listEl5, selected: selected3 }) {
-    const sel = typeof selected3 === "number" ? selected3 : 0;
-    Array.from(listEl5.children).forEach(
+  function highlight({ listEl: listEl6, selected: selected4 }) {
+    const sel = typeof selected4 === "number" ? selected4 : 0;
+    Array.from(listEl6.children).forEach(
       (li, i) => li.classList.toggle("selected", i === sel)
     );
-    const el = listEl5.children[sel];
+    const el = listEl6.children[sel];
     if (el) el.scrollIntoView({ block: "nearest" });
   }
-  function move({ listEl: listEl5, filtered: filtered3, selected: selected3, delta }) {
-    if (filtered3.length === 0) return selected3;
-    const next2 = (selected3 + delta + filtered3.length) % filtered3.length;
-    highlight({ listEl: listEl5, selected: next2 });
+  function move({ listEl: listEl6, filtered: filtered4, selected: selected4, delta }) {
+    if (filtered4.length === 0) return selected4;
+    const next2 = (selected4 + delta + filtered4.length) % filtered4.length;
+    highlight({ listEl: listEl6, selected: next2 });
     return next2;
   }
 
@@ -3262,35 +3282,35 @@
     openOrder.push(name);
   }
   function byName(name) {
-    return overlays.find((overlay5) => overlay5.name === name);
+    return overlays.find((overlay6) => overlay6.name === name);
   }
   var Overlays = {
     closeAll() {
       const seen = /* @__PURE__ */ new Set();
       for (let i = openOrder.length - 1; i >= 0; i--) {
-        const overlay5 = byName(openOrder[i]);
-        if (overlay5 && !seen.has(overlay5.name) && overlay5.isActive()) {
-          seen.add(overlay5.name);
-          overlay5.close();
+        const overlay6 = byName(openOrder[i]);
+        if (overlay6 && !seen.has(overlay6.name) && overlay6.isActive()) {
+          seen.add(overlay6.name);
+          overlay6.close();
         }
       }
-      for (const overlay5 of overlays) {
-        if (!seen.has(overlay5.name) && overlay5.isActive()) overlay5.close();
+      for (const overlay6 of overlays) {
+        if (!seen.has(overlay6.name) && overlay6.isActive()) overlay6.close();
       }
       openOrder.length = 0;
     },
     active() {
       for (let i = openOrder.length - 1; i >= 0; i--) {
-        const overlay5 = byName(openOrder[i]);
-        if (overlay5 && overlay5.modal && overlay5.isActive()) return overlay5;
+        const overlay6 = byName(openOrder[i]);
+        if (overlay6 && overlay6.modal && overlay6.isActive()) return overlay6;
       }
-      return overlays.find((overlay5) => overlay5.modal && overlay5.isActive()) || null;
+      return overlays.find((overlay6) => overlay6.modal && overlay6.isActive()) || null;
     }
   };
 
   // content/prompt.js
-  function parseKeyword(query4) {
-    return parseEngineKeyword(query4, settings.getSearchEngines());
+  function parseKeyword(query5) {
+    return parseEngineKeyword(query5, settings.getSearchEngines());
   }
   var active = false;
   var host = null;
@@ -3443,8 +3463,8 @@
       renderList2();
     });
   }
-  function rank(list, query4) {
-    return rankMatches(query4, list, settings.isFuzzyMatching());
+  function rank(list, query5) {
+    return rankMatches(query5, list, settings.isFuzzyMatching());
   }
   function rankTabs(q, list) {
     return rank(list, q).map((x) => x.item);
@@ -3625,6 +3645,1072 @@
   };
   register("prompt", { close, onKeyDown, isActive });
 
+  // content/tab-manager.js
+  var HOST_CLASS = "jari-tab-manager-host";
+  var GROUPED_NONE = -1;
+  var POLL_MS = 2e3;
+  var FOOTER_MINIMAL = "Space mark | Enter switch | d close | / filter | Esc close | ? more";
+  var FOOTER_FULL = [
+    "Space mark | v range | a all | Enter switch | d close | y duplicate | e edit | t new tab | ? less",
+    "p pin | m mute | g group | G to group | u ungroup | r rename | b bookmark | J/K reorder | Esc close"
+  ];
+  var FIELDS = {
+    open: {
+      maxLength: 500,
+      placeholder: "Open URL or search...",
+      hint: "Enter opens in the background \xB7 Esc cancel",
+      badge: "tab URL"
+    },
+    group: {
+      maxLength: 100,
+      placeholder: "Group name",
+      hint: "Enter save \xB7 Esc cancel",
+      badge: "renaming group"
+    },
+    url: {
+      maxLength: 500,
+      placeholder: "Tab URL",
+      hint: "Enter save \xB7 Esc cancel",
+      badge: "editing url"
+    },
+    filter: {
+      maxLength: 200,
+      placeholder: "Filter tabs",
+      hint: "Enter done \xB7 Esc cancel",
+      badge: "filtering"
+    }
+  };
+  var active2 = false;
+  var host2 = null;
+  var overlay2 = null;
+  var headerEl = null;
+  var listEl2 = null;
+  var footerEl = null;
+  var restoreFocus2 = null;
+  var tabs2 = [];
+  var windowId = null;
+  var groupsById = /* @__PURE__ */ new Map();
+  var filtered2 = [];
+  var selected2 = 0;
+  var marked = /* @__PURE__ */ new Set();
+  var query2 = "";
+  var showHints = false;
+  var visualAnchor = null;
+  var visualPainted = /* @__PURE__ */ new Set();
+  var visualBaseline = /* @__PURE__ */ new Set();
+  var field = null;
+  var fieldEl = null;
+  var fieldFocusBefore = null;
+  var confirm = null;
+  var pollTimer = null;
+  var refreshing = false;
+  function sortManagerTabs(list) {
+    return [...Array.isArray(list) ? list : []].sort((a, b) => {
+      if (a.windowId !== b.windowId) return a.windowId - b.windowId;
+      return (a.index || 0) - (b.index || 0);
+    });
+  }
+  function filterManagerTabs(list, text, fuzzy = true) {
+    const q = String(text || "").trim();
+    if (!q) return [...list];
+    const ranked = rankMatches(q, list, fuzzy);
+    return fuzzy ? ranked.map((entry) => entry.item) : ranked;
+  }
+  function targetsForAction(list, markedIds, focusedId2) {
+    const rows = Array.isArray(list) ? list : [];
+    const ids = [...markedIds || []];
+    if (ids.length > 0) {
+      const wanted = new Set(ids);
+      return rows.filter((tab) => wanted.has(tab.id));
+    }
+    const focused = rows.find((tab) => tab.id === focusedId2);
+    return focused ? [focused] : [];
+  }
+  function needsCloseConfirm(targets) {
+    return Array.isArray(targets) && targets.length > 1;
+  }
+  function decideSetState(targets, key) {
+    return (targets || []).some((tab) => !tab[key]);
+  }
+  var GROUP_COLORS = {
+    grey: "#878787",
+    blue: "#6e94b2",
+    red: "#d8647e",
+    yellow: "#fdbe7c",
+    green: "#7fa563",
+    pink: "#ed9daf",
+    purple: "#97519c",
+    cyan: "#aeaed1",
+    orange: "#e0a363"
+  };
+  function groupColorHex(name) {
+    return GROUP_COLORS[String(name || "").toLowerCase()] || "#888888";
+  }
+  function stateTags(tab) {
+    const out = [];
+    if (!tab) return out;
+    if (tab.pinned) out.push("pin");
+    if (tab.muted) out.push("muted");
+    else if (tab.audible) out.push("playing");
+    if (tab.bookmarked) out.push("bookmarked");
+    return out;
+  }
+  function confirmKey(ids) {
+    return [...ids || []].sort((a, b) => a - b).join(",");
+  }
+  function isActive2() {
+    return active2;
+  }
+  async function ask(action, payload) {
+    try {
+      return await sendMessage(action, payload);
+    } catch {
+      return null;
+    }
+  }
+  function focusedTab() {
+    return filtered2[selected2] || null;
+  }
+  function focusedId() {
+    const focused = focusedTab();
+    return focused ? focused.id : null;
+  }
+  function currentTargets() {
+    return targetsForAction(tabs2, marked, focusedId());
+  }
+  function managerCss() {
+    return promptCss() + `
+    .jari-prompt-footer {
+      display: block;
+      background: #252530;
+      color: #cdcdcd;
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      border-top: 1px solid #333738;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+      white-space: normal;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-prompt-footer.jari-manager-warn {
+      color: #e0a363;
+      font-weight: bold !important;
+    }
+    .jari-prompt-input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      color: #cdcdcd;
+      background: #1c1c24;
+      border: none !important;
+      border-top: 1px solid #333738;
+      outline: none !important;
+      box-shadow: none !important;
+      font-family: var(--jari-cmdl-font-family, monospace) !important;
+      font-size: var(--jari-cmdl-font-size, 9pt) !important;
+      line-height: var(--jari-cmdl-line-height, 1.5) !important;
+      font-weight: normal !important;
+      text-align: left !important;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+    }
+    .jari-prompt-list li.jari-mgr-row {
+      display: grid !important;
+      grid-template-columns: auto auto minmax(0, 1fr) auto minmax(0, 36%);
+      column-gap: 1ex;
+      align-items: baseline !important;
+      height: auto !important;
+      line-height: 1.7 !important;
+      white-space: nowrap !important;
+      padding: 0 1ex !important;
+      margin: 0;
+      overflow: hidden !important;
+      cursor: pointer;
+    }
+    .jari-prompt-list li.jari-mgr-row .jari-mgr-loc,
+    .jari-prompt-list li.jari-mgr-row .jari-mgr-tag {
+      opacity: 0.7;
+      white-space: nowrap;
+    }
+    .jari-prompt-list li.jari-mgr-row .jari-mgr-mark {
+      color: var(--jari-accent, #e0a363);
+      font-weight: bold !important;
+    }
+    .jari-prompt-list li.jari-mgr-row.marked {
+      background: rgba(224, 163, 99, 0.16) !important;
+    }
+    .jari-prompt-list li.jari-mgr-row.selected {
+      background: var(--jari-of-bg, #333738) !important;
+    }
+    .jari-prompt-list li.jari-mgr-row .jari-mgr-win {
+      font-weight: bold !important;
+    }
+    .jari-prompt-list li.jari-mgr-row .jari-mgr-win.jari-mgr-cur {
+      color: var(--jari-accent, #e0a363);
+    }
+    .jari-prompt-list li.jari-mgr-row .title,
+    .jari-prompt-list li.jari-mgr-row .url {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    .jari-prompt-list li.jari-mgr-row .url {
+      margin-left: 0;
+    }
+    .jari-manager-backdrop {
+      all: initial;
+      display: block;
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(0, 0, 0, 0.45) !important;
+      z-index: 2147483645 !important;
+      pointer-events: auto !important;
+    }
+    .jari-overlay {
+      left: 50% !important;
+      right: auto !important;
+      bottom: auto !important;
+      top: 12vh !important;
+      transform: translateX(-50%) !important;
+      width: min(1020px, calc(100vw - 48px)) !important;
+      max-height: 76vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+      border: 1px solid #45454f !important;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55) !important;
+      overflow: hidden !important;
+    }
+    .jari-prompt-list {
+      max-height: 52vh !important;
+    }
+  `;
+  }
+  function windowLabels(rows) {
+    const labels = /* @__PURE__ */ new Map();
+    let n = 0;
+    for (const tab of rows) {
+      if (!labels.has(tab.windowId)) labels.set(tab.windowId, ++n);
+    }
+    return labels;
+  }
+  function appendSpan(li, className, text) {
+    const span = document.createElement("span");
+    span.className = className;
+    span.textContent = text;
+    li.appendChild(span);
+    return span;
+  }
+  function highlightSpan(span, text, q) {
+    if (!q) {
+      span.textContent = text;
+      return;
+    }
+    if (settings.isFuzzyMatching()) renderText(span, text, fuzzyIndices(q, text));
+    else renderText(span, text, substringIndices(q, text));
+  }
+  function renderRow(tab, labels, currentWin) {
+    const li = document.createElement("li");
+    li.className = "jari-mgr-row";
+    li.classList.toggle("marked", marked.has(tab.id));
+    appendSpan(li, "jari-mgr-mark", marked.has(tab.id) ? "\u25CF" : "\u25CB");
+    const info = groupsById.get(tab.groupId) || null;
+    const loc = document.createElement("span");
+    loc.className = "jari-mgr-loc";
+    const win = document.createElement("span");
+    win.className = "jari-mgr-win";
+    win.textContent = `W${labels.get(tab.windowId) || "?"}`;
+    win.classList.toggle("jari-mgr-cur", tab.windowId === currentWin);
+    loc.appendChild(win);
+    if (info) {
+      const group = document.createElement("span");
+      group.className = "jari-mgr-group";
+      group.textContent = `/${info.title || "group"}`;
+      if (info.color) {
+        try {
+          group.style.color = groupColorHex(info.color);
+        } catch {
+        }
+      }
+      loc.appendChild(group);
+    }
+    li.appendChild(loc);
+    const title = document.createElement("span");
+    title.className = "title";
+    highlightSpan(title, tab.title || "(untitled)", query2);
+    li.appendChild(title);
+    appendSpan(
+      li,
+      "jari-mgr-tag",
+      stateTags(tab).map((tag) => `[${tag}]`).join(" ")
+    );
+    appendSpan(li, "url", tab.url || "");
+    return li;
+  }
+  function renderHeader() {
+    const wins = new Set(tabs2.map((tab) => tab.windowId)).size;
+    const parts = [
+      `Tab manager \u2014 ${tabs2.length} tabs \xB7 ${wins} windows \xB7 ${marked.size} marked`
+    ];
+    if (windowId !== null) {
+      const labels = windowLabels(tabs2);
+      parts.push(`current W${labels.get(windowId) || "?"}`);
+    }
+    if (query2) parts.push(`/${query2}`);
+    if (visualAnchor !== null) parts.push("(visual)");
+    if (field) parts.push(`(${FIELDS[field.kind].badge})`);
+    headerEl.textContent = parts.join(" ");
+  }
+  function renderFooter() {
+    if (field) {
+      setFooterLines([FIELDS[field.kind].hint], false);
+      return;
+    }
+    if (confirm) {
+      setFooterLines([confirm.message], true);
+    } else {
+      setFooterLines(showHints ? FOOTER_FULL : [FOOTER_MINIMAL], false);
+    }
+  }
+  function setFooterLines(lines, warn) {
+    footerEl.classList.toggle("jari-manager-warn", !!warn);
+    footerEl.textContent = "";
+    for (const line of lines) {
+      const div = document.createElement("div");
+      div.textContent = line;
+      footerEl.appendChild(div);
+    }
+  }
+  function renderList3() {
+    const labels = windowLabels(tabs2);
+    listEl2.textContent = "";
+    if (filtered2.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = query2 ? "No matching tabs" : "No tabs";
+      listEl2.appendChild(li);
+      return;
+    }
+    for (const tab of filtered2)
+      listEl2.appendChild(renderRow(tab, labels, windowId));
+    Array.from(listEl2.children).forEach(
+      (li, i) => li.classList.toggle("selected", i === selected2)
+    );
+    const el = listEl2.children[selected2];
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }
+  function renderAll() {
+    if (!active2) return;
+    renderHeader();
+    renderList3();
+    renderFooter();
+  }
+  function indexOfTab(id) {
+    return filtered2.findIndex((tab) => tab.id === id);
+  }
+  function applyFilter() {
+    const focused = focusedId();
+    filtered2 = filterManagerTabs(tabs2, query2, settings.isFuzzyMatching());
+    const kept = focused === null ? -1 : indexOfTab(focused);
+    selected2 = kept >= 0 ? kept : Math.min(selected2, filtered2.length - 1);
+  }
+  function adoptSnapshot(res) {
+    tabs2 = sortManagerTabs(res.tabs);
+    windowId = Number.isInteger(res.currentWindowId) ? res.currentWindowId : null;
+    groupsById = new Map(
+      (Array.isArray(res.groups) ? res.groups : []).map((group) => [
+        group.id,
+        { title: group.title || "", color: group.color || "" }
+      ])
+    );
+  }
+  function pruneMarksAndConfirm() {
+    const alive = new Set(tabs2.map((tab) => tab.id));
+    for (const id of [...marked]) {
+      if (!alive.has(id)) marked.delete(id);
+    }
+    if (!confirm) return;
+    const gone = confirm.ids.filter((id) => !alive.has(id));
+    if (gone.length === 0) return;
+    const kept = confirm.ids.filter((id) => alive.has(id));
+    confirm = {
+      ...confirm,
+      ids: kept,
+      message: `Some tabs are gone \u2014 press d again to close ${kept.length}`
+    };
+  }
+  async function refresh() {
+    refreshing = true;
+    let res;
+    try {
+      res = await sendMessage("managerList");
+    } catch {
+      res = null;
+    } finally {
+      refreshing = false;
+    }
+    if (!active2) return;
+    if (!res || !res.ok || !Array.isArray(res.tabs)) {
+      ui.toast("Tab manager unavailable");
+      close2();
+      return;
+    }
+    const focused = focusedId();
+    adoptSnapshot(res);
+    pruneMarksAndConfirm();
+    applyFilter();
+    const kept = focused === null ? -1 : indexOfTab(focused);
+    if (kept >= 0) selected2 = kept;
+    renderAll();
+  }
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(() => {
+      if (!active2 || refreshing || document.hidden) return;
+      if (field) return;
+      refresh();
+    }, POLL_MS);
+  }
+  function stopPolling() {
+    if (pollTimer !== null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+  async function open() {
+    if (active2) return;
+    const res = await ask("managerList");
+    if (!res || !res.ok || !Array.isArray(res.tabs)) {
+      ui.toast("Tab manager unavailable");
+      return;
+    }
+    adoptSnapshot(res);
+    filtered2 = [];
+    selected2 = 0;
+    marked = /* @__PURE__ */ new Set();
+    query2 = "";
+    field = null;
+    confirm = null;
+    endVisual();
+    active2 = true;
+    touch("tab-manager");
+    const created = createShadowHost(HOST_CLASS, managerCss());
+    host2 = created.host;
+    overlay2 = document.createElement("div");
+    overlay2.className = "jari-overlay jari-prompt";
+    headerEl = document.createElement("div");
+    headerEl.className = "jari-prompt-header";
+    listEl2 = document.createElement("ul");
+    listEl2.className = "jari-prompt-list";
+    footerEl = document.createElement("div");
+    footerEl.className = "jari-prompt-footer";
+    const backdrop = document.createElement("div");
+    backdrop.className = "jari-manager-backdrop";
+    backdrop.addEventListener("click", () => close2());
+    overlay2.appendChild(headerEl);
+    overlay2.appendChild(listEl2);
+    overlay2.appendChild(footerEl);
+    created.shadow.appendChild(backdrop);
+    created.shadow.appendChild(overlay2);
+    restoreFocus2 = document.activeElement;
+    applyFilter();
+    const start2 = tabs2.find((tab) => tab.windowId === windowId && tab.active) || tabs2.find((tab) => tab.windowId === windowId) || tabs2.find((tab) => tab.active);
+    if (start2) {
+      const idx = indexOfTab(start2.id);
+      if (idx >= 0) selected2 = idx;
+    }
+    renderAll();
+    document.addEventListener("visibilitychange", onVisibility);
+    startPolling();
+  }
+  function onVisibility() {
+    if (!document.hidden && active2) refresh();
+  }
+  function close2() {
+    stopPolling();
+    refreshing = false;
+    document.removeEventListener("visibilitychange", onVisibility);
+    if (host2) {
+      try {
+        host2.remove();
+      } catch {
+      }
+      host2 = null;
+    }
+    overlay2 = null;
+    field = null;
+    fieldEl = null;
+    fieldFocusBefore = null;
+    headerEl = null;
+    listEl2 = null;
+    footerEl = null;
+    tabs2 = [];
+    windowId = null;
+    groupsById = /* @__PURE__ */ new Map();
+    filtered2 = [];
+    selected2 = 0;
+    marked = /* @__PURE__ */ new Set();
+    query2 = "";
+    field = null;
+    confirm = null;
+    endVisual();
+    active2 = false;
+    if (restoreFocus2 && restoreFocus2.isConnected && document.activeElement !== restoreFocus2) {
+      try {
+        restoreFocus2.focus();
+      } catch {
+      }
+    }
+    restoreFocus2 = null;
+  }
+  function paintRange() {
+    if (visualAnchor === null) return;
+    const from = Math.min(visualAnchor, selected2);
+    const to = Math.max(visualAnchor, selected2);
+    const painted = /* @__PURE__ */ new Set();
+    for (let i = from; i <= to; i++) {
+      const tab = filtered2[i];
+      if (!tab) continue;
+      painted.add(tab.id);
+      marked.add(tab.id);
+    }
+    for (const id of visualPainted) {
+      if (painted.has(id) || visualBaseline.has(id)) continue;
+      marked.delete(id);
+    }
+    visualPainted = painted;
+  }
+  function move3(delta) {
+    if (filtered2.length === 0) return;
+    confirm = null;
+    endVisual();
+    selected2 = (selected2 + delta + filtered2.length) % filtered2.length;
+    renderAll();
+  }
+  function moveVisual(delta) {
+    if (filtered2.length === 0) return;
+    confirm = null;
+    selected2 = (selected2 + delta + filtered2.length) % filtered2.length;
+    paintRange();
+    renderAll();
+  }
+  function toggleMark() {
+    const tab = focusedTab();
+    if (!tab) return;
+    confirm = null;
+    if (marked.has(tab.id)) marked.delete(tab.id);
+    else marked.add(tab.id);
+    renderAll();
+  }
+  function endVisual() {
+    visualAnchor = null;
+    visualPainted = /* @__PURE__ */ new Set();
+    visualBaseline = /* @__PURE__ */ new Set();
+  }
+  function startVisual() {
+    if (filtered2.length === 0) return;
+    confirm = null;
+    visualAnchor = selected2;
+    visualBaseline = new Set(marked);
+    visualPainted = /* @__PURE__ */ new Set();
+    paintRange();
+  }
+  function markAllVisible() {
+    confirm = null;
+    endVisual();
+    for (const tab of filtered2) marked.add(tab.id);
+    renderAll();
+  }
+  function consumeMarks() {
+    marked = /* @__PURE__ */ new Set();
+    endVisual();
+  }
+  async function activateFocused() {
+    const tab = focusedTab();
+    if (!tab) return;
+    close2();
+    await sendMessage("activateTab", { id: tab.id });
+  }
+  function armConfirm(kind, ids, message) {
+    confirm = { kind, key: confirmKey(ids), ids: [...ids], message };
+    renderAll();
+  }
+  function isConfirmed(kind, ids) {
+    return !!confirm && confirm.kind === kind && confirm.key === confirmKey(ids) && confirm.ids.length === ids.length;
+  }
+  function failureMessage(res, outcome) {
+    if (res && res.reason === "unsupported") {
+      return "Tab groups not supported here";
+    }
+    return outcome.failed;
+  }
+  async function runOnTargets(action, payload, outcome) {
+    const targets = currentTargets();
+    if (targets.length === 0) return;
+    confirm = null;
+    const res = await ask(action, payload(targets));
+    if (!active2) return;
+    if (!res || !res.ok) {
+      ui.toast(failureMessage(res, outcome));
+      renderAll();
+      return;
+    }
+    if (outcome.done) outcome.done(res, targets);
+    consumeMarks();
+    await refresh();
+  }
+  async function closeTargets() {
+    const targets = currentTargets();
+    if (targets.length === 0) return;
+    const ids = targets.map((tab) => tab.id);
+    if (needsCloseConfirm(targets) && !isConfirmed("close", ids)) {
+      const pinned = targets.filter((tab) => tab.pinned).length;
+      armConfirm(
+        "close",
+        ids,
+        `Press d again to close ${ids.length} tabs${pinned ? ` (${pinned} pinned)` : ""} \xB7 Esc cancels`
+      );
+      return;
+    }
+    await runOnTargets(
+      "closeManagerTabs",
+      () => ({ ids }),
+      { failed: "Close failed", done: (res) => ui.toast(`Closed ${res.closed}`) }
+    );
+  }
+  var FLAGS = {
+    pin: {
+      label: "Pin",
+      key: "pinned",
+      action: "setTabsPinned",
+      field: "pinned",
+      on: "Pinned",
+      off: "Unpinned"
+    },
+    mute: {
+      label: "Mute",
+      key: "muted",
+      action: "setTabsMuted",
+      field: "muted",
+      on: "Muted",
+      off: "Unmuted"
+    }
+  };
+  function toggleFlag(kind) {
+    const flag = FLAGS[kind];
+    return runOnTargets(
+      flag.action,
+      (targets) => ({
+        ids: targets.map((tab) => tab.id),
+        [flag.field]: decideSetState(targets, flag.key)
+      }),
+      {
+        failed: `${flag.label} failed`,
+        done: (res, targets) => {
+          const next2 = decideSetState(targets, flag.key);
+          ui.toast(`${next2 ? flag.on : flag.off} ${res.updated}`);
+        }
+      }
+    );
+  }
+  function groupTargets() {
+    return runOnTargets(
+      "groupManagerTabs",
+      (targets) => ({ ids: targets.map((tab) => tab.id) }),
+      {
+        failed: "Group failed",
+        done: (res, targets) => ui.toast(`Grouped ${targets.length} tabs`)
+      }
+    );
+  }
+  async function addToFocusedGroup() {
+    const focused = focusedTab();
+    const targets = currentTargets();
+    if (!focused || targets.length === 0) return;
+    confirm = null;
+    if (focused.groupId === GROUPED_NONE) {
+      ui.toast("Focused tab has no group \u2014 g creates one");
+      renderAll();
+      return;
+    }
+    const outside = targets.filter((tab) => tab.groupId !== focused.groupId);
+    if (outside.length === 0) {
+      ui.toast("Already in this group");
+      renderAll();
+      return;
+    }
+    const res = await ask("groupManagerTabs", {
+      ids: outside.map((tab) => tab.id),
+      groupId: focused.groupId
+    });
+    if (!active2) return;
+    if (!res || !res.ok) {
+      ui.toast(failureMessage(res, { failed: "Move to group failed" }));
+      renderAll();
+      return;
+    }
+    ui.toast(`Moved ${outside.length} tabs to group`);
+    consumeMarks();
+    await refresh();
+  }
+  async function ungroupTargets() {
+    const grouped = currentTargets().filter(
+      (tab) => tab.groupId !== GROUPED_NONE
+    );
+    if (grouped.length === 0) {
+      ui.toast("No grouped tabs selected");
+      renderAll();
+      return;
+    }
+    await runOnTargets(
+      "ungroupManagerTabs",
+      () => ({ ids: grouped.map((tab) => tab.id) }),
+      {
+        failed: "Ungroup failed",
+        done: () => ui.toast(`Ungrouped ${grouped.length} tabs`)
+      }
+    );
+  }
+  function startRename() {
+    const focused = focusedTab();
+    if (!focused) return;
+    if (focused.groupId === GROUPED_NONE) {
+      ui.toast("Focused tab is not in a group");
+      renderAll();
+      return;
+    }
+    openField("group", (groupsById.get(focused.groupId) || {}).title || "", {
+      groupId: focused.groupId
+    });
+  }
+  function startEditUrl() {
+    const focused = focusedTab();
+    if (!focused) return;
+    openField("url", focused.url || "", { tabId: focused.id });
+  }
+  async function commitRename() {
+    if (!field || field.kind !== "group") return;
+    const { groupId } = field;
+    const title = fieldValue().trim();
+    closeField();
+    const res = await ask("renameGroup", { groupId, title });
+    if (!active2) return;
+    if (!res || !res.ok) {
+      ui.toast(failureMessage(res, { failed: "Rename failed" }));
+      renderAll();
+      return;
+    }
+    ui.toast("Renamed group");
+    await refresh();
+  }
+  async function commitEditUrl() {
+    if (!field || field.kind !== "url") return;
+    const { tabId } = field;
+    const value = fieldValue().trim();
+    closeField();
+    if (!value) return;
+    const res = await ask("editManagerTab", { id: tabId, url: value });
+    if (!active2) return;
+    if (!res || !res.ok) {
+      ui.toast("Not a valid URL");
+      renderAll();
+      return;
+    }
+    ui.toast("URL updated");
+    await refresh();
+  }
+  function duplicateTargets() {
+    return runOnTargets(
+      "duplicateManagerTabs",
+      (targets) => ({ ids: targets.map((tab) => tab.id) }),
+      {
+        failed: "Duplicate failed",
+        done: (res) => ui.toast(`Duplicated ${res.duplicated}`)
+      }
+    );
+  }
+  function bookmarkPayload(targets) {
+    return { tabs: targets.map((tab) => ({ url: tab.url, title: tab.title })) };
+  }
+  function saveBookmarks() {
+    return runOnTargets(
+      "bookmarkManagerTabs",
+      bookmarkPayload,
+      {
+        failed: "Bookmark failed",
+        done: (res) => ui.toast(
+          res.saved > 0 ? `Bookmarked ${res.saved}${res.skipped ? ` (${res.skipped} skipped)` : ""}` : "Already bookmarked"
+        )
+      }
+    );
+  }
+  function removeBookmarks() {
+    return runOnTargets(
+      "unbookmarkManagerTabs",
+      bookmarkPayload,
+      {
+        failed: "Unbookmark failed",
+        done: (res) => {
+          const plural = res.removed === 1 ? "" : "s";
+          ui.toast(`Removed ${res.removed} bookmark${plural}`);
+        }
+      }
+    );
+  }
+  function bookmarkTargets() {
+    return decideSetState(currentTargets(), "bookmarked") ? saveBookmarks() : removeBookmarks();
+  }
+  function openField(kind, text, meta = {}) {
+    if (field) return;
+    confirm = null;
+    const cfg = FIELDS[kind];
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "jari-prompt-input";
+    input.placeholder = cfg.placeholder;
+    input.value = text || "";
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("spellcheck", "false");
+    input.setAttribute("maxlength", String(cfg.maxLength));
+    input.addEventListener("keydown", (event) => event.stopPropagation());
+    input.addEventListener("input", () => {
+      if (!field || field.kind !== "filter") return;
+      query2 = fieldEl.value;
+      applyFilter();
+      renderAll();
+    });
+    fieldEl = input;
+    field = { kind, ...meta };
+    overlay2.insertBefore(input, footerEl);
+    renderAll();
+    fieldFocusBefore = document.activeElement;
+    input.focus();
+    try {
+      input.select();
+    } catch {
+    }
+  }
+  function closeField() {
+    if (!fieldEl) return;
+    try {
+      fieldEl.remove();
+    } catch {
+    }
+    fieldEl = null;
+    field = null;
+    renderAll();
+    if (fieldFocusBefore && fieldFocusBefore.isConnected && document.activeElement !== fieldFocusBefore) {
+      try {
+        fieldFocusBefore.focus();
+      } catch {
+      }
+    }
+    fieldFocusBefore = null;
+  }
+  function fieldValue() {
+    return fieldEl ? fieldEl.value : "";
+  }
+  async function submitOpen() {
+    const raw = fieldValue().trim();
+    closeField();
+    if (!raw) return;
+    const kw = parseEngineKeyword(raw, settings.getSearchEngines());
+    const url = kw ? kw.url : Url.looksLikeUrl(raw) ? normalizeUrl(raw) || raw : null;
+    if (url) {
+      await ask("openInBackgroundTab", { url });
+    } else {
+      await ask("search", {
+        query: Url.suggestionTerm(raw),
+        newTab: true,
+        incognito: false,
+        background: true
+      });
+    }
+    if (!active2) return;
+    renderAll();
+    await refresh();
+  }
+  function moveTargets(delta) {
+    return runOnTargets(
+      "moveManagerTabs",
+      (targets) => ({ ids: targets.map((tab) => tab.id), delta }),
+      { failed: "Move failed", done: null }
+    );
+  }
+  function consume2(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  function isModifier(event) {
+    return event.key === "Control" || event.key === "Alt" || event.key === "Shift" || event.key === "Meta";
+  }
+  function onFieldKey(event) {
+    if (event.isComposing || event.keyCode === 229) return false;
+    if (event.key === "Escape") {
+      consume2(event);
+      if (field.kind === "filter") {
+        query2 = "";
+        applyFilter();
+      }
+      closeField();
+      return true;
+    }
+    if (event.key === "Enter") {
+      consume2(event);
+      if (field.kind === "open") submitOpen();
+      else if (field.kind === "group") commitRename();
+      else if (field.kind === "url") commitEditUrl();
+      else closeField();
+      return true;
+    }
+    return false;
+  }
+  function onNormalKey(event) {
+    if (isModifier(event)) return false;
+    const hasMod = event.ctrlKey || event.altKey || event.metaKey;
+    if (hasMod) return false;
+    switch (event.key) {
+      case "Escape":
+        consume2(event);
+        if (confirm) {
+          confirm = null;
+          renderAll();
+        } else if (visualAnchor !== null) {
+          endVisual();
+          renderAll();
+        } else if (query2) {
+          query2 = "";
+          applyFilter();
+          renderAll();
+        } else if (marked.size > 0) {
+          marked = /* @__PURE__ */ new Set();
+          renderAll();
+        } else {
+          close2();
+        }
+        return true;
+      case "/":
+        consume2(event);
+        openField("filter", query2);
+        return true;
+      case "?":
+        consume2(event);
+        showHints = !showHints;
+        renderAll();
+        return true;
+      case "Enter":
+        consume2(event);
+        activateFocused();
+        return true;
+      case "Tab":
+        consume2(event);
+        move3(event.shiftKey ? -1 : 1);
+        return true;
+      case " ":
+        consume2(event);
+        toggleMark();
+        return true;
+      case "ArrowDown":
+      case "j":
+        consume2(event);
+        if (visualAnchor !== null) moveVisual(1);
+        else move3(1);
+        return true;
+      case "ArrowUp":
+      case "k":
+        consume2(event);
+        if (visualAnchor !== null) moveVisual(-1);
+        else move3(-1);
+        return true;
+      case "v":
+        consume2(event);
+        if (visualAnchor !== null) endVisual();
+        else startVisual();
+        renderAll();
+        return true;
+      case "ArrowLeft":
+        consume2(event);
+        moveTargets(-1);
+        return true;
+      case "ArrowRight":
+        consume2(event);
+        moveTargets(1);
+        return true;
+      case "J":
+        consume2(event);
+        moveTargets(1);
+        return true;
+      case "K":
+        consume2(event);
+        moveTargets(-1);
+        return true;
+      case "a":
+        consume2(event);
+        markAllVisible();
+        return true;
+      case "d":
+        consume2(event);
+        closeTargets();
+        return true;
+      case "y":
+        consume2(event);
+        duplicateTargets();
+        return true;
+      case "e":
+        consume2(event);
+        startEditUrl();
+        return true;
+      case "p":
+        consume2(event);
+        toggleFlag("pin");
+        return true;
+      case "m":
+        consume2(event);
+        toggleFlag("mute");
+        return true;
+      case "g":
+        consume2(event);
+        groupTargets();
+        return true;
+      case "G":
+        consume2(event);
+        addToFocusedGroup();
+        return true;
+      case "u":
+        consume2(event);
+        ungroupTargets();
+        return true;
+      case "r":
+        consume2(event);
+        startRename();
+        return true;
+      case "b":
+        consume2(event);
+        bookmarkTargets();
+        return true;
+      case "t":
+        consume2(event);
+        openField("open", "");
+        return true;
+      default:
+        return false;
+    }
+  }
+  function onKeyDown2(event) {
+    if (!active2) return false;
+    if (field) return onFieldKey(event);
+    return onNormalKey(event);
+  }
+  var TabManager = {
+    open,
+    close: close2,
+    onKeyDown: onKeyDown2,
+    isActive: isActive2
+  };
+  register("tab-manager", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
+
   // content/highlight.js
   function detectHighlightSupport() {
     try {
@@ -3646,13 +4732,13 @@
   function hasUpperCase(s) {
     return /\p{Lu}/u.test(s);
   }
-  function buildMatcher(query4, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
-    if (!query4) return null;
+  function buildMatcher(query5, { regex = false, wholeWord = false, caseSensitive = false } = {}) {
+    if (!query5) return null;
     const flags = (caseSensitive ? "g" : "gi") + "mu";
     const bounds = (src) => `(?<![\\p{L}\\p{N}_])${src}(?![\\p{L}\\p{N}_])`;
     try {
-      if (regex) return new RegExp(wholeWord ? bounds(query4) : query4, flags);
-      const src = query4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (regex) return new RegExp(wholeWord ? bounds(query5) : query5, flags);
+      const src = query5.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       return new RegExp(wholeWord ? bounds(src) : src, flags);
     } catch {
       return null;
@@ -3676,8 +4762,8 @@
     try {
       const root = parent.getRootNode && parent.getRootNode();
       if (root && root.host && root.host.classList) {
-        const host5 = root.host;
-        if (host5.classList.contains("jari-help-host") || host5.classList.contains("jari-find-host") || host5.classList.contains("jari-prompt-host") || host5.classList.contains("jari-hints-host") || host5.classList.contains("jari-visual-caret-host"))
+        const host6 = root.host;
+        if (host6.classList.contains("jari-help-host") || host6.classList.contains("jari-find-host") || host6.classList.contains("jari-prompt-host") || host6.classList.contains("jari-tab-manager-host") || host6.classList.contains("jari-hints-host") || host6.classList.contains("jari-visual-caret-host"))
           return true;
       }
     } catch {
@@ -3828,20 +4914,20 @@
     }
     return z;
   }
-  function placeHintsHost(host5) {
+  function placeHintsHost(host6) {
     try {
       const topLayer = document.querySelector("dialog[open]");
       if (topLayer) {
         const r = topLayer.getBoundingClientRect();
         const style = window.getComputedStyle(topLayer);
         if (r.width > 0 && r.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
-          topLayer.appendChild(host5);
+          topLayer.appendChild(host6);
           return;
         }
       }
     } catch {
     }
-    (document.documentElement || document.body).appendChild(host5);
+    (document.documentElement || document.body).appendChild(host6);
   }
   function coordinate(holderEl) {
     const probe = document.createElement("div");
@@ -3934,22 +5020,22 @@
   `;
   }
   function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFAULT) {
-    const host5 = document.createElement("div");
-    host5.className = "jari-hints-host";
-    host5.style.position = "fixed";
-    host5.style.left = "0";
-    host5.style.top = "0";
-    host5.style.width = "0";
-    host5.style.height = "0";
-    host5.style.overflow = "visible";
-    host5.style.pointerEvents = "none";
-    host5.style.zIndex = "2147483647";
+    const host6 = document.createElement("div");
+    host6.className = "jari-hints-host";
+    host6.style.position = "fixed";
+    host6.style.left = "0";
+    host6.style.top = "0";
+    host6.style.width = "0";
+    host6.style.height = "0";
+    host6.style.overflow = "visible";
+    host6.style.pointerEvents = "none";
+    host6.style.zIndex = "2147483647";
     try {
-      host5.attachShadow({ mode: "open" });
+      host6.attachShadow({ mode: "open" });
     } catch {
-      host5.shadowRoot = host5;
+      host6.shadowRoot = host6;
     }
-    const shadow = host5.shadowRoot;
+    const shadow = host6.shadowRoot;
     const style = document.createElement("style");
     style.textContent = hintCss(theme, fontSize);
     shadow.appendChild(style);
@@ -3958,8 +5044,8 @@
     holder2.style.display = "block";
     holder2.style.opacity = "1";
     shadow.appendChild(holder2);
-    placeHintsHost(host5);
-    return { host: host5, holder: holder2 };
+    placeHintsHost(host6);
+    return { host: host6, holder: holder2 };
   }
   function estimateLabelBox(label, fontSize) {
     const size = hintFontSize(fontSize);
@@ -4810,7 +5896,7 @@
   }
 
   // content/visual.js
-  var active2 = false;
+  var active3 = false;
   var mode2 = "visual";
   var pillEl = null;
   var pendingCount = "";
@@ -4842,8 +5928,8 @@
   var pendingVisualMode = "visual";
   var findOpenHandler = null;
   var findNavHandler = null;
-  function isActive2() {
-    return active2 || hintActive;
+  function isActive3() {
+    return active3 || hintActive;
   }
   function setFindOpen(handler) {
     findOpenHandler = handler;
@@ -4933,7 +6019,7 @@
     }
   }
   function updateBlockCaretImmediate() {
-    if (!active2 || !caretEl || !caretHost) return;
+    if (!active3 || !caretEl || !caretHost) return;
     const sel = getSelection2();
     if (!sel || sel.rangeCount === 0) return;
     try {
@@ -5082,8 +6168,8 @@
       }
       caretRaf = null;
     }
-    if (!active2 && !hintActive) disableSelectOverride();
-    if (!active2 && !hintActive) detachMouseListeners();
+    if (!active3 && !hintActive) disableSelectOverride();
+    if (!active3 && !hintActive) detachMouseListeners();
   }
   var selectOverrideEl = null;
   function enableSelectOverride() {
@@ -5131,14 +6217,14 @@
     return false;
   }
   function onMouseDown(event) {
-    if (!active2 && !hintActive) return;
+    if (!active3 && !hintActive) return;
     if (isJariUiEvent(event)) return;
     if (hintActive) closeHints();
-    if (!active2) return;
-    if (isEditable(mouseTarget(event))) close2(true);
+    if (!active3) return;
+    if (isEditable(mouseTarget(event))) close3(true);
   }
   function onSelectionChange() {
-    if (!active2 || hintActive) return;
+    if (!active3 || hintActive) return;
     const sel = getSelection2();
     if (!sel || sel.rangeCount === 0) return;
     if (sel.isCollapsed && (mode2 === "visual" || mode2 === "line")) {
@@ -5249,15 +6335,15 @@
       hintHost = null;
       hintHolder = null;
     }
-    if (!active2 && !hintActive) disableSelectOverride();
-    if (!active2 && !hintActive) detachMouseListeners();
-    if (!active2 && pillEl) {
+    if (!active3 && !hintActive) disableSelectOverride();
+    if (!active3 && !hintActive) detachMouseListeners();
+    if (!active3 && pillEl) {
       try {
         pillEl.remove();
       } catch {
       }
       pillEl = null;
-    } else if (active2 && pillEl) {
+    } else if (active3 && pillEl) {
       pillEl.textContent = pillText(mode2);
     }
   }
@@ -5270,7 +6356,7 @@
     return true;
   }
   function enterAtElement(el, newMode) {
-    if (active2) close2(false);
+    if (active3) close3(false);
     mode2 = newMode || "visual";
     let range;
     try {
@@ -5331,7 +6417,7 @@
         sel.addRange(r2);
       }
     }
-    active2 = true;
+    active3 = true;
     showPill();
     showBlockCaret();
     attachCaretListeners();
@@ -5874,7 +6960,7 @@
     }
   }
   function enterCaretAtFocus() {
-    if (!active2) return;
+    if (!active3) return;
     collapseToFocus();
     mode2 = "caret";
     if (pillEl) pillEl.textContent = pillText(mode2);
@@ -5889,15 +6975,15 @@
   }
   function enter(newMode) {
     if (hintActive) closeHints();
-    if (active2) close2(false);
+    if (active3) close3(false);
     touch("visual");
     pendingVisualMode = newMode || "visual";
     showVisualHints(pendingVisualMode);
   }
-  function close2(keepSelection = false) {
+  function close3(keepSelection = false) {
     if (hintActive) closeHints();
-    if (!active2) return;
-    active2 = false;
+    if (!active3) return;
+    active3 = false;
     hidePill();
     hideBlockCaret();
     detachCaretListeners();
@@ -5916,7 +7002,7 @@
       }
     }
   }
-  function onKeyDown2(event) {
+  function onKeyDown3(event) {
     if (hintActive) {
       const key2 = event.key;
       if (key2 === "Escape") {
@@ -5966,7 +7052,7 @@
       ui.consume(event);
       return true;
     }
-    if (!active2) return false;
+    if (!active3) return false;
     if (pendingF) {
       const ch = event.key;
       if (ch.length === 1) {
@@ -5987,11 +7073,11 @@
     if (key === "Escape") {
       ui.consume(event);
       if (isCaret()) {
-        close2(false);
+        close3(false);
       } else {
         enterCaretAtFocus();
-        if (!active2) {
-          close2(false);
+        if (!active3) {
+          close3(false);
         }
       }
       return true;
@@ -6102,7 +7188,7 @@
       }
       if (key === "/") {
         ui.consume(event);
-        close2(false);
+        close3(false);
         if (findOpenHandler) findOpenHandler();
         pendingCount = "";
         return true;
@@ -6148,7 +7234,7 @@
         if (!activateCaretLink()) {
           ui.toast("No link at caret");
         } else {
-          close2(false);
+          close3(false);
         }
         pendingCount = "";
         return true;
@@ -6233,7 +7319,7 @@
         } else if (mode2 === "line") {
           enterCaretAtFocus();
         } else {
-          close2(false);
+          close3(false);
           enter("visual");
         }
         break;
@@ -6242,7 +7328,7 @@
         if (mode2 === "line" || mode2 === "visual") {
           enterCaretAtFocus();
         } else {
-          close2(false);
+          close3(false);
           enter("line");
         }
         break;
@@ -6308,12 +7394,12 @@
   }
   var Visual = {
     enter,
-    close: close2,
-    isActive: isActive2,
+    close: close3,
+    isActive: isActive3,
     setFindOpen,
     setFindNav,
     enterCaretAtFocus,
-    onKeyDown: onKeyDown2,
+    onKeyDown: onKeyDown3,
     showBlockCaret,
     hideBlockCaret,
     updateBlockCaret
@@ -6321,14 +7407,14 @@
   register("visual", {
     close: () => {
       closeHints();
-      close2(false);
+      close3(false);
     },
-    onKeyDown: onKeyDown2,
-    isActive: isActive2
+    onKeyDown: onKeyDown3,
+    isActive: isActive3
   });
   function __resetVisualState() {
     closeHints();
-    close2(false);
+    close3(false);
     pendingCount = "";
     pendingG = false;
     pendingF = null;
@@ -6338,12 +7424,12 @@
 
   // content/find.js
   var MAX_MATCHES = 1500;
-  var active3 = false;
-  var host2 = null;
-  var overlay2 = null;
+  var active4 = false;
+  var host3 = null;
+  var overlay3 = null;
   var inputEl2 = null;
   var statusEl = null;
-  var restoreFocus2 = null;
+  var restoreFocus3 = null;
   var matches = [];
   var currentIdx = 0;
   var lastQuery = "";
@@ -6371,8 +7457,8 @@
   function hasHighlights() {
     return matches.length > 0 && !highlightsHidden;
   }
-  function isActive3() {
-    return active3;
+  function isActive4() {
+    return active4;
   }
   function matchesChanged(a, b) {
     if (a.length !== b.length) return true;
@@ -6385,7 +7471,7 @@
     clearTimeout(findObserverTimer);
     findObserverTimer = setTimeout(() => {
       try {
-        if (active3 && pendingQuery) {
+        if (active4 && pendingQuery) {
           const q = pendingQuery.trim();
           if (!q) return;
           const rebuilt = buildMatches(q);
@@ -6398,7 +7484,7 @@
           }
           return;
         }
-        if (!active3 && hasHighlights() && (lastQuery || "").trim()) {
+        if (!active4 && hasHighlights() && (lastQuery || "").trim()) {
           const rebuilt = buildMatches(lastQuery.trim());
           if (matchesChanged(rebuilt, matches)) {
             matches = rebuilt;
@@ -6430,16 +7516,16 @@
     }
   }
   function syncObserver() {
-    if (active3 || hasHighlights()) {
+    if (active4 || hasHighlights()) {
       if (!findObserver) startFindObserver();
     } else {
       stopFindObserver();
     }
   }
-  function buildMatches(query4) {
-    if (!query4) return [];
-    const caseSensitive = findCase || !findRegex && hasUpperCase(query4);
-    const matcher = buildMatcher(query4, {
+  function buildMatches(query5) {
+    if (!query5) return [];
+    const caseSensitive = findCase || !findRegex && hasUpperCase(query5);
+    const matcher = buildMatcher(query5, {
       regex: findRegex,
       wholeWord: findWholeWord,
       caseSensitive
@@ -6649,9 +7735,9 @@
   function executeQuery(q) {
     highlightsHidden = false;
     pendingQuery = q;
-    const query4 = (q || "").trim();
+    const query5 = (q || "").trim();
     clearTimeout(inputDebounce);
-    if (!query4) {
+    if (!query5) {
       matches = [];
       currentIdx = 0;
       clearHighlightApi();
@@ -6659,13 +7745,13 @@
       return;
     }
     inputDebounce = setTimeout(() => {
-      runQuery(query4);
+      runQuery(query5);
     }, 80);
   }
-  function runQuery(query4) {
+  function runQuery(query5) {
     highlightsHidden = false;
     try {
-      matches = buildMatches(query4);
+      matches = buildMatches(query5);
       currentIdx = 0;
       applyHighlights();
       if (matches.length > 0) scrollToCurrent();
@@ -6710,9 +7796,9 @@
     }
   }
   async function pushFindHistory(q) {
-    const query4 = (q || "").trim();
-    if (!query4) return;
-    findHistory = [query4, ...findHistory.filter((s) => s !== query4)].slice(
+    const query5 = (q || "").trim();
+    if (!query5) return;
+    findHistory = [query5, ...findHistory.filter((s) => s !== query5)].slice(
       0,
       MAX_FIND_HISTORY
     );
@@ -6865,10 +7951,10 @@
   }
   function renderBar() {
     const created = createShadowHost("jari-find-host", findCss());
-    host2 = created.host;
+    host3 = created.host;
     const shadow = created.shadow;
-    overlay2 = document.createElement("div");
-    overlay2.className = "jari-overlay jari-find";
+    overlay3 = document.createElement("div");
+    overlay3.className = "jari-overlay jari-find";
     const bar = document.createElement("div");
     bar.className = "jari-find-bar";
     const label = document.createElement("span");
@@ -6908,9 +7994,9 @@
       bar.appendChild(btn);
     }
     bar.appendChild(statusEl);
-    overlay2.appendChild(bar);
-    shadow.appendChild(overlay2);
-    restoreFocus2 = document.activeElement;
+    overlay3.appendChild(bar);
+    shadow.appendChild(overlay3);
+    restoreFocus3 = document.activeElement;
     historyIdx = -1;
     historyDraft = "";
     inputEl2.addEventListener("input", () => {
@@ -6927,35 +8013,35 @@
     inputEl2.focus();
     updateStatus();
   }
-  function open() {
-    if (active3) return;
+  function open2() {
+    if (active4) return;
     touch("find");
     useHighlights = detectHighlightSupport();
     committedQuery = lastQuery;
     committedIdx = currentIdx;
     committedHidden = highlightsHidden;
-    active3 = true;
+    active4 = true;
     startFindObserver();
     pendingQuery = "";
     loadFindHistory();
     renderBar();
   }
   function closeBar() {
-    if (!active3) return;
+    if (!active4) return;
     clearTimeout(inputDebounce);
     inputDebounce = null;
     const wasInput = inputEl2;
-    const wasHost = host2;
-    active3 = false;
+    const wasHost = host3;
+    active4 = false;
     pendingQuery = "";
-    if (host2) {
+    if (host3) {
       try {
-        host2.remove();
+        host3.remove();
       } catch {
       }
-      host2 = null;
+      host3 = null;
     }
-    overlay2 = null;
+    overlay3 = null;
     inputEl2 = null;
     statusEl = null;
     let focused;
@@ -6964,9 +8050,9 @@
     } catch {
       focused = document.activeElement;
     }
-    if (restoreFocus2 && restoreFocus2.isConnected && focused !== restoreFocus2) {
+    if (restoreFocus3 && restoreFocus3.isConnected && focused !== restoreFocus3) {
       try {
-        restoreFocus2.focus();
+        restoreFocus3.focus();
       } catch {
       }
     } else if (wasInput && (focused === wasInput || focused === wasHost)) {
@@ -6988,7 +8074,7 @@
         }
       }
     }
-    restoreFocus2 = null;
+    restoreFocus3 = null;
     syncObserver();
   }
   function closeAndClear() {
@@ -7039,20 +8125,20 @@
   function commitQuery(q) {
     clearTimeout(inputDebounce);
     inputDebounce = null;
-    const query4 = (q || "").trim();
-    if (!query4) {
+    const query5 = (q || "").trim();
+    if (!query5) {
       closeDiscardPending();
       return;
     }
     try {
-      matches = buildMatches(query4);
+      matches = buildMatches(query5);
       currentIdx = 0;
     } catch {
       matches = [];
       currentIdx = 0;
     }
-    lastQuery = query4;
-    committedQuery = query4;
+    lastQuery = query5;
+    committedQuery = query5;
     committedIdx = 0;
     committedHidden = false;
     committedRegex = findRegex;
@@ -7061,7 +8147,7 @@
     pendingQuery = "";
     highlightsHidden = false;
     useHighlights = detectHighlightSupport();
-    pushFindHistory(query4);
+    pushFindHistory(query5);
     closeBar();
     applyHighlights();
     if (matches.length > 0) scrollToCurrent();
@@ -7161,7 +8247,7 @@
     else findCase = true;
   }
   function toggleOrOpen(name) {
-    if (isActive3()) {
+    if (isActive4()) {
       toggleFindFlag(name);
       try {
         if (inputEl2) inputEl2.focus();
@@ -7169,14 +8255,14 @@
       }
       return;
     }
-    open();
+    open2();
     if (!inputEl2) return;
     enableFindFlag(name);
     refreshToggles();
     updateStatus();
   }
-  function onKeyDown3(event) {
-    if (!active3) return false;
+  function onKeyDown4(event) {
+    if (!active4) return false;
     const combo = canonicalKey(event);
     const toggleCmd = findToggleCommandFor(settings.getKeymap(), combo);
     let focused;
@@ -7250,21 +8336,21 @@
     return true;
   }
   var Find = {
-    open,
+    open: open2,
     close: closeBar,
     clearHighlights,
     hideHighlights,
     next,
     toggleOrOpen,
-    isActive: isActive3,
+    isActive: isActive4,
     hasHighlights,
     handleGlobalEsc,
     handleGlobalEnter,
-    onKeyDown: onKeyDown3
+    onKeyDown: onKeyDown4
   };
-  register("find", { close: closeAndClear, onKeyDown: onKeyDown3, isActive: isActive3 });
+  register("find", { close: closeAndClear, onKeyDown: onKeyDown4, isActive: isActive4 });
   try {
-    Visual.setFindOpen(() => open());
+    Visual.setFindOpen(() => open2());
     if (typeof Visual.setFindNav === "function") Visual.setFindNav((count, reverse) => next(count, reverse));
   } catch {
   }
@@ -7295,32 +8381,32 @@
   // content/help.js
   var STEP = 50;
   var COLUMNS = 3;
-  var active4 = false;
-  var host3 = null;
-  var overlay3 = null;
-  var listEl2 = null;
+  var active5 = false;
+  var host4 = null;
+  var overlay4 = null;
+  var listEl3 = null;
   var footerBar = null;
   var entries = [];
   var searching = false;
-  var query2 = "";
+  var query3 = "";
   var matches2 = [];
   var currentIdx2 = 0;
   var gPending = false;
   var FOOTER_DEFAULT = "j/k scroll | / search | esc close";
-  function isActive4() {
-    return active4;
+  function isActive5() {
+    return active5;
   }
-  function open2() {
-    if (active4) return;
-    active4 = true;
+  function open3() {
+    if (active5) return;
+    active5 = true;
     touch("help");
     try {
       if (Find.hasHighlights()) Find.hideHighlights();
     } catch {
     }
     render2();
-    overlay3.tabIndex = -1;
-    overlay3.focus();
+    overlay4.tabIndex = -1;
+    overlay4.focus();
   }
   function helpCss() {
     return `
@@ -7443,17 +8529,17 @@
   }
   function render2() {
     const created = createShadowHost("jari-help-host", helpCss());
-    host3 = created.host;
+    host4 = created.host;
     const shadow = created.shadow;
-    overlay3 = document.createElement("div");
-    overlay3.className = "jari-overlay jari-help";
+    overlay4 = document.createElement("div");
+    overlay4.className = "jari-overlay jari-help";
     const title = document.createElement("div");
     title.className = "jari-help-title";
     title.textContent = "Jari keybindings";
-    overlay3.appendChild(title);
+    overlay4.appendChild(title);
     entries = [];
     searching = false;
-    query2 = "";
+    query3 = "";
     matches2 = [];
     currentIdx2 = 0;
     const byCommand = /* @__PURE__ */ new Map();
@@ -7468,9 +8554,9 @@
       if (!byCategory.has(id)) byCategory.set(id, []);
       byCategory.get(id).push({ keys, label: meta.label, commandName });
     }
-    listEl2 = document.createElement("div");
-    listEl2.className = "jari-help-list";
-    listEl2.appendChild(
+    listEl3 = document.createElement("div");
+    listEl3.className = "jari-help-list";
+    listEl3.appendChild(
       ui.buildCategorizedGrid(byCategory, {
         columnCount: COLUMNS,
         gridClass: "jari-help-columns",
@@ -7503,19 +8589,19 @@
         }
       })
     );
-    overlay3.appendChild(listEl2);
+    overlay4.appendChild(listEl3);
     const footer = document.createElement("div");
     footer.className = "jari-help-footer";
     footerBar = document.createElement("span");
     footerBar.textContent = FOOTER_DEFAULT;
     footer.appendChild(footerBar);
-    overlay3.appendChild(footer);
-    shadow.appendChild(overlay3);
+    overlay4.appendChild(footer);
+    shadow.appendChild(overlay4);
   }
   function updateFooter() {
     if (!footerBar) return;
     if (searching) {
-      footerBar.textContent = matches2.length === 0 ? `/${query2} \u2014 No match` : `/${query2} ${currentIdx2 + 1}/${matches2.length} (Enter done)`;
+      footerBar.textContent = matches2.length === 0 ? `/${query3} \u2014 No match` : `/${query3} ${currentIdx2 + 1}/${matches2.length} (Enter done)`;
     } else if (matches2.length > 0) {
       footerBar.textContent = `${currentIdx2 + 1}/${matches2.length} (n/N jump) | / search | esc close`;
     } else {
@@ -7592,7 +8678,7 @@
   }
   function applySearch() {
     clearSearchHighlights();
-    const q = query2.toLowerCase();
+    const q = query3.toLowerCase();
     if (q) {
       for (const entry of entries) {
         for (const td of [entry.keyTd, entry.labelTd]) {
@@ -7618,7 +8704,7 @@
     updateFooter();
     scrollMatchIntoView();
   }
-  function onKeyDown4(event) {
+  function onKeyDown5(event) {
     const key = event.key;
     if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
       return false;
@@ -7628,7 +8714,7 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         searching = false;
-        query2 = "";
+        query3 = "";
         clearSearchHighlights();
         updateFooter();
         return;
@@ -7644,16 +8730,16 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         if (event.ctrlKey || event.metaKey) {
-          const trimmed = query2.trimEnd();
+          const trimmed = query3.trimEnd();
           if (!trimmed) {
-            query2 = "";
+            query3 = "";
           } else {
             const words = trimmed.split(/\s+/);
             words.pop();
-            query2 = words.join(" ");
+            query3 = words.join(" ");
           }
         } else {
-          query2 = query2.slice(0, -1);
+          query3 = query3.slice(0, -1);
         }
         applySearch();
         return;
@@ -7662,7 +8748,7 @@
         if (event.ctrlKey) return false;
         event.preventDefault();
         event.stopImmediatePropagation();
-        query2 += key;
+        query3 += key;
         applySearch();
         return;
       }
@@ -7684,13 +8770,13 @@
           updateFooter();
           return;
         }
-        close3();
+        close4();
         return;
       }
       if (key === "/" && !hasMod) {
         gPending = false;
         searching = true;
-        query2 = "";
+        query3 = "";
         clearSearchHighlights();
         updateFooter();
         return;
@@ -7707,60 +8793,60 @@
     }
     if (gPending) {
       gPending = false;
-      if (event.key === "g") listEl2.scrollTo(0, 0);
+      if (event.key === "g") listEl3.scrollTo(0, 0);
       return;
     }
     if (event.ctrlKey) {
-      if (event.key === "d") listEl2.scrollBy(0, listEl2.clientHeight * 0.5);
-      else if (event.key === "u") listEl2.scrollBy(0, -listEl2.clientHeight * 0.5);
-      else if (event.key === "f") listEl2.scrollBy(0, listEl2.clientHeight * 0.9);
-      else if (event.key === "b") listEl2.scrollBy(0, -listEl2.clientHeight * 0.9);
+      if (event.key === "d") listEl3.scrollBy(0, listEl3.clientHeight * 0.5);
+      else if (event.key === "u") listEl3.scrollBy(0, -listEl3.clientHeight * 0.5);
+      else if (event.key === "f") listEl3.scrollBy(0, listEl3.clientHeight * 0.9);
+      else if (event.key === "b") listEl3.scrollBy(0, -listEl3.clientHeight * 0.9);
       return;
     }
     switch (event.key) {
       case "G":
-        listEl2.scrollTo(0, listEl2.scrollHeight);
+        listEl3.scrollTo(0, listEl3.scrollHeight);
         break;
       case "j":
       case "ArrowDown":
-        listEl2.scrollBy(0, STEP);
+        listEl3.scrollBy(0, STEP);
         break;
       case "k":
       case "ArrowUp":
-        listEl2.scrollBy(0, -STEP);
+        listEl3.scrollBy(0, -STEP);
         break;
     }
   }
-  function close3() {
+  function close4() {
     try {
       clearSearchHighlights();
     } catch {
     }
-    if (host3) {
+    if (host4) {
       try {
-        host3.remove();
+        host4.remove();
       } catch {
       }
-      host3 = null;
+      host4 = null;
     }
-    overlay3 = null;
-    listEl2 = null;
+    overlay4 = null;
+    listEl3 = null;
     footerBar = null;
     entries = [];
     searching = false;
-    query2 = "";
+    query3 = "";
     matches2 = [];
     currentIdx2 = 0;
     gPending = false;
-    active4 = false;
+    active5 = false;
   }
-  var Help = { open: open2, close: close3, onKeyDown: onKeyDown4, isActive: isActive4 };
-  register("help", { close: close3, onKeyDown: onKeyDown4, isActive: isActive4 });
+  var Help = { open: open3, close: close4, onKeyDown: onKeyDown5, isActive: isActive5 };
+  register("help", { close: close4, onKeyDown: onKeyDown5, isActive: isActive5 });
 
   // content/hints.js
   var MAX_HINTS = 800;
   var REGENERATE_DELAY = 150;
-  var active5 = false;
+  var active6 = false;
   var hintsHost = null;
   var holder = null;
   var elements = [];
@@ -7826,11 +8912,11 @@
     if (regenerateTimer) return;
     regenerateTimer = setTimeout(() => {
       regenerateTimer = null;
-      if (!active5) return;
+      if (!active6) return;
       const savedPrefix = prefix;
       const fresh = collectElements(mode3);
       if (fresh.length === 0) {
-        close4();
+        close5();
         ui.toast("No hints");
         return;
       }
@@ -7845,11 +8931,11 @@
       if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
         prefix = "";
       }
-      refresh();
+      refresh2();
     }, REGENERATE_DELAY);
   }
-  function isActive5() {
-    return active5;
+  function isActive6() {
+    return active6;
   }
   function focusFrame(el) {
     ui.focusFrameElement(el);
@@ -7888,8 +8974,8 @@
       }
     }
   }
-  function refresh() {
-    if (!active5) return;
+  function refresh2() {
+    if (!active6) return;
     for (const h of hints) {
       if (!prefix) {
         h.hintEl.style.opacity = "1";
@@ -7977,7 +9063,7 @@
       label: link.label,
       hintEl: link
     }));
-    refresh();
+    refresh2();
   }
   function flashElement(el) {
     try {
@@ -8004,7 +9090,7 @@
   function disableScrollLock() {
     if (scrollLockPrevent) return;
     scrollLockPrevent = (e) => {
-      if (!active5) return;
+      if (!active6) return;
       const t = e.target;
       if (t?.closest?.(".jari-hint")) return;
       e.preventDefault();
@@ -8085,21 +9171,21 @@
     } catch {
     }
     keyUpHandler = (e) => {
-      if (active5) onKeyUp(e);
+      if (active6) onKeyUp(e);
     };
     try {
       window.addEventListener("keyup", keyUpHandler, true);
     } catch {
     }
     resizeHandler = () => {
-      if (!active5) return;
+      if (!active6) return;
       scheduleRegenerate();
     };
     window.addEventListener("resize", resizeHandler);
   }
-  function close4() {
-    if (!active5) return;
-    active5 = false;
+  function close5() {
+    if (!active6) return;
+    active6 = false;
     prefix = "";
     spaceHeld = false;
     for (const el of elements) {
@@ -8130,8 +9216,8 @@
     "yank",
     "yankText"
   ]);
-  function open3(requestedMode) {
-    if (active5) close4();
+  function open4(requestedMode) {
+    if (active6) close5();
     mode3 = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
     multipleHits = mode3 === "openBackground";
     let candidates = collectElements(mode3);
@@ -8150,16 +9236,16 @@
     }
     elements = candidates;
     prefix = "";
-    active5 = true;
+    active6 = true;
     touch("hints");
     render3();
     startTracking();
   }
   function handleActivationEnd() {
-    if (!multipleHits) close4();
+    if (!multipleHits) close5();
     else {
       prefix = "";
-      refresh();
+      refresh2();
     }
   }
   function activate2(el) {
@@ -8184,17 +9270,17 @@
       const url = getHref(el);
       if (url) {
         sendMessage("navigate", { url });
-        close4();
+        close5();
       } else if (isFrameElement(el)) {
         focusFrame(el);
-        close4();
+        close5();
       } else {
         ui.dispatchClick(el);
-        close4();
+        close5();
       }
     } else if (mode3 === "input") {
       focusInput(el);
-      close4();
+      close5();
     } else if (mode3 === "yank") {
       const url = getHref(el);
       if (url) {
@@ -8204,7 +9290,7 @@
       } else {
         ui.toast("No link");
       }
-      close4();
+      close5();
     } else if (mode3 === "yankText") {
       const text = (el.innerText || el.textContent || "").trim();
       if (text) {
@@ -8214,19 +9300,19 @@
       } else {
         ui.toast("No text");
       }
-      close4();
+      close5();
     }
   }
-  function onKeyDown5(event) {
-    if (!active5) return false;
+  function onKeyDown6(event) {
+    if (!active6) return false;
     const key = event.key;
     if (key === "Escape") {
       ui.consume(event);
       if (prefix) {
         prefix = "";
-        refresh();
+        refresh2();
       } else {
-        close4();
+        close5();
       }
       return true;
     }
@@ -8245,9 +9331,9 @@
       ui.consume(event);
       if (prefix) {
         prefix = prefix.slice(0, -1);
-        refresh();
+        refresh2();
       } else {
-        close4();
+        close5();
       }
       return true;
     }
@@ -8264,7 +9350,7 @@
         const next2 = prefix + lower.toUpperCase();
         const exact = hints.find((h) => h.label === next2);
         prefix = next2;
-        refresh();
+        refresh2();
         if (exact) activate2(exact.el);
         return true;
       }
@@ -8273,7 +9359,7 @@
     return true;
   }
   function onKeyUp(event) {
-    if (!active5) return false;
+    if (!active6) return false;
     if (event.key === " " || event.code === "Space") {
       ui.consume(event);
       spaceHeld = false;
@@ -8282,8 +9368,8 @@
     }
     return false;
   }
-  var Hints = { open: open3, close: close4, isActive: isActive5, onKeyDown: onKeyDown5, genLabels };
-  register("hints", { close: close4, onKeyDown: onKeyDown5, isActive: isActive5 });
+  var Hints = { open: open4, close: close5, isActive: isActive6, onKeyDown: onKeyDown6, genLabels };
+  register("hints", { close: close5, onKeyDown: onKeyDown6, isActive: isActive6 });
 
   // content/page-nav.js
   function normText(value) {
@@ -8336,19 +9422,19 @@
   }
 
   // content/palette.js
-  var active6 = false;
-  var host4 = null;
-  var overlay4 = null;
+  var active7 = false;
+  var host5 = null;
+  var overlay5 = null;
   var inputEl3 = null;
-  var listEl3 = null;
+  var listEl4 = null;
   var source = [];
-  var filtered2 = [];
-  var selected2 = 0;
-  var query3 = "";
-  var restoreFocus3 = null;
+  var filtered3 = [];
+  var selected3 = 0;
+  var query4 = "";
+  var restoreFocus4 = null;
   var commandTable = null;
-  function isActive6() {
-    return active6;
+  function isActive7() {
+    return active7;
   }
   function buildCommandSource(keymap) {
     const out = [];
@@ -8369,54 +9455,54 @@
     const ranked = rankMatches(trimmed, items, fuzzy);
     return fuzzy ? ranked.map((x) => x.item) : ranked;
   }
-  function open4(table) {
-    if (active6) return;
+  function open5(table) {
+    if (active7) return;
     commandTable = table || null;
     source = buildCommandSource(settings.getKeymap());
-    filtered2 = source;
-    selected2 = 0;
-    query3 = "";
-    active6 = true;
+    filtered3 = source;
+    selected3 = 0;
+    query4 = "";
+    active7 = true;
     touch("palette");
     const created = createShadowHost("jari-palette-host", promptCss());
-    host4 = created.host;
+    host5 = created.host;
     const shadow = created.shadow;
-    overlay4 = document.createElement("div");
-    overlay4.className = "jari-overlay jari-prompt";
+    overlay5 = document.createElement("div");
+    overlay5.className = "jari-overlay jari-prompt";
     inputEl3 = document.createElement("input");
     inputEl3.type = "text";
     inputEl3.placeholder = "Run command...";
     inputEl3.setAttribute("autocomplete", "off");
     inputEl3.setAttribute("spellcheck", "false");
     inputEl3.addEventListener("input", () => {
-      query3 = inputEl3.value.trim();
-      filtered2 = filterCommands(source, query3, settings.isFuzzyMatching());
-      selected2 = 0;
-      renderList3();
+      query4 = inputEl3.value.trim();
+      filtered3 = filterCommands(source, query4, settings.isFuzzyMatching());
+      selected3 = 0;
+      renderList4();
     });
     inputEl3.addEventListener("keydown", (event) => event.stopPropagation());
-    listEl3 = document.createElement("ul");
-    listEl3.className = "jari-prompt-list";
+    listEl4 = document.createElement("ul");
+    listEl4.className = "jari-prompt-list";
     const header = document.createElement("div");
     header.className = "jari-prompt-header";
     header.textContent = "Command";
-    overlay4.appendChild(listEl3);
-    overlay4.appendChild(header);
-    overlay4.appendChild(inputEl3);
-    shadow.appendChild(overlay4);
-    renderList3();
-    restoreFocus3 = document.activeElement;
+    overlay5.appendChild(listEl4);
+    overlay5.appendChild(header);
+    overlay5.appendChild(inputEl3);
+    shadow.appendChild(overlay5);
+    renderList4();
+    restoreFocus4 = document.activeElement;
     inputEl3.focus();
   }
-  function renderRow(item) {
+  function renderRow2(item) {
     const li = document.createElement("li");
     const title = document.createElement("span");
     title.className = "title";
-    if (query3) {
+    if (query4) {
       renderText(
         title,
         item.title,
-        settings.isFuzzyMatching() ? fuzzyIndices(query3, item.title) : substringIndices(query3, item.title)
+        settings.isFuzzyMatching() ? fuzzyIndices(query4, item.title) : substringIndices(query4, item.title)
       );
     } else {
       title.textContent = item.title;
@@ -8428,34 +9514,34 @@
     li.appendChild(detail);
     return li;
   }
-  function renderList3() {
-    const rows = filtered2.slice(0, settings.getMaxResults());
-    listEl3.textContent = "";
-    for (const row of rows) listEl3.appendChild(renderRow(row));
+  function renderList4() {
+    const rows = filtered3.slice(0, settings.getMaxResults());
+    listEl4.textContent = "";
+    for (const row of rows) listEl4.appendChild(renderRow2(row));
     highlight2();
   }
   function highlight2() {
-    Array.from(listEl3.children).forEach(
-      (li, i) => li.classList.toggle("selected", i === selected2)
+    Array.from(listEl4.children).forEach(
+      (li, i) => li.classList.toggle("selected", i === selected3)
     );
-    const el = listEl3.children[selected2];
+    const el = listEl4.children[selected3];
     if (el) el.scrollIntoView({ block: "nearest" });
   }
-  function move3(delta) {
-    if (filtered2.length === 0) return;
-    selected2 = (selected2 + delta + filtered2.length) % filtered2.length;
+  function move4(delta) {
+    if (filtered3.length === 0) return;
+    selected3 = (selected3 + delta + filtered3.length) % filtered3.length;
     highlight2();
   }
   function activate3() {
-    const item = filtered2[selected2];
+    const item = filtered3[selected3];
     const table = commandTable;
-    close5();
+    close6();
     if (!item || !table) return;
     const cmd2 = table[item.name];
     if (!cmd2 || typeof cmd2.run !== "function") return;
     cmd2.run({ count: 1 });
   }
-  function onKeyDown6(event) {
+  function onKeyDown7(event) {
     let focused;
     try {
       focused = deepActiveElement();
@@ -8466,7 +9552,7 @@
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        close5();
+        close6();
       } else if (event.key === "Enter") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -8474,57 +9560,57 @@
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move3(1);
+        move4(1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move3(-1);
+        move4(-1);
       } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        move3(event.shiftKey ? -1 : 1);
+        move4(event.shiftKey ? -1 : 1);
       }
       return;
     }
     if (event.key === "Escape" || event.key === "Enter") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      close5();
+      close6();
     } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      move3(event.shiftKey ? -1 : 1);
+      move4(event.shiftKey ? -1 : 1);
     }
   }
-  function close5() {
-    if (host4) {
+  function close6() {
+    if (host5) {
       try {
-        host4.remove();
+        host5.remove();
       } catch {
       }
-      host4 = null;
+      host5 = null;
     }
-    overlay4 = null;
+    overlay5 = null;
     inputEl3 = null;
-    listEl3 = null;
+    listEl4 = null;
     source = [];
-    filtered2 = [];
-    selected2 = 0;
-    query3 = "";
+    filtered3 = [];
+    selected3 = 0;
+    query4 = "";
     commandTable = null;
-    active6 = false;
-    if (restoreFocus3 && restoreFocus3.isConnected && document.activeElement !== restoreFocus3) {
-      restoreFocus3.focus();
+    active7 = false;
+    if (restoreFocus4 && restoreFocus4.isConnected && document.activeElement !== restoreFocus4) {
+      restoreFocus4.focus();
     }
-    restoreFocus3 = null;
+    restoreFocus4 = null;
   }
   var Palette = {
-    open: open4,
-    close: close5,
-    onKeyDown: onKeyDown6,
-    isActive: isActive6
+    open: open5,
+    close: close6,
+    onKeyDown: onKeyDown7,
+    isActive: isActive7
   };
-  register("palette", { close: close5, onKeyDown: onKeyDown6, isActive: isActive6 });
+  register("palette", { close: close6, onKeyDown: onKeyDown7, isActive: isActive7 });
 
   // content/screenshot.js
   var UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
@@ -8544,15 +9630,15 @@
   function isScreenshotDataUrl(value) {
     return typeof value === "string" && value.startsWith(PNG_DATA_URL_PREFIX);
   }
-  function sanitizeHostForFilename(host5) {
-    const s = String(host5 || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  function sanitizeHostForFilename(host6) {
+    const s = String(host6 || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     return s.slice(0, 40);
   }
-  function screenshotFilename(date = /* @__PURE__ */ new Date(), host5 = "") {
+  function screenshotFilename(date = /* @__PURE__ */ new Date(), host6 = "") {
     const d = date instanceof Date && Number.isFinite(date.getTime()) ? date : /* @__PURE__ */ new Date();
     const pad = (n) => String(n).padStart(2, "0");
     const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-    const h = sanitizeHostForFilename(host5);
+    const h = sanitizeHostForFilename(host6);
     return h ? `jari-${h}-${stamp}.png` : `jari-${stamp}.png`;
   }
   function pageHost() {
@@ -8844,7 +9930,7 @@
   var STEP2 = 16;
   var SHIFT_STEP = 1;
   var PENDING_G_MS = 1500;
-  var active7 = false;
+  var active8 = false;
   var cursor = { x: 0, y: 0 };
   var start = null;
   var pendingCount2 = "";
@@ -8855,8 +9941,8 @@
   var rectEl = null;
   var pillEl2 = null;
   var finishing = false;
-  function isActive7() {
-    return active7;
+  function isActive8() {
+    return active8;
   }
   function viewport() {
     return {
@@ -9010,9 +10096,9 @@
     paintMark();
     paintRect();
   }
-  function open5() {
-    if (active7) return;
-    active7 = true;
+  function open6() {
+    if (active8) return;
+    active8 = true;
     touch("shot");
     const { w, h } = viewport();
     cursor = { x: Math.floor(w / 2), y: Math.floor(h / 2) };
@@ -9024,9 +10110,9 @@
     showPill2("shot: mark start");
     paint();
   }
-  function close6() {
-    if (!active7) return;
-    active7 = false;
+  function close7() {
+    if (!active8) return;
+    active8 = false;
     start = null;
     pendingCount2 = "";
     pendingG2 = false;
@@ -9039,7 +10125,7 @@
     cursor.x = Math.max(0, Math.min(Math.max(0, w - 1), cursor.x));
     cursor.y = Math.max(0, Math.min(Math.max(0, h - 1), cursor.y));
   }
-  function move4(dx, dy, step) {
+  function move5(dx, dy, step) {
     const n = pendingCount2 ? parseInt(pendingCount2, 10) || 1 : 1;
     pendingCount2 = "";
     cursor.x += dx * step * n;
@@ -9062,7 +10148,7 @@
     try {
       const { w, h } = viewport();
       const rect = normalizeRect(start, cursor, w, h);
-      close6();
+      close7();
       if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width < 2 || rect.height < 2) {
         ui.toast("Empty region");
         return;
@@ -9094,12 +10180,12 @@
     } catch {
     }
   }
-  function onKeyDown7(event) {
-    if (!active7) return false;
+  function onKeyDown8(event) {
+    if (!active8) return false;
     const key = event.key;
     if (key === "Escape") {
       ui.consume(event);
-      close6();
+      close7();
       return true;
     }
     if (key === "g" && !event.ctrlKey && !event.altKey && !event.metaKey) {
@@ -9177,19 +10263,19 @@
       ui.consume(event);
       const [dx, dy] = dirs[key];
       const step = big || key.startsWith("Arrow") && event.shiftKey ? SHIFT_STEP : STEP2;
-      move4(dx, dy, step);
+      move5(dx, dy, step);
       return true;
     }
     ui.consume(event);
     return true;
   }
   var Shot = {
-    open: open5,
-    close: close6,
-    onKeyDown: onKeyDown7,
-    isActive: isActive7
+    open: open6,
+    close: close7,
+    onKeyDown: onKeyDown8,
+    isActive: isActive8
   };
-  register("shot", { close: close6, onKeyDown: onKeyDown7, isActive: isActive7 });
+  register("shot", { close: close7, onKeyDown: onKeyDown8, isActive: isActive8 });
 
   // content/scrollshot.js
   var SETTLE_MS = 120;
@@ -9743,6 +10829,7 @@ ${location.href}`;
     },
     moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
     moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
+    openTabManager: { ...COMMAND_CATALOG.openTabManager, run: () => TabManager.open() },
     duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
     togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
     toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },
@@ -9812,7 +10899,7 @@ ${location.href}`;
   var activePrefix = null;
   var renderPrefix = null;
   var renderCount = "";
-  var listEl4 = null;
+  var listEl5 = null;
   var titleEl = null;
   function commandLabel(commandName) {
     return COMMAND_CATALOG[commandName]?.label || commandName;
@@ -9831,7 +10918,7 @@ ${location.href}`;
     activePrefix = null;
     renderPrefix = null;
     renderCount = "";
-    listEl4 = null;
+    listEl5 = null;
     titleEl = null;
     if (clueEl) {
       try {
@@ -9846,10 +10933,10 @@ ${location.href}`;
     return suffix.length > 1 ? `${suffix[0]} \u25B8 ${suffix.slice(1)}` : suffix;
   }
   function paint2() {
-    if (!clueEl || !listEl4 || !titleEl) return;
+    if (!clueEl || !listEl5 || !titleEl) return;
     const rows = getPrefixEntries(settings.getKeymap(), renderPrefix);
     titleEl.textContent = `${renderCount || ""}${displayCombo(renderPrefix)} \u2014 ${rows.length} bindings`;
-    listEl4.textContent = "";
+    listEl5.textContent = "";
     for (const { suffix, command } of rows) {
       const row = document.createElement("div");
       row.className = "jari-clue-row";
@@ -9861,7 +10948,7 @@ ${location.href}`;
       label.textContent = commandLabel(command);
       row.appendChild(key);
       row.appendChild(label);
-      listEl4.appendChild(row);
+      listEl5.appendChild(row);
     }
   }
   function render4(prefix2, countStr) {
@@ -9882,7 +10969,7 @@ ${location.href}`;
       (document.body || document.documentElement).appendChild(root);
       clueEl = root;
       titleEl = title;
-      listEl4 = list;
+      listEl5 = list;
       activePrefix = prefix2;
       renderPrefix = prefix2;
       renderCount = countStr || "";
@@ -9906,7 +10993,7 @@ ${location.href}`;
       render4(prefix2, countStr);
     }, delay);
   }
-  function refresh2(prefix2, countStr = "") {
+  function refresh3(prefix2, countStr = "") {
     if (!settings.isClueEnabled()) return;
     if (!isVisible()) {
       schedule(prefix2, countStr);
@@ -9921,7 +11008,7 @@ ${location.href}`;
   }
   var Clue = {
     schedule,
-    refresh: refresh2,
+    refresh: refresh3,
     hide,
     isVisible,
     getActivePrefix
@@ -10055,10 +11142,10 @@ ${location.href}`;
       clearPending();
       return;
     }
-    const overlay5 = Overlays.active();
-    if (overlay5) {
+    const overlay6 = Overlays.active();
+    if (overlay6) {
       Clue.hide();
-      const handled = overlay5.onKeyDown(event);
+      const handled = overlay6.onKeyDown(event);
       if (isJariUiTarget(event)) event.stopPropagation();
       return handled;
     }

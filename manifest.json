@@ -25,7 +25,8 @@
     "sessions",
     "clipboardRead",
     "history",
-    "bookmarks"
+    "bookmarks",
+    "tabGroups"
   ],
   "options_ui": {
     "page": "options/options.html",

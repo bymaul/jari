@@ -6,6 +6,39 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
+### Added
+
+- Tab manager (`gt`): keyboard-driven floating panel listing every tab
+  across windows with `[pin]`/`[muted]`/`[playing]`/`[bookmarked]` state tags
+  and muted group colors. `Space` multi-marks,
+  `Enter` switches, `d` closes (two-press confirm for more than one),
+  `p`/`m` pin/mute, `e` edits the focused tab's URL, `y` duplicates
+  marked tabs, `g` groups, `G` adds to the focused tab's group,
+  `u` ungroups, `r` renames the group, `b` toggles bookmarks for the
+  marked tabs, `t` opens a new tab, `J`/`K` reorder, `/` filters. The `t`, `r`,
+  and `e` modes all share one in-panel text field. Bookmark matching
+  ignores trailing slashes and hashes. Grouping needs the
+  `tabGroups` permission (Chrome build only); elsewhere it reports
+  honestly instead of failing silently. The list re-fetches every 2s while
+  open (and on tab focus), so tabs opened, closed, pinned, muted, or
+  grouped elsewhere show up live. Inside the manager, `t` reveals an in-panel URL/search field:
+  Enter opens the URL, engine keyword, or search in a **background**
+  tab so the current page keeps focus, the manager stays open, and the
+  new tab shows up in the list (the search handler takes a `background`
+  flag so URLs and searches behave the same). The `t`, `r`, `e`, and
+  `/` modes share one in-panel `<input>` styled like the omnibar, which
+  restores page focus when it closes. Duplicating keeps the current tab
+  active. `b` toggles: it bookmarks the targets that are missing and
+  removes them once every target is already saved. Closing a tab keeps
+  the cursor where the tab used to be. The footer keeps a
+  one-line hint by default; `?` toggles the full two-line reference.
+  Marking: `Space` toggles the row under the cursor, `v` anchors a
+  range that paints and shrinks as you move, `a` marks all visible.
+  Bulk actions consume the marks they acted on, and `Esc` unwinds one
+  layer at a time: confirm, visual anchor, filter, marks, then close.
+  Stored keymaps migrate forward
+  (schema v10): `gt` fills where free.
+
 ### Changed
 
 - Release assets use standardized names

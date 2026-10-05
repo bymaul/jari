@@ -3,6 +3,7 @@ import { settings } from "./settings.js";
 import { sendMessage, sendMessageWithTimeout, ui } from "./ui.js";
 import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.js";
 import { Prompt } from "./prompt.js";
+import { TabManager } from "./tab-manager.js";
 import { Help } from "./help.js";
 import { Hints } from "./hints.js";
 import { Find } from "./find.js";
@@ -283,6 +284,7 @@ export const commands = {
   },
   moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
   moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
+  openTabManager: { ...COMMAND_CATALOG.openTabManager, run: () => TabManager.open() },
   duplicateTab: { ...COMMAND_CATALOG.duplicateTab, run: () => sendMessage("duplicateTab") },
   togglePin: { ...COMMAND_CATALOG.togglePin, run: () => sendMessage("togglePin") },
   toggleMute: { ...COMMAND_CATALOG.toggleMute, run: () => sendMessage("toggleMute") },

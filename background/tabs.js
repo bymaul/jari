@@ -1,5 +1,6 @@
 import { normalizeUrl } from "../shared/url.js";
 import { clampCount } from "./utils.js";
+import { bookmarkedUrlKeys, bookmarkUrlKey } from "./bookmarks.js";
 import { focusWindow, moveTabIntoWindowAndFocus, openInIncognito } from "./windows.js";
 
 export async function createTab(_, { url } = {}) {
@@ -173,6 +174,254 @@ export async function listTabs() {
     lastAccessed: tab.lastAccessed || 0,
     audible: !!tab.audible,
   }));
+}
+
+function sanitizeIds(ids, max = 100) {
+  if (!Array.isArray(ids)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const id of ids) {
+    if (!Number.isInteger(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function hasApi(path) {
+  try {
+    let owner = chrome;
+    for (const name of path) {
+      if (!owner || typeof owner[name] === "undefined") return false;
+      owner = owner[name];
+    }
+    return typeof owner === "function";
+  } catch {
+    return false;
+  }
+}
+
+function groupsSupported() {
+  return hasApi(["tabs", "group"]) && hasApi(["tabs", "ungroup"]);
+}
+
+export async function managerList(sender) {
+  let raw;
+  try {
+    raw = (await chrome.tabs.query({})) || [];
+  } catch {
+    return { ok: false };
+  }
+  let bookmarkedUrls = new Set();
+  if (chrome.bookmarks && typeof chrome.bookmarks.getTree === "function") {
+    bookmarkedUrls = await bookmarkedUrlKeys();
+  }
+  const tabs = raw.map((tab) => ({
+    id: tab.id,
+    windowId: tab.windowId,
+    index: typeof tab.index === "number" ? tab.index : 0,
+    title: tab.title || "",
+    url: tab.url || "",
+    active: !!tab.active,
+    pinned: !!tab.pinned,
+    muted: !!(tab.mutedInfo && tab.mutedInfo.muted),
+    audible: !!tab.audible,
+    bookmarked: bookmarkedUrls.has(bookmarkUrlKey(tab.url || "")),
+    groupId: typeof tab.groupId === "number" ? tab.groupId : -1,
+    lastAccessed: tab.lastAccessed || 0,
+  }));
+  let groups = [];
+  try {
+    if (chrome.tabGroups && typeof chrome.tabGroups.query === "function") {
+      const found = (await chrome.tabGroups.query({})) || [];
+      groups = found.map((group) => ({
+        id: group.id,
+        title: group.title || "",
+        color: group.color || "",
+        collapsed: !!group.collapsed,
+      }));
+    }
+  } catch {}
+  return { ok: true, tabs, groups, currentWindowId: await currentWindowId(sender) };
+}
+
+async function currentWindowId(sender) {
+  if (sender && sender.tab && Number.isInteger(sender.tab.windowId)) {
+    return sender.tab.windowId;
+  }
+  try {
+    if (chrome.windows && typeof chrome.windows.getLastFocused === "function") {
+      const win = await chrome.windows.getLastFocused();
+      if (win && Number.isInteger(win.id)) return win.id;
+    }
+  } catch {}
+  return null;
+}
+
+export async function closeManagerTabs(_, { ids } = {}) {
+  const targets = sanitizeIds(ids);
+  if (targets.length === 0) return { ok: false };
+  try {
+    await chrome.tabs.remove(targets);
+  } catch {
+    return { ok: false };
+  }
+  return { ok: true, closed: targets.length };
+}
+
+export async function setTabsPinned(_, { ids, pinned } = {}) {
+  const targets = sanitizeIds(ids);
+  if (targets.length === 0) return { ok: false };
+  const next = !!pinned;
+  const results = await Promise.allSettled(
+    targets.map((id) => chrome.tabs.update(id, { pinned: next })),
+  );
+  const updated = results.filter((r) => r.status === "fulfilled").length;
+  return updated > 0 ? { ok: true, updated, pinned: next } : { ok: false };
+}
+
+export async function setTabsMuted(_, { ids, muted } = {}) {
+  const targets = sanitizeIds(ids);
+  if (targets.length === 0) return { ok: false };
+  const next = !!muted;
+  const results = await Promise.allSettled(
+    targets.map((id) => chrome.tabs.update(id, { muted: next })),
+  );
+  const updated = results.filter((r) => r.status === "fulfilled").length;
+  return updated > 0 ? { ok: true, updated, muted: next } : { ok: false };
+}
+
+export async function moveManagerTabs(_, { ids, delta = 0 } = {}) {
+  const targets = sanitizeIds(ids);
+  const step = Number.isFinite(Number(delta)) ? Math.trunc(Number(delta)) : 0;
+  if (targets.length === 0 || step === 0) return { ok: false };
+  let all;
+  try {
+    all = (await chrome.tabs.query({})) || [];
+  } catch {
+    return { ok: false };
+  }
+  const byId = new Map(all.map((tab) => [tab.id, tab]));
+  const perWindow = new Map();
+  for (const id of targets) {
+    const tab = byId.get(id);
+    if (!tab) continue;
+    const pinned = !!tab.pinned;
+    const key = `${tab.windowId}:${pinned ? "pinned" : "open"}`;
+    if (!perWindow.has(key)) {
+      perWindow.set(key, { windowId: tab.windowId, pinned, ids: [] });
+    }
+    perWindow.get(key).ids.push(id);
+  }
+  if (perWindow.size === 0) return { ok: false };
+  let moved = 0;
+  for (const { windowId, pinned, ids: group } of perWindow.values()) {
+    const siblings = all
+      .filter((tab) => tab.windowId === windowId && !!tab.pinned === pinned)
+      .sort((a, b) => a.index - b.index)
+      .map((tab) => tab.id);
+    if (siblings.length < 2) continue;
+    const positions = group
+      .map((id) => siblings.indexOf(id))
+      .sort((a, b) => a - b);
+    if (positions.some((pos) => pos < 0)) continue;
+    const target = Math.min(
+      siblings.length - group.length,
+      Math.max(0, positions[0] + step),
+    );
+    try {
+      await chrome.tabs.move(group, { index: target });
+      moved += group.length;
+    } catch {}
+  }
+  return moved > 0 ? { ok: true, moved } : { ok: false };
+}
+
+export async function duplicateManagerTabs(_, { ids } = {}) {
+  const targets = sanitizeIds(ids);
+  if (targets.length === 0) return { ok: false };
+  const activeBefore = new Map();
+  try {
+    for (const tab of (await chrome.tabs.query({ active: true })) || []) {
+      if (tab && Number.isInteger(tab.windowId)) activeBefore.set(tab.windowId, tab.id);
+    }
+  } catch {}
+  const created = [];
+  for (const id of [...targets].reverse()) {
+    try {
+      const tab = await chrome.tabs.duplicate(id);
+      if (tab && Number.isInteger(tab.id)) created.push(tab);
+    } catch {}
+  }
+  for (const windowId of new Set(created.map((tab) => tab.windowId))) {
+    const previous = activeBefore.get(windowId);
+    if (previous === undefined) continue;
+    if (created.some((tab) => tab.windowId === windowId && tab.id === previous)) {
+      continue;
+    }
+    try {
+      await chrome.tabs.update(previous, { active: true });
+    } catch {}
+  }
+  return created.length > 0
+    ? { ok: true, duplicated: created.length, ids: created.map((tab) => tab.id) }
+    : { ok: false };
+}
+
+export async function editManagerTab(_, { id, url } = {}) {
+  if (!Number.isInteger(id)) return { ok: false };
+  const target = normalizeUrl(url);
+  if (!target) return { ok: false };
+  try {
+    await chrome.tabs.update(id, { url: target });
+    return { ok: true, url: target };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+export async function groupManagerTabs(_, { ids, groupId } = {}) {
+  const targets = sanitizeIds(ids);
+  if (targets.length === 0) return { ok: false };
+  if (!groupsSupported()) return { ok: false, reason: "unsupported" };
+  try {
+    const options =
+      Number.isInteger(groupId) && groupId >= 0
+        ? { tabIds: targets, groupId }
+        : { tabIds: targets };
+    const createdId = await chrome.tabs.group(options);
+    return { ok: true, groupId: createdId };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+export async function ungroupManagerTabs(_, { ids } = {}) {
+  const targets = sanitizeIds(ids);
+  if (targets.length === 0) return { ok: false };
+  if (!groupsSupported()) return { ok: false, reason: "unsupported" };
+  try {
+    await chrome.tabs.ungroup(targets);
+    return { ok: true, ungrouped: targets.length };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+export async function renameGroup(_, { groupId, title } = {}) {
+  if (!Number.isInteger(groupId)) return { ok: false };
+  if (!hasApi(["tabGroups", "update"])) {
+    return { ok: false, reason: "unsupported" };
+  }
+  try {
+    await chrome.tabGroups.update(groupId, {
+      title: String(title ?? "").slice(0, 100),
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 }
 
 async function goHistory(tab, delta) {

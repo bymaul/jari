@@ -363,6 +363,24 @@ function stubNavigator(userAgent) {
   };
 }
 
+test("search opens an inactive tab when background is set", async () => {
+  const createdTabs = [];
+  stubChrome({
+    windows: [{ id: 1, incognito: false }],
+    onCreateTab: (opts) => createdTabs.push(opts),
+  });
+  assert.deepEqual(
+    await handlers.search(
+      {},
+      { query: "hello", newTab: true, incognito: false, background: true },
+    ),
+    { ok: true },
+  );
+  assert.deepEqual(createdTabs, [
+    { url: "https://www.google.com/search?q=hello", active: false },
+  ]);
+});
+
 function stubTabsCreate(impl) {
   const savedCreate = globalThis.chrome.tabs.create;
   globalThis.chrome.tabs.create = impl;

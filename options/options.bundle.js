@@ -315,6 +315,7 @@
     togglePin: { category: "tabs", label: "Pin / unpin tab" },
     toggleMute: { category: "tabs", label: "Mute / unmute tab" },
     moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
+    openTabManager: { category: "tabs", label: "Open tab manager" },
     goBack: { category: "history", label: "Go back in history" },
     goForward: { category: "history", label: "Go forward in history" },
     reloadTab: { category: "page", label: "Reload tab" },
@@ -355,7 +356,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 9;
+  var SETTINGS_SCHEMA_VERSION = 10;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -416,6 +417,7 @@
     ge: "editUrl",
     g0: "goToFirstTab",
     g$: "goToLastTab",
+    gt: "openTabManager",
     ";e": "openSettings",
     ";x": "openExtensions",
     ";w": "resetScrollTarget",
@@ -613,6 +615,10 @@
       d.keymap = migrateV9Bindings(d.keymap);
       version = 9;
     }
+    if (version < 10) {
+      d.keymap = migrateV10Bindings(d.keymap);
+      version = 10;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -710,6 +716,19 @@
     }
     const out = { ...keymap };
     for (const [combo, command] of V9_DEFAULT_FILLS) {
+      if (combo in out) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
+    }
+    return out;
+  }
+  var V10_DEFAULT_FILLS = [["gt", "openTabManager"]];
+  function migrateV10Bindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    for (const [combo, command] of V10_DEFAULT_FILLS) {
       if (combo in out) continue;
       if (findOverlapConflicts(out, combo).length > 0) continue;
       out[combo] = command;
@@ -1279,6 +1298,7 @@
     ".jari-prompt-host",
     ".jari-palette-host",
     ".jari-help-host",
+    ".jari-tab-manager-host",
     ".jari-visual-caret-host",
     ".jari-status-stack",
     ".jari-clue",

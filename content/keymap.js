@@ -16,7 +16,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
-export const SETTINGS_SCHEMA_VERSION = 9;
+export const SETTINGS_SCHEMA_VERSION = 10;
 
 export const Events = {
   listeners: {},
@@ -88,6 +88,7 @@ export const keymapDefaults = {
   ge: "editUrl",
   g0: "goToFirstTab",
   g$: "goToLastTab",
+  gt: "openTabManager",
   ";e": "openSettings",
   ";x": "openExtensions",
   ";w": "resetScrollTarget",
@@ -286,7 +287,7 @@ export function parseRepeatCount(raw) {
 }
 
 export const overlaySelectors =
-  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host";
+  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host, .jari-tab-manager-host";
 
 export function deepActiveElement() {
   let el = document.activeElement;
@@ -426,6 +427,12 @@ export function migrateSettings(data) {
     d.keymap = migrateV9Bindings(d.keymap);
     version = 9;
   }
+  // v9 -> v10: tab manager gains gt. The combo fills only where free, so
+  // custom rebinds are never clobbered.
+  if (version < 10) {
+    d.keymap = migrateV10Bindings(d.keymap);
+    version = 10;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -533,6 +540,21 @@ export function migrateV9Bindings(keymap) {
   }
   const out = { ...keymap };
   for (const [combo, command] of V9_DEFAULT_FILLS) {
+    if (combo in out) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
+  }
+  return out;
+}
+
+const V10_DEFAULT_FILLS = [["gt", "openTabManager"]];
+
+export function migrateV10Bindings(keymap) {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap;
+  }
+  const out = { ...keymap };
+  for (const [combo, command] of V10_DEFAULT_FILLS) {
     if (combo in out) continue;
     if (findOverlapConflicts(out, combo).length > 0) continue;
     out[combo] = command;
