@@ -162,22 +162,6 @@ function managerCss() {
   return (
     promptCss() +
     `
-    .jari-prompt-footer {
-      display: block;
-      background: #252530;
-      color: #cdcdcd;
-      font-size: var(--jari-header-font-size, 9pt) !important;
-      border-top: 1px solid #333738;
-      padding: 0.25ex 0.5ex;
-      margin: 0;
-      white-space: normal;
-      overflow: hidden;
-      text-align: left !important;
-    }
-    .jari-prompt-footer.jari-manager-warn {
-      color: #e0a363;
-      font-weight: bold !important;
-    }
     .jari-prompt-input {
       display: block;
       width: 100%;

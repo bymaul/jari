@@ -3,7 +3,7 @@ import { parseEngineKeyword } from "../shared/search-engines.js";
 import { rankMatches } from "./rank.js";
 import { settings } from "./settings.js";
 import { sendMessage, createShadowHost } from "./ui.js";
-import { promptCss, renderText } from "./prompt/shared.js";
+import { promptCss, renderText, makeFooter, FOOTER_PROMPT } from "./prompt/shared.js";
 import { renderList as renderPromptList, move as movePrompt } from "./prompt/list.js";
 export { promptCss, renderText };
 import { deepActiveElement } from "./keymap.js";
@@ -18,6 +18,7 @@ let host = null;
 let overlay = null;
 let inputEl = null;
 let listEl = null;
+let footerEl = null;
 let tabs = [];
 let filtered = [];
 let selected = 0;
@@ -227,6 +228,8 @@ function render(title, placeholder) {
   overlay.appendChild(listEl);
   overlay.appendChild(header);
   overlay.appendChild(inputEl);
+  footerEl = makeFooter(FOOTER_PROMPT);
+  overlay.appendChild(footerEl);
   shadow.appendChild(overlay);
 
   filtered = tabs;
@@ -374,6 +377,7 @@ function close() {
   overlay = null;
   inputEl = null;
   listEl = null;
+  footerEl = null;
   tabs = [];
   filtered = [];
   selected = 0;

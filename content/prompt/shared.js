@@ -107,7 +107,33 @@ export function promptCss() {  return `
       background: var(--jari-accent, #e0a363);
       color: #1a1a1a;
     }
+    .jari-prompt-footer {
+      display: block;
+      background: #252530;
+      color: #cdcdcd;
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      border-top: 1px solid #333738;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+      white-space: normal;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-prompt-footer.jari-manager-warn {
+      color: #e0a363;
+      font-weight: bold !important;
+    }
   `;
+}
+
+export const FOOTER_PROMPT = "Enter select | Ctrl+Enter new tab | Esc cancel | Up/Down/Tab move";
+export const FOOTER_PALETTE = "Enter run | Esc cancel | Up/Down/Tab move";
+
+export function makeFooter(text) {
+  const el = document.createElement("div");
+  el.className = "jari-prompt-footer";
+  el.textContent = text;
+  return el;
 }
 
 export function renderText(el, text, indices) {

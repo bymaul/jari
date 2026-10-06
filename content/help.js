@@ -158,16 +158,7 @@ function helpCss() {
       display: flex;
       align-items: baseline;
       gap: 1ex;
-      background: #252530;
-      color: #cdcdcd;
-      font-size: var(--jari-header-font-size, 9pt) !important;
       line-height: var(--jari-cmdl-line-height, 1.5);
-      border-top: 1px solid #333738;
-      padding: 0.25ex 0.5ex;
-      margin: 0;
-      white-space: normal;
-      overflow: hidden;
-      text-align: left !important;
     }
     .jari-help-status {
       white-space: nowrap;

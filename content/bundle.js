@@ -3137,7 +3137,31 @@
       background: var(--jari-accent, #e0a363);
       color: #1a1a1a;
     }
+    .jari-prompt-footer {
+      display: block;
+      background: #252530;
+      color: #cdcdcd;
+      font-size: var(--jari-header-font-size, 9pt) !important;
+      border-top: 1px solid #333738;
+      padding: 0.25ex 0.5ex;
+      margin: 0;
+      white-space: normal;
+      overflow: hidden;
+      text-align: left !important;
+    }
+    .jari-prompt-footer.jari-manager-warn {
+      color: #e0a363;
+      font-weight: bold !important;
+    }
   `;
+  }
+  var FOOTER_PROMPT = "Enter select | Ctrl+Enter new tab | Esc cancel | Up/Down/Tab move";
+  var FOOTER_PALETTE = "Enter run | Esc cancel | Up/Down/Tab move";
+  function makeFooter(text) {
+    const el = document.createElement("div");
+    el.className = "jari-prompt-footer";
+    el.textContent = text;
+    return el;
   }
   function renderText(el, text, indices) {
     if (!indices || indices.length === 0) {
@@ -3311,6 +3335,7 @@
   var overlay = null;
   var inputEl = null;
   var listEl = null;
+  var footerEl = null;
   var tabs = [];
   var filtered = [];
   var selected = 0;
@@ -3495,6 +3520,8 @@
     overlay.appendChild(listEl);
     overlay.appendChild(header);
     overlay.appendChild(inputEl);
+    footerEl = makeFooter(FOOTER_PROMPT);
+    overlay.appendChild(footerEl);
     shadow.appendChild(overlay);
     filtered = tabs;
     renderList2();
@@ -3617,6 +3644,7 @@
     overlay = null;
     inputEl = null;
     listEl = null;
+    footerEl = null;
     tabs = [];
     filtered = [];
     selected = 0;
@@ -3679,7 +3707,7 @@
   var overlay2 = null;
   var headerEl = null;
   var listEl2 = null;
-  var footerEl = null;
+  var footerEl2 = null;
   var restoreFocus2 = null;
   var tabs2 = [];
   var windowId = null;
@@ -3774,22 +3802,6 @@
   }
   function managerCss() {
     return promptCss() + `
-    .jari-prompt-footer {
-      display: block;
-      background: #252530;
-      color: #cdcdcd;
-      font-size: var(--jari-header-font-size, 9pt) !important;
-      border-top: 1px solid #333738;
-      padding: 0.25ex 0.5ex;
-      margin: 0;
-      white-space: normal;
-      overflow: hidden;
-      text-align: left !important;
-    }
-    .jari-prompt-footer.jari-manager-warn {
-      color: #e0a363;
-      font-weight: bold !important;
-    }
     .jari-prompt-input {
       display: block;
       width: 100%;
@@ -4006,12 +4018,12 @@
     }
   }
   function setFooterLines(lines, warn) {
-    footerEl.classList.toggle("jari-manager-warn", !!warn);
-    footerEl.textContent = "";
+    footerEl2.classList.toggle("jari-manager-warn", !!warn);
+    footerEl2.textContent = "";
     for (const line of lines) {
       const div = document.createElement("div");
       div.textContent = line;
-      footerEl.appendChild(div);
+      footerEl2.appendChild(div);
     }
   }
   function renderList3() {
@@ -4134,14 +4146,14 @@
     headerEl.className = "jari-prompt-header";
     listEl2 = document.createElement("ul");
     listEl2.className = "jari-prompt-list";
-    footerEl = document.createElement("div");
-    footerEl.className = "jari-prompt-footer";
+    footerEl2 = document.createElement("div");
+    footerEl2.className = "jari-prompt-footer";
     const backdrop = document.createElement("div");
     backdrop.className = "jari-manager-backdrop";
     backdrop.addEventListener("click", () => close2());
     overlay2.appendChild(headerEl);
     overlay2.appendChild(listEl2);
-    overlay2.appendChild(footerEl);
+    overlay2.appendChild(footerEl2);
     created.shadow.appendChild(backdrop);
     created.shadow.appendChild(overlay2);
     restoreFocus2 = document.activeElement;
@@ -4177,7 +4189,7 @@
     fieldFocusBefore = null;
     headerEl = null;
     listEl2 = null;
-    footerEl = null;
+    footerEl2 = null;
     tabs2 = [];
     windowId = null;
     groupsById = /* @__PURE__ */ new Map();
@@ -4542,7 +4554,7 @@
     });
     fieldEl = input;
     field = { kind, ...meta };
-    overlay2.insertBefore(input, footerEl);
+    overlay2.insertBefore(input, footerEl2);
     renderAll();
     const prev = document.activeElement;
     fieldFocusBefore = isOwnChrome(prev) ? null : prev;
@@ -8592,16 +8604,7 @@
       display: flex;
       align-items: baseline;
       gap: 1ex;
-      background: #252530;
-      color: #cdcdcd;
-      font-size: var(--jari-header-font-size, 9pt) !important;
       line-height: var(--jari-cmdl-line-height, 1.5);
-      border-top: 1px solid #333738;
-      padding: 0.25ex 0.5ex;
-      margin: 0;
-      white-space: normal;
-      overflow: hidden;
-      text-align: left !important;
     }
     .jari-help-status {
       white-space: nowrap;
@@ -9533,6 +9536,7 @@
   var overlay5 = null;
   var inputEl4 = null;
   var listEl4 = null;
+  var footerEl3 = null;
   var source = [];
   var filtered3 = [];
   var selected3 = 0;
@@ -9595,6 +9599,8 @@
     overlay5.appendChild(listEl4);
     overlay5.appendChild(header);
     overlay5.appendChild(inputEl4);
+    footerEl3 = makeFooter(FOOTER_PALETTE);
+    overlay5.appendChild(footerEl3);
     shadow.appendChild(overlay5);
     renderList4();
     restoreFocus5 = document.activeElement;
@@ -9699,6 +9705,7 @@
     overlay5 = null;
     inputEl4 = null;
     listEl4 = null;
+    footerEl3 = null;
     source = [];
     filtered3 = [];
     selected3 = 0;
