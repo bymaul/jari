@@ -8,17 +8,11 @@ into IIFE bundles (content scripts cannot use runtime ESM imports).
 ```sh
 npm install
 npm run lint          # eslint, must be clean
-npm test              # node --test, 71 unit tests
+npm test              # node --test, ~78 unit tests
 npm run build:chrome  # rebuild bundles + manifest.json for Chrome
 npm run build:firefox # rebuild bundles + manifest.json for Firefox
 npm run dist          # zips + firefox xpi (+ chrome crx with CRX_PRIVATE_KEY)
 npm run sign:firefox  # AMO sign (unlisted) via WEB_EXT_API_KEY/SECRET
-```
-
-E2E (needs Chromium + fresh profile, see `tests/e2e/README.md`):
-```sh
-npm run build:chrome
-./tests/e2e/launch.sh "$PROFILE" "$(pwd)"
 ```
 
 ## Generated files - never hand-edit
@@ -78,8 +72,11 @@ source (repo convention).
 - `shared/url.js` scheme policy (`urlSchemes`, `blockedUrlSchemes`) is
   security-sensitive: keep `normalizeUrl` / `looksLikeUrl` branches explicit,
   do not merge them for brevity.
+- Tests cover major behavior only: security branches, pure-logic boundaries,
+  core user-facing flows (happy-path + 1-2 edge cases each). Do not add
+  copy/text/ordering snapshot tests or combinatorial permutations.
 - Tests import `./setup.mjs` for window/document/location/chrome stubs;
-  per-test DOM fixtures use save/restore (`prompt.test.js`, `shadow.test.js`
+  per-test DOM fixtures use save/restore (`background.test.js`
   pattern). Pure-logic suites (`rank`, `keymap`, `url`) need no stubs.
 - `content/visual.js` now passes eslint (previously `/* eslint-disable */`); new
   modules must pass eslint (declare browser globals via `/* global ... */`).

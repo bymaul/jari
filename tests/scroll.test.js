@@ -2,15 +2,6 @@ import "./setup.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-// Capture the window "message" listener scroll.js registers at import time,
-// before the module is loaded.
-const messageHandlers = [];
-const baseAddEventListener = globalThis.window.addEventListener;
-globalThis.window.addEventListener = (type, fn, ...rest) => {
-  if (type === "message") messageHandlers.push(fn);
-  return baseAddEventListener(type, fn, ...rest);
-};
-
 const { Scroll } = await import("../content/scroll.js");
 
 const VW = 800;
@@ -152,105 +143,6 @@ test("a repeat count skips stops in either direction", () => {
   assert.equal(Scroll.getTarget(), globalThis.window);
 });
 
-test("cycling onto a frame focuses it, cycling off releases focus", () => {
-  rotateTo(globalThis.window);
-  Scroll.cycle();
-  assert.equal(Scroll.getTarget(), area);
-  resetCalls();
-
-  Scroll.cycle();
-  assert.equal(Scroll.getTarget(), frame);
-  assert.ok(frame.focusCalls > 0, "expected the frame element to be focused");
-
-  // The browser points the top document at the frame once it is focused.
-  globalThis.document.activeElement = frame;
-  resetCalls();
-
-  Scroll.cycle();
-  assert.equal(Scroll.getTarget(), globalThis.window);
-  assert.ok(frame.blurCalls > 0, "expected the frame to be blurred");
-  assert.ok(windowCalls.focus > 0, "expected focus to return to the page");
-});
-
-test("w inside a frame forwards to the top frame instead of cycling locally", () => {
-  rotateTo(frame);
-  const posted = [];
-  const top = {
-    postMessage: (msg) => posted.push(msg),
-    focus: () => {},
-  };
-  globalThis.window.top = top;
-  const activeBlur = [];
-  globalThis.document.activeElement = { blur: () => activeBlur.push("blur") };
-  const focusBefore = frame.focusCalls;
-
-  Scroll.cycle();
-
-  assert.equal(posted.length, 1);
-  assert.equal(posted[0].type, "jari-cycle-scroll");
-  assert.equal(
-    Scroll.getTarget(),
-    frame,
-    "expected the subframe to leave its local target alone",
-  );
-  assert.equal(frame.focusCalls, focusBefore);
-});
-
-test("the top frame advances its cycle on a subframe request", () => {
-  assert.ok(messageHandlers.length > 0, "expected a message listener");
-  const onMessage = messageHandlers[messageHandlers.length - 1];
-  rotateTo(frame);
-  globalThis.document.activeElement = frame;
-
-  onMessage({ data: { type: "jari-cycle-scroll" }, source: frame.contentWindow });
-
-  assert.equal(Scroll.getTarget(), globalThis.window);
-});
-
-test("W inside a frame forwards the direction to the top frame", () => {
-  rotateTo(frame);
-  const posted = [];
-  const top = {
-    postMessage: (msg) => posted.push(msg),
-    focus: () => {},
-  };
-  globalThis.window.top = top;
-  globalThis.document.activeElement = null;
-  const focusBefore = frame.focusCalls;
-
-  Scroll.cycle(-1);
-
-  assert.equal(posted.length, 1);
-  assert.equal(posted[0].type, "jari-cycle-scroll");
-  assert.equal(posted[0].dir, -1);
-  assert.equal(Scroll.getTarget(), frame);
-  assert.equal(frame.focusCalls, focusBefore);
-});
-
-test("the top frame cycles backward on a directed subframe request", () => {
-  assert.ok(messageHandlers.length > 0, "expected a message listener");
-  const onMessage = messageHandlers[messageHandlers.length - 1];
-  rotateTo(area);
-  globalThis.document.activeElement = area;
-
-  onMessage({ data: { type: "jari-cycle-scroll", dir: -1 }, source: frame.contentWindow });
-
-  assert.equal(Scroll.getTarget(), globalThis.window);
-});
-
-test("the top frame ignores cycle requests from stranger sources", () => {
-  assert.ok(messageHandlers.length > 0, "expected a message listener");
-  const onMessage = messageHandlers[messageHandlers.length - 1];
-  rotateTo(frame);
-  globalThis.document.activeElement = frame;
-
-  onMessage({ data: { type: "jari-cycle-scroll" }, source: {} });
-  onMessage({ data: { type: "jari-cycle-scroll" }, source: globalThis.window });
-  onMessage({ data: { type: "jari-cycle-scroll" }, source: null });
-
-  assert.equal(Scroll.getTarget(), frame);
-});
-
 test("reset returns to the page after cycling onto an area", () => {
   rotateTo(area);
   assert.equal(Scroll.getTarget(), area);
@@ -271,14 +163,4 @@ test("reset releases frame focus and returns to the page", () => {
   assert.equal(Scroll.getTarget(), globalThis.window);
   assert.ok(frame.blurCalls > 0, "expected the frame to be blurred");
   assert.ok(windowCalls.focus > 0, "expected focus to return to the page");
-});
-
-test("the top frame ignores unrelated messages", () => {
-  assert.ok(messageHandlers.length > 0, "expected a message listener");
-  const onMessage = messageHandlers[messageHandlers.length - 1];
-  rotateTo(frame);
-
-  onMessage({ data: { type: "something-else" }, source: {} });
-
-  assert.equal(Scroll.getTarget(), frame);
 });

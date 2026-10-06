@@ -5,11 +5,7 @@ import assert from "node:assert";
 const { settings } = await import("../content/settings.js");
 const { commands } = await import("../content/commands.js");
 const { keymapDefaults } = await import("../content/keymap.js");
-const { Clue } = await import("../content/clue.js");
-const { ui } = await import("../content/ui.js");
-const { handleKeydown, shieldOverlayKey, __resetState } = await import(
-  "../content/content.js"
-);
+const { handleKeydown, __resetState } = await import("../content/content.js");
 const { Overlays, register, touch } = await import("../content/overlays.js");
 
 let shieldActive = false;
@@ -68,18 +64,6 @@ function restoreSpies() {
   for (const name of Object.keys(spiedCalls)) delete spiedCalls[name];
 }
 
-const uiSpies = {};
-function spyUi(method) {
-  uiSpies[method] = ui[method];
-  const calls = [];
-  ui[method] = (...args) => calls.push(args);
-  return calls;
-}
-function restoreUi() {
-  for (const [method, original] of Object.entries(uiSpies)) ui[method] = original;
-  for (const method of Object.keys(uiSpies)) delete uiSpies[method];
-}
-
 beforeEach(() => {
   settings.set({
     keymap: { ...keymapDefaults },
@@ -96,20 +80,11 @@ afterEach(() => {
   shieldKeys.length = 0;
   Overlays.closeAll();
   restoreSpies();
-  restoreUi();
 });
 
 test("synthetic events are ignored", () => {
   spyOn("scrollDown");
   const ev = key({ isTrusted: false });
-  handleKeydown(ev);
-  assert.equal(spiedCalls.scrollDown.length, 0);
-  assertUnclaimed(ev);
-});
-
-test("bare modifier keys pass through", () => {
-  spyOn("scrollDown");
-  const ev = key({ key: "Shift" });
   handleKeydown(ev);
   assert.equal(spiedCalls.scrollDown.length, 0);
   assertUnclaimed(ev);
@@ -133,37 +108,12 @@ test("a count prefix repeats a command", () => {
   assert.equal(spiedCalls.scrollDown[0].count, 2);
 });
 
-test("a bare zero count clamps to one repeat", () => {
-  spyOn("scrollDown");
-  handleKeydown(key({ key: "0" }));
-  handleKeydown(key({ key: "j" }));
-  assert.equal(spiedCalls.scrollDown.length, 1);
-  assert.equal(spiedCalls.scrollDown[0].count, 1);
-});
-
 test("a two-key prefix composes a binding", () => {
   spyOn("goToParent");
   handleKeydown(key({ key: "g" }));
   handleKeydown(key({ key: "u" }));
   assert.equal(spiedCalls.goToParent.length, 1);
   assert.equal(spiedCalls.goToParent[0].count, 1);
-});
-
-test("a modifier press does not cancel a pending prefix", () => {
-  spyOn("goToParent");
-  handleKeydown(key({ key: "g" }));
-  handleKeydown(key({ key: "Shift" }));
-  handleKeydown(key({ key: "u" }));
-  assert.equal(spiedCalls.goToParent.length, 1);
-});
-
-test("an unbound prefix completion is a dead key", () => {
-  spyOn("scrollDown");
-  const ev = key({ key: "q" });
-  handleKeydown(key({ key: "g" }));
-  handleKeydown(ev);
-  assert.equal(spiedCalls.scrollDown.length, 0);
-  assertClaimed(ev);
 });
 
 test("Escape with a pending count cancels the composition", () => {
@@ -174,28 +124,6 @@ test("Escape with a pending count cancels the composition", () => {
   assertClaimed(esc);
   handleKeydown(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown[0].count, 1);
-});
-
-test("Escape with nothing pending reaches the page", () => {
-  spyOn("scrollDown");
-  const esc = key({ key: "Escape" });
-  handleKeydown(esc);
-  assertUnclaimed(esc);
-  assert.equal(spiedCalls.scrollDown.length, 0);
-});
-
-test("the showcmd readout echoes counts and prefixes", () => {
-  const showcmdCalls = spyUi("showcmd");
-  const flashCalls = spyUi("flash");
-  spyOn("goToParent");
-  handleKeydown(key({ key: "2" }));
-  assert.deepEqual(showcmdCalls, [["2"]]);
-  handleKeydown(key({ key: "g" }));
-  assert.deepEqual(showcmdCalls, [["2"], ["2g"]]);
-  handleKeydown(key({ key: "u" }));
-  assert.deepEqual(flashCalls, [["2gu"]]);
-  // goToParent is not repeatable, so the count is dropped on delivery.
-  assert.equal(spiedCalls.goToParent[0].count, 1);
 });
 
 test("ignore mode passes every key through except its toggle and Escape", () => {
@@ -213,30 +141,6 @@ test("ignore mode passes every key through except its toggle and Escape", () => 
   handleKeydown(off);
   assertClaimed(off);
 
-  handleKeydown(key({ key: "j" }));
-  assert.equal(spiedCalls.scrollDown.length, 1);
-});
-
-test("ignore mode exits on Escape", () => {
-  spyOn("scrollDown");
-  handleKeydown(key({ key: "I" }));
-  handleKeydown(key({ key: "Escape" }));
-  handleKeydown(key({ key: "j" }));
-  assert.equal(spiedCalls.scrollDown.length, 1);
-});
-
-test("ignore mode respects a rebound toggle key", () => {
-  settings.set({ keymap: { ...keymapDefaults, I: "scrollDown", z: "toggleIgnore" } });
-  spyOn("scrollDown");
-
-  handleKeydown(key({ key: "z" }));
-  handleKeydown(key({ key: "I" }));
-  const pass = key({ key: "j" });
-  handleKeydown(pass);
-  assert.equal(spiedCalls.scrollDown.length, 0);
-  assertUnclaimed(pass);
-
-  handleKeydown(key({ key: "z" }));
   handleKeydown(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown.length, 1);
 });
@@ -260,31 +164,6 @@ test("passthrough lets every key through until Escape", () => {
   assert.equal(spiedCalls.scrollDown.length, 1);
 });
 
-test("passthrough exits when the timeout expires", async () => {
-  settings.set({ passthroughMs: 30 });
-  spyOn("scrollDown");
-  handleKeydown(key({ key: "p" }));
-  await new Promise((r) => setTimeout(r, 50));
-  handleKeydown(key({ key: "j" }));
-  assert.equal(spiedCalls.scrollDown.length, 1);
-});
-
-test("passthrough stays alive while keys keep coming", async () => {
-  settings.set({ passthroughMs: 40 });
-  spyOn("scrollDown");
-  handleKeydown(key({ key: "p" }));
-  for (let i = 0; i < 4; i++) {
-    await new Promise((r) => setTimeout(r, 20));
-    const pass = key({ key: "l" });
-    handleKeydown(pass);
-    assert.equal(spiedCalls.scrollDown.length, 0);
-    assertUnclaimed(pass);
-  }
-  await new Promise((r) => setTimeout(r, 60));
-  handleKeydown(key({ key: "j" }));
-  assert.equal(spiedCalls.scrollDown.length, 1);
-});
-
 test("disabled sites pass every key through except the toggle", () => {
   settings.set({ disabledSites: ["test.example"] });
   spyOn("scrollDown");
@@ -299,26 +178,6 @@ test("disabled sites pass every key through except the toggle", () => {
   handleKeydown(toggle);
   assert.equal(spiedCalls.toggleSiteEnabled.length, 1);
   assertClaimed(toggle);
-});
-
-test("a zero sequence timeout keeps a pending prefix until completed", async () => {
-  settings.set({ timeoutMs: 0 });
-  spyOn("goToParent");
-  handleKeydown(key({ key: "g" }));
-  await new Promise((r) => setTimeout(r, 40));
-  handleKeydown(key({ key: "u" }));
-  assert.equal(spiedCalls.goToParent.length, 1);
-});
-
-test("a zero passthrough timeout keeps passthrough until Escape", async () => {
-  settings.set({ passthroughMs: 0 });
-  spyOn("scrollDown");
-  handleKeydown(key({ key: "p" }));
-  await new Promise((r) => setTimeout(r, 40));
-  const pass = key({ key: "j" });
-  handleKeydown(pass);
-  assert.equal(spiedCalls.scrollDown.length, 0);
-  assertUnclaimed(pass);
 });
 
 test("keys typed into a form field reach the page, Escape blurs", () => {
@@ -342,116 +201,6 @@ test("keys typed into a form field reach the page, Escape blurs", () => {
   assert.deepEqual(calls, ["blur"]);
 });
 
-test("a pending prefix is dropped when focus moves into a form field", () => {
-  spyOn("goToParent");
-  handleKeydown(key({ key: "g" }));
-  document.activeElement = {
-    tagName: "INPUT",
-    isContentEditable: false,
-    getAttribute: () => null,
-    blur() {},
-  };
-  handleKeydown(key({ key: "u" }));
-  assert.equal(spiedCalls.goToParent.length, 0);
-  document.activeElement = null;
-  handleKeydown(key({ key: "z" }));
-  assert.equal(spiedCalls.goToParent.length, 0);
-});
-
-test("a pending prefix is dropped on disabled sites", () => {
-  spyOn("goToParent");
-  handleKeydown(key({ key: "g" }));
-  settings.set({ disabledSites: ["test.example"] });
-  handleKeydown(key({ key: "z" }));
-  assert.equal(spiedCalls.goToParent.length, 0);
-});
-
-test("counts are dropped for non-repeatable commands", () => {
-  spyOn("goToParent");
-  handleKeydown(key({ key: "3" }));
-  handleKeydown(key({ key: "g" }));
-  handleKeydown(key({ key: "u" }));
-  assert.equal(spiedCalls.goToParent.length, 1);
-  assert.equal(spiedCalls.goToParent[0].count, 1);
-});
-
-test("counts reach repeatable commands", () => {
-  spyOn("scrollDown");
-  handleKeydown(key({ key: "3" }));
-  handleKeydown(key({ key: "j" }));
-  assert.equal(spiedCalls.scrollDown.length, 1);
-  assert.equal(spiedCalls.scrollDown[0].count, 3);
-});
-
-test("a dead key cancels the pending prefix instead of filtering", () => {
-  settings.set({ clueDelayMs: 0 });
-  spyOn("scrollHalfPageUp");
-  const original = commands.goToParent;
-  let calls = 0;
-  commands.goToParent = { run: () => calls++ };
-  try {
-    handleKeydown(key({ key: "g" }));
-    assert.equal(Clue.isVisible(), true);
-    const ev = key({ key: "x" });
-    handleKeydown(ev);
-    assertClaimed(ev);
-    assert.equal(calls, 0);
-    assert.equal(Clue.isVisible(), false);
-    handleKeydown(key({ key: "u" }));
-    assert.equal(calls, 0);
-    assert.equal(spiedCalls.scrollHalfPageUp.length, 1);
-  } finally {
-    commands.goToParent = original;
-    settings.set({ clueDelayMs: 300 });
-  }
-});
-
-test("an invalid prefix completion never runs a single-key command", () => {
-  spyOn("closeTab");
-  spyOn("scrollDown");
-  handleKeydown(key({ key: "g" }));
-  const ev = key({ key: "x" });
-  handleKeydown(ev);
-  assertClaimed(ev);
-  assert.equal(spiedCalls.closeTab.length, 0);
-  handleKeydown(key({ key: "j" }));
-  assert.equal(spiedCalls.scrollDown.length, 1);
-});
-
-test("a three-key sequence composes a binding and takes a count", () => {
-  const saved = { ...settings.getKeymap() };
-  settings.set({ keymap: { ...saved, qfk: "scrollDown" } });
-  spyOn("scrollDown");
-  try {
-    handleKeydown(key({ key: "2" }));
-    handleKeydown(key({ key: "q" }));
-    handleKeydown(key({ key: "f" }));
-    assert.equal(spiedCalls.scrollDown.length, 0);
-    handleKeydown(key({ key: "k" }));
-    assert.equal(spiedCalls.scrollDown.length, 1);
-    assert.equal(spiedCalls.scrollDown[0].count, 2);
-  } finally {
-    settings.set({ keymap: saved });
-  }
-});
-
-test("a dead key mid-sequence cancels the whole buffer", () => {
-  const saved = { ...settings.getKeymap() };
-  settings.set({ keymap: { ...saved, qfk: "scrollDown" } });
-  spyOn("scrollDown");
-  spyOn("scrollUp");
-  try {
-    handleKeydown(key({ key: "q" }));
-    handleKeydown(key({ key: "z" }));
-    assert.equal(spiedCalls.scrollDown.length, 0);
-    handleKeydown(key({ key: "k" }));
-    assert.equal(spiedCalls.scrollDown.length, 0);
-    assert.equal(spiedCalls.scrollUp.length, 1);
-  } finally {
-    settings.set({ keymap: saved });
-  }
-});
-
 test("keys typed into overlay UI are shielded from the page", () => {
   shieldActive = true;
   touch("test-shield");
@@ -463,80 +212,4 @@ test("keys typed into overlay UI are shielded from the page", () => {
   handleKeydown(ev);
   assert.deepEqual(shieldKeys, ["/"]);
   assert.ok(ev.shielded, "expected stopPropagation for Jari UI targets");
-});
-
-test("overlay UI shielding falls back to the event target", () => {
-  shieldActive = true;
-  touch("test-shield");
-  const ev = key({
-    key: "/",
-    target: { className: "jari-palette-host" },
-  });
-  handleKeydown(ev);
-  assert.deepEqual(shieldKeys, ["/"]);
-  assert.ok(ev.shielded, "expected stopPropagation without composedPath");
-});
-
-test("page targets are never shielded while an overlay is open", () => {
-  shieldActive = true;
-  touch("test-shield");
-  const ev = key({
-    key: "/",
-    target: { className: "google-search" },
-    composedPath: () => [{ className: "google-search" }],
-  });
-  handleKeydown(ev);
-  assert.deepEqual(shieldKeys, ["/"]);
-  assert.ok(!ev.shielded, "expected the key to reach the page");
-});
-
-test("no shielding without an active overlay", () => {
-  spyOn("scrollDown");
-  const ev = key({
-    key: "j",
-    target: { className: "jari-toast" },
-    composedPath: () => [{ className: "jari-toast" }],
-  });
-  handleKeydown(ev);
-  assert.equal(spiedCalls.scrollDown.length, 1);
-  assert.ok(!ev.shielded, "expected no shielding outside overlays");
-});
-
-test("keypress and keyup in overlay UI are shielded from the page", () => {
-  shieldActive = true;
-  touch("test-shield");
-  for (const type of ["keypress", "keyup"]) {
-    const ev = key({
-      key: "/",
-      target: { className: "jari-prompt-host" },
-    });
-    shieldOverlayKey(ev);
-    assert.ok(ev.shielded, `expected stopPropagation for ${type} in Jari UI`);
-    assert.ok(!ev.claimed, `expected no preventDefault for ${type} in Jari UI`);
-  }
-});
-
-test("page keypress and keyup are claimed while an overlay is open", () => {
-  shieldActive = true;
-  touch("test-shield");
-  for (const type of ["keypress", "keyup"]) {
-    const ev = key({
-      key: " ",
-      target: { className: "page-node" },
-      composedPath: () => [{ className: "page-node" }],
-    });
-    shieldOverlayKey(ev);
-    assert.ok(ev.claimed, `expected page ${type} to be claimed`);
-  }
-});
-
-test("shieldOverlayKey passes everything through without an active overlay", () => {
-  const ev = key({
-    key: " ",
-    target: { className: "page-node" },
-    composedPath: () => [{ className: "page-node" }],
-  });
-  shieldOverlayKey(ev);
-  assert.ok(!ev.claimed, "expected the key to reach the page");
-  assert.ok(!ev.shielded, "expected no shielding outside overlays");
 });

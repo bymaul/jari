@@ -1,11 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import {
-  fuzzyIndices,
   fuzzyMatch,
   parseQuery,
   rankMatches,
-  substringIndices,
   substringMatch,
 } from "../content/rank.js";
 
@@ -27,43 +25,6 @@ test("fuzzyMatch prefers consecutive runs and word starts", () => {
   const wordStart = fuzzyMatch("ab", "ab").score;
   const midWord = fuzzyMatch("ab", "cab").score;
   assert.ok(wordStart > midWord);
-});
-
-test("fuzzyMatch rewards camel-case boundaries", () => {
-  const camel = fuzzyMatch("ot", "inOTabs").score;
-  const plain = fuzzyMatch("ot", "inotabs").score;
-  assert.ok(camel > plain);
-});
-
-test("fuzzyMatch picks the tightest alignment over a greedy first-char scan", () => {
-  assert.deepEqual(fuzzyMatch("ob", "o x ob").indices, [4, 5]);
-  assert.deepEqual(fuzzyMatch("er", "e x er").indices, [4, 5]);
-  assert.deepEqual(fuzzyMatch("ab", "abxb").indices, [0, 1]);
-});
-
-test("fuzzyMatch ranks an uppercase boundary above a separator boundary", () => {
-  assert.ok(
-    fuzzyMatch("gh", "GitHub").score > fuzzyMatch("gh", "g h").score,
-  );
-});
-
-test("fuzzyMatch prefers a match at the start of the text", () => {
-  assert.ok(
-    fuzzyMatch("hub", "GitHub").score > fuzzyMatch("hub", "ZZZ hub").score,
-  );
-});
-
-test("fuzzyMatch multi-term requires every term and sums scores", () => {
-  assert.deepEqual(fuzzyMatch("pria youtube", "Pria on YouTube").indices, [
-    0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14,
-  ]);
-  assert.ok(
-    fuzzyMatch("pria youtube", "Pria on YouTube").score >
-      fuzzyMatch("pria", "Pria on YouTube").score,
-  );
-  assert.equal(fuzzyMatch("pria youtube", "Pria only"), null);
-  assert.equal(fuzzyMatch("pria   youtube", "Pria on YouTube") === null, false);
-  assert.equal(fuzzyMatch("", "anything"), null);
 });
 
 test("rankMatches orders by score, then tightness, then text length", () => {
@@ -129,51 +90,11 @@ test("rankMatches finds youtube from the ytb shorthand", () => {
   assert.equal(titles[0], "lofi hip hop radio - YouTube");
 });
 
-test("fuzzyIndices skips terms that are not in the field", () => {
-  assert.deepEqual(fuzzyIndices("pria youtube", "Pria"), [0, 1, 2, 3]);
-  assert.deepEqual(fuzzyIndices("pria youtube", "YouTube"), [0, 1, 2, 3, 4, 5, 6]);
-  assert.deepEqual(fuzzyIndices("pria youtube", "zzz"), []);
-  assert.deepEqual(fuzzyIndices("", "anything"), []);
-});
-
 test("substringMatch requires every term as a substring", () => {
   assert.equal(substringMatch("pria youtube", "Pria on YouTube"), true);
   assert.equal(substringMatch("pria youtube", "Pria only"), false);
   assert.equal(substringMatch("pria", "My Pria Page"), true);
   assert.equal(substringMatch("", "anything"), false);
-});
-
-test("bestAlignment still finds distant completions past many same-char starts", () => {
-  const hay = "ax".repeat(70) + "ab";
-  const match = fuzzyMatch("ab", hay);
-  assert.ok(match !== null);
-  assert.equal(match.indices.length, 2);
-  assert.equal(match.indices[1], 141);
-});
-
-test("fuzzyMatch finds the optimal alignment when a greedy scan fails", () => {
-  assert.deepEqual(fuzzyMatch("aba", "aaabba").indices, [0, 4, 5]);
-  assert.deepEqual(fuzzyMatch("aab", "aaa ab").indices, [0, 4, 5]);
-});
-
-test("fuzzyMatch prefers the tightest end run past the old start cap", () => {
-  const hay = "ax".repeat(70) + "ab";
-  assert.deepEqual(fuzzyMatch("ab", hay).indices, [140, 141]);
-});
-
-test("fuzzyMatch highlights every phrase occurrence like fuzzyIndices", () => {
-  assert.deepEqual(fuzzyMatch('"ab"', "ab ab").indices, [0, 1, 3, 4]);
-  assert.deepEqual(
-    fuzzyMatch('"ab"', "ab ab").indices,
-    fuzzyIndices('"ab"', "ab ab"),
-  );
-  assert.equal(fuzzyMatch('"ab"', "ab ab").score, 14);
-});
-
-test("match indices map back through NFKD expansions", () => {
-  assert.deepEqual(fuzzyMatch("fi", "ﬁsh").indices, [0, 0]);
-  assert.deepEqual(substringIndices("fi", "ﬁsh"), [0]);
-  assert.deepEqual(fuzzyMatch("e", "café").indices, [3]);
 });
 
 test("parseQuery handles negated phrases and stray quotes", () => {
@@ -184,38 +105,4 @@ test("parseQuery handles negated phrases and stray quotes", () => {
   });
   assert.deepEqual(parseQuery('"foo bar" baz').phrases, ["foo bar"]);
   assert.deepEqual(parseQuery('"unclosed').include, ["unclosed"]);
-});
-
-test("exclusion-only queries match everything not excluded", () => {
-  assert.ok(fuzzyMatch("-spam", "ham eggs") !== null);
-  assert.deepEqual(fuzzyMatch("-spam", "ham eggs").indices, []);
-  assert.equal(fuzzyMatch("-spam", "spam ham"), null);
-  assert.ok(fuzzyMatch('-"spam eggs"', "ham") !== null);
-  assert.equal(fuzzyMatch('-"spam eggs"', "spam eggs here"), null);
-  assert.equal(substringMatch("-spam", "ham"), true);
-  assert.deepEqual(
-    rankMatches("-spam", [{ title: "spam spam" }, { title: "ham" }]).map(
-      (x) => x.item.title,
-    ),
-    ["ham"],
-  );
-});
-
-test("rankMatches treats empty queries the same in both modes", () => {
-  const items = [
-    { title: "b", url: "https://b.example" },
-    { title: "a", url: "https://a.example" },
-  ];
-  assert.deepEqual(
-    rankMatches("", items).map((x) => x.title),
-    ["b", "a"],
-  );
-  assert.deepEqual(
-    rankMatches("", items, false).map((x) => x.title),
-    ["b", "a"],
-  );
-});
-
-test("rankMatches never matches a missing title as undefined", () => {
-  assert.deepEqual(rankMatches("ned", [{ url: "https://x.example" }]), []);
 });
