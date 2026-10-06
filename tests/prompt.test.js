@@ -800,3 +800,61 @@ test("omnibar t prefix with no match falls back to searching the stripped query"
     }
   });
 });
+
+test("Escape clears the query first and closes on the second press", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const restore = mockSuggest([]);
+    try {
+      const input = openOmnibarPrompt(document);
+      input.value = "hello";
+      input.dispatch("input", {});
+      assert.equal(Prompt.isActive(), true);
+      Prompt.onKeyDown(keyEvent("Escape"));
+      assert.equal(Prompt.isActive(), true);
+      assert.equal(input.value, "");
+      Prompt.onKeyDown(keyEvent("Escape"));
+      assert.equal(Prompt.isActive(), false);
+    } finally {
+      restore();
+      Prompt.close();
+    }
+  });
+});
+
+test("Ctrl+Enter on a tab match opens it in a new tab instead of switching", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const sent = [];
+    const restore = mockSuggest(
+      [
+        {
+          id: 7,
+          title: "Example tab",
+          url: "https://x.example/",
+          source: "tab",
+        },
+      ],
+      (m) => sent.push(m),
+    );
+    try {
+      const input = openOmnibarPrompt(document);
+      input.value = "t Example";
+      input.dispatch("input", {});
+      await waitSuggest();
+      assert.equal(renderedRows(document), 1);
+      Prompt.onKeyDown(keyEvent("Enter", { ctrlKey: true }));
+      assert.deepEqual(
+        sent.find((m) => m.action === "createTab"),
+        { action: "createTab", url: "https://x.example/" },
+      );
+      assert.ok(
+        !sent.some((m) => m.action === "activateTab"),
+        "expected no tab switch on Ctrl+Enter",
+      );
+    } finally {
+      restore();
+      Prompt.close();
+    }
+  });
+});

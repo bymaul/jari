@@ -44,6 +44,13 @@ export function filterCommands(items, q, fuzzy = true) {
   return fuzzy ? ranked.map((x) => x.item) : ranked;
 }
 
+function handleInput() {
+  query = inputEl.value.trim();
+  filtered = filterCommands(source, query, settings.isFuzzyMatching());
+  selected = 0;
+  renderList();
+}
+
 function open(table) {
   if (active) return;
   commandTable = table || null;
@@ -64,12 +71,7 @@ function open(table) {
   inputEl.placeholder = "Run command...";
   inputEl.setAttribute("autocomplete", "off");
   inputEl.setAttribute("spellcheck", "false");
-  inputEl.addEventListener("input", () => {
-    query = inputEl.value.trim();
-    filtered = filterCommands(source, query, settings.isFuzzyMatching());
-    selected = 0;
-    renderList();
-  });
+  inputEl.addEventListener("input", handleInput);
   inputEl.addEventListener("keydown", (event) => event.stopPropagation());
 
   listEl = document.createElement("ul");
@@ -157,7 +159,12 @@ function onKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      close();
+      if (inputEl && inputEl.value !== "") {
+        inputEl.value = "";
+        handleInput();
+      } else {
+        close();
+      }
     } else if (event.key === "Enter") {
       event.preventDefault();
       event.stopImmediatePropagation();
