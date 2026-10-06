@@ -13,8 +13,8 @@ const POLL_MS = 2000;
 const FOOTER_MINIMAL =
   "Space mark | Enter switch | d close | / filter | Esc close | ? more";
 const FOOTER_FULL = [
-  "Space mark | v range | a all | Enter switch | d close | y duplicate | e edit | t new tab | ? less",
-  "p pin | m mute | g group | G to group | u ungroup | r rename | b bookmark | J/K reorder | Esc close",
+  "Space mark | v range | V all | Enter switch | d close | y duplicate | e edit | t new tab | ? less",
+  "p pin | m mute | g group | a add to group | u ungroup | r rename | b bookmark | J/K reorder | Esc close",
 ];
 
 const FIELDS = {
@@ -269,6 +269,32 @@ function managerCss() {
     .jari-prompt-list {
       max-height: 52vh !important;
     }
+    .jari-prompt-header.jari-mgr-header {
+      display: flex !important;
+      align-items: baseline !important;
+      gap: 0 1.5ex;
+    }
+    .jari-mgr-title {
+      flex: none;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+    }
+    .jari-mgr-stats {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.8;
+      font-weight: normal !important;
+    }
+    .jari-mgr-badge {
+      flex: none;
+      opacity: 0.8;
+      font-weight: normal !important;
+    }
+    .jari-mgr-pos {
+      flex: none;
+      opacity: 0.7;
+      font-weight: normal !important;
+    }
   `
   );
 }
@@ -341,17 +367,31 @@ function renderRow(tab, labels, currentWin) {
 
 function renderHeader() {
   const wins = new Set(tabs.map((tab) => tab.windowId)).size;
-  const parts = [
-    `Tab manager — ${tabs.length} tabs · ${wins} windows · ${marked.size} marked`,
-  ];
-  if (windowId !== null) {
-    const labels = windowLabels(tabs);
-    parts.push(`current W${labels.get(windowId) || "?"}`);
-  }
-  if (query) parts.push(`/${query}`);
-  if (visualAnchor !== null) parts.push("(visual)");
-  if (field) parts.push(`(${FIELDS[field.kind].badge})`);
-  headerEl.textContent = parts.join(" ");
+  headerEl.textContent = "";
+  headerEl.classList.add("jari-mgr-header");
+
+  appendSpan(headerEl, "jari-mgr-title", "Tab manager");
+
+  const stats = document.createElement("span");
+  stats.className = "jari-mgr-stats";
+  const labels = windowLabels(tabs);
+  let summary = `${tabs.length} tabs · ${wins} windows`;
+  if (windowId !== null) summary += ` · current W${labels.get(windowId) || "?"}`;
+  summary += " · ";
+  stats.textContent = summary;
+  const marks = document.createElement("span");
+  marks.className = "jari-mgr-marked";
+  marks.textContent = `${marked.size} marked`;
+  stats.appendChild(marks);
+  headerEl.appendChild(stats);
+
+  if (query) appendSpan(headerEl, "jari-mgr-badge", `/${query}`);
+  if (visualAnchor !== null)
+    appendSpan(headerEl, "jari-mgr-badge", "(visual)");
+  if (field) appendSpan(headerEl, "jari-mgr-badge", `(${FIELDS[field.kind].badge})`);
+
+  const total = filtered.length;
+  appendSpan(headerEl, "jari-mgr-pos", total === 0 ? "0/0" : `${selected + 1}/${total}`);
 }
 
 function renderFooter() {
@@ -537,6 +577,8 @@ async function open() {
     if (idx >= 0) selected = idx;
   }
   renderAll();
+  overlay.tabIndex = -1;
+  ui.safeFocus(overlay, { preventScroll: true });
   document.addEventListener("visibilitychange", onVisibility);
   startPolling();
 }
@@ -684,7 +726,7 @@ function failureMessage(res, outcome) {
   return outcome.failed;
 }
 
-async function runOnTargets(action, payload, outcome) {
+async function runOnTargets(action, payload, outcome, opts = {}) {
   const targets = currentTargets();
   if (targets.length === 0) return;
   confirm = null;
@@ -696,7 +738,7 @@ async function runOnTargets(action, payload, outcome) {
     return;
   }
   if (outcome.done) outcome.done(res, targets);
-  consumeMarks();
+  if (!opts.keepMarks) consumeMarks();
   await refresh();
 }
 
@@ -773,12 +815,25 @@ async function addToFocusedGroup() {
   const targets = currentTargets();
   if (!focused || targets.length === 0) return;
   confirm = null;
-  if (focused.groupId === GROUPED_NONE) {
-    ui.toast("Focused tab has no group — g creates one");
+  let groupId = GROUPED_NONE;
+  for (let dist = 0; dist < filtered.length; dist++) {
+    const up = filtered[selected - dist];
+    if (up && up.groupId !== GROUPED_NONE) {
+      groupId = up.groupId;
+      break;
+    }
+    const down = filtered[selected + dist];
+    if (down && down.groupId !== GROUPED_NONE) {
+      groupId = down.groupId;
+      break;
+    }
+  }
+  if (groupId === GROUPED_NONE) {
+    ui.toast("No groups yet — g creates one");
     renderAll();
     return;
   }
-  const outside = targets.filter((tab) => tab.groupId !== focused.groupId);
+  const outside = targets.filter((tab) => tab.groupId !== groupId);
   if (outside.length === 0) {
     ui.toast("Already in this group");
     renderAll();
@@ -786,7 +841,7 @@ async function addToFocusedGroup() {
   }
   const res = await ask("groupManagerTabs", {
     ids: outside.map((tab) => tab.id),
-    groupId: focused.groupId,
+    groupId,
   });
   if (!active) return;
   if (!res || !res.ok) {
@@ -921,6 +976,22 @@ function bookmarkTargets() {
     : removeBookmarks();
 }
 
+function focusOverlay() {
+  if (!overlay) return;
+  ui.safeFocus(overlay, { preventScroll: true });
+}
+
+function isOwnChrome(el) {
+  try {
+    if (!el) return false;
+    if (el === host || el === overlay) return true;
+    const cls = el.className;
+    return typeof cls === "string" && cls.includes(HOST_CLASS);
+  } catch {
+    return false;
+  }
+}
+
 function openField(kind, text, meta = {}) {
   if (field) return;
   confirm = null;
@@ -944,7 +1015,8 @@ function openField(kind, text, meta = {}) {
   field = { kind, ...meta };
   overlay.insertBefore(input, footerEl);
   renderAll();
-  fieldFocusBefore = document.activeElement;
+  const prev = document.activeElement;
+  fieldFocusBefore = isOwnChrome(prev) ? null : prev;
   input.focus();
   try {
     input.select();
@@ -959,16 +1031,19 @@ function closeField() {
   fieldEl = null;
   field = null;
   renderAll();
-  if (
-    fieldFocusBefore &&
-    fieldFocusBefore.isConnected &&
-    document.activeElement !== fieldFocusBefore
-  ) {
-    try {
-      fieldFocusBefore.focus();
-    } catch {}
-  }
+  const prev = fieldFocusBefore;
   fieldFocusBefore = null;
+  if (prev && prev.isConnected) {
+    if (document.activeElement !== prev) {
+      try {
+        prev.focus();
+      } catch {
+        focusOverlay();
+      }
+    }
+    return;
+  }
+  focusOverlay();
 }
 
 function fieldValue() {
@@ -1005,6 +1080,7 @@ function moveTargets(delta) {
     "moveManagerTabs",
     (targets) => ({ ids: targets.map((tab) => tab.id), delta }),
     { failed: "Move failed", done: null },
+    { keepMarks: true },
   );
 }
 
@@ -1123,7 +1199,7 @@ function onNormalKey(event) {
       consume(event);
       moveTargets(-1);
       return true;
-    case "a":
+    case "V":
       consume(event);
       markAllVisible();
       return true;
@@ -1151,7 +1227,7 @@ function onNormalKey(event) {
       consume(event);
       groupTargets();
       return true;
-    case "G":
+    case "a":
       consume(event);
       addToFocusedGroup();
       return true;

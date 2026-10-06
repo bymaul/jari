@@ -241,9 +241,9 @@ test("moveManagerTabs nudges a block without mixing pinned tabs", async () => {
   const moved = [];
   const restore = stubTabs({
     query: async () => [
-      { id: 1, windowId: 1, index: 0, pinned: false },
-      { id: 2, windowId: 1, index: 1, pinned: false },
-      { id: 3, windowId: 1, index: 2, pinned: false },
+      { id: 1, windowId: 1, index: 1, pinned: false },
+      { id: 2, windowId: 1, index: 2, pinned: false },
+      { id: 3, windowId: 1, index: 3, pinned: false },
       { id: 4, windowId: 1, index: 0, pinned: true },
     ],
     move: async (ids, props) => {
@@ -256,14 +256,120 @@ test("moveManagerTabs nudges a block without mixing pinned tabs", async () => {
       { ok: true, moved: 2 },
     );
     assert.deepEqual(moved, [
-      [
-        [1, 2],
-        { index: 1 },
-      ],
+      [2, { index: 3 }],
+      [1, { index: 2 }],
     ]);
     assert.deepEqual(await handlers.moveManagerTabs({}, { ids: [9], delta: 1 }), {
       ok: false,
     });
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabs offsets unpinned moves past pinned tabs", async () => {
+  const moved = [];
+  const restore = stubTabs({
+    query: async () => [
+      { id: 9, windowId: 1, index: 0, pinned: true },
+      { id: 1, windowId: 1, index: 1, pinned: false },
+      { id: 2, windowId: 1, index: 2, pinned: false },
+      { id: 3, windowId: 1, index: 3, pinned: false },
+    ],
+    move: async (ids, props) => {
+      moved.push([ids, props]);
+    },
+  });
+  try {
+    assert.deepEqual(
+      await handlers.moveManagerTabs({}, { ids: [1], delta: 1 }),
+      { ok: true, moved: 1 },
+    );
+    assert.deepEqual(moved, [[1, { index: 2 }]]);
+    moved.length = 0;
+    assert.deepEqual(
+      await handlers.moveManagerTabs({}, { ids: [1], delta: -1 }),
+      { ok: true, moved: 0 },
+    );
+    assert.deepEqual(moved, []);
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabs nudges each marked tab one slot, even when scattered", async () => {
+  const moved = [];
+  const restore = stubTabs({
+    query: async () => [
+      { id: 1, windowId: 1, index: 0, pinned: false },
+      { id: 2, windowId: 1, index: 1, pinned: false },
+      { id: 3, windowId: 1, index: 2, pinned: false },
+      { id: 4, windowId: 1, index: 3, pinned: false },
+    ],
+    move: async (ids, props) => {
+      moved.push([ids, props]);
+    },
+  });
+  try {
+    assert.deepEqual(
+      await handlers.moveManagerTabs({}, { ids: [1, 3], delta: 1 }),
+      { ok: true, moved: 2 },
+    );
+    assert.deepEqual(moved, [
+      [3, { index: 3 }],
+      [1, { index: 1 }],
+    ]);
+    moved.length = 0;
+    assert.deepEqual(
+      await handlers.moveManagerTabs({}, { ids: [2, 4], delta: -1 }),
+      { ok: true, moved: 2 },
+    );
+    assert.deepEqual(moved, [
+      [2, { index: 0 }],
+      [4, { index: 2 }],
+    ]);
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabs restores groups after moving marked tabs", async () => {
+  const moved = [];
+  const grouped = [];
+  const restore = stubTabs({
+    query: async () => [
+      { id: 1, windowId: 1, index: 0, pinned: false, groupId: 7 },
+      { id: 2, windowId: 1, index: 1, pinned: false, groupId: 7 },
+      { id: 3, windowId: 1, index: 2, pinned: false, groupId: -1 },
+    ],
+    move: async (ids, props) => {
+      moved.push([ids, props]);
+    },
+    group: async (opts) => {
+      grouped.push(opts);
+      return opts.groupId;
+    },
+    ungroup: async () => {},
+  });
+  try {
+    assert.deepEqual(
+      await handlers.moveManagerTabs({}, { ids: [1, 2], delta: 1 }),
+      { ok: true, moved: 2 },
+    );
+    assert.deepEqual(moved, [
+      [2, { index: 2 }],
+      [1, { index: 1 }],
+    ]);
+    assert.deepEqual(grouped, [{ tabIds: [1, 2], groupId: 7 }]);
+
+    moved.length = 0;
+    grouped.length = 0;
+    assert.deepEqual(
+      await handlers.moveManagerTabs({}, { ids: [3], delta: -1 }),
+      { ok: true, moved: 1 },
+    );
+    assert.deepEqual(moved, [[3, { index: 1 }]]);
+    assert.deepEqual(grouped, []);
   } finally {
     restore();
   }

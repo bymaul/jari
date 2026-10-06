@@ -512,12 +512,31 @@ test("keypress and keyup in overlay UI are shielded from the page", () => {
     });
     shieldOverlayKey(ev);
     assert.ok(ev.shielded, `expected stopPropagation for ${type} in Jari UI`);
+    assert.ok(!ev.claimed, `expected no preventDefault for ${type} in Jari UI`);
   }
-  const page = key({
-    key: "/",
+});
+
+test("page keypress and keyup are claimed while an overlay is open", () => {
+  shieldActive = true;
+  touch("test-shield");
+  for (const type of ["keypress", "keyup"]) {
+    const ev = key({
+      key: " ",
+      target: { className: "page-node" },
+      composedPath: () => [{ className: "page-node" }],
+    });
+    shieldOverlayKey(ev);
+    assert.ok(ev.claimed, `expected page ${type} to be claimed`);
+  }
+});
+
+test("shieldOverlayKey passes everything through without an active overlay", () => {
+  const ev = key({
+    key: " ",
     target: { className: "page-node" },
     composedPath: () => [{ className: "page-node" }],
   });
-  shieldOverlayKey(page);
-  assert.ok(!page.shielded, "expected page keypress/keyup to pass through");
+  shieldOverlayKey(ev);
+  assert.ok(!ev.claimed, "expected the key to reach the page");
+  assert.ok(!ev.shielded, "expected no shielding outside overlays");
 });

@@ -744,6 +744,7 @@
     }
     const byId = new Map(all.map((tab) => [tab.id, tab]));
     const perWindow = /* @__PURE__ */ new Map();
+    const regroup = /* @__PURE__ */ new Map();
     for (const id of targets) {
       const tab = byId.get(id);
       if (!tab) continue;
@@ -753,25 +754,54 @@
         perWindow.set(key, { windowId: tab.windowId, pinned, ids: [] });
       }
       perWindow.get(key).ids.push(id);
-    }
-    if (perWindow.size === 0) return { ok: false };
-    let moved = 0;
-    for (const { windowId, pinned, ids: group } of perWindow.values()) {
-      const siblings = all.filter((tab) => tab.windowId === windowId && !!tab.pinned === pinned).sort((a, b) => a.index - b.index).map((tab) => tab.id);
-      if (siblings.length < 2) continue;
-      const positions = group.map((id) => siblings.indexOf(id)).sort((a, b) => a - b);
-      if (positions.some((pos) => pos < 0)) continue;
-      const target = Math.min(
-        siblings.length - group.length,
-        Math.max(0, positions[0] + step)
-      );
-      try {
-        await chrome.tabs.move(group, { index: target });
-        moved += group.length;
-      } catch {
+      if (Number.isInteger(tab.groupId) && tab.groupId >= 0) {
+        if (!regroup.has(tab.groupId)) regroup.set(tab.groupId, []);
+        regroup.get(tab.groupId).push(id);
       }
     }
-    return moved > 0 ? { ok: true, moved } : { ok: false };
+    if (perWindow.size === 0) return { ok: false };
+    const dir = step > 0 ? 1 : -1;
+    const pinnedCount = /* @__PURE__ */ new Map();
+    for (const tab of all) {
+      if (!tab.pinned) continue;
+      pinnedCount.set(tab.windowId, (pinnedCount.get(tab.windowId) || 0) + 1);
+    }
+    let viable = false;
+    let moved = 0;
+    for (const { windowId, pinned, ids: group } of perWindow.values()) {
+      const order = all.filter((tab) => tab.windowId === windowId && !!tab.pinned === pinned).sort((a, b) => a.index - b.index).map((tab) => tab.id);
+      if (order.length < 2) continue;
+      viable = true;
+      const base = pinned ? 0 : pinnedCount.get(windowId) || 0;
+      for (let n = 0; n < Math.abs(step); n++) {
+        const pos = new Map(order.map((id, i) => [id, i]));
+        const sequenced = group.filter((id) => pos.has(id)).sort(
+          (a, b) => dir > 0 ? pos.get(b) - pos.get(a) : pos.get(a) - pos.get(b)
+        );
+        for (const id of sequenced) {
+          const from = order.indexOf(id);
+          if (from < 0) continue;
+          const target = Math.min(order.length - 1, Math.max(0, from + dir));
+          order.splice(from, 1);
+          order.splice(target, 0, id);
+          if (target === from) continue;
+          try {
+            await chrome.tabs.move(id, { index: base + target });
+            moved++;
+          } catch {
+          }
+        }
+      }
+    }
+    if (moved > 0 && groupsSupported()) {
+      for (const [groupId, ids2] of regroup) {
+        try {
+          await chrome.tabs.group({ tabIds: ids2, groupId });
+        } catch {
+        }
+      }
+    }
+    return viable ? { ok: true, moved } : { ok: false };
   }
   async function duplicateManagerTabs(_, { ids } = {}) {
     const targets = sanitizeIds(ids);

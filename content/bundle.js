@@ -3645,8 +3645,8 @@
   var POLL_MS = 2e3;
   var FOOTER_MINIMAL = "Space mark | Enter switch | d close | / filter | Esc close | ? more";
   var FOOTER_FULL = [
-    "Space mark | v range | a all | Enter switch | d close | y duplicate | e edit | t new tab | ? less",
-    "p pin | m mute | g group | G to group | u ungroup | r rename | b bookmark | J/K reorder | Esc close"
+    "Space mark | v range | V all | Enter switch | d close | y duplicate | e edit | t new tab | ? less",
+    "p pin | m mute | g group | a add to group | u ungroup | r rename | b bookmark | J/K reorder | Esc close"
   ];
   var FIELDS = {
     open: {
@@ -3881,6 +3881,32 @@
     .jari-prompt-list {
       max-height: 52vh !important;
     }
+    .jari-prompt-header.jari-mgr-header {
+      display: flex !important;
+      align-items: baseline !important;
+      gap: 0 1.5ex;
+    }
+    .jari-mgr-title {
+      flex: none;
+      font-weight: var(--jari-header-font-weight, bold) !important;
+    }
+    .jari-mgr-stats {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.8;
+      font-weight: normal !important;
+    }
+    .jari-mgr-badge {
+      flex: none;
+      opacity: 0.8;
+      font-weight: normal !important;
+    }
+    .jari-mgr-pos {
+      flex: none;
+      opacity: 0.7;
+      font-weight: normal !important;
+    }
   `;
   }
   function windowLabels(rows) {
@@ -3946,17 +3972,27 @@
   }
   function renderHeader() {
     const wins = new Set(tabs2.map((tab) => tab.windowId)).size;
-    const parts = [
-      `Tab manager \u2014 ${tabs2.length} tabs \xB7 ${wins} windows \xB7 ${marked.size} marked`
-    ];
-    if (windowId !== null) {
-      const labels = windowLabels(tabs2);
-      parts.push(`current W${labels.get(windowId) || "?"}`);
-    }
-    if (query2) parts.push(`/${query2}`);
-    if (visualAnchor !== null) parts.push("(visual)");
-    if (field) parts.push(`(${FIELDS[field.kind].badge})`);
-    headerEl.textContent = parts.join(" ");
+    headerEl.textContent = "";
+    headerEl.classList.add("jari-mgr-header");
+    appendSpan(headerEl, "jari-mgr-title", "Tab manager");
+    const stats = document.createElement("span");
+    stats.className = "jari-mgr-stats";
+    const labels = windowLabels(tabs2);
+    let summary = `${tabs2.length} tabs \xB7 ${wins} windows`;
+    if (windowId !== null) summary += ` \xB7 current W${labels.get(windowId) || "?"}`;
+    summary += " \xB7 ";
+    stats.textContent = summary;
+    const marks = document.createElement("span");
+    marks.className = "jari-mgr-marked";
+    marks.textContent = `${marked.size} marked`;
+    stats.appendChild(marks);
+    headerEl.appendChild(stats);
+    if (query2) appendSpan(headerEl, "jari-mgr-badge", `/${query2}`);
+    if (visualAnchor !== null)
+      appendSpan(headerEl, "jari-mgr-badge", "(visual)");
+    if (field) appendSpan(headerEl, "jari-mgr-badge", `(${FIELDS[field.kind].badge})`);
+    const total = filtered2.length;
+    appendSpan(headerEl, "jari-mgr-pos", total === 0 ? "0/0" : `${selected2 + 1}/${total}`);
   }
   function renderFooter() {
     if (field) {
@@ -4116,6 +4152,8 @@
       if (idx >= 0) selected2 = idx;
     }
     renderAll();
+    overlay2.tabIndex = -1;
+    ui.safeFocus(overlay2, { preventScroll: true });
     document.addEventListener("visibilitychange", onVisibility);
     startPolling();
   }
@@ -4240,7 +4278,7 @@
     }
     return outcome.failed;
   }
-  async function runOnTargets(action, payload, outcome) {
+  async function runOnTargets(action, payload, outcome, opts = {}) {
     const targets = currentTargets();
     if (targets.length === 0) return;
     confirm = null;
@@ -4252,7 +4290,7 @@
       return;
     }
     if (outcome.done) outcome.done(res, targets);
-    consumeMarks();
+    if (!opts.keepMarks) consumeMarks();
     await refresh();
   }
   async function closeTargets() {
@@ -4324,12 +4362,25 @@
     const targets = currentTargets();
     if (!focused || targets.length === 0) return;
     confirm = null;
-    if (focused.groupId === GROUPED_NONE) {
-      ui.toast("Focused tab has no group \u2014 g creates one");
+    let groupId = GROUPED_NONE;
+    for (let dist = 0; dist < filtered2.length; dist++) {
+      const up = filtered2[selected2 - dist];
+      if (up && up.groupId !== GROUPED_NONE) {
+        groupId = up.groupId;
+        break;
+      }
+      const down = filtered2[selected2 + dist];
+      if (down && down.groupId !== GROUPED_NONE) {
+        groupId = down.groupId;
+        break;
+      }
+    }
+    if (groupId === GROUPED_NONE) {
+      ui.toast("No groups yet \u2014 g creates one");
       renderAll();
       return;
     }
-    const outside = targets.filter((tab) => tab.groupId !== focused.groupId);
+    const outside = targets.filter((tab) => tab.groupId !== groupId);
     if (outside.length === 0) {
       ui.toast("Already in this group");
       renderAll();
@@ -4337,7 +4388,7 @@
     }
     const res = await ask("groupManagerTabs", {
       ids: outside.map((tab) => tab.id),
-      groupId: focused.groupId
+      groupId
     });
     if (!active2) return;
     if (!res || !res.ok) {
@@ -4456,6 +4507,20 @@
   function bookmarkTargets() {
     return decideSetState(currentTargets(), "bookmarked") ? saveBookmarks() : removeBookmarks();
   }
+  function focusOverlay() {
+    if (!overlay2) return;
+    ui.safeFocus(overlay2, { preventScroll: true });
+  }
+  function isOwnChrome(el) {
+    try {
+      if (!el) return false;
+      if (el === host2 || el === overlay2) return true;
+      const cls = el.className;
+      return typeof cls === "string" && cls.includes(HOST_CLASS);
+    } catch {
+      return false;
+    }
+  }
   function openField(kind, text, meta = {}) {
     if (field) return;
     confirm = null;
@@ -4479,7 +4544,8 @@
     field = { kind, ...meta };
     overlay2.insertBefore(input, footerEl);
     renderAll();
-    fieldFocusBefore = document.activeElement;
+    const prev = document.activeElement;
+    fieldFocusBefore = isOwnChrome(prev) ? null : prev;
     input.focus();
     try {
       input.select();
@@ -4495,13 +4561,19 @@
     fieldEl = null;
     field = null;
     renderAll();
-    if (fieldFocusBefore && fieldFocusBefore.isConnected && document.activeElement !== fieldFocusBefore) {
-      try {
-        fieldFocusBefore.focus();
-      } catch {
-      }
-    }
+    const prev = fieldFocusBefore;
     fieldFocusBefore = null;
+    if (prev && prev.isConnected) {
+      if (document.activeElement !== prev) {
+        try {
+          prev.focus();
+        } catch {
+          focusOverlay();
+        }
+      }
+      return;
+    }
+    focusOverlay();
   }
   function fieldValue() {
     return fieldEl ? fieldEl.value : "";
@@ -4530,7 +4602,8 @@
     return runOnTargets(
       "moveManagerTabs",
       (targets) => ({ ids: targets.map((tab) => tab.id), delta }),
-      { failed: "Move failed", done: null }
+      { failed: "Move failed", done: null },
+      { keepMarks: true }
     );
   }
   function consume2(event) {
@@ -4640,7 +4713,7 @@
         consume2(event);
         moveTargets(-1);
         return true;
-      case "a":
+      case "V":
         consume2(event);
         markAllVisible();
         return true;
@@ -4668,7 +4741,7 @@
         consume2(event);
         groupTargets();
         return true;
-      case "G":
+      case "a":
         consume2(event);
         addToFocusedGroup();
         return true;
@@ -8415,7 +8488,7 @@
       return document.activeElement === inputEl3;
     }
   }
-  function focusOverlay() {
+  function focusOverlay2() {
     if (!overlay4) return;
     try {
       overlay4.focus();
@@ -8463,7 +8536,7 @@
     } catch {
     }
     inputEl3 = null;
-    focusOverlay();
+    focusOverlay2();
     updateStatus2();
   }
   function helpCss() {
@@ -11139,7 +11212,13 @@ ${location.href}`;
     return false;
   }
   function shieldOverlayKey(event) {
-    if (Overlays.active() && isJariUiTarget(event)) event.stopPropagation();
+    if (!Overlays.active()) return;
+    if (isJariUiTarget(event)) {
+      event.stopPropagation();
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
   }
   function handleKeydown(event) {
     if (!event.isTrusted) return;
@@ -11260,8 +11339,7 @@ ${location.href}`;
     const count = parseRepeatCount(pendingCount3);
     const hadCount = countStr !== "";
     pendingCount3 = "";
-    if (hadCount || bufferWasPending)
-      ui.flash(countStr + buffer + key);
+    if (hadCount || bufferWasPending) ui.flash(countStr + buffer + key);
     restartTimer();
     run(commandName, count, event);
   }

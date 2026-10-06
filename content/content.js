@@ -145,13 +145,18 @@ function isJariUiTarget(event) {
 }
 
 export function shieldOverlayKey(event) {
-  if (Overlays.active() && isJariUiTarget(event)) event.stopPropagation();
+  if (!Overlays.active()) return;
+  if (isJariUiTarget(event)) {
+    event.stopPropagation();
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
 }
 
 function handleKeydown(event) {
   if (!event.isTrusted) return;
 
-  // The options page recorder claims keys while rebinding (see options.js).
   if (window.__jariOptionsRecording) {
     clearPending();
     return;
@@ -293,8 +298,7 @@ function handleKeydown(event) {
   const hadCount = countStr !== "";
   pendingCount = "";
 
-  if (hadCount || bufferWasPending)
-    ui.flash(countStr + buffer + key);
+  if (hadCount || bufferWasPending) ui.flash(countStr + buffer + key);
   restartTimer();
 
   run(commandName, count, event);

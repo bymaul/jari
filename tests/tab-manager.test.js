@@ -177,7 +177,13 @@ function makeElement(tag) {
       if (value === "") this.children.length = 0;
     },
     get textContent() {
-      return this._text;
+      let out = this._text || "";
+      for (const child of this.children || []) {
+        try {
+          out += child.textContent || "";
+        } catch {}
+      }
+      return out;
     },
     classList: {
       _set: new Set(),
@@ -442,6 +448,124 @@ test("open renders every tab with the active tab selected", async () => {
         { action: "activateTab", id: 2 },
       );
       assert.equal(TabManager.isActive(), false);
+    } finally {
+      runtime.restore();
+      TabManager.close();
+    }
+  });
+});
+
+test("header shows structured title, stats, position and badges", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const runtime = stubRuntime(managerHandler);
+    try {
+      await TabManager.open();
+      const headerKids = () => headerOf(document).children;
+      const byClass = (cls) =>
+        headerKids().filter((el) => el.className === cls);
+
+      assert.equal(byClass("jari-mgr-title")[0].textContent, "Tab manager");
+      const stats = byClass("jari-mgr-stats")[0];
+      assert.ok(stats.textContent.includes("3 tabs"));
+      assert.ok(stats.textContent.includes("current W1"));
+      assert.ok(stats.textContent.includes("0 marked"));
+      const marks = stats.children[0];
+      assert.equal(marks.className, "jari-mgr-marked");
+      assert.equal(byClass("jari-mgr-pos")[0].textContent, "1/3");
+      assert.deepEqual(byClass("jari-mgr-badge"), []);
+
+      TabManager.onKeyDown(keyEvent(" "));
+      assert.ok(
+        byClass("jari-mgr-stats")[0].children[0].textContent.includes("1 marked"),
+      );
+
+      TabManager.onKeyDown(keyEvent("j"));
+      assert.equal(byClass("jari-mgr-pos")[0].textContent, "2/3");
+
+      TabManager.onKeyDown(keyEvent("/"));
+      const input = fieldElOf(document);
+      input.value = "docs";
+      input.dispatch("input", {});
+      const badges = byClass("jari-mgr-badge").map((el) => el.textContent);
+      assert.ok(badges.includes("/docs"), "expected the filter badge");
+      assert.ok(badges.includes("(filtering)"), "expected the field badge");
+      TabManager.onKeyDown(keyEvent("Escape"));
+      assert.ok(
+        byClass("jari-mgr-badge").every((el) => el.textContent !== "(filtering)"),
+        "expected the field badge to clear",
+      );
+    } finally {
+      runtime.restore();
+      TabManager.close();
+    }
+  });
+});
+
+test("J and K reorder marked tabs without dropping the marks", async () => {
+  const document = makeDocument();
+  let order = [2, 1];
+  const handler = (message, sent) => {
+    if (message.action === "managerList") {
+      const tabs = TABS.map((tab) =>
+        tab.id === 3 ? tab : { ...tab, index: order.indexOf(tab.id) },
+      );
+      return { ok: true, tabs, groups: GROUPS, currentWindowId: 1 };
+    }
+    if (message.action === "moveManagerTabs") {
+      const ids = message.ids.filter((id) => order.includes(id));
+      const rest = order.filter((id) => !ids.includes(id));
+      const at = Math.min(
+        rest.length,
+        Math.max(0, order.indexOf(ids[0]) + message.delta),
+      );
+      order = [...rest.slice(0, at), ...ids, ...rest.slice(at)];
+      return { ok: true, moved: ids.length };
+    }
+    return managerHandler(message, sent);
+  };
+  await withDocument(document, async () => {
+    const runtime = stubRuntime(handler);
+    try {
+      await TabManager.open();
+      const titles = () =>
+        spansInRows(document, "title").map((el) => el.textContent);
+      const pos = () =>
+        headerOf(document).children.find(
+          (el) => el.className === "jari-mgr-pos",
+        ).textContent;
+      assert.deepEqual(titles(), [
+        "Mail inbox",
+        "GitHub - pull requests",
+        "Docs",
+      ]);
+
+      TabManager.onKeyDown(keyEvent(" "));
+      TabManager.onKeyDown(keyEvent("J"));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.deepEqual(titles(), [
+        "GitHub - pull requests",
+        "Mail inbox",
+        "Docs",
+      ]);
+      assert.ok(headerOf(document).textContent.includes("1 marked"));
+      assert.equal(pos(), "2/3");
+
+      TabManager.onKeyDown(keyEvent("K"));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.deepEqual(titles(), [
+        "Mail inbox",
+        "GitHub - pull requests",
+        "Docs",
+      ]);
+      assert.ok(headerOf(document).textContent.includes("1 marked"));
+      assert.equal(pos(), "1/3");
+
+      TabManager.onKeyDown(keyEvent("j"));
+      TabManager.onKeyDown(keyEvent(" "));
+      TabManager.onKeyDown(keyEvent("J"));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.ok(headerOf(document).textContent.includes("2 marked"));
     } finally {
       runtime.restore();
       TabManager.close();
@@ -960,13 +1084,131 @@ test("t field ignores an empty submit", async () => {
   });
 });
 
+test("a adds marked tabs to the focused tab's group and G is unbound", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const runtime = stubRuntime(managerHandler);
+    try {
+      await TabManager.open();
+      assert.equal(TabManager.onKeyDown(keyEvent("G")), false);
+      TabManager.onKeyDown(keyEvent("j"));
+      TabManager.onKeyDown(keyEvent(" "));
+      TabManager.onKeyDown(keyEvent("j"));
+      TabManager.onKeyDown(keyEvent(" "));
+      TabManager.onKeyDown(keyEvent("k"));
+      TabManager.onKeyDown(keyEvent("k"));
+      TabManager.onKeyDown(keyEvent("a"));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.deepEqual(
+        runtime.sent.find((m) => m.action === "groupManagerTabs"),
+        { action: "groupManagerTabs", ids: [1, 3], groupId: 10 },
+      );
+      assert.ok(headerOf(document).textContent.includes("0 marked"));
+    } finally {
+      runtime.restore();
+      TabManager.close();
+    }
+  });
+});
+
+test("V marks all visible tabs", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const runtime = stubRuntime(managerHandler);
+    try {
+      await TabManager.open();
+      TabManager.onKeyDown(keyEvent("V"));
+      assert.ok(headerOf(document).textContent.includes("3 marked"));
+    } finally {
+      runtime.restore();
+      TabManager.close();
+    }
+  });
+});
+
+test("a adds the focused tab to the nearest group without marks", async () => {
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const runtime = stubRuntime(managerHandler);
+    try {
+      await TabManager.open();
+      TabManager.onKeyDown(keyEvent("j"));
+      TabManager.onKeyDown(keyEvent("a"));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.deepEqual(
+        runtime.sent.find((m) => m.action === "groupManagerTabs"),
+        { action: "groupManagerTabs", ids: [1], groupId: 10 },
+      );
+    } finally {
+      runtime.restore();
+      TabManager.close();
+    }
+  });
+});
+
+test("a prefers the group above on a tie and toasts when groupless", async () => {
+  const tabs = [
+    { id: 1, windowId: 1, index: 0, title: "A", url: "https://a.example/", active: false, pinned: false, muted: false, audible: false, bookmarked: false, groupId: -1 },
+    { id: 2, windowId: 1, index: 1, title: "B", url: "https://b.example/", active: false, pinned: false, muted: false, audible: false, bookmarked: false, groupId: 7 },
+    { id: 3, windowId: 1, index: 2, title: "C", url: "https://c.example/", active: true, pinned: false, muted: false, audible: false, bookmarked: false, groupId: -1 },
+    { id: 4, windowId: 1, index: 3, title: "D", url: "https://d.example/", active: false, pinned: false, muted: false, audible: false, bookmarked: false, groupId: 8 },
+  ];
+  const groups = [
+    { id: 7, title: "Up", color: "blue", collapsed: false },
+    { id: 8, title: "Down", color: "red", collapsed: false },
+  ];
+  const document = makeDocument();
+  await withDocument(document, async () => {
+    const runtime = stubRuntime((message) =>
+      message.action === "managerList"
+        ? { ok: true, tabs, groups, currentWindowId: 1 }
+        : managerHandler(message),
+    );
+    try {
+      await TabManager.open();
+      TabManager.onKeyDown(keyEvent("a"));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.deepEqual(
+        runtime.sent.find((m) => m.action === "groupManagerTabs"),
+        { action: "groupManagerTabs", ids: [3], groupId: 7 },
+      );
+    } finally {
+      runtime.restore();
+      TabManager.close();
+    }
+  });
+
+  const bare = tabs.map((tab) => ({ ...tab, groupId: -1 }));
+  const document2 = makeDocument();
+  await withDocument(document2, async () => {
+    const runtime = stubRuntime((message) =>
+      message.action === "managerList"
+        ? { ok: true, tabs: bare, groups: [], currentWindowId: 1 }
+        : managerHandler(message),
+    );
+    try {
+      await TabManager.open();
+      TabManager.onKeyDown(keyEvent("a"));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.ok(
+        !runtime.sent.some((m) => m.action === "groupManagerTabs"),
+        "expected no grouping without groups",
+      );
+      assert.equal(TabManager.isActive(), true);
+    } finally {
+      runtime.restore();
+      TabManager.close();
+    }
+  });
+});
+
 test("y duplicates marked tabs and keeps the manager open", async () => {
   const document = makeDocument();
   await withDocument(document, async () => {
     const runtime = stubRuntime(managerHandler);
     try {
       await TabManager.open();
-      TabManager.onKeyDown(keyEvent("a"));
+      TabManager.onKeyDown(keyEvent("V"));
       TabManager.onKeyDown(keyEvent("y"));
       await new Promise((r) => setTimeout(r, 10));
       assert.deepEqual(

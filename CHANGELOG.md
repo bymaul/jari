@@ -13,7 +13,8 @@ versioned for the extension manifest (`manifest.base.json`).
   and muted group colors. `Space` multi-marks,
   `Enter` switches, `d` closes (two-press confirm for more than one),
   `p`/`m` pin/mute, `e` edits the focused tab's URL, `y` duplicates
-  marked tabs, `g` groups, `G` adds to the focused tab's group,
+  marked tabs, `g` groups, `a` adds to the nearest group from the
+  cursor with no marks needed (ties go upward),
   `u` ungroups, `r` renames the group, `b` toggles bookmarks for the
   marked tabs, `t` opens a new tab, `J`/`K` reorder, `/` filters. The `t`, `r`,
   and `e` modes all share one in-panel text field. Bookmark matching
@@ -33,8 +34,9 @@ versioned for the extension manifest (`manifest.base.json`).
   the cursor where the tab used to be. The footer keeps a
   one-line hint by default; `?` toggles the full two-line reference.
   Marking: `Space` toggles the row under the cursor, `v` anchors a
-  range that paints and shrinks as you move, `a` marks all visible.
-  Bulk actions consume the marks they acted on, and `Esc` unwinds one
+  range that paints and shrinks as you move, `V` marks all visible.
+  Bulk actions consume the marks they acted on except reordering with
+  `J`/`K`, which keeps them for repeated presses, and `Esc` unwinds one
   layer at a time: confirm, visual anchor, filter, marks, then close.
   Stored keymaps migrate forward
   (schema v10): `gt` fills where free.
