@@ -1,0 +1,135 @@
+:root {
+  --bg: #1e1e26;
+  --panel: #262630;
+  --border: #3f4346;
+  --fg: #d9d9de;
+  --muted: #606079;
+  --link: #7e98e8;
+  --danger: #e08a8a;
+  --mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:focus-visible {
+  outline: none;
+}
+
+body {
+  margin: 0;
+  width: 320px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--fg);
+}
+
+#version {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+#status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.dot.on {
+  background: var(--fg);
+}
+
+.dot.off {
+  background: var(--danger);
+}
+
+#host {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button {
+  padding: 3px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button:hover,
+button:focus-visible {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+button:active {
+  border-style: inset;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#toggle {
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.row button {
+  flex: 1;
+}
+
+footer {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+footer a {
+  color: var(--link);
+}

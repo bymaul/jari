@@ -13,6 +13,7 @@ export default [
       // Generated bundles, rebuilt by npm run build:chrome.
       "content/bundle.js",
       "options/options.bundle.js",
+      "popup/popup.bundle.js",
       "background.js",
     ],
   },

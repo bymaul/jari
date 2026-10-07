@@ -7,6 +7,7 @@ import {
   parseRepeatCount,
 } from "./keymap.js";
 import { settings } from "./settings.js";
+import { SHOW_HELP_ACTION } from "../popup/site.js";
 import { ui } from "./ui.js";
 import { commands, setModeActions } from "./commands.js";
 import { Overlays } from "./overlays.js";
@@ -320,6 +321,12 @@ async function boot() {
   window.addEventListener("keypress", shieldOverlayKey, true);
   window.addEventListener("keyup", shieldOverlayKey, true);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
+  chrome.runtime.onMessage.addListener((message) => {
+    if (!message || message.action !== SHOW_HELP_ACTION) return;
+    if (window.top !== window) return;
+    const cmd = commands.showHelp;
+    if (cmd) cmd.run({ count: 1 });
+  });
 }
 
 setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });

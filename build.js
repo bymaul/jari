@@ -31,6 +31,9 @@ const distFiles = [
   "options/options.html",
   "options/options.bundle.js",
   "options/options.css",
+  "popup/popup.html",
+  "popup/popup.css",
+  "popup/popup.bundle.js",
   "icons/icon-16.png",
   "icons/icon-32.png",
   "icons/icon-48.png",
@@ -39,10 +42,12 @@ const distFiles = [
 
 await buildOne("content", "content.js", "bundle.js", buildBanner);
 await buildOne("options", "options.js", "options.bundle.js", buildBanner);
+await buildOne("popup", "popup.js", "popup.bundle.js", buildBanner);
 await buildOne("background", "main.js", "background.js", buildBanner);
 
 console.log("Wrote content/bundle.js");
 console.log("Wrote options/options.bundle.js");
+console.log("Wrote popup/popup.bundle.js");
 console.log("Wrote background.js");
 
 if (target === "dist") {

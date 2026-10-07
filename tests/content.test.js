@@ -213,3 +213,32 @@ test("keys typed into overlay UI are shielded from the page", () => {
   assert.deepEqual(shieldKeys, ["/"]);
   assert.ok(ev.shielded, "expected stopPropagation for Jari UI targets");
 });
+
+test("popup help message opens the cheatsheet in the top frame", async () => {
+  const { SHOW_HELP_ACTION } = await import("../popup/site.js");
+  spyOn("showHelp");
+  globalThis.window.top = globalThis.window;
+  try {
+    const listeners = globalThis.chrome.runtime.onMessage._listeners;
+    assert.ok(listeners.length > 0);
+    for (const fn of listeners) fn({ action: SHOW_HELP_ACTION });
+    assert.equal(spiedCalls.showHelp.length, 1);
+  } finally {
+    delete globalThis.window.top;
+  }
+});
+
+test("popup help message is ignored in subframes and for other actions", async () => {
+  const { SHOW_HELP_ACTION } = await import("../popup/site.js");
+  spyOn("showHelp");
+  const listeners = globalThis.chrome.runtime.onMessage._listeners;
+  globalThis.window.top = {};
+  try {
+    for (const fn of listeners) fn({ action: SHOW_HELP_ACTION });
+  } finally {
+    delete globalThis.window.top;
+  }
+  for (const fn of listeners) fn({ action: "something-else" });
+  for (const fn of listeners) fn(null);
+  assert.equal(spiedCalls.showHelp.length, 0);
+});

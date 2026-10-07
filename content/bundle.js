@@ -1374,6 +1374,9 @@
     toggleSiteEnabled
   };
 
+  // popup/site.js
+  var SHOW_HELP_ACTION = "jari-show-help";
+
   // content/ui.js
   function sendMessage(action, payload = {}) {
     return new Promise((resolve) => {
@@ -11401,6 +11404,12 @@ ${location.href}`;
     window.addEventListener("keypress", shieldOverlayKey, true);
     window.addEventListener("keyup", shieldOverlayKey, true);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    chrome.runtime.onMessage.addListener((message) => {
+      if (!message || message.action !== SHOW_HELP_ACTION) return;
+      if (window.top !== window) return;
+      const cmd2 = commands.showHelp;
+      if (cmd2) cmd2.run({ count: 1 });
+    });
   }
   setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
   boot();

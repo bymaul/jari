@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Jari</h1>
+        <span id="version" aria-label="Jari version"></span>
+      </header>
+      <p id="status" role="status" aria-live="polite">
+        <span id="dot" class="dot na" aria-hidden="true"></span>
+        <span id="status-text">Loading…</span>
+      </p>
+      <p id="host" hidden></p>
+      <button id="toggle" type="button">Disable on this site</button>
+      <div class="row">
+        <button id="settings" type="button">Settings</button>
+        <button id="help" type="button">Help</button>
+      </div>
+      <footer>
+        <a
+          href="https://github.com/bymaul/jari"
+          target="_blank"
+          rel="noreferrer"
+          >GitHub</a
+        >
+        ·
+        <a
+          href="https://github.com/bymaul/jari/issues"
+          target="_blank"
+          rel="noreferrer"
+          >Report issue</a
+        >
+      </footer>
+    </main>
+    <script src="popup.bundle.js"></script>
+  </body>
+</html>
