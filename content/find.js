@@ -1,12 +1,7 @@
 /* global CSS, Highlight */
 import { register, touch } from "./overlays.js";
 import { ui, createShadowHost } from "./ui.js";
-import {
-  canonicalKey,
-  deepActiveElement,
-  keysForCommand,
-} from "./keymap.js";
-import { settings } from "./settings.js";
+import { deepActiveElement } from "./keymap.js";
 import { getLinkAncestor } from "./hints-elements.js";
 import {
   detectHighlightSupport,
@@ -34,14 +29,6 @@ let pendingQuery = "";
 let committedQuery = "";
 let committedIdx = 0;
 let committedHidden = false;
-let committedRegex = false;
-let committedWholeWord = false;
-let committedCase = false;
-
-let findRegex = false;
-let findWholeWord = false;
-let findCase = false;
-let toggleButtons = {};
 
 const FIND_HISTORY_KEY = "findHistory";
 const MAX_FIND_HISTORY = 20;
@@ -129,12 +116,7 @@ function syncObserver() {
 
 function buildMatches(query) {
   if (!query) return [];
-  const caseSensitive = findCase || (!findRegex && hasUpperCase(query));
-  const matcher = buildMatcher(query, {
-    regex: findRegex,
-    wholeWord: findWholeWord,
-    caseSensitive,
-  });
+  const matcher = buildMatcher(query, { caseSensitive: hasUpperCase(query) });
   if (!matcher) return [];
   const nodes = collectTextNodes();
   const out = [];
@@ -365,35 +347,6 @@ function runQuery(query) {
   } catch {}
 }
 
-function findFlagLabel(name) {
-  return name === "regex" ? ".*" : name === "wholeWord" ? "\\b" : "Aa";
-}
-
-function refreshToggles() {
-  for (const [name, btn] of Object.entries(toggleButtons)) {
-    try {
-      const on =
-        name === "regex" ? findRegex : name === "wholeWord" ? findWholeWord : findCase;
-      btn.classList.toggle("jari-find-toggle-on", on);
-      btn.setAttribute("aria-pressed", on ? "true" : "false");
-    } catch {}
-  }
-}
-
-function toggleFindFlag(name) {
-  if (name === "regex") findRegex = !findRegex;
-  else if (name === "wholeWord") findWholeWord = !findWholeWord;
-  else findCase = !findCase;
-  refreshToggles();
-  const q = (inputEl && inputEl.value.trim()) || pendingQuery || lastQuery;
-  if (q) {
-    clearTimeout(inputDebounce);
-    runQuery(q);
-  } else {
-    updateStatus();
-  }
-}
-
 async function loadFindHistory() {
   try {
     const stored = await chrome.storage.local.get(FIND_HISTORY_KEY);
@@ -429,14 +382,6 @@ function stepHistory(delta) {
   executeQuery(inputEl.value);
 }
 
-function activeFlagSuffix() {
-  const flags = [];
-  if (findRegex) flags.push(".*");
-  if (findWholeWord) flags.push("\\b");
-  if (findCase) flags.push("Aa");
-  return flags.length > 0 ? ` · ${flags.join(" ")}` : "";
-}
-
 function updateStatus() {
   if (!statusEl) return;
   if (!pendingQuery && matches.length === 0 && !lastQuery) {
@@ -450,17 +395,10 @@ function updateStatus() {
     return;
   }
   if (matches.length === 0) {
-    if (
-      findRegex &&
-      !buildMatcher(q, { regex: true, wholeWord: findWholeWord, caseSensitive: findCase })
-    ) {
-      statusEl.textContent = "Invalid pattern";
-    } else {
-      statusEl.textContent = `No match for "${q}"${activeFlagSuffix()}`;
-    }
+    statusEl.textContent = `No match for "${q}"`;
     statusEl.classList.add("jari-find-no-match");
   } else {
-    statusEl.textContent = `${currentIdx + 1}/${matches.length}${activeFlagSuffix()}`;
+    statusEl.textContent = `${currentIdx + 1}/${matches.length}`;
     statusEl.classList.remove("jari-find-no-match");
   }
 }
@@ -532,23 +470,6 @@ function findCss() {
       outline: none !important;
       box-shadow: none !important;
     }
-    .jari-find-toggle {
-      flex: 0 0 auto;
-      font-family: var(--jari-cmdl-font-family, monospace) !important;
-      font-size: var(--jari-cmdl-font-size, 9pt) !important;
-      line-height: 1 !important;
-      color: #878787;
-      background: transparent;
-      border: 1px solid #333738;
-      border-radius: 2px;
-      padding: 0 0.5ex;
-      margin: 0;
-      cursor: pointer;
-    }
-    .jari-find-toggle-on {
-      color: var(--jari-accent, #e0a363);
-      border-color: var(--jari-accent-border, #c38a22);
-    }
     .jari-find-status {
       flex: 0 0 auto;
       font-size: var(--jari-cmdl-font-size, 9pt) !important;
@@ -585,29 +506,6 @@ function renderBar() {
   statusEl.className = "jari-find-status";
   bar.appendChild(label);
   bar.appendChild(inputEl);
-  toggleButtons = {};
-  for (const [name, command, label] of [
-    ["regex", "toggleFindRegex", "Regular expression"],
-    ["wholeWord", "toggleFindWholeWord", "Whole word"],
-    ["findCase", "toggleFindCase", "Match case"],
-  ]) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "jari-find-toggle";
-    btn.textContent = findFlagLabel(name);
-    const bound = keysForCommand(settings.getKeymap(), command);
-    btn.title = bound.length > 0 ? `${label} (${bound.join(", ")})` : label;
-    btn.setAttribute("aria-pressed", "false");
-    btn.setAttribute("aria-label", btn.title);
-    btn.addEventListener("click", () => {
-      toggleFindFlag(name);
-      try {
-        inputEl.focus();
-      } catch {}
-    });
-    toggleButtons[name] = btn;
-    bar.appendChild(btn);
-  }
   bar.appendChild(statusEl);
   overlay.appendChild(bar);
   shadow.appendChild(overlay);
@@ -718,22 +616,12 @@ function closeDiscardPending() {
   }
   lastQuery = committedQuery;
   pendingQuery = "";
-  const keepRegex = findRegex;
-  const keepWholeWord = findWholeWord;
-  const keepCase = findCase;
-  findRegex = committedRegex;
-  findWholeWord = committedWholeWord;
-  findCase = committedCase;
   try {
     matches = buildMatches(q);
     currentIdx = Math.min(committedIdx, Math.max(0, matches.length - 1));
   } catch {
     matches = [];
     currentIdx = 0;
-  } finally {
-    findRegex = keepRegex;
-    findWholeWord = keepWholeWord;
-    findCase = keepCase;
   }
   highlightsHidden = committedHidden;
   useHighlights = detectHighlightSupport();
@@ -761,9 +649,6 @@ function commitQuery(q) {
   committedQuery = query;
   committedIdx = 0;
   committedHidden = false;
-  committedRegex = findRegex;
-  committedWholeWord = findWholeWord;
-  committedCase = findCase;
   pendingQuery = "";
   highlightsHidden = false;
   useHighlights = detectHighlightSupport();
@@ -847,61 +732,13 @@ function next(count = 1, reverse = false) {
   ui.toast(`${currentIdx + 1}/${len}`);
 }
 
-const FIND_TOGGLE_COMMANDS = {
-  toggleFindRegex: "regex",
-  toggleFindWholeWord: "wholeWord",
-  toggleFindCase: "findCase",
-};
-
-export function findToggleCommandFor(keymap, combo) {
-  try {
-    const cmd = keymap ? keymap[combo] : null;
-    if (cmd && Object.prototype.hasOwnProperty.call(FIND_TOGGLE_COMMANDS, cmd)) {
-      return cmd;
-    }
-  } catch {}
-  return null;
-}
-
-function enableFindFlag(name) {
-  if (name === "regex") findRegex = true;
-  else if (name === "wholeWord") findWholeWord = true;
-  else findCase = true;
-}
-
-function toggleOrOpen(name) {
-  if (isActive()) {
-    toggleFindFlag(name);
-    try {
-      if (inputEl) inputEl.focus();
-    } catch {}
-    return;
-  }
-  open();
-  if (!inputEl) return;
-  enableFindFlag(name);
-  refreshToggles();
-  updateStatus();
-}
-
 function onKeyDown(event) {
   if (!active) return false;
-  const combo = canonicalKey(event);
-  const toggleCmd = findToggleCommandFor(settings.getKeymap(), combo);
   let focused;
   try {
     focused = deepActiveElement();
   } catch {
     focused = document.activeElement;
-  }
-  if (toggleCmd && (combo.includes("+") || focused !== inputEl)) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    toggleFindFlag(FIND_TOGGLE_COMMANDS[toggleCmd]);
-    try {
-      if (inputEl) inputEl.focus();
-    } catch {}
-    return true;
   }
   const inInput = focused === inputEl;
   if (inInput) {
@@ -966,7 +803,6 @@ export const Find = {
   clearHighlights,
   hideHighlights,
   next,
-  toggleOrOpen,
   isActive,
   hasHighlights,
   handleGlobalEsc,
@@ -984,7 +820,6 @@ try {
 export const __testHelpers = {
   buildMatches,
   buildMatcher,
-  findToggleCommandFor,
   hasUpperCase,
   matchesChanged,
   syncObserver,
@@ -1029,13 +864,7 @@ export function __resetFindState() {
   committedQuery = "";
   committedIdx = 0;
   committedHidden = false;
-  committedRegex = false;
-  committedWholeWord = false;
-  committedCase = false;
   useHighlights = false;
-  findRegex = false;
-  findWholeWord = false;
-  findCase = false;
   findHistory = [];
   historyIdx = -1;
   historyDraft = "";

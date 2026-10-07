@@ -3,14 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { buildMatcher, hasUpperCase } from "../content/find/matcher.js";
 
-test("find/matcher direct import: buildMatcher substring and regex", () => {
+test("find/matcher direct import: buildMatcher is a literal substring", () => {
   const sub = buildMatcher("a.c");
   assert.ok(sub.test("a.c"));
   assert.ok(!sub.test("aXc"));
-  const rx = buildMatcher("a+c", { regex: true });
-  assert.ok(rx.test("aaac"));
   assert.equal(buildMatcher(""), null);
-  assert.equal(buildMatcher("(unclosed", { regex: true }), null);
 });
 
 test("find/matcher direct import: hasUpperCase", () => {
@@ -19,10 +16,9 @@ test("find/matcher direct import: hasUpperCase", () => {
   assert.equal(hasUpperCase("Äpfel"), true);
 });
 
-test("find/matcher direct import: wholeWord and caseSensitive", () => {
-  const word = buildMatcher("cat", { wholeWord: true });
-  assert.ok(word.test("a cat sat"));
-  assert.ok(!word.test("concatenate"));
+test("find/matcher direct import: caseSensitive flag", () => {
+  const insensitive = buildMatcher("Abc");
+  assert.ok(insensitive.test("abc"));
   const sensitive = buildMatcher("Abc", { caseSensitive: true });
   assert.ok(sensitive.test("Abc"));
   assert.ok(!sensitive.test("abc"));

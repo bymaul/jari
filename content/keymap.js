@@ -76,9 +76,6 @@ export const keymapDefaults = {
   "/": "findText",
   n: "findNext",
   N: "findPrev",
-  "alt+1": "toggleFindRegex",
-  "alt+2": "toggleFindWholeWord",
-  "alt+3": "toggleFindCase",
   v: "enterVisual",
   V: "enterVisualLine",
 
@@ -398,13 +395,12 @@ export function migrateSettings(data) {
     d.keymap = migrateYankBindings(d.keymap);
     version = 6;
   }
-  // v6 -> v7: half-page binds land on d/u and find toggles move from
-  // alt+r/w/c to alt+1/2/3. Default-shaped toggle entries are pruned,
-  // then the new combos fill where free and their command is bound
-  // nowhere, so custom rebinds are never clobbered. Like the v4
-  // backfill, an intentionally unbound command may gain the new bind.
+  // v6 -> v7: find toggles (regex/whole-word/case) were removed and
+  // half-page binds land on d/u. Stored bindings for the deleted
+  // commands are pruned, then d/u fill where free and their command is
+  // bound nowhere, so custom rebinds are never clobbered.
   if (version < 7) {
-    d.keymap = migrateFindToggleBindings(d.keymap);
+    d.keymap = migrateRemovedFindToggles(d.keymap);
     version = 7;
   }
   // v7 -> v8: page navigation binds land on [[/]] and the custom
@@ -471,35 +467,31 @@ export function migrateYankBindings(keymap) {
   return out;
 }
 
-const FIND_TOGGLE_SWAPS = [
-  ["alt+r", "alt+1", "toggleFindRegex"],
-  ["alt+w", "alt+2", "toggleFindWholeWord"],
-  ["alt+c", "alt+3", "toggleFindCase"],
-];
+const REMOVED_FIND_COMMANDS = new Set([
+  "toggleFindRegex",
+  "toggleFindWholeWord",
+  "toggleFindCase",
+]);
 
 const HALF_PAGE_FILLS = [
   ["d", "scrollHalfPageDown"],
   ["u", "scrollHalfPageUp"],
 ];
 
-export function migrateFindToggleBindings(keymap) {
+export function migrateRemovedFindToggles(keymap) {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
     return keymap;
   }
-  const out = { ...keymap };
-  for (const [oldCombo, newCombo, command] of FIND_TOGGLE_SWAPS) {
-    if (out[oldCombo] !== command) continue;
-    if (newCombo in out && out[newCombo] !== command) continue;
-    delete out[oldCombo];
+  const out = {};
+  for (const [combo, command] of Object.entries(keymap)) {
+    if (REMOVED_FIND_COMMANDS.has(command)) continue;
+    out[combo] = command;
   }
   const used = new Set(Object.values(out));
-  for (const [newCombo, command] of [
-    ...FIND_TOGGLE_SWAPS.map(([, combo, cmd]) => [combo, cmd]),
-    ...HALF_PAGE_FILLS,
-  ]) {
-    if (newCombo in out || used.has(command)) continue;
-    if (findOverlapConflicts(out, newCombo).length > 0) continue;
-    out[newCombo] = command;
+  for (const [combo, command] of HALF_PAGE_FILLS) {
+    if (combo in out || used.has(command)) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
     used.add(command);
   }
   return out;

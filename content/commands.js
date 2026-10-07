@@ -302,9 +302,6 @@ export const commands = {
   findText: { ...COMMAND_CATALOG.findText, run: () => Find.open() },
   findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
   findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
-  toggleFindRegex: { ...COMMAND_CATALOG.toggleFindRegex, run: () => Find.toggleOrOpen("regex") },
-  toggleFindWholeWord: { ...COMMAND_CATALOG.toggleFindWholeWord, run: () => Find.toggleOrOpen("wholeWord") },
-  toggleFindCase: { ...COMMAND_CATALOG.toggleFindCase, run: () => Find.toggleOrOpen("findCase") },
 
   enterVisual: { ...COMMAND_CATALOG.enterVisual, run: () => Visual.enter("visual") },
   enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },

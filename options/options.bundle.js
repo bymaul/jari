@@ -338,9 +338,6 @@
     findText: { category: "find", label: "Find in page" },
     findNext: { category: "find", label: "Next match", repeatable: true },
     findPrev: { category: "find", label: "Previous match", repeatable: true },
-    toggleFindRegex: { category: "find", label: "Toggle regex search" },
-    toggleFindWholeWord: { category: "find", label: "Toggle whole-word search" },
-    toggleFindCase: { category: "find", label: "Toggle case-sensitive search" },
     enterVisual: { category: "visual", label: "Visual mode" },
     enterVisualLine: { category: "visual", label: "Visual line mode" },
     showHelp: { category: "help", label: "Show this help" },
@@ -400,9 +397,6 @@
     "/": "findText",
     n: "findNext",
     N: "findPrev",
-    "alt+1": "toggleFindRegex",
-    "alt+2": "toggleFindWholeWord",
-    "alt+3": "toggleFindCase",
     v: "enterVisual",
     V: "enterVisualLine",
     gg: "scrollToTop",
@@ -595,7 +589,7 @@
       version = 6;
     }
     if (version < 7) {
-      d.keymap = migrateFindToggleBindings(d.keymap);
+      d.keymap = migrateRemovedFindToggles(d.keymap);
       version = 7;
     }
     if (version < 8) {
@@ -647,33 +641,29 @@
     }
     return out;
   }
-  var FIND_TOGGLE_SWAPS = [
-    ["alt+r", "alt+1", "toggleFindRegex"],
-    ["alt+w", "alt+2", "toggleFindWholeWord"],
-    ["alt+c", "alt+3", "toggleFindCase"]
-  ];
+  var REMOVED_FIND_COMMANDS = /* @__PURE__ */ new Set([
+    "toggleFindRegex",
+    "toggleFindWholeWord",
+    "toggleFindCase"
+  ]);
   var HALF_PAGE_FILLS = [
     ["d", "scrollHalfPageDown"],
     ["u", "scrollHalfPageUp"]
   ];
-  function migrateFindToggleBindings(keymap) {
+  function migrateRemovedFindToggles(keymap) {
     if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
       return keymap;
     }
-    const out = { ...keymap };
-    for (const [oldCombo, newCombo, command] of FIND_TOGGLE_SWAPS) {
-      if (out[oldCombo] !== command) continue;
-      if (newCombo in out && out[newCombo] !== command) continue;
-      delete out[oldCombo];
+    const out = {};
+    for (const [combo, command] of Object.entries(keymap)) {
+      if (REMOVED_FIND_COMMANDS.has(command)) continue;
+      out[combo] = command;
     }
     const used = new Set(Object.values(out));
-    for (const [newCombo, command] of [
-      ...FIND_TOGGLE_SWAPS.map(([, combo, cmd]) => [combo, cmd]),
-      ...HALF_PAGE_FILLS
-    ]) {
-      if (newCombo in out || used.has(command)) continue;
-      if (findOverlapConflicts(out, newCombo).length > 0) continue;
-      out[newCombo] = command;
+    for (const [combo, command] of HALF_PAGE_FILLS) {
+      if (combo in out || used.has(command)) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
       used.add(command);
     }
     return out;

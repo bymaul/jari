@@ -30,7 +30,6 @@ Bindings chain into sequences of any length.
   (customizable link texts in settings)
 - Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
-  rebindable toggles `alt+1` regex, `alt+2` whole word, `alt+3` case;
   `Up`/`Down` history)
 - Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,
   `G`/`gg`, `f`/`F`/`t`/`T` + char, `o` swap; `y` yank)
