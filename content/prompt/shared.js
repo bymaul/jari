@@ -126,16 +126,6 @@ export function promptCss() {  return `
   `;
 }
 
-export const FOOTER_PROMPT = "Enter select | Ctrl+Enter new tab | Esc cancel | Up/Down/Tab move";
-export const FOOTER_PALETTE = "Enter run | Esc cancel | Up/Down/Tab move";
-
-export function makeFooter(text) {
-  const el = document.createElement("div");
-  el.className = "jari-prompt-footer";
-  el.textContent = text;
-  return el;
-}
-
 export function renderText(el, text, indices) {
   if (!indices || indices.length === 0) {
     el.textContent = text;

@@ -3,7 +3,7 @@ import { deepActiveElement, displayCombo, keysForCommand } from "./keymap.js";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
 import { createShadowHost } from "./ui.js";
-import { promptCss, renderText, makeFooter, FOOTER_PALETTE } from "./prompt/shared.js";
+import { promptCss, renderText } from "./prompt/shared.js";
 import { register, touch } from "./overlays.js";
 
 let active = false;
@@ -11,7 +11,6 @@ let host = null;
 let overlay = null;
 let inputEl = null;
 let listEl = null;
-let footerEl = null;
 let source = [];
 let filtered = [];
 let selected = 0;
@@ -84,8 +83,6 @@ function open(table) {
   overlay.appendChild(listEl);
   overlay.appendChild(header);
   overlay.appendChild(inputEl);
-  footerEl = makeFooter(FOOTER_PALETTE);
-  overlay.appendChild(footerEl);
   shadow.appendChild(overlay);
 
   renderList();
@@ -215,7 +212,6 @@ function close() {
   overlay = null;
   inputEl = null;
   listEl = null;
-  footerEl = null;
   source = [];
   filtered = [];
   selected = 0;

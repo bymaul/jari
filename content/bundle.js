@@ -3158,14 +3158,6 @@
     }
   `;
   }
-  var FOOTER_PROMPT = "Enter select | Ctrl+Enter new tab | Esc cancel | Up/Down/Tab move";
-  var FOOTER_PALETTE = "Enter run | Esc cancel | Up/Down/Tab move";
-  function makeFooter(text) {
-    const el = document.createElement("div");
-    el.className = "jari-prompt-footer";
-    el.textContent = text;
-    return el;
-  }
   function renderText(el, text, indices) {
     if (!indices || indices.length === 0) {
       el.textContent = text;
@@ -3338,7 +3330,6 @@
   var overlay = null;
   var inputEl = null;
   var listEl = null;
-  var footerEl = null;
   var tabs = [];
   var filtered = [];
   var selected = 0;
@@ -3527,8 +3518,6 @@
     overlay.appendChild(listEl);
     overlay.appendChild(header);
     overlay.appendChild(inputEl);
-    footerEl = makeFooter(FOOTER_PROMPT);
-    overlay.appendChild(footerEl);
     shadow.appendChild(overlay);
     filtered = tabs;
     renderList2();
@@ -3662,7 +3651,6 @@
     overlay = null;
     inputEl = null;
     listEl = null;
-    footerEl = null;
     tabs = [];
     filtered = [];
     selected = 0;
@@ -3725,7 +3713,7 @@
   var overlay2 = null;
   var headerEl = null;
   var listEl2 = null;
-  var footerEl2 = null;
+  var footerEl = null;
   var restoreFocus2 = null;
   var tabs2 = [];
   var windowId = null;
@@ -4036,12 +4024,12 @@
     }
   }
   function setFooterLines(lines, warn) {
-    footerEl2.classList.toggle("jari-manager-warn", !!warn);
-    footerEl2.textContent = "";
+    footerEl.classList.toggle("jari-manager-warn", !!warn);
+    footerEl.textContent = "";
     for (const line of lines) {
       const div = document.createElement("div");
       div.textContent = line;
-      footerEl2.appendChild(div);
+      footerEl.appendChild(div);
     }
   }
   function renderList3() {
@@ -4164,14 +4152,14 @@
     headerEl.className = "jari-prompt-header";
     listEl2 = document.createElement("ul");
     listEl2.className = "jari-prompt-list";
-    footerEl2 = document.createElement("div");
-    footerEl2.className = "jari-prompt-footer";
+    footerEl = document.createElement("div");
+    footerEl.className = "jari-prompt-footer";
     const backdrop = document.createElement("div");
     backdrop.className = "jari-manager-backdrop";
     backdrop.addEventListener("click", () => close2());
     overlay2.appendChild(headerEl);
     overlay2.appendChild(listEl2);
-    overlay2.appendChild(footerEl2);
+    overlay2.appendChild(footerEl);
     created.shadow.appendChild(backdrop);
     created.shadow.appendChild(overlay2);
     restoreFocus2 = document.activeElement;
@@ -4207,7 +4195,7 @@
     fieldFocusBefore = null;
     headerEl = null;
     listEl2 = null;
-    footerEl2 = null;
+    footerEl = null;
     tabs2 = [];
     windowId = null;
     groupsById = /* @__PURE__ */ new Map();
@@ -4572,7 +4560,7 @@
     });
     fieldEl = input;
     field = { kind, ...meta };
-    overlay2.insertBefore(input, footerEl2);
+    overlay2.insertBefore(input, footerEl);
     renderAll();
     const prev = document.activeElement;
     fieldFocusBefore = isOwnChrome(prev) ? null : prev;
@@ -9562,7 +9550,6 @@
   var overlay5 = null;
   var inputEl4 = null;
   var listEl4 = null;
-  var footerEl3 = null;
   var source = [];
   var filtered3 = [];
   var selected3 = 0;
@@ -9626,8 +9613,6 @@
     overlay5.appendChild(listEl4);
     overlay5.appendChild(header);
     overlay5.appendChild(inputEl4);
-    footerEl3 = makeFooter(FOOTER_PALETTE);
-    overlay5.appendChild(footerEl3);
     shadow.appendChild(overlay5);
     renderList4();
     restoreFocus5 = document.activeElement;
@@ -9737,7 +9722,6 @@
     overlay5 = null;
     inputEl4 = null;
     listEl4 = null;
-    footerEl3 = null;
     source = [];
     filtered3 = [];
     selected3 = 0;

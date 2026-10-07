@@ -31,8 +31,6 @@ versioned for the extension manifest (`manifest.base.json`).
 - Omnibar `Ctrl+Enter` (`Cmd+Enter` on macOS) forces the result into a
   new tab: tab matches open instead of switching, edit-URL creates
   instead of navigating, and searches always open in a new tab.
-- One-line footer hints in the omnibar and command palette; help and
-  the tab manager reuse the same footer styling.
 
 ### Changed
 
