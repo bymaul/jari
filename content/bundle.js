@@ -3544,12 +3544,7 @@
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (inputEl && inputEl.value !== "") {
-          inputEl.value = "";
-          handleInput();
-        } else {
-          close();
-        }
+        close();
       } else if (event.key === "Enter") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -7157,14 +7152,6 @@
     const key = event.key;
     if (key === "Escape") {
       ui.consume(event);
-      if (pendingG || pendingCount || pendingY) {
-        pendingG = false;
-        pendingCount = "";
-        pendingY = false;
-        clearPendingKeyTimers();
-        if (pillEl) pillEl.textContent = pillText(mode2);
-        return true;
-      }
       if (isCaret()) {
         close3(false);
       } else {
@@ -9676,12 +9663,7 @@
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (inputEl4 && inputEl4.value !== "") {
-          inputEl4.value = "";
-          handleInput2();
-        } else {
-          close6();
-        }
+        close6();
       } else if (event.key === "Enter") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -10314,15 +10296,7 @@
     const key = event.key;
     if (key === "Escape") {
       ui.consume(event);
-      if (start || pendingCount2 || pendingG2) {
-        start = null;
-        pendingCount2 = "";
-        pendingG2 = false;
-        clearPendingGTimer();
-        paint();
-      } else {
-        close7();
-      }
+      close7();
       return true;
     }
     if (key === "g" && !event.ctrlKey && !event.altKey && !event.metaKey) {

@@ -287,15 +287,7 @@ function onKeyDown(event) {
   const key = event.key;
   if (key === "Escape") {
     ui.consume(event);
-    if (start || pendingCount || pendingG) {
-      start = null;
-      pendingCount = "";
-      pendingG = false;
-      clearPendingGTimer();
-      paint();
-    } else {
-      close();
-    }
+    close();
     return true;
   }
   if (key === "g" && !event.ctrlKey && !event.altKey && !event.metaKey) {

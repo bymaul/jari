@@ -1260,14 +1260,6 @@ function onKeyDown(event) {
 
   if (key === "Escape") {
     ui.consume(event);
-    if (pendingG || pendingCount || pendingY) {
-      pendingG = false;
-      pendingCount = "";
-      pendingY = false;
-      clearPendingKeyTimers();
-      if (pillEl) pillEl.textContent = pillText(mode);
-      return true;
-    }
     if (isCaret()) {
       close(false);
     } else {

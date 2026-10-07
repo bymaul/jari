@@ -51,9 +51,6 @@ versioned for the extension manifest (`manifest.base.json`).
   releases are titled `Jari vX.Y.Z`. The workflow checks AMO for the
   version before building and fails fast if it is taken, since AMO
   never reuses version strings, not even deleted ones.
-- `Esc` clears before it closes: the omnibar and palette clear the
-  query first, region screenshots clear the start anchor first, and
-  visual mode cancels pending keys first — a second `Esc` closes.
 
 ### Removed
 

@@ -264,12 +264,7 @@ function onKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (inputEl && inputEl.value !== "") {
-        inputEl.value = "";
-        handleInput();
-      } else {
-        close();
-      }
+      close();
     } else if (event.key === "Enter") {
       event.preventDefault();
       event.stopImmediatePropagation();
