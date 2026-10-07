@@ -5,15 +5,19 @@ import {
 
 export const SHOW_HELP_ACTION = "jari-show-help";
 
+function notToggleable(protocol) {
+  return { toggleable: false, host: "", protocol, label: "", key: "" };
+}
+
 export function parseTabSite(rawUrl) {
   if (typeof rawUrl !== "string" || !rawUrl) {
-    return { toggleable: false, host: "", protocol: "", label: "", key: "" };
+    return notToggleable("");
   }
   let parsed;
   try {
     parsed = new URL(rawUrl);
   } catch {
-    return { toggleable: false, host: "", protocol: "", label: "", key: "" };
+    return notToggleable("");
   }
   const protocol = parsed.protocol || "";
   if (protocol === "file:") {
@@ -26,11 +30,11 @@ export function parseTabSite(rawUrl) {
     };
   }
   if (protocol !== "http:" && protocol !== "https:") {
-    return { toggleable: false, host: "", protocol, label: "", key: "" };
+    return notToggleable(protocol);
   }
   const host = parsed.hostname || "";
   if (!host) {
-    return { toggleable: false, host: "", protocol, label: "", key: "" };
+    return notToggleable(protocol);
   }
   return {
     toggleable: true,

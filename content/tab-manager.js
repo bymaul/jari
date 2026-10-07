@@ -1068,11 +1068,6 @@ function moveTargets(delta) {
   );
 }
 
-function consume(event) {
-  event.preventDefault();
-  event.stopImmediatePropagation();
-}
-
 function isModifier(event) {
   return (
     event.key === "Control" ||
@@ -1085,7 +1080,7 @@ function isModifier(event) {
 function onFieldKey(event) {
   if (event.isComposing || event.keyCode === 229) return false;
   if (event.key === "Escape") {
-    consume(event);
+    ui.consume(event);
     if (field.kind === "filter") {
       query = "";
       applyFilter();
@@ -1094,7 +1089,7 @@ function onFieldKey(event) {
     return true;
   }
   if (event.key === "Enter") {
-    consume(event);
+    ui.consume(event);
     if (field.kind === "open") submitOpen();
     else if (field.kind === "group") commitRename();
     else if (field.kind === "url") commitEditUrl();
@@ -1110,7 +1105,7 @@ function onNormalKey(event) {
   if (hasMod) return false;
   switch (event.key) {
     case "Escape":
-      consume(event);
+      ui.consume(event);
       if (confirm) {
         confirm = null;
         renderAll();
@@ -1129,106 +1124,106 @@ function onNormalKey(event) {
       }
       return true;
     case "/":
-      consume(event);
+      ui.consume(event);
       openField("filter", query);
       return true;
     case "?":
-      consume(event);
+      ui.consume(event);
       showHints = !showHints;
       renderAll();
       return true;
     case "Enter":
-      consume(event);
+      ui.consume(event);
       activateFocused();
       return true;
     case "Tab":
-      consume(event);
+      ui.consume(event);
       move(event.shiftKey ? -1 : 1);
       return true;
     case " ":
-      consume(event);
+      ui.consume(event);
       toggleMark();
       return true;
     case "ArrowDown":
     case "j":
-      consume(event);
+      ui.consume(event);
       if (visualAnchor !== null) moveVisual(1);
       else move(1);
       return true;
     case "ArrowUp":
     case "k":
-      consume(event);
+      ui.consume(event);
       if (visualAnchor !== null) moveVisual(-1);
       else move(-1);
       return true;
     case "v":
-      consume(event);
+      ui.consume(event);
       if (visualAnchor !== null) endVisual();
       else startVisual();
       renderAll();
       return true;
     case "ArrowLeft":
-      consume(event);
+      ui.consume(event);
       moveTargets(-1);
       return true;
     case "ArrowRight":
-      consume(event);
+      ui.consume(event);
       moveTargets(1);
       return true;
     case "J":
-      consume(event);
+      ui.consume(event);
       moveTargets(1);
       return true;
     case "K":
-      consume(event);
+      ui.consume(event);
       moveTargets(-1);
       return true;
     case "V":
-      consume(event);
+      ui.consume(event);
       markAllVisible();
       return true;
     case "d":
-      consume(event);
+      ui.consume(event);
       closeTargets();
       return true;
     case "y":
-      consume(event);
+      ui.consume(event);
       duplicateTargets();
       return true;
     case "e":
-      consume(event);
+      ui.consume(event);
       startEditUrl();
       return true;
     case "p":
-      consume(event);
+      ui.consume(event);
       toggleFlag("pin");
       return true;
     case "m":
-      consume(event);
+      ui.consume(event);
       toggleFlag("mute");
       return true;
     case "g":
-      consume(event);
+      ui.consume(event);
       groupTargets();
       return true;
     case "a":
-      consume(event);
+      ui.consume(event);
       addToFocusedGroup();
       return true;
     case "u":
-      consume(event);
+      ui.consume(event);
       ungroupTargets();
       return true;
     case "r":
-      consume(event);
+      ui.consume(event);
       startRename();
       return true;
     case "b":
-      consume(event);
+      ui.consume(event);
       bookmarkTargets();
       return true;
     case "t":
-      consume(event);
+      ui.consume(event);
       openField("open", "");
       return true;
     default:

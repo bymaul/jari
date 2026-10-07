@@ -1112,6 +1112,16 @@
     return columns;
   }
 
+  // popup/site.js
+  var SHOW_HELP_ACTION = "jari-show-help";
+  function toggleSiteInList(disabledSites, key) {
+    const list = Array.isArray(disabledSites) ? disabledSites.slice() : [];
+    const idx = list.indexOf(key);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push(key);
+    return list;
+  }
+
   // content/settings.js
   var STORAGE_KEY = "settings";
   var persistedLocal = false;
@@ -1179,19 +1189,17 @@
     if (synced) return { area: "sync", data: synced };
     return { area: "none", data: null };
   }
+  async function readOne(area) {
+    try {
+      const stored = await chrome.storage[area].get(STORAGE_KEY);
+      if (stored && stored[STORAGE_KEY]) return stored[STORAGE_KEY];
+    } catch {
+    }
+    return null;
+  }
   async function load() {
-    let synced = null;
-    let local = null;
-    try {
-      const stored = await chrome.storage.sync.get(STORAGE_KEY);
-      if (stored && stored[STORAGE_KEY]) synced = stored[STORAGE_KEY];
-    } catch {
-    }
-    try {
-      const resident = await chrome.storage.local.get(STORAGE_KEY);
-      if (resident && resident[STORAGE_KEY]) local = resident[STORAGE_KEY];
-    } catch {
-    }
+    const synced = await readOne("sync");
+    const local = await readOne("local");
     const winner = pickNewest(synced, local);
     if (winner.data) {
       merge(winner.data);
@@ -1330,9 +1338,7 @@
   function toggleSiteEnabled() {
     const key = pageSiteKey(location.hostname || "", location.protocol || "");
     const prev = state.disabledSites.slice();
-    const idx = state.disabledSites.indexOf(key);
-    if (idx >= 0) state.disabledSites.splice(idx, 1);
-    else state.disabledSites.push(key);
+    state.disabledSites = toggleSiteInList(state.disabledSites, key);
     persist().catch(() => {
       state.disabledSites = prev;
     });
@@ -1373,9 +1379,6 @@
     getClueDelayMs,
     toggleSiteEnabled
   };
-
-  // popup/site.js
-  var SHOW_HELP_ACTION = "jari-show-help";
 
   // content/ui.js
   function sendMessage(action, payload = {}) {
@@ -3542,40 +3545,32 @@
     const inInput = focused === inputEl;
     if (inInput) {
       if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         close();
       } else if (event.key === "Enter") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         activate(event.ctrlKey || event.metaKey);
       } else if (event.key === "ArrowDown") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         move2(1);
       } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         move2(-1);
       } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         move2(event.shiftKey ? -1 : 1);
       }
       return;
     }
     if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       close();
     } else if (event.key === "Enter") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       if (event.ctrlKey || event.metaKey) activate(true);
       else close();
     } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move2(event.shiftKey ? -1 : 1);
     }
   }
@@ -4619,17 +4614,13 @@
       { keepMarks: true }
     );
   }
-  function consume2(event) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
   function isModifier(event) {
     return event.key === "Control" || event.key === "Alt" || event.key === "Shift" || event.key === "Meta";
   }
   function onFieldKey(event) {
     if (event.isComposing || event.keyCode === 229) return false;
     if (event.key === "Escape") {
-      consume2(event);
+      ui.consume(event);
       if (field.kind === "filter") {
         query2 = "";
         applyFilter();
@@ -4638,7 +4629,7 @@
       return true;
     }
     if (event.key === "Enter") {
-      consume2(event);
+      ui.consume(event);
       if (field.kind === "open") submitOpen();
       else if (field.kind === "group") commitRename();
       else if (field.kind === "url") commitEditUrl();
@@ -4653,7 +4644,7 @@
     if (hasMod) return false;
     switch (event.key) {
       case "Escape":
-        consume2(event);
+        ui.consume(event);
         if (confirm) {
           confirm = null;
           renderAll();
@@ -4672,106 +4663,106 @@
         }
         return true;
       case "/":
-        consume2(event);
+        ui.consume(event);
         openField("filter", query2);
         return true;
       case "?":
-        consume2(event);
+        ui.consume(event);
         showHints = !showHints;
         renderAll();
         return true;
       case "Enter":
-        consume2(event);
+        ui.consume(event);
         activateFocused();
         return true;
       case "Tab":
-        consume2(event);
+        ui.consume(event);
         move3(event.shiftKey ? -1 : 1);
         return true;
       case " ":
-        consume2(event);
+        ui.consume(event);
         toggleMark();
         return true;
       case "ArrowDown":
       case "j":
-        consume2(event);
+        ui.consume(event);
         if (visualAnchor !== null) moveVisual(1);
         else move3(1);
         return true;
       case "ArrowUp":
       case "k":
-        consume2(event);
+        ui.consume(event);
         if (visualAnchor !== null) moveVisual(-1);
         else move3(-1);
         return true;
       case "v":
-        consume2(event);
+        ui.consume(event);
         if (visualAnchor !== null) endVisual();
         else startVisual();
         renderAll();
         return true;
       case "ArrowLeft":
-        consume2(event);
+        ui.consume(event);
         moveTargets(-1);
         return true;
       case "ArrowRight":
-        consume2(event);
+        ui.consume(event);
         moveTargets(1);
         return true;
       case "J":
-        consume2(event);
+        ui.consume(event);
         moveTargets(1);
         return true;
       case "K":
-        consume2(event);
+        ui.consume(event);
         moveTargets(-1);
         return true;
       case "V":
-        consume2(event);
+        ui.consume(event);
         markAllVisible();
         return true;
       case "d":
-        consume2(event);
+        ui.consume(event);
         closeTargets();
         return true;
       case "y":
-        consume2(event);
+        ui.consume(event);
         duplicateTargets();
         return true;
       case "e":
-        consume2(event);
+        ui.consume(event);
         startEditUrl();
         return true;
       case "p":
-        consume2(event);
+        ui.consume(event);
         toggleFlag("pin");
         return true;
       case "m":
-        consume2(event);
+        ui.consume(event);
         toggleFlag("mute");
         return true;
       case "g":
-        consume2(event);
+        ui.consume(event);
         groupTargets();
         return true;
       case "a":
-        consume2(event);
+        ui.consume(event);
         addToFocusedGroup();
         return true;
       case "u":
-        consume2(event);
+        ui.consume(event);
         ungroupTargets();
         return true;
       case "r":
-        consume2(event);
+        ui.consume(event);
         startRename();
         return true;
       case "b":
-        consume2(event);
+        ui.consume(event);
         bookmarkTargets();
         return true;
       case "t":
-        consume2(event);
+        ui.consume(event);
         openField("open", "");
         return true;
       default:
@@ -9661,35 +9652,28 @@
     }
     if (focused === inputEl4) {
       if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         close6();
       } else if (event.key === "Enter") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         activate3();
       } else if (event.key === "ArrowDown") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         move4(1);
       } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         move4(-1);
       } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         move4(event.shiftKey ? -1 : 1);
       }
       return;
     }
     if (event.key === "Escape" || event.key === "Enter") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       close6();
     } else if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move4(event.shiftKey ? -1 : 1);
     }
   }
@@ -11128,8 +11112,7 @@ ${location.href}`;
   function run(commandName, count, event) {
     const cmd2 = commands[commandName];
     if (!cmd2) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     Clue.hide();
     cmd2.run({ count: cmd2.repeatable ? count : 1, event });
   }
@@ -11222,8 +11205,7 @@ ${location.href}`;
       event.stopPropagation();
       return;
     }
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
   }
   function handleKeydown(event) {
     if (!event.isTrusted) return;
@@ -11241,8 +11223,7 @@ ${location.href}`;
     if (modifierKeys.has(event.key)) return;
     if (passthroughMode) {
       if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         exitPassthrough();
       } else {
         restartPassthroughTimer();
@@ -11252,8 +11233,7 @@ ${location.href}`;
     if (ignoreMode) {
       const key2 = canonicalKey(event);
       if (settings.getKeymap()[key2] === "toggleIgnore" || event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         toggleIgnore();
       }
       return;
@@ -11280,16 +11260,14 @@ ${location.href}`;
     if (isEditable(activeEl)) {
       if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
       else if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         activeEl.blur();
         clearPending();
       } else if (pendingKeys || pendingCount3) clearPending();
       return;
     }
     if (bufferWasPending && !commandName) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       if (!event.ctrlKey && !event.altKey && !event.metaKey && isPrefixKey(settings.getKeymap(), buffer + key)) {
         pendingKeys = buffer + key;
         ui.showcmd(pendingCount3 + pendingKeys);
@@ -11302,14 +11280,12 @@ ${location.href}`;
     }
     if (event.key === "Escape") {
       if (pendingCount3) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         clearPending();
         return;
       }
       if (Find.hasHighlights()) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        ui.consume(event);
         Find.handleGlobalEsc(event);
         return;
       }
@@ -11321,8 +11297,7 @@ ${location.href}`;
     if (!commandName && /^[0-9]$/.test(key)) {
       if (pendingCount3.length < 9) pendingCount3 += key;
       ui.showcmd(pendingCount3);
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       restartTimer();
       return;
     }
@@ -11330,8 +11305,7 @@ ${location.href}`;
       pendingKeys = key;
       ui.showcmd(pendingCount3 + key);
       Clue.schedule(key, pendingCount3);
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       restartTimer();
       return;
     }

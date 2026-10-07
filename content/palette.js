@@ -2,7 +2,7 @@ import { COMMAND_CATALOG } from "./catalog.js";
 import { deepActiveElement, displayCombo, keysForCommand } from "./keymap.js";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
-import { createShadowHost } from "./ui.js";
+import { createShadowHost, ui } from "./ui.js";
 import { promptCss, renderText } from "./prompt/shared.js";
 import { register, touch } from "./overlays.js";
 
@@ -154,20 +154,16 @@ function onKeyDown(event) {
   }
   if (focused === inputEl) {
     if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       close();
     } else if (event.key === "Enter") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       activate();
     } else if (event.key === "ArrowDown") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move(1);
     } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move(-1);
     } else if (
       event.key === "Tab" &&
@@ -175,15 +171,13 @@ function onKeyDown(event) {
       !event.metaKey &&
       !event.altKey
     ) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move(event.shiftKey ? -1 : 1);
     }
     return;
   }
   if (event.key === "Escape" || event.key === "Enter") {
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     close();
   } else if (
     event.key === "Tab" &&
@@ -191,8 +185,7 @@ function onKeyDown(event) {
     !event.metaKey &&
     !event.altKey
   ) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     move(event.shiftKey ? -1 : 1);
   }
 }

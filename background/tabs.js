@@ -3,17 +3,26 @@ import { clampCount } from "./utils.js";
 import { bookmarkedUrlKeys, bookmarkUrlKey } from "./bookmarks.js";
 import { focusWindow, moveTabIntoWindowAndFocus, openInIncognito } from "./windows.js";
 
+function resolveTarget(url) {
+  if (url === undefined) return { ok: true, target: undefined };
+  const target = normalizeUrl(url);
+  if (!target) return { ok: false };
+  return { ok: true, target };
+}
+
 export async function createTab(_, { url } = {}) {
-  const target = url === undefined ? undefined : normalizeUrl(url);
-  if (url !== undefined && !target) return { ok: false };
-  const tab = await chrome.tabs.create(target ? { url: target } : {});
+  const resolved = resolveTarget(url);
+  if (!resolved.ok) return resolved;
+  const tab = await chrome.tabs.create(
+    resolved.target ? { url: resolved.target } : {},
+  );
   return tab ? { ok: true, id: tab.id } : { ok: false };
 }
 
 export async function openIncognitoTab(_, { url } = {}) {
-  const target = url === undefined ? undefined : normalizeUrl(url);
-  if (url !== undefined && !target) return { ok: false };
-  return openInIncognito(target);
+  const resolved = resolveTarget(url);
+  if (!resolved.ok) return resolved;
+  return openInIncognito(resolved.target);
 }
 
 export async function navigate(sender, { url } = {}) {
@@ -243,26 +252,23 @@ export async function closeManagerTabs(_, { ids } = {}) {
   return { ok: true, closed: targets.length };
 }
 
-export async function setTabsPinned(_, { ids, pinned } = {}) {
+async function updateTabFlag(ids, prop, value) {
   const targets = sanitizeIds(ids);
   if (targets.length === 0) return { ok: false };
-  const next = !!pinned;
+  const next = !!value;
   const results = await Promise.allSettled(
-    targets.map((id) => chrome.tabs.update(id, { pinned: next })),
+    targets.map((id) => chrome.tabs.update(id, { [prop]: next })),
   );
   const updated = results.filter((r) => r.status === "fulfilled").length;
-  return updated > 0 ? { ok: true, updated, pinned: next } : { ok: false };
+  return updated > 0 ? { ok: true, updated, [prop]: next } : { ok: false };
+}
+
+export async function setTabsPinned(_, { ids, pinned } = {}) {
+  return updateTabFlag(ids, "pinned", pinned);
 }
 
 export async function setTabsMuted(_, { ids, muted } = {}) {
-  const targets = sanitizeIds(ids);
-  if (targets.length === 0) return { ok: false };
-  const next = !!muted;
-  const results = await Promise.allSettled(
-    targets.map((id) => chrome.tabs.update(id, { muted: next })),
-  );
-  const updated = results.filter((r) => r.status === "fulfilled").length;
-  return updated > 0 ? { ok: true, updated, muted: next } : { ok: false };
+  return updateTabFlag(ids, "muted", muted);
 }
 
 export async function moveManagerTabs(_, { ids, delta = 0 } = {}) {

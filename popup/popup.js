@@ -23,21 +23,25 @@ function storedAt(data) {
   return data && Number.isFinite(data.updatedAt) ? data.updatedAt : 0;
 }
 
+async function readOne(area) {
+  try {
+    const stored = await chrome.storage[area].get(STORAGE_KEY);
+    if (stored && stored[STORAGE_KEY]) return stored[STORAGE_KEY];
+  } catch {}
+  return null;
+}
+
 async function readSettings() {
-  let synced = null;
-  let local = null;
-  try {
-    const stored = await chrome.storage.sync.get(STORAGE_KEY);
-    if (stored && stored[STORAGE_KEY]) synced = stored[STORAGE_KEY];
-  } catch {}
-  try {
-    const stored = await chrome.storage.local.get(STORAGE_KEY);
-    if (stored && stored[STORAGE_KEY]) local = stored[STORAGE_KEY];
-  } catch {}
+  const synced = await readOne("sync");
+  const local = await readOne("local");
   if (synced && local) {
     return storedAt(local) > storedAt(synced) ? local : synced;
   }
   return local || synced || null;
+}
+
+function isQuotaError(err) {
+  return /quota/i.test(String((err && err.message) || err || ""));
 }
 
 async function writeSettings(data) {
@@ -47,7 +51,7 @@ async function writeSettings(data) {
   try {
     await chrome.storage.sync.set(payload);
   } catch (err) {
-    if (!/quota/i.test(String((err && err.message) || err || ""))) throw err;
+    if (!isQuotaError(err)) throw err;
     await chrome.storage.local.set(payload);
   }
 }

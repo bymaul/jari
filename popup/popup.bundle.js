@@ -146,15 +146,18 @@
 
   // popup/site.js
   var SHOW_HELP_ACTION = "jari-show-help";
+  function notToggleable(protocol) {
+    return { toggleable: false, host: "", protocol, label: "", key: "" };
+  }
   function parseTabSite(rawUrl) {
     if (typeof rawUrl !== "string" || !rawUrl) {
-      return { toggleable: false, host: "", protocol: "", label: "", key: "" };
+      return notToggleable("");
     }
     let parsed;
     try {
       parsed = new URL(rawUrl);
     } catch {
-      return { toggleable: false, host: "", protocol: "", label: "", key: "" };
+      return notToggleable("");
     }
     const protocol = parsed.protocol || "";
     if (protocol === "file:") {
@@ -167,11 +170,11 @@
       };
     }
     if (protocol !== "http:" && protocol !== "https:") {
-      return { toggleable: false, host: "", protocol, label: "", key: "" };
+      return notToggleable(protocol);
     }
     const host = parsed.hostname || "";
     if (!host) {
-      return { toggleable: false, host: "", protocol, label: "", key: "" };
+      return notToggleable(protocol);
     }
     return {
       toggleable: true,
@@ -211,23 +214,24 @@
   function storedAt(data) {
     return data && Number.isFinite(data.updatedAt) ? data.updatedAt : 0;
   }
+  async function readOne(area) {
+    try {
+      const stored = await chrome.storage[area].get(STORAGE_KEY);
+      if (stored && stored[STORAGE_KEY]) return stored[STORAGE_KEY];
+    } catch {
+    }
+    return null;
+  }
   async function readSettings() {
-    let synced = null;
-    let local = null;
-    try {
-      const stored = await chrome.storage.sync.get(STORAGE_KEY);
-      if (stored && stored[STORAGE_KEY]) synced = stored[STORAGE_KEY];
-    } catch {
-    }
-    try {
-      const stored = await chrome.storage.local.get(STORAGE_KEY);
-      if (stored && stored[STORAGE_KEY]) local = stored[STORAGE_KEY];
-    } catch {
-    }
+    const synced = await readOne("sync");
+    const local = await readOne("local");
     if (synced && local) {
       return storedAt(local) > storedAt(synced) ? local : synced;
     }
     return local || synced || null;
+  }
+  function isQuotaError(err) {
+    return /quota/i.test(String(err && err.message || err || ""));
   }
   async function writeSettings(data) {
     const payload = {
@@ -236,7 +240,7 @@
     try {
       await chrome.storage.sync.set(payload);
     } catch (err) {
-      if (!/quota/i.test(String(err && err.message || err || ""))) throw err;
+      if (!isQuotaError(err)) throw err;
       await chrome.storage.local.set(payload);
     }
   }

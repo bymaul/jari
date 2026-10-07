@@ -47,8 +47,7 @@ function restartTimer() {
 function run(commandName, count, event) {
   const cmd = commands[commandName];
   if (!cmd) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
+  ui.consume(event);
   Clue.hide();
   cmd.run({ count: cmd.repeatable ? count : 1, event });
 }
@@ -151,8 +150,7 @@ export function shieldOverlayKey(event) {
     event.stopPropagation();
     return;
   }
-  event.preventDefault();
-  event.stopImmediatePropagation();
+  ui.consume(event);
 }
 
 function handleKeydown(event) {
@@ -175,8 +173,7 @@ function handleKeydown(event) {
 
   if (passthroughMode) {
     if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       exitPassthrough();
     } else {
       restartPassthroughTimer();
@@ -190,8 +187,7 @@ function handleKeydown(event) {
       settings.getKeymap()[key] === "toggleIgnore" ||
       event.key === "Escape"
     ) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       toggleIgnore();
     }
     return;
@@ -222,8 +218,7 @@ function handleKeydown(event) {
   if (isEditable(activeEl)) {
     if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
     else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       activeEl.blur();
       clearPending();
     } else if (pendingKeys || pendingCount) clearPending();
@@ -231,8 +226,7 @@ function handleKeydown(event) {
   }
 
   if (bufferWasPending && !commandName) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     if (
       !event.ctrlKey &&
       !event.altKey &&
@@ -251,14 +245,12 @@ function handleKeydown(event) {
 
   if (event.key === "Escape") {
     if (pendingCount) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       clearPending();
       return;
     }
     if (Find.hasHighlights()) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       Find.handleGlobalEsc(event);
       return;
     }
@@ -272,8 +264,7 @@ function handleKeydown(event) {
   if (!commandName && /^[0-9]$/.test(key)) {
     if (pendingCount.length < 9) pendingCount += key;
     ui.showcmd(pendingCount);
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     restartTimer();
     return;
   }
@@ -282,8 +273,7 @@ function handleKeydown(event) {
     pendingKeys = key;
     ui.showcmd(pendingCount + key);
     Clue.schedule(key, pendingCount);
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     restartTimer();
     return;
   }

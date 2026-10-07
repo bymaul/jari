@@ -6,6 +6,7 @@ import {
   settingsDefaults,
 } from "./keymap.js";
 import { matchesSitePattern, pageSiteKey } from "../shared/url.js";
+import { toggleSiteInList } from "../popup/site.js";
 
 const STORAGE_KEY = "settings";
 
@@ -82,17 +83,17 @@ function pickNewest(synced, local) {
   return { area: "none", data: null };
 }
 
+async function readOne(area) {
+  try {
+    const stored = await chrome.storage[area].get(STORAGE_KEY);
+    if (stored && stored[STORAGE_KEY]) return stored[STORAGE_KEY];
+  } catch {}
+  return null;
+}
+
 async function load() {
-  let synced = null;
-  let local = null;
-  try {
-    const stored = await chrome.storage.sync.get(STORAGE_KEY);
-    if (stored && stored[STORAGE_KEY]) synced = stored[STORAGE_KEY];
-  } catch {}
-  try {
-    const resident = await chrome.storage.local.get(STORAGE_KEY);
-    if (resident && resident[STORAGE_KEY]) local = resident[STORAGE_KEY];
-  } catch {}
+  const synced = await readOne("sync");
+  const local = await readOne("local");
   const winner = pickNewest(synced, local);
   if (winner.data) {
     merge(winner.data);
@@ -258,9 +259,7 @@ function getClueDelayMs() {
 function toggleSiteEnabled() {
   const key = pageSiteKey(location.hostname || "", location.protocol || "");
   const prev = state.disabledSites.slice();
-  const idx = state.disabledSites.indexOf(key);
-  if (idx >= 0) state.disabledSites.splice(idx, 1);
-  else state.disabledSites.push(key);
+  state.disabledSites = toggleSiteInList(state.disabledSites, key);
   persist().catch(() => {
     state.disabledSites = prev;
   });

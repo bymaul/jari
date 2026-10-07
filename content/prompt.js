@@ -2,7 +2,7 @@ import { Url, normalizeUrl } from "../shared/url.js";
 import { parseEngineKeyword } from "../shared/search-engines.js";
 import { rankMatches } from "./rank.js";
 import { settings } from "./settings.js";
-import { sendMessage, createShadowHost } from "./ui.js";
+import { sendMessage, createShadowHost, ui } from "./ui.js";
 import { promptCss, renderText } from "./prompt/shared.js";
 import { renderList as renderPromptList, move as movePrompt } from "./prompt/list.js";
 export { promptCss, renderText };
@@ -262,20 +262,16 @@ function onKeyDown(event) {
   const inInput = focused === inputEl;
   if (inInput) {
     if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       close();
     } else if (event.key === "Enter") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       activate(event.ctrlKey || event.metaKey);
     } else if (event.key === "ArrowDown") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move(1);
     } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move(-1);
     } else if (
       event.key === "Tab" &&
@@ -283,19 +279,16 @@ function onKeyDown(event) {
       !event.metaKey &&
       !event.altKey
     ) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      ui.consume(event);
       move(event.shiftKey ? -1 : 1);
     }
     return;
   }
   if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     close();
   } else if (event.key === "Enter") {
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     if (event.ctrlKey || event.metaKey) activate(true);
     else close();
   } else if (
@@ -304,8 +297,7 @@ function onKeyDown(event) {
     !event.metaKey &&
     !event.altKey
   ) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    ui.consume(event);
     move(event.shiftKey ? -1 : 1);
   }
 }
