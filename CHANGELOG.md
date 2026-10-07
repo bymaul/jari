@@ -34,6 +34,19 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Changed
 
+- Scroll-area cycle (`]w` / `[w`) walks stops top-to-bottom instead of
+  DOM order, and the first step lands on the best inner stop: open
+  dialogs win, then the focused area, then the largest
+  overflow. Nested wrappers collapse to the innermost area. Cross-origin
+  frames stay listed (their overflow can't be verified) and highlight
+  as `frame?`.
+
+### Fixed
+
+- Modal auto-focus no longer misses: the observer now sees `open`,
+  `hidden`, and ARIA toggles (not just classes), a fresh dialog takes
+  the target even after cycling, and an open modal wins the page on
+  the next keypress as a fallback.
 - The help sheet (`?`) filters through a plain text field instead of a
   `/` prompt that swallowed keystrokes, matching the tab manager's
   field and reusing its prompt styling, so the sheet is now the same

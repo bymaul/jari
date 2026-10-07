@@ -2,7 +2,7 @@ import "./setup.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-const { Scroll } = await import("../content/scroll.js");
+const { Scroll, __resetScrollCache, __adoptNewDialog } = await import("../content/scroll.js");
 
 const VW = 800;
 const VH = 600;
@@ -41,6 +41,8 @@ function makeArea() {
     focusCalls: 0,
     blurCalls: 0,
     closest: () => null,
+    contains: () => false,
+    getAttribute: () => null,
     hasAttribute: () => false,
     getRootNode: () => ({ host: null }),
     getBoundingClientRect: () => ({
@@ -163,4 +165,187 @@ test("reset releases frame focus and returns to the page", () => {
   assert.equal(Scroll.getTarget(), globalThis.window);
   assert.ok(frame.blurCalls > 0, "expected the frame to be blurred");
   assert.ok(windowCalls.focus > 0, "expected focus to return to the page");
+});
+
+function makeAreaAt({ top = 0, left = 0, w = 200, h = 200, overflow = 400, tag = "DIV" } = {}) {
+  const el = makeArea();
+  el.tagName = tag;
+  el.clientHeight = h;
+  el.clientWidth = w;
+  el.scrollHeight = h + overflow;
+  el.scrollWidth = w;
+  el.getBoundingClientRect = () => ({
+    left,
+    top,
+    right: left + w,
+    bottom: top + h,
+    width: w,
+    height: h,
+  });
+  return el;
+}
+
+const defaultFixtures = globalThis.document.querySelectorAll;
+
+function useFixtures(list) {
+  globalThis.document.querySelectorAll = () => list;
+  __resetScrollCache();
+  Scroll.reset();
+}
+
+function restoreFixtures() {
+  globalThis.document.querySelectorAll = defaultFixtures;
+  globalThis.document.scrollingElement = { scrollHeight: 1200, clientHeight: 600 };
+  globalThis.document.activeElement = null;
+  __resetScrollCache();
+  Scroll.reset();
+}
+
+test("the first cycle step prefers the largest overflow", () => {
+  const small = makeAreaAt({ overflow: 50 });
+  const big = makeAreaAt({ left: 300, overflow: 900 });
+  useFixtures([small, big]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), big);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("an open dialog wins the first step even when the page scrolls", () => {
+  const plain = makeAreaAt({ overflow: 900 });
+  const dialog = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
+  useFixtures([plain, dialog]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), dialog);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("the focused area wins the first step", () => {
+  const big = makeAreaAt({ overflow: 900 });
+  const small = makeAreaAt({ left: 300, overflow: 50 });
+  const inner = { nodeType: 1 };
+  small.contains = (node) => node === inner;
+  globalThis.document.querySelectorAll = () => [big, small];
+  __resetScrollCache();
+  Scroll.reset();
+  globalThis.document.activeElement = inner;
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), small);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("stops after the first pick follow visual top-to-bottom order", () => {
+  const bottom = makeAreaAt({ top: 400 });
+  const top = makeAreaAt({ top: 0 });
+  useFixtures([bottom, top]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), top);
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), bottom);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("nested wrappers collapse to a single stop", () => {
+  const outer = makeAreaAt({ overflow: 900 });
+  const inner = makeAreaAt({ left: 10, top: 10, w: 100, h: 100, overflow: 400 });
+  outer.contains = (node) => node === inner;
+  useFixtures([outer, inner]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), inner);
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), globalThis.window);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("a fresh dialog steals the target from a plain area", () => {
+  const plain = makeAreaAt({ overflow: 900 });
+  const dialog = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
+  useFixtures([plain]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), plain);
+    globalThis.document.querySelectorAll = () => [plain, dialog];
+    __resetScrollCache();
+    __adoptNewDialog([]);
+    assert.equal(Scroll.getTarget(), dialog);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("adoption leaves an open dialog alone and ignores stale dialogs", () => {
+  const plain = makeAreaAt({ overflow: 900 });
+  const first = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
+  const second = makeAreaAt({ left: 500, overflow: 50, tag: "DIALOG" });
+  useFixtures([plain, first]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), first);
+    globalThis.document.querySelectorAll = () => [plain, first, second];
+    __resetScrollCache();
+    __adoptNewDialog([plain, first]);
+    assert.equal(Scroll.getTarget(), first);
+  } finally {
+    restoreFixtures();
+  }
+  useFixtures([plain]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), plain);
+    globalThis.document.querySelectorAll = () => [plain, first];
+    __resetScrollCache();
+    __adoptNewDialog([plain, first]);
+    assert.equal(Scroll.getTarget(), plain);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("getTarget prefers an open modal over a scrolling page", () => {
+  const plain = makeAreaAt({ overflow: 900 });
+  const dialog = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
+  useFixtures([plain, dialog]);
+  try {
+    assert.equal(Scroll.getTarget(), dialog);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("getTarget prefers an aria-modal div over a scrolling page", () => {
+  const plain = makeAreaAt({ overflow: 900 });
+  const modal = makeAreaAt({ left: 300, overflow: 50 });
+  modal.getAttribute = (name) => (name === "aria-modal" ? "true" : null);
+  useFixtures([plain, modal]);
+  try {
+    assert.equal(Scroll.getTarget(), modal);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("a plain role=dialog panel does not steal the page", () => {
+  const plain = makeAreaAt({ overflow: 900 });
+  const panel = makeAreaAt({ left: 300, overflow: 50 });
+  panel.getAttribute = (name) => (name === "role" ? "dialog" : null);
+  useFixtures([plain, panel]);
+  try {
+    assert.equal(Scroll.getTarget(), globalThis.window);
+  } finally {
+    restoreFixtures();
+  }
 });
