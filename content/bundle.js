@@ -3,7 +3,7 @@
 (() => {
   // shared/constants.js
   var suggestionSources = ["tab", "history", "bookmark"];
-  var maxResultsDefault = 50;
+  var maxResultsDefault = 20;
   var maxResultsMin = 5;
   var maxResultsMax = 100;
   function clampMaxResults(n) {
@@ -2271,25 +2271,58 @@
     };
   }
   function invalidateScrollCache() {
-    resolved = false;
     if (mutationTimeout) return;
+    resolved = false;
     mutationTimeout = setTimeout(() => {
       const prevStops = lastStops;
       scanEpoch++;
       resolved = false;
       mutationTimeout = null;
+      pruneObserved();
       lastStops = adoptNewDialog(prevStops);
     }, 150);
   }
   var observedRoots = /* @__PURE__ */ new Set();
+  var observedWatchers = /* @__PURE__ */ new Map();
+  var MAX_OBSERVED_ROOTS = 300;
+  function pruneObserved() {
+    for (const root of observedRoots) {
+      let connected;
+      try {
+        connected = root.isConnected !== false;
+      } catch {
+        connected = false;
+      }
+      if (connected) continue;
+      observedRoots.delete(root);
+      const watcher = observedWatchers.get(root);
+      observedWatchers.delete(root);
+      if (watcher) {
+        try {
+          watcher.disconnect();
+        } catch {
+        }
+      }
+    }
+  }
   function ensureObserved(root, options) {
     if (observedRoots.has(root)) return;
+    if (observedRoots.size >= MAX_OBSERVED_ROOTS) {
+      pruneObserved();
+      if (observedRoots.size >= MAX_OBSERVED_ROOTS) return;
+    }
     observedRoots.add(root);
     if (typeof window.MutationObserver !== "undefined") {
-      new window.MutationObserver(invalidateScrollCache).observe(
-        root,
-        options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "hidden", "aria-modal", "aria-hidden", "role"] }
-      );
+      try {
+        const watcher = new window.MutationObserver(invalidateScrollCache);
+        watcher.observe(
+          root,
+          options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "hidden", "aria-modal", "aria-hidden", "role"] }
+        );
+        observedWatchers.set(root, watcher);
+      } catch {
+        observedRoots.delete(root);
+      }
     }
   }
   function observeDocument() {
@@ -2303,16 +2336,18 @@
     } catch {
     }
   }
-  function isScrollVisible(el) {
+  function isScrollVisible(el, selfStyle) {
     let node = el;
+    let first = true;
     while (node) {
       if (node.nodeType === Node.ELEMENT_NODE) {
         if (node.hasAttribute("hidden")) return false;
-        const style = window.getComputedStyle(node);
+        const style = first && selfStyle !== void 0 ? selfStyle : window.getComputedStyle(node);
         if (style.display === "none" || style.visibility === "hidden")
           return false;
         if (parseFloat(style.opacity) === 0) return false;
       }
+      first = false;
       node = node.getRootNode().host || node.parentElement;
     }
     return true;
@@ -2328,11 +2363,11 @@
       if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
       if (el.clientHeight < MIN_SCROLL_AREA_SIZE && el.clientWidth < MIN_SCROLL_AREA_SIZE)
         continue;
-      if (!isScrollVisible(el)) continue;
+      const style = window.getComputedStyle(el);
+      if (!isScrollVisible(el, style)) continue;
       const canY = el.scrollHeight > el.clientHeight + 1;
       const canX = el.scrollWidth > el.clientWidth + 1;
       if (!canY && !canX) continue;
-      const style = window.getComputedStyle(el);
       const overflowY = style.overflowY;
       const overflowX = style.overflowX;
       const scrollableY = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && canY;
@@ -3076,16 +3111,10 @@
     }
     return [...new Set(indices)].sort((a, b) => a - b);
   }
-  function fieldBoost(query5, field2, base, weight) {
-    if (!field2) return 0;
-    const m = fuzzyMatch(query5, field2);
-    return m ? base + m.score * weight : 0;
-  }
-  function titleBoost(query5, item) {
-    return fieldBoost(query5, item.title, 8, 0.15);
-  }
-  function hostBoost(query5, item) {
-    return fieldBoost(query5, extractHost(item.url || ""), 6, 0.1);
+  function substringFieldBonus(queryTerms, field2, base) {
+    if (!field2 || queryTerms.length === 0) return 0;
+    const f = normalizeForMatch(field2);
+    return queryTerms.every((t) => f.includes(t)) ? base : 0;
   }
   function recencyScore(item) {
     const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
@@ -3112,6 +3141,8 @@
         (item) => substringMatch(q, (item.title || "") + " " + (item.url || ""))
       );
     }
+    const parsed = parseQuery(q);
+    const queryTerms = [...parsed.include, ...parsed.phrases];
     return list.map((item) => {
       const hay = (item.title || "") + " " + (item.url || "");
       const match = fuzzyMatch(q, hay);
@@ -3119,8 +3150,8 @@
       const first = match.indices.length > 0 ? match.indices[0] : 0;
       const last = match.indices.length > 0 ? match.indices[match.indices.length - 1] : 0;
       const baseScore = match.score;
-      const tBoost = titleBoost(q, item);
-      const hBoost = hostBoost(q, item);
+      const tBoost = substringFieldBonus(queryTerms, item.title, 8);
+      const hBoost = substringFieldBonus(queryTerms, extractHost(item.url || ""), 6);
       const rScore = recencyScore(item);
       const fScore = frequencyScore(item);
       const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
@@ -3141,6 +3172,7 @@
     .jari-overlay {
       all: initial;
       display: block;
+      contain: layout paint;
       position: fixed !important;
       left: 0;
       right: 0;
@@ -3201,6 +3233,7 @@
     }
     .jari-prompt-list {
       display: block;
+      contain: layout paint;
       list-style: none;
       margin: 0;
       padding: 0;
@@ -3271,27 +3304,35 @@
     const matched = new Set(indices);
     const frag = document.createDocumentFragment();
     let run2 = "";
+    let mark = "";
+    function flushRun() {
+      if (run2) {
+        const span = document.createElement("span");
+        span.textContent = run2;
+        frag.appendChild(span);
+        run2 = "";
+      }
+    }
+    function flushMark() {
+      if (mark) {
+        const span = document.createElement("span");
+        span.className = "jari-match";
+        span.textContent = mark;
+        frag.appendChild(span);
+        mark = "";
+      }
+    }
     for (let i = 0; i < text.length; i++) {
       if (matched.has(i)) {
-        if (run2) {
-          const span = document.createElement("span");
-          span.textContent = run2;
-          frag.appendChild(span);
-          run2 = "";
-        }
-        const mark = document.createElement("span");
-        mark.className = "jari-match";
-        mark.textContent = text[i];
-        frag.appendChild(mark);
+        flushRun();
+        mark += text[i];
       } else {
+        flushMark();
         run2 += text[i];
       }
     }
-    if (run2) {
-      const span = document.createElement("span");
-      span.textContent = run2;
-      frag.appendChild(span);
-    }
+    flushRun();
+    flushMark();
     el.textContent = "";
     el.appendChild(frag);
   }
@@ -3358,33 +3399,41 @@
   }
   function renderList({ listEl: listEl6, filtered: filtered4, query: query5, mode: mode4, tabUrlMap: tabUrlMap2, selected: selected4 = 0 }) {
     const rows = filtered4.slice(0, settings.getMaxResults());
-    listEl6.textContent = "";
+    const frag = document.createDocumentFragment();
     if (mode4 === "open" || mode4 === "edit" || mode4 === "incognito") {
-      for (const row of rows) listEl6.appendChild(renderSuggestionRow(row, query5, tabUrlMap2));
-      highlight({ listEl: listEl6, selected: selected4 });
-      return;
+      for (const row of rows) frag.appendChild(renderSuggestionRow(row, query5, tabUrlMap2));
+    } else {
+      const winLabels = /* @__PURE__ */ new Map();
+      let winIndex = 0;
+      for (const tab of rows) {
+        if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
+      }
+      for (const tab of rows)
+        frag.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query5));
     }
-    const winLabels = /* @__PURE__ */ new Map();
-    let winIndex = 0;
-    for (const tab of rows) {
-      if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
-    }
-    for (const tab of rows)
-      listEl6.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query5));
+    listEl6.textContent = "";
+    listEl6.appendChild(frag);
     highlight({ listEl: listEl6, selected: selected4 });
+    if (selected4 === 0) {
+      try {
+        listEl6.scrollTop = 0;
+      } catch {
+      }
+    }
   }
-  function highlight({ listEl: listEl6, selected: selected4 }) {
+  function highlight({ listEl: listEl6, selected: selected4, scroll = false }) {
     const sel = typeof selected4 === "number" ? selected4 : 0;
     Array.from(listEl6.children).forEach(
       (li, i) => li.classList.toggle("selected", i === sel)
     );
+    if (!scroll) return;
     const el = listEl6.children[sel];
     if (el) el.scrollIntoView({ block: "nearest" });
   }
   function move({ listEl: listEl6, filtered: filtered4, selected: selected4, delta }) {
     if (filtered4.length === 0) return selected4;
     const next2 = (selected4 + delta + filtered4.length) % filtered4.length;
-    highlight({ listEl: listEl6, selected: next2 });
+    highlight({ listEl: listEl6, selected: next2, scroll: true });
     return next2;
   }
 
@@ -3428,7 +3477,7 @@
 
   // content/prompt.js
   function parseKeyword(query5) {
-    return parseEngineKeyword(query5, settings.getSearchEngines());
+    return parseEngineKeyword(query5, cachedEngines || settings.getSearchEngines());
   }
   var active = false;
   var host = null;
@@ -3444,6 +3493,7 @@
   var suggestTimer = null;
   var restoreFocus = null;
   var tabUrlMap = /* @__PURE__ */ new Map();
+  var cachedEngines = null;
   function isActive() {
     return active;
   }
@@ -3603,6 +3653,7 @@
   }
   function render(title, placeholder) {
     touch("prompt");
+    cachedEngines = settings.getSearchEngines();
     const created = createShadowHost("jari-prompt-host", promptCss());
     host = created.host;
     const shadow = created.shadow;
@@ -3614,6 +3665,8 @@
     inputEl.setAttribute("autocomplete", "off");
     inputEl.setAttribute("spellcheck", "false");
     inputEl.addEventListener("input", handleInput);
+    inputEl.addEventListener("input", (event) => event.stopPropagation());
+    inputEl.addEventListener("beforeinput", (event) => event.stopPropagation());
     inputEl.addEventListener("keydown", (event) => event.stopPropagation());
     listEl = document.createElement("ul");
     listEl.className = "jari-prompt-list";
@@ -3749,6 +3802,8 @@
     query = "";
     mode = "tabs";
     active = false;
+    cachedEngines = null;
+    tabUrlMap.clear();
     if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
       restoreFocus.focus();
     }

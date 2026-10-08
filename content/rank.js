@@ -234,16 +234,10 @@ export function substringIndices(query, text) {
   }
   return [...new Set(indices)].sort((a, b) => a - b);
 }
-function fieldBoost(query, field, base, weight) {
-  if (!field) return 0;
-  const m = fuzzyMatch(query, field);
-  return m ? base + m.score * weight : 0;
-}
-function titleBoost(query, item) {
-  return fieldBoost(query, item.title, 8, 0.15);
-}
-function hostBoost(query, item) {
-  return fieldBoost(query, extractHost(item.url || ""), 6, 0.1);
+function substringFieldBonus(queryTerms, field, base) {
+  if (!field || queryTerms.length === 0) return 0;
+  const f = normalizeForMatch(field);
+  return queryTerms.every((t) => f.includes(t)) ? base : 0;
 }
 function recencyScore(item) {
   const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
@@ -271,6 +265,8 @@ export function rankMatches(query, list, fuzzy = true) {
       substringMatch(q, (item.title || "") + " " + (item.url || "")),
     );
   }
+  const parsed = parseQuery(q);
+  const queryTerms = [...parsed.include, ...parsed.phrases];
   return list
     .map((item) => {
       const hay = (item.title || "") + " " + (item.url || "");
@@ -279,8 +275,8 @@ export function rankMatches(query, list, fuzzy = true) {
       const first = match.indices.length > 0 ? match.indices[0] : 0;
       const last = match.indices.length > 0 ? match.indices[match.indices.length - 1] : 0;
       const baseScore = match.score;
-      const tBoost = titleBoost(q, item);
-      const hBoost = hostBoost(q, item);
+      const tBoost = substringFieldBonus(queryTerms, item.title, 8);
+      const hBoost = substringFieldBonus(queryTerms, extractHost(item.url || ""), 6);
       const rScore = recencyScore(item);
       const fScore = frequencyScore(item);
       const totalScore = baseScore + tBoost + hBoost + rScore + fScore;

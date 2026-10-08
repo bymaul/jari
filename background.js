@@ -1007,7 +1007,7 @@
 
   // shared/constants.js
   var suggestionSources = ["tab", "history", "bookmark"];
-  var maxResultsDefault = 50;
+  var maxResultsDefault = 20;
   var maxResultsMin = 5;
   var maxResultsMax = 100;
   function clampMaxResults(n) {
@@ -1101,9 +1101,38 @@
     );
     return buildEngineUrl(engines, keyword, text) || "https://www.google.com/search?q=" + encodeURIComponent(text);
   }
+  var bookmarkDataCache = null;
+  async function getBookmarkData() {
+    if (bookmarkDataCache) return bookmarkDataCache;
+    try {
+      let walk = function(nodes, path) {
+        for (const node of nodes) {
+          if (node.children) {
+            const nextPath = [...path, node.title].filter(Boolean);
+            if (node.id) folderMap.set(node.id, nextPath);
+            walk(node.children, nextPath);
+          } else if (node.url) {
+            entries.push({
+              title: node.title || "",
+              url: node.url,
+              parentId: node.parentId,
+              dateAdded: node.dateAdded || 0
+            });
+          }
+        }
+      };
+      const tree = await chrome.bookmarks.getTree();
+      const folderMap = /* @__PURE__ */ new Map();
+      const entries = [];
+      walk(tree || [], []);
+      bookmarkDataCache = { entries, folderMap };
+    } catch {
+      bookmarkDataCache = { entries: [], folderMap: /* @__PURE__ */ new Map() };
+    }
+    return bookmarkDataCache;
+  }
   async function suggest(_, { query = "" } = {}) {
-    const q = query.trim().toLowerCase();
-    const qRaw = query.trim();
+    const q = query.trim();
     const map = /* @__PURE__ */ new Map();
     function push(title, url, source, extra = {}) {
       if (!url) return;
@@ -1120,30 +1149,6 @@
       map.set(url, { title: title || url, url, source, ...extra });
     }
     const { sources, maxResults } = await getSuggestSettings();
-    let bookmarkFolderMap = null;
-    async function getBookmarkFolderMap() {
-      if (bookmarkFolderMap) return bookmarkFolderMap;
-      try {
-        let walk = function(nodes, path) {
-          for (const node of nodes) {
-            if (node.children) {
-              const np = [...path, node.title].filter(Boolean);
-              if (node.id) m.set(node.id, np);
-              walk(node.children, np);
-            } else if (node.id) {
-              m.set(node.id, path);
-            }
-          }
-        };
-        const tree = await chrome.bookmarks.getTree();
-        const m = /* @__PURE__ */ new Map();
-        walk(tree, []);
-        bookmarkFolderMap = m;
-      } catch {
-        bookmarkFolderMap = /* @__PURE__ */ new Map();
-      }
-      return bookmarkFolderMap;
-    }
     if (sources.includes("tab")) {
       try {
         const tabs = await chrome.tabs.query({});
@@ -1165,7 +1170,7 @@
       }
       if (sources.includes("bookmark")) {
         try {
-          const folderMap = await getBookmarkFolderMap();
+          const { folderMap } = await getBookmarkData();
           const bms = await chrome.bookmarks.search("");
           const withPath = bms.filter((bm) => bm.url).map((bm) => ({ bm, path: folderMap.get(bm.parentId) || [] }));
           withPath.sort((a, b) => (b.bm.dateAdded || 0) - (a.bm.dateAdded || 0));
@@ -1177,38 +1182,18 @@
     } else {
       if (sources.includes("history")) {
         try {
-          const results = await chrome.history.search({ text: qRaw, maxResults: 30, startTime: Date.now() - 90 * 864e5 });
-          const top = results.slice(0, 15);
-          const visitGroups = await Promise.allSettled(top.map((item) => chrome.history.getVisits ? chrome.history.getVisits({ url: item.url }).catch(() => []) : Promise.resolve([])));
-          for (let i = 0; i < top.length; i++) {
-            const item = top[i];
-            const visits = visitGroups[i].status === "fulfilled" ? visitGroups[i].value : [];
-            const typedVisits = visits.filter((v) => v.transition === "typed").length;
-            push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0, typedVisits });
-          }
-          for (const item of results.slice(15)) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
+          const results = await chrome.history.search({ text: q, maxResults: 20, startTime: Date.now() - 90 * 864e5 });
+          for (const item of results) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
         } catch (err) {
           console.debug("[jari] History search failed:", err);
-        }
-        try {
-          const recent = await chrome.history.search({ text: "", maxResults: 100, startTime: Date.now() - 90 * 864e5 });
-          for (const item of recent) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
-        } catch (err) {
-          console.debug("[jari] Recent history pool failed:", err);
         }
       }
       if (sources.includes("bookmark")) {
         try {
-          const folderMap = await getBookmarkFolderMap();
-          const tree = await chrome.bookmarks.getTree();
-          const stack = [...tree || []];
-          while (stack.length) {
-            const node = stack.pop();
-            if (node.url) {
-              const path = folderMap.get(node.parentId) || [];
-              push(node.title, node.url, "bookmark", { dateAdded: node.dateAdded || 0, folderPath: path.join(" / ") });
-            }
-            if (node.children) stack.push(...node.children);
+          const { entries, folderMap } = await getBookmarkData();
+          for (const entry of entries) {
+            const path = folderMap.get(entry.parentId) || [];
+            push(entry.title, entry.url, "bookmark", { dateAdded: entry.dateAdded, folderPath: path.join(" / ") });
           }
         } catch (err) {
           console.debug("[jari] Bookmark search failed:", err);

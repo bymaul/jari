@@ -3,6 +3,7 @@ export function promptCss() {  return `
     .jari-overlay {
       all: initial;
       display: block;
+      contain: layout paint;
       position: fixed !important;
       left: 0;
       right: 0;
@@ -63,6 +64,7 @@ export function promptCss() {  return `
     }
     .jari-prompt-list {
       display: block;
+      contain: layout paint;
       list-style: none;
       margin: 0;
       padding: 0;
@@ -134,27 +136,35 @@ export function renderText(el, text, indices) {
   const matched = new Set(indices);
   const frag = document.createDocumentFragment();
   let run = "";
+  let mark = "";
+  function flushRun() {
+    if (run) {
+      const span = document.createElement("span");
+      span.textContent = run;
+      frag.appendChild(span);
+      run = "";
+    }
+  }
+  function flushMark() {
+    if (mark) {
+      const span = document.createElement("span");
+      span.className = "jari-match";
+      span.textContent = mark;
+      frag.appendChild(span);
+      mark = "";
+    }
+  }
   for (let i = 0; i < text.length; i++) {
     if (matched.has(i)) {
-      if (run) {
-        const span = document.createElement("span");
-        span.textContent = run;
-        frag.appendChild(span);
-        run = "";
-      }
-      const mark = document.createElement("span");
-      mark.className = "jari-match";
-      mark.textContent = text[i];
-      frag.appendChild(mark);
+      flushRun();
+      mark += text[i];
     } else {
+      flushMark();
       run += text[i];
     }
   }
-  if (run) {
-    const span = document.createElement("span");
-    span.textContent = run;
-    frag.appendChild(span);
-  }
+  flushRun();
+  flushMark();
   el.textContent = "";
   el.appendChild(frag);
 }

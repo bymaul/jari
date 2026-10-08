@@ -2,7 +2,7 @@ import "./setup.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-const { Scroll, __resetScrollCache, __adoptNewDialog } = await import("../content/scroll.js");
+const { Scroll, __resetScrollCache, __adoptNewDialog, __pruneObserved, __observedRootCount } = await import("../content/scroll.js");
 
 const VW = 800;
 const VH = 600;
@@ -347,5 +347,22 @@ test("a plain role=dialog panel does not steal the page", () => {
     assert.equal(Scroll.getTarget(), globalThis.window);
   } finally {
     restoreFixtures();
+  }
+});
+
+test("detached observed roots are pruned instead of leaking", () => {
+  const host = makeAreaAt({ overflow: 900 });
+  const deadShadow = { isConnected: false, querySelectorAll: () => [] };
+  host.shadowRoot = deadShadow;
+  useFixtures([host]);
+  try {
+    Scroll.getTarget();
+    const before = __observedRootCount();
+    assert.ok(before >= 1, "expected the shadow root to be observed");
+    __pruneObserved();
+    assert.equal(__observedRootCount(), before - 1);
+  } finally {
+    restoreFixtures();
+    __pruneObserved();
   }
 });

@@ -3,7 +3,7 @@
 (() => {
   // shared/constants.js
   var suggestionSources = ["tab", "history", "bookmark"];
-  var maxResultsDefault = 50;
+  var maxResultsDefault = 20;
   var maxResultsMin = 5;
   var maxResultsMax = 100;
   function clampMaxResults(n) {

@@ -1,6 +1,6 @@
 export const suggestionSources = ["tab", "history", "bookmark"];
 
-export const maxResultsDefault = 50;
+export const maxResultsDefault = 20;
 export const maxResultsMin = 5;
 export const maxResultsMax = 100;
 

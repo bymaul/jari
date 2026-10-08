@@ -10,7 +10,7 @@ import { deepActiveElement } from "./keymap.js";
 import { register, touch } from "./overlays.js";
 
 function parseKeyword(query) {
-  return parseEngineKeyword(query, settings.getSearchEngines());
+  return parseEngineKeyword(query, cachedEngines || settings.getSearchEngines());
 }
 
 let active = false;
@@ -27,6 +27,7 @@ let suggestSeq = 0;
 let suggestTimer = null;
 let restoreFocus = null;
 let tabUrlMap = new Map();
+let cachedEngines = null;
 
 function isActive() {
   return active;
@@ -208,6 +209,7 @@ function rankTabs(q, list) {
 
 function render(title, placeholder) {
   touch("prompt");
+  cachedEngines = settings.getSearchEngines();
   const created = createShadowHost("jari-prompt-host", promptCss());
   host = created.host;
   const shadow = created.shadow;
@@ -220,6 +222,8 @@ function render(title, placeholder) {
   inputEl.setAttribute("autocomplete", "off");
   inputEl.setAttribute("spellcheck", "false");
   inputEl.addEventListener("input", handleInput);
+  inputEl.addEventListener("input", (event) => event.stopPropagation());
+  inputEl.addEventListener("beforeinput", (event) => event.stopPropagation());
 
   inputEl.addEventListener("keydown", (event) => event.stopPropagation());
 
@@ -383,6 +387,8 @@ function close() {
   query = "";
   mode = "tabs";
   active = false;
+  cachedEngines = null;
+  tabUrlMap.clear();
 
   if (
     restoreFocus &&

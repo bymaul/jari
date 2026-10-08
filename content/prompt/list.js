@@ -72,27 +72,34 @@ export function renderTabRow(tab, winLabel, query) {
 
 export function renderList({ listEl, filtered, query, mode, tabUrlMap, selected = 0 }) {
   const rows = filtered.slice(0, settings.getMaxResults());
-  listEl.textContent = "";
+  const frag = document.createDocumentFragment();
   if (mode === "open" || mode === "edit" || mode === "incognito") {
-    for (const row of rows) listEl.appendChild(renderSuggestionRow(row, query, tabUrlMap));
-    highlight({ listEl, selected });
-    return;
+    for (const row of rows) frag.appendChild(renderSuggestionRow(row, query, tabUrlMap));
+  } else {
+    const winLabels = new Map();
+    let winIndex = 0;
+    for (const tab of rows) {
+      if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
+    }
+    for (const tab of rows)
+      frag.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query));
   }
-  const winLabels = new Map();
-  let winIndex = 0;
-  for (const tab of rows) {
-    if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
-  }
-  for (const tab of rows)
-    listEl.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query));
+  listEl.textContent = "";
+  listEl.appendChild(frag);
   highlight({ listEl, selected });
+  if (selected === 0) {
+    try {
+      listEl.scrollTop = 0;
+    } catch {}
+  }
 }
 
-export function highlight({ listEl, selected }) {
+export function highlight({ listEl, selected, scroll = false }) {
   const sel = typeof selected === "number" ? selected : 0;
   Array.from(listEl.children).forEach((li, i) =>
     li.classList.toggle("selected", i === sel),
   );
+  if (!scroll) return;
   const el = listEl.children[sel];
   if (el) el.scrollIntoView({ block: "nearest" });
 }
@@ -100,6 +107,6 @@ export function highlight({ listEl, selected }) {
 export function move({ listEl, filtered, selected, delta }) {
   if (filtered.length === 0) return selected;
   const next = (selected + delta + filtered.length) % filtered.length;
-  highlight({ listEl, selected: next });
+  highlight({ listEl, selected: next, scroll: true });
   return next;
 }

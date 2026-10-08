@@ -48,30 +48,63 @@ function epochCache(compute) {
 }
 
 function invalidateScrollCache() {
-  // Mark resolved stale synchronously so the next getTarget() re-picks
-  // even within the throttle window; the epoch bump itself is throttled
-  // (not debounced) so sustained churn still rescans periodically.
-  resolved = false;
+  // Throttled (not debounced) so sustained churn still rescans periodically.
+  // The resolved flag flips only here, never per-mutation, so scroll
+  // keypresses between bumps reuse the cached stops instead of forcing a
+  // full-page scan on a churning feed.
   if (mutationTimeout) return;
+  resolved = false;
 
   mutationTimeout = setTimeout(() => {
     const prevStops = lastStops;
     scanEpoch++;
     resolved = false;
     mutationTimeout = null;
+    pruneObserved();
     lastStops = adoptNewDialog(prevStops);
   }, 150);
 }
 
 const observedRoots = new Set();
+const observedWatchers = new Map();
+const MAX_OBSERVED_ROOTS = 300;
+function pruneObserved() {
+  for (const root of observedRoots) {
+    let connected;
+    try {
+      connected = root.isConnected !== false;
+    } catch {
+      connected = false;
+    }
+    if (connected) continue;
+    observedRoots.delete(root);
+    const watcher = observedWatchers.get(root);
+    observedWatchers.delete(root);
+    if (watcher) {
+      try {
+        watcher.disconnect();
+      } catch {}
+    }
+  }
+}
 function ensureObserved(root, options) {
   if (observedRoots.has(root)) return;
+  if (observedRoots.size >= MAX_OBSERVED_ROOTS) {
+    pruneObserved();
+    if (observedRoots.size >= MAX_OBSERVED_ROOTS) return;
+  }
   observedRoots.add(root);
   if (typeof window.MutationObserver !== "undefined") {
-    new window.MutationObserver(invalidateScrollCache).observe(
-      root,
-      options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "hidden", "aria-modal", "aria-hidden", "role"] },
-    );
+    try {
+      const watcher = new window.MutationObserver(invalidateScrollCache);
+      watcher.observe(
+        root,
+        options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "hidden", "aria-modal", "aria-hidden", "role"] },
+      );
+      observedWatchers.set(root, watcher);
+    } catch {
+      observedRoots.delete(root);
+    }
   }
 }
 
@@ -94,16 +127,21 @@ function observeDocument() {
   } catch {}
 }
 
-function isScrollVisible(el) {
+function isScrollVisible(el, selfStyle) {
   let node = el;
+  let first = true;
   while (node) {
     if (node.nodeType === Node.ELEMENT_NODE) {
       if (node.hasAttribute("hidden")) return false;
-      const style = window.getComputedStyle(node);
+      const style =
+        first && selfStyle !== undefined
+          ? selfStyle
+          : window.getComputedStyle(node);
       if (style.display === "none" || style.visibility === "hidden")
         return false;
       if (parseFloat(style.opacity) === 0) return false;
     }
+    first = false;
     node = node.getRootNode().host || node.parentElement;
   }
   return true;
@@ -124,11 +162,11 @@ const findScrollableElements = epochCache(() => {
       el.clientWidth < MIN_SCROLL_AREA_SIZE
     )
       continue;
-    if (!isScrollVisible(el)) continue;
+    const style = window.getComputedStyle(el);
+    if (!isScrollVisible(el, style)) continue;
     const canY = el.scrollHeight > el.clientHeight + 1;
     const canX = el.scrollWidth > el.clientWidth + 1;
     if (!canY && !canX) continue;
-    const style = window.getComputedStyle(el);
     const overflowY = style.overflowY;
     const overflowX = style.overflowX;
     const scrollableY =
@@ -699,6 +737,14 @@ export function __resetScrollCache() {
   scanEpoch++;
   resolved = false;
   lastStops = [];
+}
+
+export function __pruneObserved() {
+  pruneObserved();
+}
+
+export function __observedRootCount() {
+  return observedRoots.size;
 }
 
 export function __adoptNewDialog(prevStops) {
