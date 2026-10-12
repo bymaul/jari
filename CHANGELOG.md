@@ -16,7 +16,10 @@ versioned for the extension manifest (`manifest.base.json`).
   duplicates (keeping the current tab active), `g` groups, `a` adds to
   the nearest group with no marks needed (ties go upward), `u` ungroups,
   `r` renames the group, `b` toggles bookmarks, `t` opens a URL or
-  search in a background tab, `J`/`K` reorder, `/` filters. `t`, `r`,
+  search in a background tab, `J`/`K` reorder, `w` splits the marked
+  tabs to a new window (or merges them when the selection empties its
+  window, choosing a window inline when several remain), preserving tab
+  groups with their titles and colors, `/` filters. `t`, `r`,
   `e`, and `/` share one in-panel field that restores page focus on
   close; `Enter` in `t` keeps the manager open and the new tab appears
   in the list. Bookmark matching ignores trailing slashes and hashes;

@@ -557,6 +557,14 @@
   async function nextTab(sender, { count = 1 } = {}) {
     return switchTab(sender.tab, clampCount(count));
   }
+  function summarizeWindow(win) {
+    const wtab = win.tabs && win.tabs.length ? win.tabs.find((t) => t.active) || win.tabs[0] : null;
+    return {
+      windowId: win.id,
+      title: wtab && wtab.title ? wtab.title : "Window",
+      url: `${win.tabs ? win.tabs.length : 0} tabs`
+    };
+  }
   async function moveTabToWindow(sender) {
     const tab = sender.tab;
     if (!tab || !tab.id) return { ok: false };
@@ -566,14 +574,7 @@
       return { ok: true, movedToNewWindow: true };
     }
     const windows = await chrome.windows.getAll({ populate: true });
-    const others = windows.filter((win) => win.id !== tab.windowId).map((win) => {
-      const wtab = win.tabs && win.tabs.length ? win.tabs.find((t) => t.active) || win.tabs[0] : null;
-      return {
-        windowId: win.id,
-        title: wtab && wtab.title ? wtab.title : "Window",
-        url: `${win.tabs ? win.tabs.length : 0} tabs`
-      };
-    });
+    const others = windows.filter((win) => win.id !== tab.windowId).map(summarizeWindow);
     if (others.length === 0) return { ok: true, needWindowChoice: false };
     if (others.length === 1) {
       await moveTabIntoWindowAndFocus(tab.id, others[0].windowId, "moveTabToWindow auto-merge");
@@ -592,6 +593,140 @@
     if (!tab || !tab.id || !targetWindowId) return { ok: false };
     await moveTabIntoWindowAndFocus(tab.id, targetWindowId, "moveTabIntoWindow");
     return { ok: true };
+  }
+  async function groupingsForIds(allTabs, ids) {
+    if (!groupsSupported()) return [];
+    const byId = new Map((allTabs || []).map((tab) => [tab.id, tab]));
+    const perGroup = /* @__PURE__ */ new Map();
+    for (const id of ids) {
+      const tab = byId.get(id);
+      if (!tab || !Number.isInteger(tab.groupId) || tab.groupId < 0) continue;
+      if (!perGroup.has(tab.groupId)) perGroup.set(tab.groupId, []);
+      perGroup.get(tab.groupId).push(id);
+    }
+    if (perGroup.size === 0) return [];
+    let meta = /* @__PURE__ */ new Map();
+    try {
+      if (chrome.tabGroups && typeof chrome.tabGroups.query === "function") {
+        const found = await chrome.tabGroups.query({}) || [];
+        meta = new Map(
+          found.map((group) => [
+            group.id,
+            { title: group.title || "", color: group.color || "" }
+          ])
+        );
+      }
+    } catch {
+    }
+    return [...perGroup].map(([groupId, tabIds]) => ({
+      tabIds,
+      ...meta.get(groupId) || { title: "", color: "" }
+    }));
+  }
+  async function restoreGroupings(groupings) {
+    if (!groupsSupported() || groupings.length === 0) return;
+    const canRename = hasApi(["tabGroups", "update"]);
+    for (const { tabIds, title, color } of groupings) {
+      let newId;
+      try {
+        newId = await chrome.tabs.group({ tabIds });
+      } catch {
+        continue;
+      }
+      if (!canRename || !Number.isInteger(newId)) continue;
+      const patch = {};
+      if (title) patch.title = title;
+      if (color) patch.color = color;
+      if (Object.keys(patch).length === 0) continue;
+      try {
+        await chrome.tabGroups.update(newId, patch);
+      } catch {
+      }
+    }
+  }
+  async function moveManagerTabsToWindow(_, { ids } = {}) {
+    const targets = sanitizeIds(ids);
+    if (targets.length === 0) return { ok: false };
+    let all;
+    try {
+      all = await chrome.tabs.query({}) || [];
+    } catch {
+      return { ok: false };
+    }
+    const byId = new Map(all.map((tab) => [tab.id, tab]));
+    const live = targets.filter((id) => byId.has(id));
+    if (live.length === 0) return { ok: false };
+    const totalByWindow = /* @__PURE__ */ new Map();
+    const selectedByWindow = /* @__PURE__ */ new Map();
+    for (const tab of all) {
+      totalByWindow.set(tab.windowId, (totalByWindow.get(tab.windowId) || 0) + 1);
+    }
+    for (const id of live) {
+      const tab = byId.get(id);
+      selectedByWindow.set(tab.windowId, (selectedByWindow.get(tab.windowId) || 0) + 1);
+    }
+    const emptied = /* @__PURE__ */ new Set();
+    for (const [windowId, count] of selectedByWindow) {
+      if (count >= (totalByWindow.get(windowId) || 0)) emptied.add(windowId);
+    }
+    if (emptied.size === 0) {
+      const groupings = await groupingsForIds(all, live);
+      try {
+        const win = await chrome.windows.create({ tabId: live[0] });
+        if (!win || !Number.isInteger(win.id)) return { ok: false };
+        if (live.length > 1) {
+          await chrome.tabs.move(live.slice(1), { windowId: win.id, index: -1 });
+        }
+        await restoreGroupings(groupings);
+        return { ok: true, movedToNewWindow: true, moved: live.length };
+      } catch {
+        return { ok: false };
+      }
+    }
+    let windows;
+    try {
+      windows = await chrome.windows.getAll({ populate: true }) || [];
+    } catch {
+      return { ok: false };
+    }
+    const others = windows.filter((win) => win && Number.isInteger(win.id) && !emptied.has(win.id)).map(summarizeWindow);
+    if (others.length === 0) return { ok: true, needWindowChoice: false };
+    if (others.length === 1) {
+      const groupings = await groupingsForIds(all, live);
+      try {
+        await moveTabIntoWindowAndFocus(
+          live,
+          others[0].windowId,
+          "moveManagerTabsToWindow auto-merge"
+        );
+        await restoreGroupings(groupings);
+      } catch {
+        return { ok: false };
+      }
+      return { ok: true, movedToWindow: true, moved: live.length };
+    }
+    return { ok: true, needWindowChoice: true, ownIds: live, tabs: others };
+  }
+  async function moveManagerTabsIntoWindow(_, { ids, targetWindowId } = {}) {
+    const targets = sanitizeIds(ids);
+    if (targets.length === 0 || !Number.isInteger(targetWindowId)) return { ok: false };
+    let all = [];
+    try {
+      all = await chrome.tabs.query({}) || [];
+    } catch {
+    }
+    const groupings = await groupingsForIds(all, targets);
+    try {
+      await moveTabIntoWindowAndFocus(
+        targets,
+        targetWindowId,
+        "moveManagerTabsIntoWindow"
+      );
+      await restoreGroupings(groupings);
+    } catch {
+      return { ok: false };
+    }
+    return { ok: true, moved: targets.length };
   }
   async function moveTabLeft(sender) {
     return moveTab(sender, -1);
@@ -1229,6 +1364,8 @@
     nextTab,
     moveTabToWindow,
     moveTabIntoWindow,
+    moveManagerTabsToWindow,
+    moveManagerTabsIntoWindow,
     moveTabLeft,
     goToFirstTab,
     goToLastTab,

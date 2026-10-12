@@ -11,10 +11,10 @@ const GROUPED_NONE = -1;
 const POLL_MS = 2000;
 
 const FOOTER_MINIMAL =
-  "Space mark | Enter switch | d close | / filter | Esc close | ? more";
+  "Space mark | Enter switch | d close | w split/merge | / filter | Esc close | ? more";
 const FOOTER_FULL = [
   "Space mark | v range | V all | Enter switch | d close | y duplicate | e edit | t new tab | ? less",
-  "p pin | m mute | g group | a add to group | u ungroup | r rename | b bookmark | J/K reorder | Esc close",
+  "p pin | m mute | g group | a add to group | u ungroup | r rename | b bookmark | J/K reorder | w split/merge | Esc close",
 ];
 
 const FIELDS = {
@@ -67,6 +67,7 @@ let field = null;
 let fieldEl = null;
 let fieldFocusBefore = null;
 let confirm = null;
+let windowChoice = null;
 let pollTimer = null;
 let refreshing = false;
 
@@ -349,6 +350,20 @@ function renderRow(tab, labels, currentWin) {
   return li;
 }
 
+function renderChoiceRow(win, labels) {
+  const li = document.createElement("li");
+  li.className = "jari-mgr-row";
+  appendSpan(li, "jari-mgr-mark", "→");
+  appendSpan(li, "jari-mgr-loc", `W${labels.get(win.windowId) || "?"}`);
+  const title = document.createElement("span");
+  title.className = "title";
+  title.textContent = win.title || "Window";
+  li.appendChild(title);
+  appendSpan(li, "jari-mgr-tag", "");
+  appendSpan(li, "url", win.url || "");
+  return li;
+}
+
 function renderHeader() {
   const wins = new Set(tabs.map((tab) => tab.windowId)).size;
   headerEl.textContent = "";
@@ -373,14 +388,24 @@ function renderHeader() {
   if (visualAnchor !== null)
     appendSpan(headerEl, "jari-mgr-badge", "(visual)");
   if (field) appendSpan(headerEl, "jari-mgr-badge", `(${FIELDS[field.kind].badge})`);
+  if (windowChoice)
+    appendSpan(
+      headerEl,
+      "jari-mgr-badge",
+      `(moving ${windowChoice.ids.length} tab${windowChoice.ids.length === 1 ? "" : "s"})`,
+    );
 
-  const total = filtered.length;
+  const total = windowChoice ? windowChoice.windows.length : filtered.length;
   appendSpan(headerEl, "jari-mgr-pos", total === 0 ? "0/0" : `${selected + 1}/${total}`);
 }
 
 function renderFooter() {
   if (field) {
     setFooterLines([FIELDS[field.kind].hint], false);
+    return;
+  }
+  if (windowChoice) {
+    setFooterLines(["Choose window: j/k move | Enter merge | Esc cancel"], true);
     return;
   }
   if (confirm) {
@@ -403,14 +428,19 @@ function setFooterLines(lines, warn) {
 function renderList() {
   const labels = windowLabels(tabs);
   listEl.textContent = "";
-  if (filtered.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = query ? "No matching tabs" : "No tabs";
-    listEl.appendChild(li);
-    return;
+  if (windowChoice) {
+    for (const win of windowChoice.windows)
+      listEl.appendChild(renderChoiceRow(win, labels));
+  } else {
+    if (filtered.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = query ? "No matching tabs" : "No tabs";
+      listEl.appendChild(li);
+      return;
+    }
+    for (const tab of filtered)
+      listEl.appendChild(renderRow(tab, labels, windowId));
   }
-  for (const tab of filtered)
-    listEl.appendChild(renderRow(tab, labels, windowId));
   Array.from(listEl.children).forEach((li, i) =>
     li.classList.toggle("selected", i === selected),
   );
@@ -464,6 +494,7 @@ function pruneMarksAndConfirm() {
 }
 
 async function refresh() {
+  if (windowChoice) return;
   refreshing = true;
   let res;
   try {
@@ -522,6 +553,7 @@ async function open() {
   query = "";
   field = null;
   confirm = null;
+  windowChoice = null;
   endVisual();
   active = true;
   touch("tab-manager");
@@ -597,6 +629,7 @@ function close() {
   query = "";
   field = null;
   confirm = null;
+  windowChoice = null;
   endVisual();
   active = false;
 
@@ -1068,6 +1101,96 @@ function moveTargets(delta) {
   );
 }
 
+async function moveWindowTargets() {
+  const targets = currentTargets();
+  if (targets.length === 0) return;
+  const ids = targets.map((tab) => tab.id);
+  confirm = null;
+  const res = await ask("moveManagerTabsToWindow", { ids });
+  if (!active) return;
+  if (!res || !res.ok) {
+    ui.toast("Move failed");
+    renderAll();
+    return;
+  }
+  if (res.movedToNewWindow) {
+    ui.toast(res.moved > 1 ? `Split ${res.moved} tabs to new window` : "Split to new window");
+    consumeMarks();
+    await refresh();
+    return;
+  }
+  if (res.movedToWindow) {
+    ui.toast(res.moved > 1 ? `Merged ${res.moved} tabs` : "Merged to window");
+    consumeMarks();
+    await refresh();
+    return;
+  }
+  if (res.needWindowChoice) {
+    const ownIds =
+      Array.isArray(res.ownIds) && res.ownIds.length > 0 ? res.ownIds : ids;
+    windowChoice = { ids: ownIds, windows: res.tabs };
+    selected = 0;
+    renderAll();
+    return;
+  }
+  ui.toast("No other window");
+  renderAll();
+}
+
+async function confirmWindowChoice() {
+  if (!windowChoice) return;
+  const { ids, windows } = windowChoice;
+  const target = windows[selected];
+  if (!target) return;
+  const res = await ask("moveManagerTabsIntoWindow", {
+    ids,
+    targetWindowId: target.windowId,
+  });
+  if (!active) return;
+  windowChoice = null;
+  if (!res || !res.ok) {
+    ui.toast("Move failed");
+    await refresh();
+    return;
+  }
+  ui.toast(ids.length > 1 ? `Merged ${ids.length} tabs` : "Merged to window");
+  consumeMarks();
+  await refresh();
+}
+
+function stepChoice(delta) {
+  const total = windowChoice.windows.length;
+  selected = (selected + delta + total) % total;
+  renderAll();
+}
+
+function onChoiceKey(event) {
+  if (!windowChoice || windowChoice.windows.length === 0) return false;
+  switch (event.key) {
+    case "Escape":
+      ui.consume(event);
+      windowChoice = null;
+      renderAll();
+      return true;
+    case "Enter":
+      ui.consume(event);
+      confirmWindowChoice();
+      return true;
+    case "ArrowDown":
+    case "j":
+      ui.consume(event);
+      stepChoice(1);
+      return true;
+    case "ArrowUp":
+    case "k":
+      ui.consume(event);
+      stepChoice(-1);
+      return true;
+    default:
+      return false;
+  }
+}
+
 function isModifier(event) {
   return (
     event.key === "Control" ||
@@ -1103,6 +1226,7 @@ function onNormalKey(event) {
   if (isModifier(event)) return false;
   const hasMod = event.ctrlKey || event.altKey || event.metaKey;
   if (hasMod) return false;
+  if (windowChoice) return onChoiceKey(event);
   switch (event.key) {
     case "Escape":
       ui.consume(event);
@@ -1225,6 +1349,10 @@ function onNormalKey(event) {
     case "t":
       ui.consume(event);
       openField("open", "");
+      return true;
+    case "w":
+      ui.consume(event);
+      moveWindowTargets();
       return true;
     default:
       return false;

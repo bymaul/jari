@@ -170,3 +170,266 @@ test("openExtensions opens the first creatable URL", async () => {
     else globalThis.chrome.tabs.create = savedCreate;
   }
 });
+
+function stubWindowMove({
+  allTabs,
+  windows,
+  onMove,
+  onCreateWindow,
+  onFocus,
+  onGroup,
+  groupList,
+  onGroupUpdate,
+}) {
+  const savedTabs = globalThis.chrome.tabs;
+  const savedWindows = globalThis.chrome.windows;
+  const savedTabGroups = globalThis.chrome.tabGroups;
+  globalThis.chrome.tabs = {
+    ...savedTabs,
+    query: async () => allTabs,
+    move: async (ids, props) => {
+      onMove && onMove(ids, props);
+    },
+    update: async () => {},
+    group: async (opts) => {
+      onGroup && onGroup(opts);
+      return 99;
+    },
+    ungroup: async () => {},
+  };
+  globalThis.chrome.windows = {
+    getAll: async () => windows,
+    get: async () => ({ state: "normal" }),
+    create: async (opts) => {
+      onCreateWindow && onCreateWindow(opts);
+      return { id: 30 };
+    },
+    update: async (...args) => {
+      onFocus && onFocus(args);
+    },
+  };
+  globalThis.chrome.tabGroups = {
+    query: async () => groupList || [],
+    update: async (...args) => {
+      onGroupUpdate && onGroupUpdate(args);
+    },
+  };
+  return () => {
+    globalThis.chrome.tabs = savedTabs;
+    globalThis.chrome.windows = savedWindows;
+    if (savedTabGroups === undefined) delete globalThis.chrome.tabGroups;
+    else globalThis.chrome.tabGroups = savedTabGroups;
+  };
+}
+
+test("moveManagerTabsToWindow splits when sources keep tabs", async () => {
+  const created = [];
+  const moved = [];
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10 },
+      { id: 2, windowId: 10 },
+      { id: 3, windowId: 20 },
+      { id: 4, windowId: 20 },
+    ],
+    windows: [],
+    onMove: (ids, props) => moved.push([ids, props]),
+    onCreateWindow: (opts) => created.push(opts),
+  });
+  try {
+    const res = await handlers.moveManagerTabsToWindow({}, { ids: [1, 3] });
+    assert.deepEqual(res, { ok: true, movedToNewWindow: true, moved: 2 });
+    assert.deepEqual(created, [{ tabId: 1 }]);
+    assert.deepEqual(moved, [[[3], { windowId: 30, index: -1 }]]);
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabsToWindow merges into the lone survivor", async () => {
+  const moved = [];
+  const focused = [];
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10 },
+      { id: 2, windowId: 10 },
+      { id: 3, windowId: 20 },
+    ],
+    windows: [
+      { id: 10, tabs: [{ id: 1 }, { id: 2 }] },
+      { id: 20, tabs: [{ id: 3, active: true, title: "Other" }] },
+    ],
+    onMove: (ids, props) => moved.push([ids, props]),
+    onFocus: (args) => focused.push(args),
+  });
+  globalThis.chrome.tabs.query = async (opts) => {
+    if (opts && opts.windowId === 20) return [{ id: 1 }, { id: 2 }, { id: 3 }];
+    if (opts && opts.windowId !== undefined) return [];
+    return [
+      { id: 1, windowId: 10 },
+      { id: 2, windowId: 10 },
+      { id: 3, windowId: 20 },
+    ];
+  };
+  try {
+    const res = await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] });
+    assert.deepEqual(res, { ok: true, movedToWindow: true, moved: 2 });
+    assert.deepEqual(moved, [
+      [[1, 2], { windowId: 20, index: -1 }],
+    ]);
+    assert.deepEqual(focused, [[20, { focused: true }]]);
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabsToWindow offers a choice with several survivors", async () => {
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10 },
+      { id: 2, windowId: 20 },
+      { id: 3, windowId: 30 },
+    ],
+    windows: [
+      { id: 10, tabs: [{ id: 1 }] },
+      { id: 20, tabs: [{ id: 2, active: true, title: "B" }] },
+      { id: 30, tabs: [{ id: 3, active: true, title: "C" }] },
+    ],
+  });
+  try {
+    const res = await handlers.moveManagerTabsToWindow({}, { ids: [1] });
+    assert.equal(res.ok, true);
+    assert.equal(res.needWindowChoice, true);
+    assert.deepEqual(res.ownIds, [1]);
+    assert.equal(res.tabs.length, 2);
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabsToWindow reports no other window", async () => {
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10 },
+      { id: 2, windowId: 10 },
+    ],
+    windows: [{ id: 10, tabs: [{ id: 1 }, { id: 2 }] }],
+  });
+  try {
+    assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] }), {
+      ok: true,
+      needWindowChoice: false,
+    });
+    assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [] }), {
+      ok: false,
+    });
+    assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [9] }), {
+      ok: false,
+    });
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabsIntoWindow moves into the chosen window", async () => {
+  const moved = [];
+  const restore = stubWindowMove({
+    allTabs: [],
+    windows: [],
+    onMove: (ids, props) => moved.push([ids, props]),
+  });
+  globalThis.chrome.tabs.query = async () => [{ id: 5 }];
+  try {
+    const res = await handlers.moveManagerTabsIntoWindow(
+      {},
+      { ids: [1, 2], targetWindowId: 20 },
+    );
+    assert.deepEqual(res, { ok: true, moved: 2 });
+    assert.deepEqual(moved, [
+      [[1, 2], { windowId: 20, index: -1 }],
+    ]);
+    assert.deepEqual(
+      await handlers.moveManagerTabsIntoWindow({}, { ids: [1] }),
+      { ok: false },
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("split regroups moved tabs with title and color", async () => {
+  const grouped = [];
+  const renamed = [];
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10, groupId: 7 },
+      { id: 2, windowId: 10, groupId: 7 },
+      { id: 3, windowId: 10, groupId: -1 },
+    ],
+    windows: [],
+    groupList: [{ id: 7, title: "Work", color: "blue" }],
+    onGroup: (opts) => grouped.push(opts),
+    onGroupUpdate: (args) => renamed.push(args),
+  });
+  try {
+    const res = await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] });
+    assert.deepEqual(res, { ok: true, movedToNewWindow: true, moved: 2 });
+    assert.deepEqual(grouped, [{ tabIds: [1, 2] }]);
+    assert.deepEqual(renamed, [[99, { title: "Work", color: "blue" }]]);
+  } finally {
+    restore();
+  }
+});
+
+test("merge regroups moved tabs in the target window", async () => {
+  const grouped = [];
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10, groupId: 7 },
+      { id: 2, windowId: 20, groupId: -1 },
+    ],
+    windows: [
+      { id: 10, tabs: [{ id: 1 }] },
+      { id: 20, tabs: [{ id: 2, active: true, title: "Other" }] },
+    ],
+    groupList: [{ id: 7, title: "", color: "" }],
+    onGroup: (opts) => grouped.push(opts),
+  });
+  globalThis.chrome.tabs.query = async (opts) => {
+    if (opts && opts.windowId === 20) return [{ id: 2 }, { id: 1 }];
+    if (opts && opts.windowId !== undefined) return [];
+    return [
+      { id: 1, windowId: 10, groupId: 7 },
+      { id: 2, windowId: 20, groupId: -1 },
+    ];
+  };
+  try {
+    const res = await handlers.moveManagerTabsToWindow({}, { ids: [1] });
+    assert.deepEqual(res, { ok: true, movedToWindow: true, moved: 1 });
+    assert.deepEqual(grouped, [{ tabIds: [1] }]);
+  } finally {
+    restore();
+  }
+});
+
+test("split still succeeds without group support", async () => {
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10, groupId: 7 },
+      { id: 2, windowId: 10, groupId: 7 },
+    ],
+    windows: [],
+  });
+  delete globalThis.chrome.tabs.group;
+  delete globalThis.chrome.tabs.ungroup;
+  delete globalThis.chrome.tabGroups;
+  try {
+    assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [1] }), {
+      ok: true,
+      movedToNewWindow: true,
+      moved: 1,
+    });
+  } finally {
+    restore();
+  }
+});

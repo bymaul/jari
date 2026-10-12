@@ -20,7 +20,7 @@ Bindings chain into sequences of any length.
   forward, `[w` back (`3]w` skips ahead), `;w` reset scroll area
 - Zoom: `+`/`=`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
-  `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder),
+  `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder, `w` split/merge),
   `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
 - History: `H`/`L` back/forward

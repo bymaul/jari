@@ -15,6 +15,8 @@ export const handlers = {
   nextTab: tabs.nextTab,
   moveTabToWindow: tabs.moveTabToWindow,
   moveTabIntoWindow: tabs.moveTabIntoWindow,
+  moveManagerTabsToWindow: tabs.moveManagerTabsToWindow,
+  moveManagerTabsIntoWindow: tabs.moveManagerTabsIntoWindow,
   moveTabLeft: tabs.moveTabLeft,
   goToFirstTab: tabs.goToFirstTab,
   goToLastTab: tabs.goToLastTab,
