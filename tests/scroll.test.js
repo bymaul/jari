@@ -2,7 +2,7 @@ import "./setup.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-const { Scroll, __resetScrollCache, __adoptNewDialog, __pruneObserved, __observedRootCount, __smoothFrameMove } = await import("../content/scroll.js");
+const { Scroll, __smoothFrameMove } = await import("../content/scroll.js");
 
 const VW = 800;
 const VH = 600;
@@ -77,8 +77,7 @@ function makeFrame() {
   return el;
 }
 
-// One shared fixture set: the scroll module caches element lookups per
-// scan epoch, so fixtures must stay identical across tests.
+// One shared fixture set, reset explicitly between cases.
 const area = makeArea();
 const frame = makeFrame();
 globalThis.document.querySelectorAll = () => [area, frame];
@@ -106,7 +105,6 @@ beforeEach(() => {
   resetCalls();
 });
 
-// The top-frame rotation is global -> area -> frame -> global.
 function rotateTo(target) {
   for (let i = 0; i < 4; i++) {
     if (Scroll.getTarget() === target) return;
@@ -189,7 +187,6 @@ const defaultFixtures = globalThis.document.querySelectorAll;
 
 function useFixtures(list) {
   globalThis.document.querySelectorAll = () => list;
-  __resetScrollCache();
   Scroll.reset();
 }
 
@@ -197,15 +194,16 @@ function restoreFixtures() {
   globalThis.document.querySelectorAll = defaultFixtures;
   globalThis.document.scrollingElement = { scrollHeight: 1200, clientHeight: 600 };
   globalThis.document.activeElement = null;
-  __resetScrollCache();
   Scroll.reset();
 }
 
-test("the first cycle step prefers the largest overflow", () => {
+test("the first cycle step follows visual order, not overflow size", () => {
   const small = makeAreaAt({ overflow: 50 });
   const big = makeAreaAt({ left: 300, overflow: 900 });
   useFixtures([small, big]);
   try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), small);
     Scroll.cycle();
     assert.equal(Scroll.getTarget(), big);
   } finally {
@@ -213,11 +211,13 @@ test("the first cycle step prefers the largest overflow", () => {
   }
 });
 
-test("an open dialog wins the first step even when the page scrolls", () => {
+test("a dialog is a plain stop in visual order", () => {
   const plain = makeAreaAt({ overflow: 900 });
   const dialog = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
   useFixtures([plain, dialog]);
   try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), plain);
     Scroll.cycle();
     assert.equal(Scroll.getTarget(), dialog);
   } finally {
@@ -225,18 +225,18 @@ test("an open dialog wins the first step even when the page scrolls", () => {
   }
 });
 
-test("the focused area wins the first step", () => {
+test("getTarget stays on the page until an explicit cycle", () => {
   const big = makeAreaAt({ overflow: 900 });
   const small = makeAreaAt({ left: 300, overflow: 50 });
   const inner = { nodeType: 1 };
   small.contains = (node) => node === inner;
   globalThis.document.querySelectorAll = () => [big, small];
-  __resetScrollCache();
   Scroll.reset();
   globalThis.document.activeElement = inner;
   try {
+    assert.equal(Scroll.getTarget(), globalThis.window);
     Scroll.cycle();
-    assert.equal(Scroll.getTarget(), small);
+    assert.equal(Scroll.getTarget(), big);
   } finally {
     restoreFixtures();
   }
@@ -271,150 +271,58 @@ test("nested wrappers collapse to a single stop", () => {
   }
 });
 
-test("a fresh dialog steals the target from a plain area", () => {
-  const plain = makeAreaAt({ overflow: 900 });
-  const dialog = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
-  useFixtures([plain]);
+test("offscreen areas are not stops, even with huge overflow", () => {
+  const visible = makeAreaAt({ overflow: 50 });
+  const offscreen = makeAreaAt({ top: 2000, overflow: 5000 });
+  useFixtures([visible, offscreen]);
   try {
     Scroll.cycle();
-    assert.equal(Scroll.getTarget(), plain);
-    globalThis.document.querySelectorAll = () => [plain, dialog];
-    __resetScrollCache();
-    __adoptNewDialog([]);
-    assert.equal(Scroll.getTarget(), dialog);
-  } finally {
-    restoreFixtures();
-  }
-});
-
-test("adoption leaves an open dialog alone and ignores stale dialogs", () => {
-  const plain = makeAreaAt({ overflow: 900 });
-  const first = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
-  const second = makeAreaAt({ left: 500, overflow: 50, tag: "DIALOG" });
-  useFixtures([plain, first]);
-  try {
+    assert.equal(Scroll.getTarget(), visible);
     Scroll.cycle();
-    assert.equal(Scroll.getTarget(), first);
-    globalThis.document.querySelectorAll = () => [plain, first, second];
-    __resetScrollCache();
-    __adoptNewDialog([plain, first]);
-    assert.equal(Scroll.getTarget(), first);
-  } finally {
-    restoreFixtures();
-  }
-  useFixtures([plain]);
-  try {
-    Scroll.cycle();
-    assert.equal(Scroll.getTarget(), plain);
-    globalThis.document.querySelectorAll = () => [plain, first];
-    __resetScrollCache();
-    __adoptNewDialog([plain, first]);
-    assert.equal(Scroll.getTarget(), plain);
-  } finally {
-    restoreFixtures();
-  }
-});
-
-test("getTarget prefers an open modal over a scrolling page", () => {
-  const plain = makeAreaAt({ overflow: 900 });
-  const dialog = makeAreaAt({ left: 300, overflow: 50, tag: "DIALOG" });
-  useFixtures([plain, dialog]);
-  try {
-    assert.equal(Scroll.getTarget(), dialog);
-  } finally {
-    restoreFixtures();
-  }
-});
-
-test("getTarget prefers an aria-modal div over a scrolling page", () => {
-  const plain = makeAreaAt({ overflow: 900 });
-  const modal = makeAreaAt({ left: 300, overflow: 50 });
-  modal.getAttribute = (name) => (name === "aria-modal" ? "true" : null);
-  useFixtures([plain, modal]);
-  try {
-    assert.equal(Scroll.getTarget(), modal);
-  } finally {
-    restoreFixtures();
-  }
-});
-
-test("a plain role=dialog panel does not steal the page", () => {
-  const plain = makeAreaAt({ overflow: 900 });
-  const panel = makeAreaAt({ left: 300, overflow: 50 });
-  panel.getAttribute = (name) => (name === "role" ? "dialog" : null);
-  useFixtures([plain, panel]);
-  try {
     assert.equal(Scroll.getTarget(), globalThis.window);
   } finally {
     restoreFixtures();
   }
 });
 
-test("detached observed roots are pruned instead of leaking", () => {
-  const host = makeAreaAt({ overflow: 900 });
-  const deadShadow = { isConnected: false, querySelectorAll: () => [] };
-  host.shadowRoot = deadShadow;
-  useFixtures([host]);
+test("a sliver peeking into the viewport is not a stop", () => {
+  const visible = makeAreaAt({ overflow: 50 });
+  const sliver = makeAreaAt({ top: -190, overflow: 400 });
+  useFixtures([visible, sliver]);
   try {
-    Scroll.getTarget();
-    const before = __observedRootCount();
-    assert.ok(before >= 1, "expected the shadow root to be observed");
-    __pruneObserved();
-    assert.equal(__observedRootCount(), before - 1);
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), visible);
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), globalThis.window);
   } finally {
     restoreFixtures();
-    __pruneObserved();
   }
 });
 
-test("scroll keypresses reuse the page conclusion instead of rescanning", () => {
+test("getTarget performs no DOM scan", () => {
   const big = makeAreaAt({ overflow: 900 });
   const prevQsa = globalThis.document.querySelectorAll;
   const prevStyle = globalThis.window.getComputedStyle;
+  let queries = 0;
   let styles = 0;
-  globalThis.document.querySelectorAll = () => [big];
+  globalThis.document.querySelectorAll = () => {
+    queries++;
+    return [big];
+  };
   globalThis.window.getComputedStyle = (...args) => {
     styles++;
     return prevStyle(...args);
   };
   try {
-    __resetScrollCache();
     Scroll.reset();
-    assert.equal(Scroll.getTarget(), globalThis.window);
-    assert.ok(styles > 0, "expected the first resolve to measure the page");
+    queries = 0;
     styles = 0;
     for (let i = 0; i < 5; i++) {
       assert.equal(Scroll.getTarget(), globalThis.window);
     }
-    assert.equal(styles, 0, "expected follow-ups to skip the scan");
+    assert.equal(queries, 0, "expected no DOM walk on plain scroll keys");
+    assert.equal(styles, 0, "expected no style reads on plain scroll keys");
   } finally {
-    globalThis.document.querySelectorAll = prevQsa;
-    globalThis.window.getComputedStyle = prevStyle;
-    restoreFixtures();
-  }
-});
-
-test("getTarget rescans once the throttle window expires", () => {
-  const big = makeAreaAt({ overflow: 900 });
-  const prevQsa = globalThis.document.querySelectorAll;
-  const prevStyle = globalThis.window.getComputedStyle;
-  const realNow = Date.now;
-  let styles = 0;
-  globalThis.document.querySelectorAll = () => [big];
-  globalThis.window.getComputedStyle = (...args) => {
-    styles++;
-    return prevStyle(...args);
-  };
-  try {
-    __resetScrollCache();
-    Scroll.reset();
-    assert.equal(Scroll.getTarget(), globalThis.window);
-    styles = 0;
-    Date.now = () => realNow() + 1000;
-    assert.equal(Scroll.getTarget(), globalThis.window);
-    assert.ok(styles > 0, "expected a rescan after the window");
-  } finally {
-    Date.now = realNow;
     globalThis.document.querySelectorAll = prevQsa;
     globalThis.window.getComputedStyle = prevStyle;
     restoreFixtures();

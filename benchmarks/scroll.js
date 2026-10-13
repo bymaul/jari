@@ -1,8 +1,6 @@
 // Scroll benchmark: per-keypress cost of Scroll.getTarget over a synthetic
 // page, plus frame-paced drain of one smooth `j` step at 60fps vs 20fps.
-// Models a churning page (playing video): every getTarget call follows
-// cache churn, so it measures what each `j`/`k` press pays. Not a test
-// (no assertions, always exits 0).
+// Not a test (no assertions, always exits 0).
 // Run: node benchmarks/scroll.js [domSize]
 const sizes = process.argv[2] ? [Number(process.argv[2])] : [500, 2000, 8000];
 
@@ -52,8 +50,7 @@ globalThis.chrome = {
   },
 };
 
-const { Scroll, smoothScrollBy, __resetScrollCache } =
-  await import("../content/scroll.js");
+const { Scroll, smoothScrollBy } = await import("../content/scroll.js");
 
 function makeArea(i) {
   return {
@@ -84,7 +81,6 @@ function makeArea(i) {
 
 for (const n of sizes) {
   list = Array.from({ length: n }, (_, i) => makeArea(i));
-  __resetScrollCache();
   let start = performance.now();
   Scroll.getTarget();
   const cold = performance.now() - start;

@@ -2237,105 +2237,11 @@
   // content/scroll.js
   var target = null;
   var HIGHLIGHT_MS = 400;
-  var lastNullResolveAt = 0;
-  var NULL_RESOLVE_MIN_MS = 500;
   function getTarget() {
     if (target !== null && !target.isConnected) {
       target = null;
     }
-    if (target === null) {
-      const now = Date.now();
-      if (lastNullResolveAt === 0 || now - lastNullResolveAt >= NULL_RESOLVE_MIN_MS) {
-        if (!pageCanScroll()) {
-          const stops = currentStops();
-          if (stops.length > 0) {
-            target = pickBestInner(stops) || stops[0];
-          }
-        }
-        if (target === null) {
-          const modals = currentStops().filter((s) => s !== null && isModalStop(s));
-          if (modals.length > 0) target = pickBestInner(modals) || modals[0];
-        }
-        lastNullResolveAt = target === null ? now : 0;
-      }
-    }
     return target === null ? window : target;
-  }
-  var scanEpoch = 0;
-  var mutationTimeout = null;
-  function epochCache(compute) {
-    let epoch = -1;
-    let value = null;
-    return () => {
-      if (epoch === scanEpoch) return value;
-      epoch = scanEpoch;
-      value = compute();
-      return value;
-    };
-  }
-  function invalidateScrollCache() {
-    if (mutationTimeout) return;
-    mutationTimeout = setTimeout(() => {
-      const prevStops = lastStops;
-      scanEpoch++;
-      mutationTimeout = null;
-      pruneObserved();
-      lastStops = adoptNewDialog(prevStops);
-    }, 150);
-  }
-  var observedRoots = /* @__PURE__ */ new Set();
-  var observedWatchers = /* @__PURE__ */ new Map();
-  var MAX_OBSERVED_ROOTS = 300;
-  function pruneObserved() {
-    for (const root of observedRoots) {
-      let connected;
-      try {
-        connected = root.isConnected !== false;
-      } catch {
-        connected = false;
-      }
-      if (connected) continue;
-      observedRoots.delete(root);
-      const watcher = observedWatchers.get(root);
-      observedWatchers.delete(root);
-      if (watcher) {
-        try {
-          watcher.disconnect();
-        } catch {
-        }
-      }
-    }
-  }
-  function ensureObserved(root, options) {
-    if (observedRoots.has(root)) return;
-    if (observedRoots.size >= MAX_OBSERVED_ROOTS) {
-      pruneObserved();
-      if (observedRoots.size >= MAX_OBSERVED_ROOTS) return;
-    }
-    observedRoots.add(root);
-    if (typeof window.MutationObserver !== "undefined") {
-      try {
-        const watcher = new window.MutationObserver(invalidateScrollCache);
-        watcher.observe(
-          root,
-          options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "hidden", "aria-modal", "aria-hidden", "role"] }
-        );
-        observedWatchers.set(root, watcher);
-      } catch {
-        observedRoots.delete(root);
-      }
-    }
-  }
-  function observeDocument() {
-    try {
-      ensureObserved(document.documentElement || document, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["class", "open", "hidden", "aria-modal", "aria-hidden", "role"]
-      });
-    } catch {
-    }
   }
   function isScrollVisible(el, selfStyle) {
     let node = el;
@@ -2353,16 +2259,32 @@
     }
     return true;
   }
-  var findScrollableElements = epochCache(() => {
-    observeDocument();
+  function findScrollableElements() {
     const areas = [];
     const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
-    for (const el of queryAll("*", ensureObserved)) {
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    for (const el of queryAll("*")) {
       if (roots.has(el)) continue;
       if (el.closest(overlaySelectors)) continue;
       const tag = el.tagName;
       if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
       if (el.clientHeight < MIN_SCROLL_AREA_SIZE && el.clientWidth < MIN_SCROLL_AREA_SIZE)
+        continue;
+      let rect;
+      try {
+        rect = el.getBoundingClientRect();
+      } catch {
+        continue;
+      }
+      if (!rect) continue;
+      const right = Number.isFinite(rect.right) ? rect.right : (rect.left || 0) + (rect.width || 0);
+      const bottom = Number.isFinite(rect.bottom) ? rect.bottom : (rect.top || 0) + (rect.height || 0);
+      if (bottom <= 0 || right <= 0 || rect.top >= vh || rect.left >= vw)
+        continue;
+      const visibleW = Math.min(right, vw) - Math.max(rect.left || 0, 0);
+      const visibleH = Math.min(bottom, vh) - Math.max(rect.top || 0, 0);
+      if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
         continue;
       const style = window.getComputedStyle(el);
       if (!isScrollVisible(el, style)) continue;
@@ -2376,11 +2298,10 @@
       if (scrollableY || scrollableX) areas.push(el);
     }
     return areas;
-  });
-  var findFrameElements = epochCache(() => {
-    observeDocument();
+  }
+  function findFrameElements() {
     const frames = [];
-    for (const el of queryAll(FRAME_SELECTOR, ensureObserved)) {
+    for (const el of queryAll(FRAME_SELECTOR)) {
       try {
         if (el.closest && el.closest(overlaySelectors)) continue;
       } catch {
@@ -2403,7 +2324,7 @@
       frames.push(el);
     }
     return frames;
-  });
+  }
   function isFrame(el) {
     if (!el || el === window) return false;
     return isFrameElement(el);
@@ -2519,20 +2440,6 @@
     }
     return false;
   }
-  function isModalStop(el) {
-    if (!el || el === window) return false;
-    try {
-      if (el.tagName === "DIALOG") return true;
-      if (typeof el.getAttribute === "function") {
-        if (el.getAttribute("aria-modal") === "true") return true;
-      }
-      if (typeof el.closest === "function" && el.closest('[aria-modal="true"]'))
-        return true;
-    } catch {
-      return false;
-    }
-    return false;
-  }
   function currentStops() {
     const areas = dedupeNestedAreas(findScrollableElements());
     const frames = findFrameElements();
@@ -2579,15 +2486,6 @@
     }
     return kept;
   }
-  function overflowAmount(el) {
-    try {
-      const y = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
-      const x = Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0));
-      return x + y;
-    } catch {
-      return 0;
-    }
-  }
   function isUnverifiedFrame(el) {
     if (!isFrame(el)) return false;
     try {
@@ -2596,102 +2494,12 @@
       return true;
     }
   }
-  function stopContains(el, node) {
-    if (!el || !node) return false;
-    if (el === node) return true;
-    try {
-      return typeof el.contains === "function" && el.contains(node);
-    } catch {
-      return false;
-    }
-  }
-  function activeStopNode() {
-    try {
-      let node = document.activeElement;
-      if (!node) return null;
-      while (node && node.shadowRoot && node.shadowRoot.activeElement) {
-        node = node.shadowRoot.activeElement;
-      }
-      return node;
-    } catch {
-      return null;
-    }
-  }
-  function focusedStop(stops) {
-    const active9 = activeStopNode();
-    if (!active9) return null;
-    return stops.find((s) => s !== null && stopContains(s, active9)) || null;
-  }
-  function rectScore(el) {
-    const vw = window.innerWidth || 0;
-    const vh = window.innerHeight || 0;
-    if (vw === 0 || vh === 0) return 0;
-    let r;
-    try {
-      r = el.getBoundingClientRect();
-    } catch {
-      return 0;
-    }
-    if (!r) return 0;
-    const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
-    const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
-    const cx = vw / 2;
-    const cy = vh / 2;
-    const centered = r.left <= cx && cx <= r.right && r.top <= cy && cy <= r.bottom;
-    return coveredW * coveredH / (vw * vh) + (centered ? 1 : 0);
-  }
-  function scoreStop(el, focused) {
-    let score = 0;
-    if (isDialogStop(el)) score += 1e6;
-    if (focused && el === focused) score += 1e5;
-    let overflow;
-    if (!isFrame(el)) overflow = overflowAmount(el);
-    else if (isUnverifiedFrame(el)) overflow = 200;
-    else overflow = 500;
-    score += Math.min(2e3, overflow / 50);
-    score += rectScore(el);
-    if (isUnverifiedFrame(el)) score -= 0.5;
-    return score;
-  }
-  function pickBestInner(stops) {
-    const inners = stops.filter((s) => s !== null);
-    if (inners.length === 0) return null;
-    const focused = focusedStop(stops);
-    let best = null;
-    let bestScore = -Infinity;
-    for (const el of inners) {
-      const score = scoreStop(el, focused);
-      if (score > bestScore) {
-        bestScore = score;
-        best = el;
-      }
-    }
-    return best;
-  }
-  var lastStops = [];
-  function adoptNewDialog(prevStops) {
-    const stops = currentStops();
-    const current = target !== null && target.isConnected ? target : null;
-    if (current === null || !isDialogStop(current)) {
-      const prev = new Set(prevStops);
-      const fresh = stops.filter(
-        (s) => s !== null && !prev.has(s) && isDialogStop(s)
-      );
-      if (fresh.length > 0) {
-        target = pickBestInner(fresh) || fresh[0];
-        focusTarget(target);
-        showHighlight();
-      }
-    }
-    return stops;
-  }
   function cycle(steps = 1) {
     if (!isTopFrame()) {
       forwardCycleToTop(steps < 0 ? -1 : 1);
       return;
     }
     const stops = currentStops();
-    const pageScrolls = stops.length > 0 && stops[0] === null;
     if (stops.length === 0) {
       target = null;
       ui.toast("No scroll areas");
@@ -2700,19 +2508,8 @@
     const dir = steps < 0 ? -1 : 1;
     const count = Math.max(1, Math.abs(Math.floor(steps)) || 1);
     const idx = stops.indexOf(target);
-    if (idx === -1) {
-      target = pageScrolls ? null : pickBestInner(stops) || stops[0];
-    } else if (pageScrolls && idx === 0) {
-      if (dir < 0) {
-        target = stops[stops.length - 1];
-      } else {
-        const ranked = stops.filter((s) => s !== null);
-        target = pickBestInner(ranked) || ranked[0] || null;
-      }
-    } else {
-      const next2 = ((idx + dir * count) % stops.length + stops.length) % stops.length;
-      target = stops[next2];
-    }
+    const next2 = idx === -1 ? 0 : ((idx + dir * count) % stops.length + stops.length) % stops.length;
+    target = stops[next2];
     focusTarget(target);
     if (!isFrame(target)) releaseFrameFocus();
     showHighlight();
@@ -2729,14 +2526,7 @@
   var highlightEl = null;
   var highlightTimer = null;
   function showHighlight() {
-    let area = getTarget();
-    const pageScrolls = pageCanScroll();
-    if (area === window && !pageScrolls) {
-      const stops2 = currentStops();
-      if (stops2.length === 0) return;
-      target = pickBestInner(stops2) || stops2[0];
-      area = target;
-    }
+    const area = getTarget();
     const stops = currentStops();
     const pos = stops.indexOf(area === window ? null : area);
     const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
@@ -2789,7 +2579,6 @@
       return;
     }
     target = null;
-    lastNullResolveAt = 0;
     releaseFrameFocus();
     showHighlight();
   }

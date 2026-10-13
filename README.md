@@ -16,8 +16,9 @@ see [PRIVACY.md](PRIVACY.md).
 Commands take a repeat count (`3j`, `2x`); `0-9` are reserved for it.
 Bindings chain into sequences of any length.
 
-- Scroll: `j`/`k`/`h`/`l`, `d`/`u` half page, `gg`/`G` top/bottom, `]w` cycle scroll area
-  forward, `[w` back (`3]w` skips ahead), `;w` reset scroll area
+- Scroll: `j`/`k`/`h`/`l`, `d`/`u` half page, `gg`/`G` top/bottom (always the page
+  until switched), `]w` cycle scroll area forward, `[w` back (`3]w` skips ahead),
+  `;w` reset scroll area
 - Zoom: `+`/`=`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
   `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder, `w` split/merge),

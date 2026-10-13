@@ -8,132 +8,11 @@ let target = null;
 
 const HIGHLIGHT_MS = 400;
 
-// Timestamp of the last resolve that concluded "page scrolls, no target".
-// Churning pages (playing video, live feeds) mutate constantly; without this
-// every keypress re-proves the page scrolls with a full DOM walk. Resolves
-// within the window reuse that conclusion. Picking an inner target or an
-// explicit cycle/reset clears it, so those always rescan immediately.
-let lastNullResolveAt = 0;
-const NULL_RESOLVE_MIN_MS = 500;
-
 function getTarget() {
   if (target !== null && !target.isConnected) {
     target = null;
   }
-  if (target === null) {
-    const now = Date.now();
-    if (
-      lastNullResolveAt === 0 ||
-      now - lastNullResolveAt >= NULL_RESOLVE_MIN_MS
-    ) {
-      if (!pageCanScroll()) {
-        const stops = currentStops();
-        if (stops.length > 0) {
-          target = pickBestInner(stops) || stops[0];
-        }
-      }
-      if (target === null) {
-        // An open modal takes the scroll target even when the page behind it
-        // still scrolls and the mutation observer missed it opening.
-        const modals = currentStops().filter((s) => s !== null && isModalStop(s));
-        if (modals.length > 0) target = pickBestInner(modals) || modals[0];
-      }
-      lastNullResolveAt = target === null ? now : 0;
-    }
-  }
   return target === null ? window : target;
-}
-
-let scanEpoch = 0;
-let mutationTimeout = null;
-
-function epochCache(compute) {
-  let epoch = -1;
-  let value = null;
-  return () => {
-    if (epoch === scanEpoch) return value;
-    epoch = scanEpoch;
-    value = compute();
-    return value;
-  };
-}
-
-function invalidateScrollCache() {
-  // Throttled (not debounced) so sustained churn still rescans periodically
-  // for cycle/reset and dialog adoption. Plain scroll keypresses reuse the
-  // last null-target conclusion within NULL_RESOLVE_MIN_MS instead of
-  // forcing a full-page scan on a churning feed.
-  if (mutationTimeout) return;
-
-  mutationTimeout = setTimeout(() => {
-    const prevStops = lastStops;
-    scanEpoch++;
-    mutationTimeout = null;
-    pruneObserved();
-    lastStops = adoptNewDialog(prevStops);
-  }, 150);
-}
-
-const observedRoots = new Set();
-const observedWatchers = new Map();
-const MAX_OBSERVED_ROOTS = 300;
-function pruneObserved() {
-  for (const root of observedRoots) {
-    let connected;
-    try {
-      connected = root.isConnected !== false;
-    } catch {
-      connected = false;
-    }
-    if (connected) continue;
-    observedRoots.delete(root);
-    const watcher = observedWatchers.get(root);
-    observedWatchers.delete(root);
-    if (watcher) {
-      try {
-        watcher.disconnect();
-      } catch {}
-    }
-  }
-}
-function ensureObserved(root, options) {
-  if (observedRoots.has(root)) return;
-  if (observedRoots.size >= MAX_OBSERVED_ROOTS) {
-    pruneObserved();
-    if (observedRoots.size >= MAX_OBSERVED_ROOTS) return;
-  }
-  observedRoots.add(root);
-  if (typeof window.MutationObserver !== "undefined") {
-    try {
-      const watcher = new window.MutationObserver(invalidateScrollCache);
-      watcher.observe(
-        root,
-        options || { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "hidden", "aria-modal", "aria-hidden", "role"] },
-      );
-      observedWatchers.set(root, watcher);
-    } catch {
-      observedRoots.delete(root);
-    }
-  }
-}
-
-function observeDocument() {
-  // queryAll only reports shadow roots to ensureObserved, so without this
-  // the scan cache never invalidates on pages without shadow-DOM churn
-  // (opened panels, SPA content, and feed growth would stay invisible).
-  // Class attributes are watched for overflow flips; style is excluded:
-  // progress bars and play-state churn would otherwise invalidate
-  // near-continuously on video sites. The open/hidden/aria tokens catch
-  // modal toggles (showModal sets open, unhides drop hidden) that never
-  // touch a class.
-  try {
-    ensureObserved(document.documentElement || document, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "open", "hidden", "aria-modal", "aria-hidden", "role"],
-    });
-  } catch {}
 }
 
 function isScrollVisible(el, selfStyle) {
@@ -156,12 +35,13 @@ function isScrollVisible(el, selfStyle) {
   return true;
 }
 
-const findScrollableElements = epochCache(() => {
-  observeDocument();
+function findScrollableElements() {
   const areas = [];
   const roots = new Set([document.documentElement, document.body]);
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
 
-  for (const el of queryAll("*", ensureObserved)) {
+  for (const el of queryAll("*")) {
     if (roots.has(el)) continue;
     if (el.closest(overlaySelectors)) continue;
     const tag = el.tagName;
@@ -170,6 +50,25 @@ const findScrollableElements = epochCache(() => {
       el.clientHeight < MIN_SCROLL_AREA_SIZE &&
       el.clientWidth < MIN_SCROLL_AREA_SIZE
     )
+      continue;
+    let rect;
+    try {
+      rect = el.getBoundingClientRect();
+    } catch {
+      continue;
+    }
+    if (!rect) continue;
+    const right = Number.isFinite(rect.right)
+      ? rect.right
+      : (rect.left || 0) + (rect.width || 0);
+    const bottom = Number.isFinite(rect.bottom)
+      ? rect.bottom
+      : (rect.top || 0) + (rect.height || 0);
+    if (bottom <= 0 || right <= 0 || rect.top >= vh || rect.left >= vw)
+      continue;
+    const visibleW = Math.min(right, vw) - Math.max(rect.left || 0, 0);
+    const visibleH = Math.min(bottom, vh) - Math.max(rect.top || 0, 0);
+    if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
       continue;
     const style = window.getComputedStyle(el);
     if (!isScrollVisible(el, style)) continue;
@@ -191,12 +90,11 @@ const findScrollableElements = epochCache(() => {
     if (scrollableY || scrollableX) areas.push(el);
   }
   return areas;
-});
+}
 
-const findFrameElements = epochCache(() => {
-  observeDocument();
+function findFrameElements() {
   const frames = [];
-  for (const el of queryAll(FRAME_SELECTOR, ensureObserved)) {
+  for (const el of queryAll(FRAME_SELECTOR)) {
     try {
       if (el.closest && el.closest(overlaySelectors)) continue;
     } catch {}
@@ -221,7 +119,7 @@ const findFrameElements = epochCache(() => {
     frames.push(el);
   }
   return frames;
-});
+}
 
 export function isFrame(el) {
   if (!el || el === window) return false;
@@ -347,21 +245,6 @@ function isDialogStop(el) {
   return false;
 }
 
-function isModalStop(el) {
-  if (!el || el === window) return false;
-  try {
-    if (el.tagName === "DIALOG") return true;
-    if (typeof el.getAttribute === "function") {
-      if (el.getAttribute("aria-modal") === "true") return true;
-    }
-    if (typeof el.closest === "function" && el.closest('[aria-modal="true"]'))
-      return true;
-  } catch {
-    return false;
-  }
-  return false;
-}
-
 function currentStops() {
   const areas = dedupeNestedAreas(findScrollableElements());
   const frames = findFrameElements();
@@ -419,16 +302,6 @@ function dedupeNestedAreas(areas) {
   return kept;
 }
 
-function overflowAmount(el) {
-  try {
-    const y = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
-    const x = Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0));
-    return x + y;
-  } catch {
-    return 0;
-  }
-}
-
 function isUnverifiedFrame(el) {
   if (!isFrame(el)) return false;
   try {
@@ -438,111 +311,12 @@ function isUnverifiedFrame(el) {
   }
 }
 
-function stopContains(el, node) {
-  if (!el || !node) return false;
-  if (el === node) return true;
-  try {
-    return typeof el.contains === "function" && el.contains(node);
-  } catch {
-    return false;
-  }
-}
-
-function activeStopNode() {
-  try {
-    let node = document.activeElement;
-    if (!node) return null;
-    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
-      node = node.shadowRoot.activeElement;
-    }
-    return node;
-  } catch {
-    return null;
-  }
-}
-
-function focusedStop(stops) {
-  const active = activeStopNode();
-  if (!active) return null;
-  return stops.find((s) => s !== null && stopContains(s, active)) || null;
-}
-
-function rectScore(el) {
-  const vw = window.innerWidth || 0;
-  const vh = window.innerHeight || 0;
-  if (vw === 0 || vh === 0) return 0;
-  let r;
-  try {
-    r = el.getBoundingClientRect();
-  } catch {
-    return 0;
-  }
-  if (!r) return 0;
-  const coveredW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
-  const coveredH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
-  const cx = vw / 2;
-  const cy = vh / 2;
-  const centered = r.left <= cx && cx <= r.right && r.top <= cy && cy <= r.bottom;
-  return (coveredW * coveredH) / (vw * vh) + (centered ? 1 : 0);
-}
-
-function scoreStop(el, focused) {
-  let score = 0;
-  if (isDialogStop(el)) score += 1000000;
-  if (focused && el === focused) score += 100000;
-  let overflow;
-  if (!isFrame(el)) overflow = overflowAmount(el);
-  else if (isUnverifiedFrame(el)) overflow = 200;
-  else overflow = 500;
-  score += Math.min(2000, overflow / 50);
-  score += rectScore(el);
-  if (isUnverifiedFrame(el)) score -= 0.5;
-  return score;
-}
-
-function pickBestInner(stops) {
-  const inners = stops.filter((s) => s !== null);
-  if (inners.length === 0) return null;
-  const focused = focusedStop(stops);
-  let best = null;
-  let bestScore = -Infinity;
-  for (const el of inners) {
-    const score = scoreStop(el, focused);
-    if (score > bestScore) {
-      bestScore = score;
-      best = el;
-    }
-  }
-  return best;
-}
-
-let lastStops = [];
-
-function adoptNewDialog(prevStops) {
-  const stops = currentStops();
-  const current = target !== null && target.isConnected ? target : null;
-  if (current === null || !isDialogStop(current)) {
-    const prev = new Set(prevStops);
-    const fresh = stops.filter(
-      (s) => s !== null && !prev.has(s) && isDialogStop(s),
-    );
-    if (fresh.length > 0) {
-      target = pickBestInner(fresh) || fresh[0];
-      focusTarget(target);
-      showHighlight();
-    }
-  }
-  return stops;
-}
-
 function cycle(steps = 1) {
   if (!isTopFrame()) {
     forwardCycleToTop(steps < 0 ? -1 : 1);
     return;
   }
   const stops = currentStops();
-  // currentStops() leads with null exactly when the page itself scrolls.
-  const pageScrolls = stops.length > 0 && stops[0] === null;
   if (stops.length === 0) {
     target = null;
     ui.toast("No scroll areas");
@@ -551,20 +325,11 @@ function cycle(steps = 1) {
   const dir = steps < 0 ? -1 : 1;
   const count = Math.max(1, Math.abs(Math.floor(steps)) || 1);
   const idx = stops.indexOf(target);
-  if (idx === -1) {
-    target = pageScrolls ? null : pickBestInner(stops) || stops[0];
-  } else if (pageScrolls && idx === 0) {
-    if (dir < 0) {
-      target = stops[stops.length - 1];
-    } else {
-      const ranked = stops.filter((s) => s !== null);
-      target = pickBestInner(ranked) || ranked[0] || null;
-    }
-  } else {
-    const next =
-      (((idx + dir * count) % stops.length) + stops.length) % stops.length;
-    target = stops[next];
-  }
+  const next =
+    idx === -1
+      ? 0
+      : (((idx + dir * count) % stops.length) + stops.length) % stops.length;
+  target = stops[next];
   focusTarget(target);
   if (!isFrame(target)) releaseFrameFocus();
   showHighlight();
@@ -590,14 +355,7 @@ let highlightEl = null;
 let highlightTimer = null;
 
 function showHighlight() {
-  let area = getTarget();
-  const pageScrolls = pageCanScroll();
-  if (area === window && !pageScrolls) {
-    const stops = currentStops();
-    if (stops.length === 0) return;
-    target = pickBestInner(stops) || stops[0];
-    area = target;
-  }
+  const area = getTarget();
   const stops = currentStops();
   const pos = stops.indexOf(area === window ? null : area);
   const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
@@ -653,7 +411,6 @@ function reset() {
     return;
   }
   target = null;
-  lastNullResolveAt = 0;
   releaseFrameFocus();
   showHighlight();
 }
@@ -753,28 +510,6 @@ export function shouldSmooth() {
 }
 
 export const Scroll = { getTarget, cycle, reset, showHighlight };
-
-export function __resetScrollCache() {
-  if (mutationTimeout) {
-    clearTimeout(mutationTimeout);
-    mutationTimeout = null;
-  }
-  scanEpoch++;
-  lastNullResolveAt = 0;
-  lastStops = [];
-}
-
-export function __pruneObserved() {
-  pruneObserved();
-}
-
-export function __observedRootCount() {
-  return observedRoots.size;
-}
-
-export function __adoptNewDialog(prevStops) {
-  return adoptNewDialog(prevStops);
-}
 
 function handleCycleMessage(event) {
   if (!isTopFrame()) return;
