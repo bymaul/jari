@@ -40,7 +40,7 @@ function open() {
   restoreFocus = document.activeElement;
   render();
   overlay.tabIndex = -1;
-  overlay.focus();
+  ui.safeFocus(overlay, { preventScroll: true });
   updateStatus();
 }
 
@@ -55,9 +55,7 @@ function filterFocused() {
 
 function focusOverlay() {
   if (!overlay) return;
-  try {
-    overlay.focus();
-  } catch {}
+  ui.safeFocus(overlay, { preventScroll: true });
 }
 
 function openFilter() {
@@ -83,7 +81,7 @@ function openFilter() {
   });
   inputEl = input;
   barEl.insertBefore(input, statusEl);
-  input.focus();
+  ui.safeFocus(input, { preventScroll: true });
   try {
     input.select();
   } catch {}
@@ -521,7 +519,7 @@ function close() {
     document.activeElement !== restoreFocus
   ) {
     try {
-      restoreFocus.focus();
+      ui.safeFocus(restoreFocus, { preventScroll: true });
     } catch {}
   }
   restoreFocus = null;

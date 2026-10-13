@@ -1108,14 +1108,14 @@
     ta.style.opacity = "0";
     const prevFocus = document.activeElement && document.activeElement.isConnected ? document.activeElement : null;
     document.body.appendChild(ta);
-    ta.focus();
+    safeFocus(ta, { preventScroll: true });
     try {
       return fn(ta);
     } finally {
       ta.remove();
       if (prevFocus) {
         try {
-          prevFocus.focus();
+          safeFocus(prevFocus, { preventScroll: true });
         } catch {
         }
       }

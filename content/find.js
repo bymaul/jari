@@ -527,7 +527,7 @@ function renderBar() {
     }
   });
 
-  inputEl.focus();
+  ui.safeFocus(inputEl, { preventScroll: true });
   updateStatus();
 }
 
@@ -570,7 +570,7 @@ function closeBar() {
   }
   if (restoreFocus && restoreFocus.isConnected && focused !== restoreFocus) {
     try {
-      restoreFocus.focus();
+      ui.safeFocus(restoreFocus, { preventScroll: true });
     } catch {}
   } else if (wasInput && (focused === wasInput || focused === wasHost)) {
     try {
@@ -585,7 +585,8 @@ function closeBar() {
     if (refocused === wasInput) {
       try {
         const body = document.body || null;
-        if (body && typeof body.focus === "function") body.focus();
+        if (body && typeof body.focus === "function")
+          ui.safeFocus(body, { preventScroll: true });
       } catch {}
     }
   }

@@ -650,7 +650,7 @@ function close() {
     document.activeElement !== restoreFocus
   ) {
     try {
-      restoreFocus.focus();
+      ui.safeFocus(restoreFocus, { preventScroll: true });
     } catch {}
   }
   restoreFocus = null;
@@ -1057,7 +1057,7 @@ function openField(kind, text, meta = {}) {
   renderAll();
   const prev = document.activeElement;
   fieldFocusBefore = isOwnChrome(prev) ? null : prev;
-  input.focus();
+  ui.safeFocus(input, { preventScroll: true });
   try {
     input.select();
   } catch {}
@@ -1076,7 +1076,7 @@ function closeField() {
   if (prev && prev.isConnected) {
     if (document.activeElement !== prev) {
       try {
-        prev.focus();
+        ui.safeFocus(prev, { preventScroll: true });
       } catch {
         focusOverlay();
       }

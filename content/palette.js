@@ -88,7 +88,7 @@ function open(table) {
   renderList();
 
   restoreFocus = document.activeElement;
-  inputEl.focus();
+  ui.safeFocus(inputEl, { preventScroll: true });
 }
 
 function renderRow(item) {
@@ -212,7 +212,7 @@ function close() {
     restoreFocus.isConnected &&
     document.activeElement !== restoreFocus
   ) {
-    restoreFocus.focus();
+    ui.safeFocus(restoreFocus, { preventScroll: true });
   }
   restoreFocus = null;
 }

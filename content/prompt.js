@@ -65,7 +65,7 @@ function openEditUrl() {
   active = true;
   render("Edit URL", "Search or type URL");
   inputEl.value = location.href;
-  inputEl.focus();
+  ui.safeFocus(inputEl, { preventScroll: true });
   try {
     inputEl.select();
   } catch {}
@@ -243,7 +243,7 @@ function render(title, placeholder) {
   renderList();
 
   restoreFocus = document.activeElement;
-  inputEl.focus();
+  ui.safeFocus(inputEl, { preventScroll: true });
 }
 
 function renderList() {
@@ -395,7 +395,7 @@ function close() {
     restoreFocus.isConnected &&
     document.activeElement !== restoreFocus
   ) {
-    restoreFocus.focus();
+    ui.safeFocus(restoreFocus, { preventScroll: true });
   }
   restoreFocus = null;
 }

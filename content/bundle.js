@@ -1456,14 +1456,14 @@
     ta.style.opacity = "0";
     const prevFocus = document.activeElement && document.activeElement.isConnected ? document.activeElement : null;
     document.body.appendChild(ta);
-    ta.focus();
+    safeFocus(ta, { preventScroll: true });
     try {
       return fn(ta);
     } finally {
       ta.remove();
       if (prevFocus) {
         try {
-          prevFocus.focus();
+          safeFocus(prevFocus, { preventScroll: true });
         } catch {
         }
       }
@@ -3538,7 +3538,7 @@
     active = true;
     render("Edit URL", "Search or type URL");
     inputEl.value = location.href;
-    inputEl.focus();
+    ui.safeFocus(inputEl, { preventScroll: true });
     try {
       inputEl.select();
     } catch {
@@ -3693,7 +3693,7 @@
     filtered = tabs;
     renderList2();
     restoreFocus = document.activeElement;
-    inputEl.focus();
+    ui.safeFocus(inputEl, { preventScroll: true });
   }
   function renderList2() {
     return renderList({ listEl, filtered, query, mode, tabUrlMap, selected });
@@ -3818,7 +3818,7 @@
     cachedEngines = null;
     tabUrlMap.clear();
     if (restoreFocus && restoreFocus.isConnected && document.activeElement !== restoreFocus) {
-      restoreFocus.focus();
+      ui.safeFocus(restoreFocus, { preventScroll: true });
     }
     restoreFocus = null;
   }
@@ -4412,7 +4412,7 @@
     active2 = false;
     if (restoreFocus2 && restoreFocus2.isConnected && document.activeElement !== restoreFocus2) {
       try {
-        restoreFocus2.focus();
+        ui.safeFocus(restoreFocus2, { preventScroll: true });
       } catch {
       }
     }
@@ -4779,7 +4779,7 @@
     renderAll();
     const prev = document.activeElement;
     fieldFocusBefore = isOwnChrome(prev) ? null : prev;
-    input.focus();
+    ui.safeFocus(input, { preventScroll: true });
     try {
       input.select();
     } catch {
@@ -4799,7 +4799,7 @@
     if (prev && prev.isConnected) {
       if (document.activeElement !== prev) {
         try {
-          prev.focus();
+          ui.safeFocus(prev, { preventScroll: true });
         } catch {
           focusOverlay();
         }
@@ -8300,7 +8300,7 @@
         stepHistory(e.key === "ArrowUp" ? 1 : -1);
       }
     });
-    inputEl2.focus();
+    ui.safeFocus(inputEl2, { preventScroll: true });
     updateStatus();
   }
   function open2() {
@@ -8342,7 +8342,7 @@
     }
     if (restoreFocus3 && restoreFocus3.isConnected && focused !== restoreFocus3) {
       try {
-        restoreFocus3.focus();
+        ui.safeFocus(restoreFocus3, { preventScroll: true });
       } catch {
       }
     } else if (wasInput && (focused === wasInput || focused === wasHost)) {
@@ -8359,7 +8359,8 @@
       if (refocused === wasInput) {
         try {
           const body = document.body || null;
-          if (body && typeof body.focus === "function") body.focus();
+          if (body && typeof body.focus === "function")
+            ui.safeFocus(body, { preventScroll: true });
         } catch {
         }
       }
@@ -8633,7 +8634,7 @@
     restoreFocus4 = document.activeElement;
     render2();
     overlay4.tabIndex = -1;
-    overlay4.focus();
+    ui.safeFocus(overlay4, { preventScroll: true });
     updateStatus2();
   }
   function filterFocused() {
@@ -8646,10 +8647,7 @@
   }
   function focusOverlay2() {
     if (!overlay4) return;
-    try {
-      overlay4.focus();
-    } catch {
-    }
+    ui.safeFocus(overlay4, { preventScroll: true });
   }
   function openFilter() {
     if (inputEl3) return;
@@ -8674,7 +8672,7 @@
     });
     inputEl3 = input;
     barEl.insertBefore(input, statusEl2);
-    input.focus();
+    ui.safeFocus(input, { preventScroll: true });
     try {
       input.select();
     } catch {
@@ -9087,7 +9085,7 @@
     active5 = false;
     if (restoreFocus4 && restoreFocus4.isConnected && document.activeElement !== restoreFocus4) {
       try {
-        restoreFocus4.focus();
+        ui.safeFocus(restoreFocus4, { preventScroll: true });
       } catch {
       }
     }
@@ -9746,7 +9744,7 @@
     shadow.appendChild(overlay5);
     renderList4();
     restoreFocus5 = document.activeElement;
-    inputEl4.focus();
+    ui.safeFocus(inputEl4, { preventScroll: true });
   }
   function renderRow2(item) {
     const li = document.createElement("li");
@@ -9847,7 +9845,7 @@
     commandTable = null;
     active7 = false;
     if (restoreFocus5 && restoreFocus5.isConnected && document.activeElement !== restoreFocus5) {
-      restoreFocus5.focus();
+      ui.safeFocus(restoreFocus5, { preventScroll: true });
     }
     restoreFocus5 = null;
   }
