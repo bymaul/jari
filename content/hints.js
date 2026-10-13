@@ -106,7 +106,10 @@ function scheduleRegenerate() {
   regenerateTimer = setTimeout(() => {
     regenerateTimer = null;
     if (!active) return;
-    const savedPrefix = prefix;
+    if (prefix) {
+      refresh();
+      return;
+    }
     const fresh = collectElements(mode);
     if (fresh.length === 0) {
       close();
@@ -123,10 +126,6 @@ function scheduleRegenerate() {
     elements = capped;
     render();
     if (holder && !spaceHeld) holder.style.display = "";
-    prefix = savedPrefix;
-    if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
-      prefix = "";
-    }
     refresh();
   }, REGENERATE_DELAY);
 }

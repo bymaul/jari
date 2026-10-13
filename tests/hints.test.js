@@ -6,7 +6,7 @@ const { settings } = await import("../content/settings.js");
 const { genLabels, normalizeCharset, __testHelpers } = await import("../content/hints.js");
 const { HINT_CHARSET_DEFAULT, keymapDefaults } = await import("../content/keymap.js");
 
-const { isExplicitlyRequested } = __testHelpers;
+const { isExplicitlyRequested, isElementClickable } = __testHelpers;
 
 function assertPrefixFree(labels) {
   assert.equal(new Set(labels).size, labels.length, "labels must be unique");
@@ -49,6 +49,17 @@ test("genLabels is prefix-free across hint counts", () => {
 
 test("normalizeCharset falls back to the shared default", () => {
   assert.equal(normalizeCharset(), HINT_CHARSET_DEFAULT);
+});
+
+test("isElementClickable honors selector matches without measuring", () => {
+  assert.equal(isElementClickable({ matches: () => true }), true);
+});
+
+test("isElementClickable reuses a passed style for the cursor check", () => {
+  const el = { matches: () => false, closest: () => null };
+  assert.equal(isElementClickable(el, { cursor: "pointer" }), true);
+  assert.equal(isElementClickable(el, { cursor: "url(foo.png)" }), true);
+  assert.equal(isElementClickable(el, { cursor: "default" }), false);
 });
 
 test("isExplicitlyRequested honors the custom clickable selector", () => {

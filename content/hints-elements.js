@@ -12,6 +12,8 @@ export const INPUT_SELECTOR =
   'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
 export const FRAME_SELECTOR = "iframe,frame";
 
+const openableCache = new Map();
+
 export function isFrameElement(el) {
   if (!el) return false;
   const tag = el.tagName;
@@ -29,13 +31,14 @@ export function isEditable(el) {
   return false;
 }
 
-export function isElementDrawn(e, rect) {
+export function isElementDrawn(e, rect, style) {
   const min = isEditable(e) ? 1 : 4;
   rect = rect || e.getBoundingClientRect();
+  const st = style || window.getComputedStyle(e);
   return (
     rect.width > min &&
     rect.height > min &&
-    (parseFloat(window.getComputedStyle(e).opacity) > 0.1 ||
+    (parseFloat(st.opacity) > 0.1 ||
       (e.tagName === "INPUT" && e.type !== "text"))
   );
 }
@@ -94,9 +97,18 @@ export function listElements(root, whatToShow, filter) {
   return out;
 }
 
-export function getVisibleElements(filter) {
+export function getVisibleElements(filter, prefilter) {
   const visibleElements = [];
   for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
+    if (prefilter) {
+      let pass;
+      try {
+        pass = prefilter(e);
+      } catch {
+        pass = false;
+      }
+      if (!pass) continue;
+    }
     let rect;
     try {
       rect = e.getBoundingClientRect();
@@ -115,15 +127,15 @@ export function getVisibleElements(filter) {
     ) {
       continue;
     }
-    let hidden;
+    let style;
     try {
-      hidden = window.getComputedStyle(e).visibility === "hidden";
+      style = window.getComputedStyle(e);
     } catch {
-      hidden = true;
+      continue;
     }
-    if (hidden) continue;
+    if (style.visibility === "hidden") continue;
     try {
-      filter(e, visibleElements);
+      filter(e, visibleElements, style);
     } catch {}
   }
   return visibleElements;
@@ -204,14 +216,18 @@ export function prioritizeForViewport(elements) {
     .map(({ el }) => el);
 }
 
-export function isElementClickable(e) {
+function matchesClickableSelector(e) {
   try {
     if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
   } catch {}
-  if (isExplicitlyRequested(e)) return true;
+  return isExplicitlyRequested(e);
+}
+
+export function isElementClickable(e, style) {
+  if (matchesClickableSelector(e)) return true;
   try {
-    const style = window.getComputedStyle(e);
-    if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
+    const st = style || window.getComputedStyle(e);
+    if (st.cursor === "pointer" || st.cursor.substr(0, 4) === "url(")
       return true;
   } catch {}
   try {
@@ -297,14 +313,27 @@ function matchesHintSelector(e, selectorString, pattern) {
   return false;
 }
 
+function prefilterClickable(e, selectorString, pattern) {
+  try {
+    if (e.closest && e.closest(overlaySelectors)) return false;
+  } catch {}
+  if (!matchesHintSelector(e, selectorString, pattern)) return false;
+  if (matchesClickableSelector(e)) return true;
+  try {
+    const cursor = window.getComputedStyle(e).cursor;
+    return cursor === "pointer" || cursor.substr(0, 4) === "url(";
+  } catch {
+    return false;
+  }
+}
+
 export function getClickableElements(selectorString = "", pattern = null) {
-  let elements = getVisibleElements((e, v) => {
-    try {
-      if (e.closest && e.closest(overlaySelectors)) return;
-    } catch {}
-    if (!matchesHintSelector(e, selectorString, pattern)) return;
-    if (isElementClickable(e)) v.push(e);
-  });
+  let elements = getVisibleElements(
+    (e, v, style) => {
+      if (isElementClickable(e, style)) v.push(e);
+    },
+    (e) => prefilterClickable(e, selectorString, pattern),
+  );
   for (const frame of getFrameElements()) {
     if (!elements.includes(frame)) elements.push(frame);
   }
@@ -346,14 +375,19 @@ export function getHref(el, base) {
 export function isOpenableLink(el, base) {
   const href = getHref(el, base);
   if (!href) return false;
+  const cached = openableCache.get(href);
+  if (cached !== undefined) return cached;
+  let openable;
   try {
     const url = new URL(href);
     const scheme = url.protocol.replace(":", "").toLowerCase();
-    if (blockedUrlSchemes.has(scheme)) return false;
-    return true;
+    openable = !blockedUrlSchemes.has(scheme);
   } catch {
-    return false;
+    openable = false;
   }
+  if (openableCache.size > 2000) openableCache.clear();
+  openableCache.set(href, openable);
+  return openable;
 }
 
 export function getLinkAncestor(el, base) {
@@ -385,10 +419,23 @@ export function getLinkAncestor(el, base) {
 }
 
 export function getLinkElements() {
-  let elements = getVisibleElements((e, v) => {
-    if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)
+  let elements = getVisibleElements(
+    (e, v) => {
       v.push(e);
-  });
+    },
+    (e) => {
+      try {
+        return !!(
+          e.matches &&
+          e.matches("[href]") &&
+          !e.disabled &&
+          !e.readOnly
+        );
+      } catch {
+        return false;
+      }
+    },
+  );
   elements = elements.filter((el) => {
     if (el.closest && el.closest(overlaySelectors)) return false;
     return isOpenableLink(el);

@@ -30,23 +30,29 @@ export function genLabels(count, charset) {
   return labels.slice(head, head + count);
 }
 
-export function getZIndex(node) {
-  let z = 0;
+export function getZIndex(node, cache) {
   try {
-    do {
-      const v = parseInt(
-        window.getComputedStyle(node).getPropertyValue("z-index"),
-      );
-      if (!isNaN(v) && v >= 0) z += v;
-      node = node.parentNode;
-    } while (
-      node &&
-      node !== document.body &&
-      node !== document &&
-      node.nodeType !== 11
-    );
-  } catch {}
-  return z;
+    return zIndexOf(node, cache || new Map());
+  } catch {
+    return 0;
+  }
+}
+
+function zIndexOf(node, cache) {
+  if (
+    !node ||
+    node === document.body ||
+    node === document ||
+    node.nodeType === 11
+  )
+    return 0;
+  if (cache.has(node)) return cache.get(node);
+  const v = parseInt(
+    window.getComputedStyle(node).getPropertyValue("z-index"),
+  );
+  const total = (isNaN(v) || v < 0 ? 0 : v) + zIndexOf(node.parentNode, cache);
+  cache.set(node, total);
+  return total;
 }
 
 export function placeHintsHost(host) {
@@ -251,9 +257,10 @@ export function layoutHints(holder, elements, labels, fontSize = HINT_FONT_SIZE_
   // Estimated boxes are close enough for de-collision (monospace labels);
   // the measured second pass below corrects any residual overlap.
   const placed = [];
+  const zCache = new Map();
   const links = elements.map((elm, i) => {
     const r = getHintRect(elm);
-    const z = getZIndex(elm);
+    const z = getZIndex(elm, zCache);
     const home = {
       left: window.pageXOffset + r.left - bof.left,
       top: Math.max(r.top + window.pageYOffset - bof.top, 0),
