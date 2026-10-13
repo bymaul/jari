@@ -1726,6 +1726,7 @@
   var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
   var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
   var FRAME_SELECTOR = "iframe,frame";
+  var openableCache = /* @__PURE__ */ new Map();
   function isFrameElement(el) {
     if (!el) return false;
     const tag = el.tagName;
@@ -1741,10 +1742,11 @@
       return true;
     return false;
   }
-  function isElementDrawn(e, rect) {
+  function isElementDrawn(e, rect, style) {
     const min = isEditable(e) ? 1 : 4;
     rect = rect || e.getBoundingClientRect();
-    return rect.width > min && rect.height > min && (parseFloat(window.getComputedStyle(e).opacity) > 0.1 || e.tagName === "INPUT" && e.type !== "text");
+    const st = style || window.getComputedStyle(e);
+    return rect.width > min && rect.height > min && (parseFloat(st.opacity) > 0.1 || e.tagName === "INPUT" && e.type !== "text");
   }
   function isElementPartiallyInViewport(el, ignoreSize) {
     const rect = el.getBoundingClientRect();
@@ -1793,9 +1795,18 @@
     }
     return out;
   }
-  function getVisibleElements(filter) {
+  function getVisibleElements(filter, prefilter) {
     const visibleElements = [];
     for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
+      if (prefilter) {
+        let pass;
+        try {
+          pass = prefilter(e);
+        } catch {
+          pass = false;
+        }
+        if (!pass) continue;
+      }
       let rect;
       try {
         rect = e.getBoundingClientRect();
@@ -1807,15 +1818,15 @@
       ) || rect.top > window.innerHeight || rect.bottom < 0 || rect.left > window.innerWidth || rect.right < 0 || rect.height <= 0) {
         continue;
       }
-      let hidden;
+      let style;
       try {
-        hidden = window.getComputedStyle(e).visibility === "hidden";
+        style = window.getComputedStyle(e);
       } catch {
-        hidden = true;
+        continue;
       }
-      if (hidden) continue;
+      if (style.visibility === "hidden") continue;
       try {
-        filter(e, visibleElements);
+        filter(e, visibleElements, style);
       } catch {
       }
     }
@@ -1879,15 +1890,18 @@
   function prioritizeForViewport(elements2) {
     return elements2.map((el, i) => ({ el, i, score: viewportScore(el) })).sort((a, b) => a.score - b.score || a.i - b.i).map(({ el }) => el);
   }
-  function isElementClickable(e) {
+  function matchesClickableSelector(e) {
     try {
       if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
     } catch {
     }
-    if (isExplicitlyRequested(e)) return true;
+    return isExplicitlyRequested(e);
+  }
+  function isElementClickable(e, style) {
+    if (matchesClickableSelector(e)) return true;
     try {
-      const style = window.getComputedStyle(e);
-      if (style.cursor === "pointer" || style.cursor.substr(0, 4) === "url(")
+      const st = style || window.getComputedStyle(e);
+      if (st.cursor === "pointer" || st.cursor.substr(0, 4) === "url(")
         return true;
     } catch {
     }
@@ -1958,15 +1972,27 @@
     }
     return false;
   }
+  function prefilterClickable(e, selectorString, pattern) {
+    try {
+      if (e.closest && e.closest(overlaySelectors)) return false;
+    } catch {
+    }
+    if (!matchesHintSelector(e, selectorString, pattern)) return false;
+    if (matchesClickableSelector(e)) return true;
+    try {
+      const cursor2 = window.getComputedStyle(e).cursor;
+      return cursor2 === "pointer" || cursor2.substr(0, 4) === "url(";
+    } catch {
+      return false;
+    }
+  }
   function getClickableElements(selectorString = "", pattern = null) {
-    let elements2 = getVisibleElements((e, v) => {
-      try {
-        if (e.closest && e.closest(overlaySelectors)) return;
-      } catch {
-      }
-      if (!matchesHintSelector(e, selectorString, pattern)) return;
-      if (isElementClickable(e)) v.push(e);
-    });
+    let elements2 = getVisibleElements(
+      (e, v, style) => {
+        if (isElementClickable(e, style)) v.push(e);
+      },
+      (e) => prefilterClickable(e, selectorString, pattern)
+    );
     for (const frame of getFrameElements()) {
       if (!elements2.includes(frame)) elements2.push(frame);
     }
@@ -2005,14 +2031,19 @@
   function isOpenableLink(el, base) {
     const href = getHref(el, base);
     if (!href) return false;
+    const cached = openableCache.get(href);
+    if (cached !== void 0) return cached;
+    let openable;
     try {
       const url = new URL(href);
       const scheme = url.protocol.replace(":", "").toLowerCase();
-      if (blockedUrlSchemes.has(scheme)) return false;
-      return true;
+      openable = !blockedUrlSchemes.has(scheme);
     } catch {
-      return false;
+      openable = false;
     }
+    if (openableCache.size > 2e3) openableCache.clear();
+    openableCache.set(href, openable);
+    return openable;
   }
   function getLinkAncestor(el, base) {
     if (!el) return null;
@@ -2043,10 +2074,18 @@
     return null;
   }
   function getLinkElements() {
-    let elements2 = getVisibleElements((e, v) => {
-      if (e.matches && e.matches("[href]") && !e.disabled && !e.readOnly)
+    let elements2 = getVisibleElements(
+      (e, v) => {
         v.push(e);
-    });
+      },
+      (e) => {
+        try {
+          return !!(e.matches && e.matches("[href]") && !e.disabled && !e.readOnly);
+        } catch {
+          return false;
+        }
+      }
+    );
     elements2 = elements2.filter((el) => {
       if (el.closest && el.closest(overlaySelectors)) return false;
       return isOpenableLink(el);
@@ -2286,11 +2325,11 @@
       const visibleH = Math.min(bottom, vh) - Math.max(rect.top || 0, 0);
       if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
         continue;
-      const style = window.getComputedStyle(el);
-      if (!isScrollVisible(el, style)) continue;
       const canY = el.scrollHeight > el.clientHeight + 1;
       const canX = el.scrollWidth > el.clientWidth + 1;
       if (!canY && !canX) continue;
+      const style = window.getComputedStyle(el);
+      if (!isScrollVisible(el, style)) continue;
       const overflowY = style.overflowY;
       const overflowX = style.overflowX;
       const scrollableY = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && canY;
@@ -5043,19 +5082,16 @@
   }
 
   // content/find/collect.js
-  function isOverlayElement(el) {
-    try {
-      return el.closest && el.closest(overlaySelectors);
-    } catch {
-      return false;
-    }
-  }
+  var SKIP_SELECTOR = `${overlaySelectors}, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay, [aria-hidden="true"], [hidden]`;
   function shouldSkipNode(node) {
     const parent = node.parentElement;
     if (!parent) return true;
     const tag = parent.tagName;
     if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
-    if (isOverlayElement(parent)) return true;
+    try {
+      if (parent.closest && parent.closest(SKIP_SELECTOR)) return true;
+    } catch {
+    }
     try {
       const root = parent.getRootNode && parent.getRootNode();
       if (root && root.host && root.host.classList) {
@@ -5065,23 +5101,22 @@
       }
     } catch {
     }
-    if (parent.closest) {
-      try {
-        if (parent.closest(
-          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay"
-        ))
-          return true;
-        if (parent.closest('[aria-hidden="true"]')) return true;
-        if (parent.closest("[hidden]")) return true;
-      } catch {
-      }
+    let rect;
+    let style;
+    try {
+      rect = parent.getBoundingClientRect();
+    } catch {
+      rect = null;
     }
     try {
-      if (!isElementDrawn(parent)) return true;
-      const style = window.getComputedStyle(parent);
-      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
-      if (parseFloat(style.opacity) < 0.05) return true;
+      style = window.getComputedStyle(parent);
     } catch {
+      style = null;
+    }
+    if (rect && style) {
+      if (!isElementDrawn(parent, rect, style)) return true;
+      if (style.display === "none" || style.visibility === "hidden") return true;
+      if (parseFloat(style.opacity) < 0.05) return true;
     }
     return false;
   }
@@ -5197,19 +5232,23 @@
     }
     return labels.slice(head, head + count);
   }
-  function getZIndex(node) {
-    let z = 0;
+  function getZIndex(node, cache) {
     try {
-      do {
-        const v = parseInt(
-          window.getComputedStyle(node).getPropertyValue("z-index")
-        );
-        if (!isNaN(v) && v >= 0) z += v;
-        node = node.parentNode;
-      } while (node && node !== document.body && node !== document && node.nodeType !== 11);
+      return zIndexOf(node, cache || /* @__PURE__ */ new Map());
     } catch {
+      return 0;
     }
-    return z;
+  }
+  function zIndexOf(node, cache) {
+    if (!node || node === document.body || node === document || node.nodeType === 11)
+      return 0;
+    if (cache.has(node)) return cache.get(node);
+    const v = parseInt(
+      window.getComputedStyle(node).getPropertyValue("z-index")
+    );
+    const total = (isNaN(v) || v < 0 ? 0 : v) + zIndexOf(node.parentNode, cache);
+    cache.set(node, total);
+    return total;
   }
   function placeHintsHost(host6) {
     try {
@@ -5390,9 +5429,10 @@
       }
     })();
     const placed = [];
+    const zCache = /* @__PURE__ */ new Map();
     const links = elements2.map((elm, i) => {
       const r = getHintRect(elm);
-      const z = getZIndex(elm);
+      const z = getZIndex(elm, zCache);
       const home = {
         left: window.pageXOffset + r.left - bof.left,
         top: Math.max(r.top + window.pageYOffset - bof.top, 0)
@@ -9081,7 +9121,10 @@
     regenerateTimer = setTimeout(() => {
       regenerateTimer = null;
       if (!active6) return;
-      const savedPrefix = prefix;
+      if (prefix) {
+        refresh2();
+        return;
+      }
       const fresh = collectElements(mode3);
       if (fresh.length === 0) {
         close5();
@@ -9095,10 +9138,6 @@
       elements = capped;
       render3();
       if (holder && !spaceHeld) holder.style.display = "";
-      prefix = savedPrefix;
-      if (prefix && !hints.some((h) => h.label.startsWith(prefix))) {
-        prefix = "";
-      }
       refresh2();
     }, REGENERATE_DELAY);
   }

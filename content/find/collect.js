@@ -3,20 +3,16 @@
 import { overlaySelectors } from "../keymap.js";
 import { isElementDrawn } from "../hints-elements.js";
 
-function isOverlayElement(el) {
-  try {
-    return el.closest && el.closest(overlaySelectors);
-  } catch {
-    return false;
-  }
-}
+const SKIP_SELECTOR = `${overlaySelectors}, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay, [aria-hidden="true"], [hidden]`;
 
 function shouldSkipNode(node) {
   const parent = node.parentElement;
   if (!parent) return true;
   const tag = parent.tagName;
   if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
-  if (isOverlayElement(parent)) return true;
+  try {
+    if (parent.closest && parent.closest(SKIP_SELECTOR)) return true;
+  } catch {}
   try {
     const root = parent.getRootNode && parent.getRootNode();
     if (root && root.host && root.host.classList) {
@@ -32,24 +28,23 @@ function shouldSkipNode(node) {
         return true;
     }
   } catch {}
-  if (parent.closest) {
-    try {
-      if (
-        parent.closest(
-          ".jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay",
-        )
-      )
-        return true;
-      if (parent.closest('[aria-hidden="true"]')) return true;
-      if (parent.closest('[hidden]')) return true;
-    } catch {}
+  let rect;
+  let style;
+  try {
+    rect = parent.getBoundingClientRect();
+  } catch {
+    rect = null;
   }
   try {
-    if (!isElementDrawn(parent)) return true;
-    const style = window.getComputedStyle(parent);
-    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return true;
+    style = window.getComputedStyle(parent);
+  } catch {
+    style = null;
+  }
+  if (rect && style) {
+    if (!isElementDrawn(parent, rect, style)) return true;
+    if (style.display === "none" || style.visibility === "hidden") return true;
     if (parseFloat(style.opacity) < 0.05) return true;
-  } catch {}
+  }
   return false;
 }
 
