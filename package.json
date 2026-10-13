@@ -13,6 +13,7 @@
   "scripts": {
     "lint": "eslint .",
     "test": "node --test",
+    "bench": "node benchmarks/rank.js",
     "build:chrome": "node build.js chrome",
     "build:firefox": "node build.js firefox",
     "dist": "node build.js dist",
