@@ -379,11 +379,33 @@
     }
     return true;
   }
+  var urlKeysCache = null;
+  function clearBookmarkedUrlKeysCache() {
+    urlKeysCache = null;
+  }
+  try {
+    const bookmarks = chrome.bookmarks;
+    if (bookmarks) {
+      for (const event of [
+        bookmarks.onCreated,
+        bookmarks.onRemoved,
+        bookmarks.onChanged,
+        bookmarks.onMoved
+      ]) {
+        if (event && typeof event.addListener === "function") {
+          event.addListener(clearBookmarkedUrlKeysCache);
+        }
+      }
+    }
+  } catch {
+  }
   async function bookmarkedUrlKeys() {
+    if (urlKeysCache) return urlKeysCache;
     const keys = /* @__PURE__ */ new Set();
     await walkBookmarkNodes((node) => {
       if (node.url) keys.add(bookmarkUrlKey(node.url));
     });
+    urlKeysCache = keys;
     return keys;
   }
   async function bookmarkManagerTabs(_, { tabs = [] } = {}) {

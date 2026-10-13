@@ -46,11 +46,35 @@ async function walkBookmarkNodes(visit) {
   return true;
 }
 
+let urlKeysCache = null;
+
+export function clearBookmarkedUrlKeysCache() {
+  urlKeysCache = null;
+}
+
+try {
+  const bookmarks = chrome.bookmarks;
+  if (bookmarks) {
+    for (const event of [
+      bookmarks.onCreated,
+      bookmarks.onRemoved,
+      bookmarks.onChanged,
+      bookmarks.onMoved,
+    ]) {
+      if (event && typeof event.addListener === "function") {
+        event.addListener(clearBookmarkedUrlKeysCache);
+      }
+    }
+  }
+} catch {}
+
 export async function bookmarkedUrlKeys() {
+  if (urlKeysCache) return urlKeysCache;
   const keys = new Set();
   await walkBookmarkNodes((node) => {
     if (node.url) keys.add(bookmarkUrlKey(node.url));
   });
+  urlKeysCache = keys;
   return keys;
 }
 

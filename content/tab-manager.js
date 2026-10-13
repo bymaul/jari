@@ -302,13 +302,27 @@ function appendSpan(li, className, text) {
   return span;
 }
 
-function highlightSpan(span, text, q) {
+function highlightSpan(span, text, q, tab) {
   if (!q) {
     span.textContent = text;
     return;
   }
-  if (settings.isFuzzyMatching()) renderText(span, text, fuzzyIndices(q, text));
-  else renderText(span, text, substringIndices(q, text));
+  renderText(span, text, titleMatch(tab, text));
+}
+
+let matchCache = new Map();
+
+function titleMatch(tab, text) {
+  const fuzzy = settings.isFuzzyMatching();
+  const hit = matchCache.get(tab.id);
+  if (hit && hit.q === query && hit.fuzzy === fuzzy && hit.text === text) {
+    return hit.indices;
+  }
+  const indices = fuzzy
+    ? fuzzyIndices(query, text)
+    : substringIndices(query, text);
+  matchCache.set(tab.id, { q: query, fuzzy, text, indices });
+  return indices;
 }
 
 function renderRow(tab, labels, currentWin) {
@@ -338,7 +352,7 @@ function renderRow(tab, labels, currentWin) {
   li.appendChild(loc);
   const title = document.createElement("span");
   title.className = "title";
-  highlightSpan(title, tab.title || "(untitled)", query);
+  highlightSpan(title, tab.title || "(untitled)", query, tab);
   li.appendChild(title);
   appendSpan(
     li,
@@ -456,6 +470,40 @@ function renderAll() {
   renderFooter();
 }
 
+function paintSelection(prev) {
+  if (!listEl || windowChoice) return;
+  const rows = listEl.children;
+  const old = rows[prev];
+  if (old) old.classList.remove("selected");
+  const el = rows[selected];
+  if (el) {
+    el.classList.add("selected");
+    try {
+      el.scrollIntoView({ block: "nearest" });
+    } catch {}
+  }
+}
+
+function repaintRows(indices) {
+  if (!listEl || windowChoice) return;
+  const labels = windowLabels(tabs);
+  for (const i of indices) {
+    const tab = filtered[i];
+    const old = listEl.children[i];
+    if (!tab || !old) continue;
+    const row = renderRow(tab, labels, windowId);
+    row.classList.toggle("selected", i === selected);
+    try {
+      listEl.replaceChild(row, old);
+    } catch {}
+    if (i === selected) {
+      try {
+        row.scrollIntoView({ block: "nearest" });
+      } catch {}
+    }
+  }
+}
+
 function indexOfTab(id) {
   return filtered.findIndex((tab) => tab.id === id);
 }
@@ -476,6 +524,50 @@ function adoptSnapshot(res) {
       { title: group.title || "", color: group.color || "" },
     ]),
   );
+}
+
+const SNAPSHOT_FIELDS = [
+  "id",
+  "windowId",
+  "index",
+  "title",
+  "url",
+  "active",
+  "pinned",
+  "muted",
+  "audible",
+  "bookmarked",
+  "groupId",
+];
+
+export function isSameSnapshot(prevTabs, prevGroups, prevWindowId, res) {
+  if (!res || !Array.isArray(res.tabs)) return false;
+  const nextWindowId = Number.isInteger(res.currentWindowId)
+    ? res.currentWindowId
+    : null;
+  if (prevWindowId !== nextWindowId) return false;
+  const nextTabs = sortManagerTabs(res.tabs);
+  if (nextTabs.length !== prevTabs.length) return false;
+  for (let i = 0; i < nextTabs.length; i++) {
+    const a = prevTabs[i];
+    const b = nextTabs[i];
+    for (const key of SNAPSHOT_FIELDS) {
+      if (a[key] !== b[key]) return false;
+    }
+  }
+  const nextGroups = Array.isArray(res.groups) ? res.groups : [];
+  if (prevGroups.size !== nextGroups.length) return false;
+  for (const group of nextGroups) {
+    const cur = prevGroups.get(group.id);
+    if (
+      !cur ||
+      cur.title !== (group.title || "") ||
+      cur.color !== (group.color || "")
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function pruneMarksAndConfirm() {
@@ -520,7 +612,10 @@ async function refresh() {
     return;
   }
   const focused = focusedId();
+  const unchanged = isSameSnapshot(tabs, groupsById, windowId, res);
   adoptSnapshot(res);
+  if (unchanged) return;
+  matchCache = new Map();
   pruneMarksAndConfirm();
   applyFilter();
   const kept = focused === null ? -1 : indexOfTab(focused);
@@ -560,6 +655,7 @@ async function open() {
   selected = 0;
   marked = new Set();
   query = "";
+  matchCache = new Map();
   field = null;
   confirm = null;
   windowChoice = null;
@@ -637,6 +733,7 @@ function close() {
   selected = 0;
   marked = new Set();
   query = "";
+  matchCache = new Map();
   field = null;
   confirm = null;
   windowChoice = null;
@@ -676,27 +773,56 @@ function paintRange() {
 
 function move(delta) {
   if (filtered.length === 0) return;
-  confirm = null;
+  const hadConfirm = takeConfirm();
   endVisual();
+  const prev = selected;
   selected = (selected + delta + filtered.length) % filtered.length;
-  renderAll();
+  if (hadConfirm) {
+    renderAll();
+    return;
+  }
+  renderHeader();
+  paintSelection(prev);
 }
 
 function moveVisual(delta) {
   if (filtered.length === 0) return;
-  confirm = null;
+  const hadConfirm = takeConfirm();
+  const anchor = visualAnchor ?? selected;
+  const lo = Math.min(anchor, selected);
+  const hi = Math.max(anchor, selected);
   selected = (selected + delta + filtered.length) % filtered.length;
   paintRange();
-  renderAll();
+  if (hadConfirm) {
+    renderAll();
+    return;
+  }
+  const rows = [];
+  for (let i = Math.min(lo, selected); i <= Math.max(hi, selected); i++) {
+    rows.push(i);
+  }
+  renderHeader();
+  repaintRows(rows);
 }
 
 function toggleMark() {
   const tab = focusedTab();
   if (!tab) return;
-  confirm = null;
+  const hadConfirm = takeConfirm();
   if (marked.has(tab.id)) marked.delete(tab.id);
   else marked.add(tab.id);
-  renderAll();
+  if (hadConfirm) {
+    renderAll();
+    return;
+  }
+  renderHeader();
+  repaintRows([selected]);
+}
+
+function takeConfirm() {
+  const hadConfirm = confirm !== null;
+  confirm = null;
+  return hadConfirm;
 }
 
 function endVisual() {

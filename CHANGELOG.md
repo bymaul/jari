@@ -46,6 +46,11 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Fixed
 
+- Tab manager (`gt`) stays responsive with many tabs: `j`/`k`/`Space`
+  repaint only the affected rows instead of rebuilding the whole list,
+  title highlights are memoized per filter query, idle poll ticks skip
+  the re-render when nothing changed, and the bookmark check backing
+  each poll is cached instead of re-walked.
 - `hjkl` scrolling stays responsive on heavy pages (playing video, live
   feeds): the scroll target now reuses its last "page scrolls" conclusion
   for 500ms instead of re-walking the DOM on every keypress (a cold walk

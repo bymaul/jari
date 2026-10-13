@@ -4118,13 +4118,23 @@
     li.appendChild(span);
     return span;
   }
-  function highlightSpan(span, text, q) {
+  function highlightSpan(span, text, q, tab) {
     if (!q) {
       span.textContent = text;
       return;
     }
-    if (settings.isFuzzyMatching()) renderText(span, text, fuzzyIndices(q, text));
-    else renderText(span, text, substringIndices(q, text));
+    renderText(span, text, titleMatch(tab, text));
+  }
+  var matchCache = /* @__PURE__ */ new Map();
+  function titleMatch(tab, text) {
+    const fuzzy = settings.isFuzzyMatching();
+    const hit = matchCache.get(tab.id);
+    if (hit && hit.q === query2 && hit.fuzzy === fuzzy && hit.text === text) {
+      return hit.indices;
+    }
+    const indices = fuzzy ? fuzzyIndices(query2, text) : substringIndices(query2, text);
+    matchCache.set(tab.id, { q: query2, fuzzy, text, indices });
+    return indices;
   }
   function renderRow(tab, labels, currentWin) {
     const li = document.createElement("li");
@@ -4154,7 +4164,7 @@
     li.appendChild(loc);
     const title = document.createElement("span");
     title.className = "title";
-    highlightSpan(title, tab.title || "(untitled)", query2);
+    highlightSpan(title, tab.title || "(untitled)", query2, tab);
     li.appendChild(title);
     appendSpan(
       li,
@@ -4259,6 +4269,41 @@
     renderList3();
     renderFooter();
   }
+  function paintSelection(prev) {
+    if (!listEl2 || windowChoice) return;
+    const rows = listEl2.children;
+    const old = rows[prev];
+    if (old) old.classList.remove("selected");
+    const el = rows[selected2];
+    if (el) {
+      el.classList.add("selected");
+      try {
+        el.scrollIntoView({ block: "nearest" });
+      } catch {
+      }
+    }
+  }
+  function repaintRows(indices) {
+    if (!listEl2 || windowChoice) return;
+    const labels = windowLabels(tabs2);
+    for (const i of indices) {
+      const tab = filtered2[i];
+      const old = listEl2.children[i];
+      if (!tab || !old) continue;
+      const row = renderRow(tab, labels, windowId);
+      row.classList.toggle("selected", i === selected2);
+      try {
+        listEl2.replaceChild(row, old);
+      } catch {
+      }
+      if (i === selected2) {
+        try {
+          row.scrollIntoView({ block: "nearest" });
+        } catch {
+        }
+      }
+    }
+  }
   function indexOfTab(id) {
     return filtered2.findIndex((tab) => tab.id === id);
   }
@@ -4277,6 +4322,42 @@
         { title: group.title || "", color: group.color || "" }
       ])
     );
+  }
+  var SNAPSHOT_FIELDS = [
+    "id",
+    "windowId",
+    "index",
+    "title",
+    "url",
+    "active",
+    "pinned",
+    "muted",
+    "audible",
+    "bookmarked",
+    "groupId"
+  ];
+  function isSameSnapshot(prevTabs, prevGroups, prevWindowId, res) {
+    if (!res || !Array.isArray(res.tabs)) return false;
+    const nextWindowId = Number.isInteger(res.currentWindowId) ? res.currentWindowId : null;
+    if (prevWindowId !== nextWindowId) return false;
+    const nextTabs = sortManagerTabs(res.tabs);
+    if (nextTabs.length !== prevTabs.length) return false;
+    for (let i = 0; i < nextTabs.length; i++) {
+      const a = prevTabs[i];
+      const b = nextTabs[i];
+      for (const key of SNAPSHOT_FIELDS) {
+        if (a[key] !== b[key]) return false;
+      }
+    }
+    const nextGroups = Array.isArray(res.groups) ? res.groups : [];
+    if (prevGroups.size !== nextGroups.length) return false;
+    for (const group of nextGroups) {
+      const cur = prevGroups.get(group.id);
+      if (!cur || cur.title !== (group.title || "") || cur.color !== (group.color || "")) {
+        return false;
+      }
+    }
+    return true;
   }
   function pruneMarksAndConfirm() {
     const alive = new Set(tabs2.map((tab) => tab.id));
@@ -4319,7 +4400,10 @@
       return;
     }
     const focused = focusedId();
+    const unchanged = isSameSnapshot(tabs2, groupsById, windowId, res);
     adoptSnapshot(res);
+    if (unchanged) return;
+    matchCache = /* @__PURE__ */ new Map();
     pruneMarksAndConfirm();
     applyFilter();
     const kept = focused === null ? -1 : indexOfTab(focused);
@@ -4352,6 +4436,7 @@
     selected2 = 0;
     marked = /* @__PURE__ */ new Set();
     query2 = "";
+    matchCache = /* @__PURE__ */ new Map();
     field = null;
     confirm = null;
     windowChoice = null;
@@ -4418,6 +4503,7 @@
     selected2 = 0;
     marked = /* @__PURE__ */ new Set();
     query2 = "";
+    matchCache = /* @__PURE__ */ new Map();
     field = null;
     confirm = null;
     windowChoice = null;
@@ -4451,25 +4537,53 @@
   }
   function move3(delta) {
     if (filtered2.length === 0) return;
-    confirm = null;
+    const hadConfirm = takeConfirm();
     endVisual();
+    const prev = selected2;
     selected2 = (selected2 + delta + filtered2.length) % filtered2.length;
-    renderAll();
+    if (hadConfirm) {
+      renderAll();
+      return;
+    }
+    renderHeader();
+    paintSelection(prev);
   }
   function moveVisual(delta) {
     if (filtered2.length === 0) return;
-    confirm = null;
+    const hadConfirm = takeConfirm();
+    const anchor = visualAnchor ?? selected2;
+    const lo = Math.min(anchor, selected2);
+    const hi = Math.max(anchor, selected2);
     selected2 = (selected2 + delta + filtered2.length) % filtered2.length;
     paintRange();
-    renderAll();
+    if (hadConfirm) {
+      renderAll();
+      return;
+    }
+    const rows = [];
+    for (let i = Math.min(lo, selected2); i <= Math.max(hi, selected2); i++) {
+      rows.push(i);
+    }
+    renderHeader();
+    repaintRows(rows);
   }
   function toggleMark() {
     const tab = focusedTab();
     if (!tab) return;
-    confirm = null;
+    const hadConfirm = takeConfirm();
     if (marked.has(tab.id)) marked.delete(tab.id);
     else marked.add(tab.id);
-    renderAll();
+    if (hadConfirm) {
+      renderAll();
+      return;
+    }
+    renderHeader();
+    repaintRows([selected2]);
+  }
+  function takeConfirm() {
+    const hadConfirm = confirm !== null;
+    confirm = null;
+    return hadConfirm;
   }
   function endVisual() {
     visualAnchor = null;
