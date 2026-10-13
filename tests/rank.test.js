@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import {
+  fuzzyIndices,
   fuzzyMatch,
   parseQuery,
   rankMatches,
@@ -88,6 +89,13 @@ test("rankMatches finds youtube from the ytb shorthand", () => {
   const titles = rankMatches("ytb", items).map((x) => x.item.title);
   assert.ok(titles.includes("lofi hip hop radio - YouTube"));
   assert.equal(titles[0], "lofi hip hop radio - YouTube");
+});
+
+test("fuzzyMatch skips terms with chars missing from the target", () => {
+  assert.equal(fuzzyMatch("foo qzx", "foo bar"), null);
+  assert.deepEqual(fuzzyMatch("f", "foo").indices, [0]);
+  assert.deepEqual(fuzzyIndices("foo qzx", "foo bar"), [0, 1, 2]);
+  assert.deepEqual(fuzzyIndices("qzx", "foo bar"), []);
 });
 
 test("substringMatch requires every term as a substring", () => {

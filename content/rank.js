@@ -164,6 +164,28 @@ function matchPreamble(query, text) {
   return { include, exclude, phrases, t, map };
 }
 
+// Every term char must occur in the target for any alignment to exist.
+// Used to skip the O(term x target) DP on guaranteed misses.
+function termImpossible(term, tChars) {
+  for (let i = 0; i < term.length; i++) {
+    if (!tChars.has(term[i])) return true;
+  }
+  return false;
+}
+
+// Null for terms that cannot match, so callers keep their exact
+// semantics (fuzzyMatch rejects, fuzzyIndices ignores). Single-char
+// terms skip the set build: their DP is already a single O(n) pass.
+function alignTerms(include, t, text, map) {
+  const multi = include.some((term) => term.length > 1);
+  const tChars = multi ? new Set(t) : null;
+  return include.map((term) =>
+    tChars && term.length > 1 && termImpossible(term, tChars)
+      ? null
+      : bestAlignment(term, t, text, map),
+  );
+}
+
 function collectPhraseIndices(phrases, t, indices, map) {
   for (const ph of phrases) {
     if (!t.includes(ph)) return false;
@@ -184,7 +206,7 @@ export function fuzzyMatch(query, text) {
     return exclude.length > 0 ? { score: 0, indices: [] } : null;
   }
   for (const ph of phrases) if (!t.includes(ph)) return null;
-  const results = include.map((term) => bestAlignment(term, t, text, map));
+  const results = alignTerms(include, t, text, map);
   if (results.some((r) => !r)) return null;
   let total = 0;
   for (const ph of phrases) total += 10 + ph.length * 2;
@@ -204,7 +226,7 @@ export function fuzzyIndices(query, text) {
   const { include, phrases, t, map } = pre;
   const indices = [];
   if (!collectPhraseIndices(phrases, t, indices, map)) return [];
-  const results = include.map((term) => bestAlignment(term, t, text, map));
+  const results = alignTerms(include, t, text, map);
   for (const r of results) if (r) indices.push(...r.indices);
   return indices.sort((a, b) => a - b);
 }

@@ -3044,6 +3044,19 @@
     if (exclude.some((ex) => t.includes(ex))) return null;
     return { include, exclude, phrases, t, map };
   }
+  function termImpossible(term, tChars) {
+    for (let i = 0; i < term.length; i++) {
+      if (!tChars.has(term[i])) return true;
+    }
+    return false;
+  }
+  function alignTerms(include, t, text, map) {
+    const multi = include.some((term) => term.length > 1);
+    const tChars = multi ? new Set(t) : null;
+    return include.map(
+      (term) => tChars && term.length > 1 && termImpossible(term, tChars) ? null : bestAlignment(term, t, text, map)
+    );
+  }
   function collectPhraseIndices(phrases, t, indices, map) {
     for (const ph of phrases) {
       if (!t.includes(ph)) return false;
@@ -3063,7 +3076,7 @@
       return exclude.length > 0 ? { score: 0, indices: [] } : null;
     }
     for (const ph of phrases) if (!t.includes(ph)) return null;
-    const results = include.map((term) => bestAlignment(term, t, text, map));
+    const results = alignTerms(include, t, text, map);
     if (results.some((r) => !r)) return null;
     let total = 0;
     for (const ph of phrases) total += 10 + ph.length * 2;
@@ -3082,7 +3095,7 @@
     const { include, phrases, t, map } = pre;
     const indices = [];
     if (!collectPhraseIndices(phrases, t, indices, map)) return [];
-    const results = include.map((term) => bestAlignment(term, t, text, map));
+    const results = alignTerms(include, t, text, map);
     for (const r of results) if (r) indices.push(...r.indices);
     return indices.sort((a, b) => a - b);
   }
