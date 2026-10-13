@@ -1274,6 +1274,27 @@
     return buildEngineUrl(engines, keyword, text) || "https://www.google.com/search?q=" + encodeURIComponent(text);
   }
   var bookmarkDataCache = null;
+  function clearBookmarkDataCache() {
+    bookmarkDataCache = null;
+  }
+  function registerBookmarkInvalidation() {
+    try {
+      const bookmarks = chrome.bookmarks;
+      if (!bookmarks) return;
+      for (const event of [
+        bookmarks.onCreated,
+        bookmarks.onRemoved,
+        bookmarks.onChanged,
+        bookmarks.onMoved
+      ]) {
+        if (event && typeof event.addListener === "function") {
+          event.addListener(clearBookmarkDataCache);
+        }
+      }
+    } catch {
+    }
+  }
+  registerBookmarkInvalidation();
   async function getBookmarkData() {
     if (bookmarkDataCache) return bookmarkDataCache;
     try {

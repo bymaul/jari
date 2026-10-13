@@ -35,6 +35,32 @@ async function getDefaultSearchUrl(text) {
 }
 
 let bookmarkDataCache = null;
+
+export function clearBookmarkDataCache() {
+  bookmarkDataCache = null;
+}
+
+function registerBookmarkInvalidation() {
+  try {
+    const bookmarks = chrome.bookmarks;
+    if (!bookmarks) return;
+    for (const event of [
+      bookmarks.onCreated,
+      bookmarks.onRemoved,
+      bookmarks.onChanged,
+      bookmarks.onMoved,
+    ]) {
+      if (event && typeof event.addListener === "function") {
+        event.addListener(clearBookmarkDataCache);
+      }
+    }
+  } catch {
+    // Bookmarks API unavailable (e.g. unit tests) — the cache just stays warm.
+  }
+}
+
+registerBookmarkInvalidation();
+
 async function getBookmarkData() {
   if (bookmarkDataCache) return bookmarkDataCache;
   try {
