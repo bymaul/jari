@@ -46,6 +46,14 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Fixed
 
+- `hjkl` scrolling stays responsive on heavy pages (playing video, live
+  feeds): the scroll target now reuses its last "page scrolls" conclusion
+  for 500ms instead of re-walking the DOM on every keypress (a cold walk
+  over an 8000-node page costs ~240ms, follow-ups now cost ~0ms), and the
+  smooth animation is time-parameterized — identical motion at 60fps, but
+  dropped frames cover proportionally more instead of slowing the whole
+  motion down (a 120px step took 550ms at 20fps, now 300ms vs 183ms at
+  60fps). Explicit target cycling/reset still rescans immediately.
 - Modal auto-focus no longer misses: the observer now sees `open`,
   `hidden`, and ARIA toggles (not just classes), a fresh dialog takes
   the target even after cycling, and an open modal wins the page on

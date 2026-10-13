@@ -8,27 +8,38 @@ let target = null;
 
 const HIGHLIGHT_MS = 400;
 
-let resolved = false;
+// Timestamp of the last resolve that concluded "page scrolls, no target".
+// Churning pages (playing video, live feeds) mutate constantly; without this
+// every keypress re-proves the page scrolls with a full DOM walk. Resolves
+// within the window reuse that conclusion. Picking an inner target or an
+// explicit cycle/reset clears it, so those always rescan immediately.
+let lastNullResolveAt = 0;
+const NULL_RESOLVE_MIN_MS = 500;
 
 function getTarget() {
   if (target !== null && !target.isConnected) {
     target = null;
-    resolved = false;
-  }
-  if (target === null && !resolved) {
-    resolved = true;
-    if (!pageCanScroll()) {
-      const stops = currentStops();
-      if (stops.length > 0) {
-        target = pickBestInner(stops) || stops[0];
-      }
-    }
   }
   if (target === null) {
-    // An open modal takes the scroll target even when the page behind it
-    // still scrolls and the mutation observer missed it opening.
-    const modals = currentStops().filter((s) => s !== null && isModalStop(s));
-    if (modals.length > 0) target = pickBestInner(modals) || modals[0];
+    const now = Date.now();
+    if (
+      lastNullResolveAt === 0 ||
+      now - lastNullResolveAt >= NULL_RESOLVE_MIN_MS
+    ) {
+      if (!pageCanScroll()) {
+        const stops = currentStops();
+        if (stops.length > 0) {
+          target = pickBestInner(stops) || stops[0];
+        }
+      }
+      if (target === null) {
+        // An open modal takes the scroll target even when the page behind it
+        // still scrolls and the mutation observer missed it opening.
+        const modals = currentStops().filter((s) => s !== null && isModalStop(s));
+        if (modals.length > 0) target = pickBestInner(modals) || modals[0];
+      }
+      lastNullResolveAt = target === null ? now : 0;
+    }
   }
   return target === null ? window : target;
 }
@@ -48,17 +59,15 @@ function epochCache(compute) {
 }
 
 function invalidateScrollCache() {
-  // Throttled (not debounced) so sustained churn still rescans periodically.
-  // The resolved flag flips only here, never per-mutation, so scroll
-  // keypresses between bumps reuse the cached stops instead of forcing a
-  // full-page scan on a churning feed.
+  // Throttled (not debounced) so sustained churn still rescans periodically
+  // for cycle/reset and dialog adoption. Plain scroll keypresses reuse the
+  // last null-target conclusion within NULL_RESOLVE_MIN_MS instead of
+  // forcing a full-page scan on a churning feed.
   if (mutationTimeout) return;
-  resolved = false;
 
   mutationTimeout = setTimeout(() => {
     const prevStops = lastStops;
     scanEpoch++;
-    resolved = false;
     mutationTimeout = null;
     pruneObserved();
     lastStops = adoptNewDialog(prevStops);
@@ -644,12 +653,17 @@ function reset() {
     return;
   }
   target = null;
-  resolved = false;
+  lastNullResolveAt = 0;
   releaseFrameFocus();
   showHighlight();
 }
 
 let smoothState = null;
+
+const SMOOTH_BASE_MS = 1000 / 60;
+const SMOOTH_FRACTION = 0.4;
+const SMOOTH_CAP = 80;
+const SMOOTH_MAX_DT_MS = 100;
 
 function prefersReducedMotion() {
   try {
@@ -671,10 +685,10 @@ function flushSmoothQueue() {
 
 export function smoothScrollBy(el, x, y) {
   if (smoothState === null) {
-    smoothState = { el, x: 0, y: 0, rafId: null };
+    smoothState = { el, x: 0, y: 0, rafId: null, last: null };
   } else if (smoothState.el !== el) {
     flushSmoothQueue();
-    smoothState = { el, x: 0, y: 0, rafId: null };
+    smoothState = { el, x: 0, y: 0, rafId: null, last: null };
   }
   smoothState.x += x;
   smoothState.y += y;
@@ -683,7 +697,19 @@ export function smoothScrollBy(el, x, y) {
   }
 }
 
-function smoothScrollStep() {
+// Share of `pending` px to cover after `dt` ms: the time-parameterized form
+// of "40% per 60fps frame". Identical feel at 60fps, but dropped frames
+// cover proportionally more instead of slowing the whole motion down the
+// way a fixed per-frame share does under load.
+export function __smoothFrameMove(pending, dt) {
+  const step = Number.isFinite(dt) && dt > 0 ? dt : SMOOTH_BASE_MS;
+  const frac = 1 - Math.pow(1 - SMOOTH_FRACTION, step / SMOOTH_BASE_MS);
+  const cap = SMOOTH_CAP * (step / SMOOTH_BASE_MS);
+  const want = Math.round(Math.abs(pending) * frac);
+  return Math.sign(pending) * Math.max(1, Math.min(cap, want));
+}
+
+function smoothScrollStep(t) {
   if (!smoothState) return;
   smoothState.rafId = null;
   const { el } = smoothState;
@@ -699,15 +725,14 @@ function smoothScrollStep() {
     return;
   }
 
-  const CAP = 80;
-  const moveX =
-    pendingX !== 0
-      ? Math.sign(pendingX) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingX) * 0.4)))
-      : 0;
-  const moveY =
-    pendingY !== 0
-      ? Math.sign(pendingY) * Math.max(1, Math.min(CAP, Math.round(Math.abs(pendingY) * 0.4)))
-      : 0;
+  const last = smoothState.last;
+  smoothState.last = t;
+  const dt =
+    last === null || !Number.isFinite(t) || !Number.isFinite(last)
+      ? SMOOTH_BASE_MS
+      : Math.min(SMOOTH_MAX_DT_MS, Math.max(0, t - last));
+  const moveX = pendingX !== 0 ? __smoothFrameMove(pendingX, dt) : 0;
+  const moveY = pendingY !== 0 ? __smoothFrameMove(pendingY, dt) : 0;
 
   const before = scrollPosOf(el);
   el.scrollBy({ left: moveX, top: moveY, behavior: "instant" });
@@ -735,7 +760,7 @@ export function __resetScrollCache() {
     mutationTimeout = null;
   }
   scanEpoch++;
-  resolved = false;
+  lastNullResolveAt = 0;
   lastStops = [];
 }
 

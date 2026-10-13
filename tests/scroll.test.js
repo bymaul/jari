@@ -2,7 +2,7 @@ import "./setup.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-const { Scroll, __resetScrollCache, __adoptNewDialog, __pruneObserved, __observedRootCount } = await import("../content/scroll.js");
+const { Scroll, __resetScrollCache, __adoptNewDialog, __pruneObserved, __observedRootCount, __smoothFrameMove } = await import("../content/scroll.js");
 
 const VW = 800;
 const VH = 600;
@@ -365,4 +365,76 @@ test("detached observed roots are pruned instead of leaking", () => {
     restoreFixtures();
     __pruneObserved();
   }
+});
+
+test("scroll keypresses reuse the page conclusion instead of rescanning", () => {
+  const big = makeAreaAt({ overflow: 900 });
+  const prevQsa = globalThis.document.querySelectorAll;
+  const prevStyle = globalThis.window.getComputedStyle;
+  let styles = 0;
+  globalThis.document.querySelectorAll = () => [big];
+  globalThis.window.getComputedStyle = (...args) => {
+    styles++;
+    return prevStyle(...args);
+  };
+  try {
+    __resetScrollCache();
+    Scroll.reset();
+    assert.equal(Scroll.getTarget(), globalThis.window);
+    assert.ok(styles > 0, "expected the first resolve to measure the page");
+    styles = 0;
+    for (let i = 0; i < 5; i++) {
+      assert.equal(Scroll.getTarget(), globalThis.window);
+    }
+    assert.equal(styles, 0, "expected follow-ups to skip the scan");
+  } finally {
+    globalThis.document.querySelectorAll = prevQsa;
+    globalThis.window.getComputedStyle = prevStyle;
+    restoreFixtures();
+  }
+});
+
+test("getTarget rescans once the throttle window expires", () => {
+  const big = makeAreaAt({ overflow: 900 });
+  const prevQsa = globalThis.document.querySelectorAll;
+  const prevStyle = globalThis.window.getComputedStyle;
+  const realNow = Date.now;
+  let styles = 0;
+  globalThis.document.querySelectorAll = () => [big];
+  globalThis.window.getComputedStyle = (...args) => {
+    styles++;
+    return prevStyle(...args);
+  };
+  try {
+    __resetScrollCache();
+    Scroll.reset();
+    assert.equal(Scroll.getTarget(), globalThis.window);
+    styles = 0;
+    Date.now = () => realNow() + 1000;
+    assert.equal(Scroll.getTarget(), globalThis.window);
+    assert.ok(styles > 0, "expected a rescan after the window");
+  } finally {
+    Date.now = realNow;
+    globalThis.document.querySelectorAll = prevQsa;
+    globalThis.window.getComputedStyle = prevStyle;
+    restoreFixtures();
+  }
+});
+
+test("__smoothFrameMove covers 40% of pending per 60fps frame", () => {
+  assert.equal(__smoothFrameMove(120, 1000 / 60), 48);
+  assert.equal(__smoothFrameMove(-120, 1000 / 60), -48);
+});
+
+test("__smoothFrameMove compensates dropped frames with bigger steps", () => {
+  const base = __smoothFrameMove(120, 1000 / 60);
+  const dropped = __smoothFrameMove(120, 50);
+  assert.ok(dropped > base, "expected a bigger step after a long frame");
+  assert.equal(dropped, 94);
+});
+
+test("__smoothFrameMove caps the per-frame share and keeps a 1px minimum", () => {
+  assert.equal(__smoothFrameMove(100000, 1000 / 60), 80);
+  assert.equal(__smoothFrameMove(1, 1000 / 60), 1);
+  assert.equal(__smoothFrameMove(0, 1000 / 60), 0);
 });
