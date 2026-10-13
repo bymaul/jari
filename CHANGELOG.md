@@ -48,6 +48,16 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Fixed
 
+- Hint collection stays responsive on heavy pages: candidates are
+  pre-filtered by selector before any layout is measured (plain elements
+  skip `getBoundingClientRect` entirely), one computed style is reused
+  for the cursor/opacity/visibility checks, hint labels reuse one
+  memoized z-index pass over shared ancestors, and re-collection pauses
+  while a hint label is being typed. Scheme checks for link URLs are
+  cached per collection.
+- Find stays responsive while typing: the per-text-node skip check reads
+  computed style once and walks ancestors with a single merged
+  `closest()` instead of two style reads and three walks.
 - Tab manager (`gt`) stays responsive with many tabs: `j`/`k`/`Space`
   repaint only the affected rows instead of rebuilding the whole list,
   title highlights are memoized per filter query, idle poll ticks skip

@@ -70,11 +70,11 @@ function findScrollableElements() {
     const visibleH = Math.min(bottom, vh) - Math.max(rect.top || 0, 0);
     if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
       continue;
-    const style = window.getComputedStyle(el);
-    if (!isScrollVisible(el, style)) continue;
     const canY = el.scrollHeight > el.clientHeight + 1;
     const canX = el.scrollWidth > el.clientWidth + 1;
     if (!canY && !canX) continue;
+    const style = window.getComputedStyle(el);
+    if (!isScrollVisible(el, style)) continue;
     const overflowY = style.overflowY;
     const overflowX = style.overflowX;
     const scrollableY =
