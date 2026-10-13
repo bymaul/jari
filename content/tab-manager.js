@@ -2,7 +2,7 @@ import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { parseEngineKeyword } from "../shared/search-engines.js";
 import { normalizeUrl, Url } from "../shared/url.js";
 import { settings } from "./settings.js";
-import { createShadowHost, sendMessage, ui } from "./ui.js";
+import { createShadowHost, sendMessageWithTimeout, ui } from "./ui.js";
 import { promptCss, renderText } from "./prompt/shared.js";
 import { register, touch } from "./overlays.js";
 
@@ -68,6 +68,7 @@ let fieldEl = null;
 let fieldFocusBefore = null;
 let confirm = null;
 let windowChoice = null;
+let refreshQueued = false;
 let pollTimer = null;
 let refreshing = false;
 
@@ -140,7 +141,7 @@ function isActive() {
 
 async function ask(action, payload) {
   try {
-    return await sendMessage(action, payload);
+    return await sendMessageWithTimeout(action, payload);
   } catch {
     return null;
   }
@@ -495,14 +496,22 @@ function pruneMarksAndConfirm() {
 
 async function refresh() {
   if (windowChoice) return;
+  if (refreshing) {
+    refreshQueued = true;
+    return;
+  }
   refreshing = true;
   let res;
   try {
-    res = await sendMessage("managerList");
+    res = await sendMessageWithTimeout("managerList");
   } catch {
     res = null;
   } finally {
     refreshing = false;
+    if (refreshQueued) {
+      refreshQueued = false;
+      if (active) await refresh();
+    }
   }
   if (!active) return;
   if (!res || !res.ok || !Array.isArray(res.tabs)) {
@@ -554,6 +563,7 @@ async function open() {
   field = null;
   confirm = null;
   windowChoice = null;
+  refreshQueued = false;
   endVisual();
   active = true;
   touch("tab-manager");
@@ -630,6 +640,7 @@ function close() {
   field = null;
   confirm = null;
   windowChoice = null;
+  refreshQueued = false;
   endVisual();
   active = false;
 
@@ -718,8 +729,14 @@ function consumeMarks() {
 async function activateFocused() {
   const tab = focusedTab();
   if (!tab) return;
-  close();
-  await sendMessage("activateTab", { id: tab.id });
+  const res = await ask("activateTab", { id: tab.id });
+  if (!active) return;
+  if (res && res.ok) {
+    close();
+    return;
+  }
+  ui.toast("Switch failed");
+  await refresh();
 }
 
 function armConfirm(kind, ids, message) {
@@ -739,6 +756,12 @@ function isConfirmed(kind, ids) {
 function failureMessage(res, outcome) {
   if (res && res.reason === "unsupported") {
     return "Tab groups not supported here";
+  }
+  if (res && res.reason === "no-target") {
+    return "Target window closed";
+  }
+  if (res && res.reason === "incognito") {
+    return "Cannot move between incognito and normal windows";
   }
   return outcome.failed;
 }
@@ -1109,7 +1132,7 @@ async function moveWindowTargets() {
   const res = await ask("moveManagerTabsToWindow", { ids });
   if (!active) return;
   if (!res || !res.ok) {
-    ui.toast("Move failed");
+    ui.toast(failureMessage(res, { failed: "Move failed" }));
     renderAll();
     return;
   }
@@ -1149,7 +1172,7 @@ async function confirmWindowChoice() {
   if (!active) return;
   windowChoice = null;
   if (!res || !res.ok) {
-    ui.toast("Move failed");
+    ui.toast(failureMessage(res, { failed: "Move failed" }));
     await refresh();
     return;
   }

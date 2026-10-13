@@ -177,6 +177,8 @@ export async function moveManagerTabsToWindow(_, { ids } = {}) {
   const byId = new Map(all.map((tab) => [tab.id, tab]));
   const live = targets.filter((id) => byId.has(id));
   if (live.length === 0) return { ok: false };
+  const kinds = new Set(live.map((id) => !!byId.get(id).incognito));
+  if (kinds.size > 1) return { ok: false, reason: "incognito" };
   const totalByWindow = new Map();
   const selectedByWindow = new Map();
   for (const tab of all) {
@@ -210,11 +212,15 @@ export async function moveManagerTabsToWindow(_, { ids } = {}) {
   } catch {
     return { ok: false };
   }
-  const others = windows
-    .filter((win) => win && Number.isInteger(win.id) && !emptied.has(win.id))
-    .map(summarizeWindow);
+  const survivors = (windows || []).filter(
+    (win) => win && Number.isInteger(win.id) && !emptied.has(win.id),
+  );
+  const others = survivors.map(summarizeWindow);
   if (others.length === 0) return { ok: true, needWindowChoice: false };
   if (others.length === 1) {
+    if (!!survivors[0].incognito !== [...kinds][0]) {
+      return { ok: false, reason: "incognito" };
+    }
     const groupings = await groupingsForIds(all, live);
     try {
       await moveTabIntoWindowAndFocus(
@@ -234,14 +240,32 @@ export async function moveManagerTabsToWindow(_, { ids } = {}) {
 export async function moveManagerTabsIntoWindow(_, { ids, targetWindowId } = {}) {
   const targets = sanitizeIds(ids);
   if (targets.length === 0 || !Number.isInteger(targetWindowId)) return { ok: false };
-  let all = [];
+  let target;
+  try {
+    target = await chrome.windows.get(targetWindowId);
+  } catch {
+    target = null;
+  }
+  if (!target) return { ok: false, reason: "no-target" };
+  let all;
   try {
     all = (await chrome.tabs.query({})) || [];
-  } catch {}
-  const groupings = await groupingsForIds(all, targets);
+  } catch {
+    all = null;
+  }
+  const byId = all ? new Map(all.map((tab) => [tab.id, tab])) : null;
+  const live = byId ? targets.filter((id) => byId.has(id)) : targets;
+  if (live.length === 0) return { ok: false };
+  if (byId) {
+    const kinds = new Set(live.map((id) => !!byId.get(id).incognito));
+    if (kinds.size > 1 || kinds.has(!target.incognito)) {
+      return { ok: false, reason: "incognito" };
+    }
+  }
+  const groupings = await groupingsForIds(all || [], live);
   try {
     await moveTabIntoWindowAndFocus(
-      targets,
+      live,
       targetWindowId,
       "moveManagerTabsIntoWindow",
     );
@@ -249,7 +273,7 @@ export async function moveManagerTabsIntoWindow(_, { ids, targetWindowId } = {})
   } catch {
     return { ok: false };
   }
-  return { ok: true, moved: targets.length };
+  return { ok: true, moved: live.length };
 }
 
 export async function moveTabLeft(sender) {
@@ -308,6 +332,19 @@ function sanitizeIds(ids, max = 100) {
     if (out.length >= max) break;
   }
   return out;
+}
+
+async function liveIds(ids) {
+  const targets = sanitizeIds(ids);
+  if (targets.length === 0) return [];
+  let all;
+  try {
+    all = (await chrome.tabs.query({})) || [];
+  } catch {
+    return [];
+  }
+  const alive = new Set(all.map((tab) => tab.id));
+  return targets.filter((id) => alive.has(id));
 }
 
 function hasApi(path) {
@@ -381,7 +418,7 @@ async function currentWindowId(sender) {
 }
 
 export async function closeManagerTabs(_, { ids } = {}) {
-  const targets = sanitizeIds(ids);
+  const targets = await liveIds(ids);
   if (targets.length === 0) return { ok: false };
   try {
     await chrome.tabs.remove(targets);
@@ -529,7 +566,7 @@ export async function editManagerTab(_, { id, url } = {}) {
 }
 
 export async function groupManagerTabs(_, { ids, groupId } = {}) {
-  const targets = sanitizeIds(ids);
+  const targets = await liveIds(ids);
   if (targets.length === 0) return { ok: false };
   if (!groupsSupported()) return { ok: false, reason: "unsupported" };
   try {
@@ -545,7 +582,7 @@ export async function groupManagerTabs(_, { ids, groupId } = {}) {
 }
 
 export async function ungroupManagerTabs(_, { ids } = {}) {
-  const targets = sanitizeIds(ids);
+  const targets = await liveIds(ids);
   if (targets.length === 0) return { ok: false };
   if (!groupsSupported()) return { ok: false, reason: "unsupported" };
   try {

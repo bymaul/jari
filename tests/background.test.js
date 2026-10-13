@@ -180,6 +180,7 @@ function stubWindowMove({
   onGroup,
   groupList,
   onGroupUpdate,
+  onRemove,
 }) {
   const savedTabs = globalThis.chrome.tabs;
   const savedWindows = globalThis.chrome.windows;
@@ -191,6 +192,9 @@ function stubWindowMove({
       onMove && onMove(ids, props);
     },
     update: async () => {},
+    remove: async (ids) => {
+      onRemove && onRemove(ids);
+    },
     group: async (opts) => {
       onGroup && onGroup(opts);
       return 99;
@@ -338,7 +342,13 @@ test("moveManagerTabsIntoWindow moves into the chosen window", async () => {
     windows: [],
     onMove: (ids, props) => moved.push([ids, props]),
   });
-  globalThis.chrome.tabs.query = async () => [{ id: 5 }];
+  globalThis.chrome.tabs.query = async (opts) => {
+    if (opts && opts.windowId !== undefined) return [{ id: 5 }];
+    return [
+      { id: 1, windowId: 10 },
+      { id: 2, windowId: 10 },
+    ];
+  };
   try {
     const res = await handlers.moveManagerTabsIntoWindow(
       {},
@@ -429,6 +439,93 @@ test("split still succeeds without group support", async () => {
       movedToNewWindow: true,
       moved: 1,
     });
+  } finally {
+    restore();
+  }
+});
+
+test("closeManagerTabs tolerates dead ids", async () => {
+  const removed = [];
+  const restore = stubWindowMove({
+    allTabs: [{ id: 1, windowId: 10 }],
+    windows: [],
+    onRemove: (ids) => removed.push(ids),
+  });
+  try {
+    const res = await handlers.closeManagerTabs({}, { ids: [1, 9] });
+    assert.deepEqual(res, { ok: true, closed: 1 });
+    assert.deepEqual(removed, [[1]]);
+    assert.deepEqual(await handlers.closeManagerTabs({}, { ids: [9] }), {
+      ok: false,
+    });
+  } finally {
+    restore();
+  }
+});
+
+test("group and ungroup tolerate dead ids", async () => {
+  const restore = stubWindowMove({
+    allTabs: [{ id: 1, windowId: 10, groupId: 7 }],
+    windows: [],
+  });
+  try {
+    assert.deepEqual(
+      await handlers.groupManagerTabs({}, { ids: [1, 9] }),
+      { ok: true, groupId: 99 },
+    );
+    assert.deepEqual(
+      await handlers.ungroupManagerTabs({}, { ids: [1, 9] }),
+      { ok: true, ungrouped: 1 },
+    );
+    assert.deepEqual(await handlers.groupManagerTabs({}, { ids: [9] }), {
+      ok: false,
+    });
+  } finally {
+    restore();
+  }
+});
+
+test("moveManagerTabsIntoWindow reports a closed target", async () => {
+  const restore = stubWindowMove({ allTabs: [], windows: [] });
+  globalThis.chrome.windows.get = async () => {
+    throw new Error("gone");
+  };
+  try {
+    assert.deepEqual(
+      await handlers.moveManagerTabsIntoWindow(
+        {},
+        { ids: [1], targetWindowId: 20 },
+      ),
+      { ok: false, reason: "no-target" },
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("window moves refuse incognito mixing", async () => {
+  const restore = stubWindowMove({
+    allTabs: [
+      { id: 1, windowId: 10 },
+      { id: 2, windowId: 20, incognito: true },
+    ],
+    windows: [
+      { id: 10, tabs: [{ id: 1 }] },
+      { id: 20, tabs: [{ id: 2 }] },
+    ],
+  });
+  try {
+    assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] }), {
+      ok: false,
+      reason: "incognito",
+    });
+    assert.deepEqual(
+      await handlers.moveManagerTabsIntoWindow(
+        {},
+        { ids: [2], targetWindowId: 10 },
+      ),
+      { ok: false, reason: "incognito" },
+    );
   } finally {
     restore();
   }

@@ -3878,6 +3878,7 @@
   var fieldFocusBefore = null;
   var confirm = null;
   var windowChoice = null;
+  var refreshQueued = false;
   var pollTimer = null;
   var refreshing = false;
   function sortManagerTabs(list) {
@@ -3939,7 +3940,7 @@
   }
   async function ask(action, payload) {
     try {
-      return await sendMessage(action, payload);
+      return await sendMessageWithTimeout(action, payload);
     } catch {
       return null;
     }
@@ -4267,14 +4268,22 @@
   }
   async function refresh() {
     if (windowChoice) return;
+    if (refreshing) {
+      refreshQueued = true;
+      return;
+    }
     refreshing = true;
     let res;
     try {
-      res = await sendMessage("managerList");
+      res = await sendMessageWithTimeout("managerList");
     } catch {
       res = null;
     } finally {
       refreshing = false;
+      if (refreshQueued) {
+        refreshQueued = false;
+        if (active2) await refresh();
+      }
     }
     if (!active2) return;
     if (!res || !res.ok || !Array.isArray(res.tabs)) {
@@ -4319,6 +4328,7 @@
     field = null;
     confirm = null;
     windowChoice = null;
+    refreshQueued = false;
     endVisual();
     active2 = true;
     touch("tab-manager");
@@ -4384,6 +4394,7 @@
     field = null;
     confirm = null;
     windowChoice = null;
+    refreshQueued = false;
     endVisual();
     active2 = false;
     if (restoreFocus2 && restoreFocus2.isConnected && document.activeElement !== restoreFocus2) {
@@ -4459,8 +4470,14 @@
   async function activateFocused() {
     const tab = focusedTab();
     if (!tab) return;
-    close2();
-    await sendMessage("activateTab", { id: tab.id });
+    const res = await ask("activateTab", { id: tab.id });
+    if (!active2) return;
+    if (res && res.ok) {
+      close2();
+      return;
+    }
+    ui.toast("Switch failed");
+    await refresh();
   }
   function armConfirm(kind, ids, message) {
     confirm = { kind, key: confirmKey(ids), ids: [...ids], message };
@@ -4472,6 +4489,12 @@
   function failureMessage(res, outcome) {
     if (res && res.reason === "unsupported") {
       return "Tab groups not supported here";
+    }
+    if (res && res.reason === "no-target") {
+      return "Target window closed";
+    }
+    if (res && res.reason === "incognito") {
+      return "Cannot move between incognito and normal windows";
     }
     return outcome.failed;
   }
@@ -4811,7 +4834,7 @@
     const res = await ask("moveManagerTabsToWindow", { ids });
     if (!active2) return;
     if (!res || !res.ok) {
-      ui.toast("Move failed");
+      ui.toast(failureMessage(res, { failed: "Move failed" }));
       renderAll();
       return;
     }
@@ -4849,7 +4872,7 @@
     if (!active2) return;
     windowChoice = null;
     if (!res || !res.ok) {
-      ui.toast("Move failed");
+      ui.toast(failureMessage(res, { failed: "Move failed" }));
       await refresh();
       return;
     }
