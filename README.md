@@ -59,7 +59,9 @@ Download the latest release from
 - Firefox: install `jari-firefox-<version>-signed.xpi` (signed, installs directly).
 - Chrome/Edge: unzip `jari-chrome-<version>.zip`, then
   `chrome://extensions` → Developer mode → Load unpacked.
-  (`jari-chrome-<version>.crx` is also attached for policy-based installs.)
+  (`jari-chrome-<version>.crx` is also attached, but only for enterprise
+  policy deployment with a self-hosted update URL — Chrome rejects
+  hand-installing it with `CRX_REQUIRED_PROOF_MISSING`.)
 
 For Firefox development without a release build, use
 `about:debugging#/runtime/this-firefox` → Load Temporary Add-on →
