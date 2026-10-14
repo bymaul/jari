@@ -1,4 +1,4 @@
-import { overlaySelectors, queryAll } from "./keymap.js";
+import { deepActiveElement, overlaySelectors, queryAll } from "./keymap.js";
 import { blockedUrlSchemes } from "../shared/url.js";
 import { settings } from "./settings.js";
 
@@ -594,7 +594,14 @@ export function collectIframeElements(requestedMode) {
   const out = [];
   const vw = window.innerWidth || 0;
   const vh = window.innerHeight || 0;
+  let focused;
+  try {
+    focused = deepActiveElement();
+  } catch {
+    focused = null;
+  }
   for (const { frame, doc, rect } of getAccessibleFrameDocs()) {
+    if (!frame || frame !== focused) continue;
     const dx = rect.left + (frame.clientLeft || 0);
     const dy = rect.top + (frame.clientTop || 0);
     let base = location.href;
