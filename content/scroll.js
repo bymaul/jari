@@ -35,6 +35,21 @@ function isScrollVisible(el, selfStyle) {
   return true;
 }
 
+const NON_SCROLL_TAGS = new Set([
+  "TEXTAREA",
+  "SELECT",
+  "INPUT",
+  "SCRIPT",
+  "STYLE",
+  "META",
+  "LINK",
+  "HEAD",
+  "TITLE",
+  "BASE",
+  "NOSCRIPT",
+  "TEMPLATE",
+]);
+
 function findScrollableElements() {
   const areas = [];
   const roots = new Set([document.documentElement, document.body]);
@@ -43,9 +58,8 @@ function findScrollableElements() {
 
   for (const el of queryAll("*")) {
     if (roots.has(el)) continue;
+    if (NON_SCROLL_TAGS.has(el.tagName)) continue;
     if (el.closest(overlaySelectors)) continue;
-    const tag = el.tagName;
-    if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
     if (
       el.clientHeight < MIN_SCROLL_AREA_SIZE &&
       el.clientWidth < MIN_SCROLL_AREA_SIZE
@@ -332,7 +346,7 @@ function cycle(steps = 1) {
   target = stops[next];
   focusTarget(target);
   if (!isFrame(target)) releaseFrameFocus();
-  showHighlight();
+  showHighlight(stops);
 }
 
 function scrollHeightOf(el) {
@@ -354,9 +368,9 @@ function scrollPosOf(el) {
 let highlightEl = null;
 let highlightTimer = null;
 
-function showHighlight() {
+function showHighlight(precomputedStops) {
   const area = getTarget();
-  const stops = currentStops();
+  const stops = precomputedStops || currentStops();
   const pos = stops.indexOf(area === window ? null : area);
   const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
   if (!document.body) return;

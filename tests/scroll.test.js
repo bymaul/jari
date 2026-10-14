@@ -143,6 +143,23 @@ test("a repeat count skips stops in either direction", () => {
   assert.equal(Scroll.getTarget(), globalThis.window);
 });
 
+test("cycle walks the DOM once per press", () => {
+  rotateTo(globalThis.window);
+  const prevQsa = globalThis.document.querySelectorAll;
+  let queries = 0;
+  globalThis.document.querySelectorAll = (...args) => {
+    queries++;
+    return prevQsa(...args);
+  };
+  try {
+    queries = 0;
+    Scroll.cycle();
+    assert.equal(queries, 2);
+  } finally {
+    globalThis.document.querySelectorAll = prevQsa;
+  }
+});
+
 test("reset returns to the page after cycling onto an area", () => {
   rotateTo(area);
   assert.equal(Scroll.getTarget(), area);

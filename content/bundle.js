@@ -2305,6 +2305,20 @@
     }
     return true;
   }
+  var NON_SCROLL_TAGS = /* @__PURE__ */ new Set([
+    "TEXTAREA",
+    "SELECT",
+    "INPUT",
+    "SCRIPT",
+    "STYLE",
+    "META",
+    "LINK",
+    "HEAD",
+    "TITLE",
+    "BASE",
+    "NOSCRIPT",
+    "TEMPLATE"
+  ]);
   function findScrollableElements() {
     const areas = [];
     const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
@@ -2312,9 +2326,8 @@
     const vh = window.innerHeight || 0;
     for (const el of queryAll("*")) {
       if (roots.has(el)) continue;
+      if (NON_SCROLL_TAGS.has(el.tagName)) continue;
       if (el.closest(overlaySelectors)) continue;
-      const tag = el.tagName;
-      if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
       if (el.clientHeight < MIN_SCROLL_AREA_SIZE && el.clientWidth < MIN_SCROLL_AREA_SIZE)
         continue;
       let rect;
@@ -2558,7 +2571,7 @@
     target = stops[next2];
     focusTarget(target);
     if (!isFrame(target)) releaseFrameFocus();
-    showHighlight();
+    showHighlight(stops);
   }
   function scrollHeightOf(el) {
     return el === window ? (document.scrollingElement || document.documentElement || document.body).scrollHeight : el.scrollHeight;
@@ -2571,9 +2584,9 @@
   }
   var highlightEl = null;
   var highlightTimer = null;
-  function showHighlight() {
+  function showHighlight(precomputedStops) {
     const area = getTarget();
-    const stops = currentStops();
+    const stops = precomputedStops || currentStops();
     const pos = stops.indexOf(area === window ? null : area);
     const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
     if (!document.body) return;
