@@ -5,7 +5,7 @@ import assert from "node:assert";
 const { settings } = await import("../content/settings.js");
 const { commands } = await import("../content/commands.js");
 const { keymapDefaults } = await import("../content/keymap.js");
-const { handleKeydown, __resetState } = await import("../content/content.js");
+const { handleKeydown, shieldOverlayKey, __resetState } = await import("../content/content.js");
 const { Overlays, register, touch } = await import("../content/overlays.js");
 
 let shieldActive = false;
@@ -17,6 +17,21 @@ register("test-shield", {
   },
   close: () => {
     shieldActive = false;
+  },
+});
+
+let keyupActive = false;
+let keyupHandled = true;
+const keyupSeen = [];
+register("test-keyup", {
+  isActive: () => keyupActive,
+  onKeyDown: () => false,
+  onKeyUp: (event) => {
+    keyupSeen.push(event.key);
+    return keyupHandled;
+  },
+  close: () => {
+    keyupActive = false;
   },
 });
 
@@ -212,6 +227,44 @@ test("keys typed into overlay UI are shielded from the page", () => {
   handleKeydown(ev);
   assert.deepEqual(shieldKeys, ["/"]);
   assert.ok(ev.shielded, "expected stopPropagation for Jari UI targets");
+});
+
+test("shieldOverlayKey offers keyup to the overlay before shielding", () => {
+  keyupActive = true;
+  keyupHandled = true;
+  keyupSeen.length = 0;
+  touch("test-keyup");
+  try {
+    const ev = key({ key: " ", type: "keyup" });
+    shieldOverlayKey(ev);
+    assert.deepEqual(keyupSeen, [" "]);
+    assertUnclaimed(ev);
+  } finally {
+    keyupActive = false;
+  }
+});
+
+test("shieldOverlayKey shields keyup the overlay ignores", () => {
+  keyupActive = true;
+  keyupHandled = false;
+  keyupSeen.length = 0;
+  touch("test-keyup");
+  try {
+    const ev = key({ key: " ", type: "keyup" });
+    shieldOverlayKey(ev);
+    assert.deepEqual(keyupSeen, [" "]);
+    assertClaimed(ev);
+  } finally {
+    keyupActive = false;
+  }
+});
+
+test("shieldOverlayKey shields keyup for overlays without onKeyUp", () => {
+  shieldActive = true;
+  touch("test-shield");
+  const ev = key({ key: " ", type: "keyup" });
+  shieldOverlayKey(ev);
+  assertClaimed(ev);
 });
 
 test("popup help message opens the cheatsheet in the top frame", async () => {

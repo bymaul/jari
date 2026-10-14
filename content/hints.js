@@ -588,9 +588,9 @@ function onKeyUp(event) {
   return false;
 }
 
-export const Hints = { open, close, isActive, onKeyDown, genLabels };
+export const Hints = { open, close, isActive, onKeyDown, onKeyUp, genLabels };
 
-register("hints", { close, onKeyDown, isActive });
+register("hints", { close, onKeyDown, onKeyUp, isActive });
 
 export function __testReset() {
   close();

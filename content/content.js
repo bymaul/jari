@@ -145,7 +145,15 @@ function isJariUiTarget(event) {
 }
 
 export function shieldOverlayKey(event) {
-  if (!Overlays.active()) return;
+  const overlay = Overlays.active();
+  if (!overlay) return;
+  if (
+    event.type === "keyup" &&
+    typeof overlay.onKeyUp === "function" &&
+    overlay.onKeyUp(event)
+  ) {
+    return;
+  }
   if (isJariUiTarget(event)) {
     event.stopPropagation();
     return;

@@ -9703,8 +9703,8 @@
     }
     return false;
   }
-  var Hints = { open: open4, close: close5, isActive: isActive6, onKeyDown: onKeyDown6, genLabels };
-  register("hints", { close: close5, onKeyDown: onKeyDown6, isActive: isActive6 });
+  var Hints = { open: open4, close: close5, isActive: isActive6, onKeyDown: onKeyDown6, onKeyUp, genLabels };
+  register("hints", { close: close5, onKeyDown: onKeyDown6, onKeyUp, isActive: isActive6 });
 
   // content/page-nav.js
   function normText(value) {
@@ -11479,7 +11479,11 @@ ${location.href}`;
     return false;
   }
   function shieldOverlayKey(event) {
-    if (!Overlays.active()) return;
+    const overlay6 = Overlays.active();
+    if (!overlay6) return;
+    if (event.type === "keyup" && typeof overlay6.onKeyUp === "function" && overlay6.onKeyUp(event)) {
+      return;
+    }
     if (isJariUiTarget(event)) {
       event.stopPropagation();
       return;

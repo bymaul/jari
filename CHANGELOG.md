@@ -56,6 +56,9 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Fixed
 
+- Hint labels reappear on Space release: the overlay key shield offers
+  keyup to the active overlay first instead of swallowing it, so the
+  hints' own keyup handler runs and unhides the labels.
 - Hint collection stays responsive on heavy pages: candidates are
   pre-filtered by selector before any layout is measured (plain elements
   skip `getBoundingClientRect` entirely), one computed style is reused
