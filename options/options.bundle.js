@@ -293,7 +293,6 @@
     scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
     scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
     cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame", repeatable: true },
-    cycleScrollFrameBack: { category: "scrolling", label: "Cycle scroll area / frame backward", repeatable: true },
     resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
     zoomIn: { category: "zoom", label: "Zoom in" },
     zoomOut: { category: "zoom", label: "Zoom out" },
@@ -347,7 +346,7 @@
   };
 
   // content/keymap.js
-  var SETTINGS_SCHEMA_VERSION = 10;
+  var SETTINGS_SCHEMA_VERSION = 12;
   var Events = {
     listeners: {},
     on(event, fn) {
@@ -363,8 +362,7 @@
     h: "scrollLeft",
     l: "scrollRight",
     G: "scrollToBottom",
-    "[w": "cycleScrollFrameBack",
-    "]w": "cycleScrollFrame",
+    w: "cycleScrollFrame",
     d: "scrollHalfPageDown",
     u: "scrollHalfPageUp",
     "+": "zoomIn",
@@ -607,6 +605,10 @@
       d.keymap = migrateV10Bindings(d.keymap);
       version = 10;
     }
+    if (version < 12) {
+      d.keymap = migrateV12Bindings(d.keymap);
+      version = 12;
+    }
     d.schemaVersion = version;
     return d;
   }
@@ -688,8 +690,6 @@
     return out;
   }
   var V9_DEFAULT_FILLS = [
-    ["[w", "cycleScrollFrameBack"],
-    ["]w", "cycleScrollFrame"],
     ["gss", "screenshotFullPage"],
     ["gsp", "screenshotPage"],
     ["gsr", "screenshotRegion"]
@@ -713,6 +713,20 @@
     }
     const out = { ...keymap };
     for (const [combo, command] of V10_DEFAULT_FILLS) {
+      if (combo in out) continue;
+      if (findOverlapConflicts(out, combo).length > 0) continue;
+      out[combo] = command;
+    }
+    return out;
+  }
+  var V12_DEFAULT_FILLS = [["w", "cycleScrollFrame"]];
+  function migrateV12Bindings(keymap) {
+    if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+      return keymap;
+    }
+    const out = { ...keymap };
+    if (out["]w"] === "cycleScrollFrame") delete out["]w"];
+    for (const [combo, command] of V12_DEFAULT_FILLS) {
       if (combo in out) continue;
       if (findOverlapConflicts(out, combo).length > 0) continue;
       out[combo] = command;

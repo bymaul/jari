@@ -37,6 +37,27 @@ test("normalizeSettings allows a zero timeout to disable the expiry", () => {
   assert.equal(Jari.normalizeSettings({ passthroughMs: 0 }).passthroughMs, 0);
 });
 
+test("migrateV12Bindings lands w for cycling without clobbering customs", () => {
+  assert.deepEqual(Jari.migrateV12Bindings({ x: "closeTab" }).w, "cycleScrollFrame");
+  assert.deepEqual(
+    Jari.migrateV12Bindings({ w: "moveTabToWindow" }).w,
+    "moveTabToWindow",
+  );
+  assert.ok(!("w" in Jari.migrateV12Bindings({ ws: "closeTab" })));
+  assert.deepEqual(
+    Jari.migrateV12Bindings({ "]w": "cycleScrollFrame", x: "closeTab" }),
+    { x: "closeTab", w: "cycleScrollFrame" },
+  );
+  assert.equal(
+    Jari.migrateV12Bindings({ "]w": "nextPage" })["]w"],
+    "nextPage",
+  );
+  const s = Jari.normalizeSettings({ schemaVersion: 10, keymap: { "[w": "cycleScrollFrameBack" } });
+  assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(s.keymap.w, "cycleScrollFrame");
+  assert.equal(s.keymap["[w"], undefined);
+});
+
 test("rebinding away a default key removes the default binding", () => {
   const s = Jari.normalizeSettings({ keymap: { z: "passthroughKeys" } });
   assert.equal(s.keymap.z, "passthroughKeys");

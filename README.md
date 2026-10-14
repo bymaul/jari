@@ -17,7 +17,7 @@ Commands take a repeat count (`3j`, `2x`); `0-9` are reserved for it.
 Bindings chain into sequences of any length.
 
 - Scroll: `j`/`k`/`h`/`l`, `d`/`u` half page, `gg`/`G` top/bottom (always the page
-  until switched), `]w` cycle scroll area forward, `[w` back (`3]w` skips ahead),
+  until switched), `w` cycle scroll area (`3w` skips ahead),
   `;w` reset scroll area
 - Zoom: `+`/`=`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
@@ -30,7 +30,7 @@ Bindings chain into sequences of any length.
   `[[`/`]]` previous/next page
   (customizable link texts in settings)
 - Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
-  (hints inside a frame appear only once the frame is focused - cycle onto it with `]w`/`[w` or click into it)
+  (hints inside a frame appear only once the frame is focused - cycle onto it with `w` or click into it)
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
   `Up`/`Down` history)
 - Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,

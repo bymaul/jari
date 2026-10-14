@@ -38,9 +38,10 @@ versioned for the extension manifest (`manifest.base.json`).
 ### Changed
 
 - Scroll target is manual: plain scroll keys always scroll the page and
-  never jump to an inner area on their own. `]w` / `[w` explicitly
-  cycle in-viewport scroll areas and frames top-to-bottom (repeat
-  counts skip ahead), `;w` resets to the page. Fully offscreen areas
+  never jump to an inner area on their own. `w` explicitly cycles
+  in-viewport scroll areas and frames top-to-bottom (repeat counts skip
+  ahead), `;w` resets to the page. The backward cycle and the `]w`
+  alias are gone. Fully offscreen areas
   and slivers peeking into the viewport are never stops. Nested
   wrappers collapse to the innermost area. Cross-origin
   frames stay listed (their overflow can't be verified) and highlight
@@ -50,7 +51,7 @@ versioned for the extension manifest (`manifest.base.json`).
   becomes a stop and scroll commands drive the inner panel directly,
   including page steps and top/bottom.
 - Hints inside same-origin frames appear only when the frame is focused:
-  cycle onto it with `]w` / `[w` or click into it. The frame itself
+  cycle onto it with `w` or click into it. The frame itself
   always keeps its hint as the entry point; `;w` reset blurs it and
   hides its inner hints again.
 

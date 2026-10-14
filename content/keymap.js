@@ -16,7 +16,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.js";
 import { COMMAND_CATALOG } from "./catalog.js";
 
-export const SETTINGS_SCHEMA_VERSION = 10;
+export const SETTINGS_SCHEMA_VERSION = 12;
 
 export const Events = {
   listeners: {},
@@ -34,8 +34,7 @@ export const keymapDefaults = {
   h: "scrollLeft",
   l: "scrollRight",
   G: "scrollToBottom",
-  "[w": "cycleScrollFrameBack",
-  "]w": "cycleScrollFrame",
+  w: "cycleScrollFrame",
   d: "scrollHalfPageDown",
   u: "scrollHalfPageUp",
   "+": "zoomIn",
@@ -429,6 +428,15 @@ export function migrateSettings(data) {
     d.keymap = migrateV10Bindings(d.keymap);
     version = 10;
   }
+  // v10 -> v11: reserved for the hint-charset refresh (unreleased branch).
+  // v11 -> v12: backward scroll-area cycle is gone and forward cycle
+  // moves to w (bare), replacing ]w. The w combo fills only where free,
+  // so custom rebinds are never clobbered; ]w binds to the same command
+  // are pruned (custom ]w rebinds stay). Stale [w binds drop out on normalize.
+  if (version < 12) {
+    d.keymap = migrateV12Bindings(d.keymap);
+    version = 12;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -519,8 +527,6 @@ export function migratePageNavBindings(keymap) {
 }
 
 const V9_DEFAULT_FILLS = [
-  ["[w", "cycleScrollFrameBack"],
-  ["]w", "cycleScrollFrame"],
   ["gss", "screenshotFullPage"],
   ["gsp", "screenshotPage"],
   ["gsr", "screenshotRegion"],
@@ -547,6 +553,22 @@ export function migrateV10Bindings(keymap) {
   }
   const out = { ...keymap };
   for (const [combo, command] of V10_DEFAULT_FILLS) {
+    if (combo in out) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
+  }
+  return out;
+}
+
+const V12_DEFAULT_FILLS = [["w", "cycleScrollFrame"]];
+
+export function migrateV12Bindings(keymap) {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap;
+  }
+  const out = { ...keymap };
+  if (out["]w"] === "cycleScrollFrame") delete out["]w"];
+  for (const [combo, command] of V12_DEFAULT_FILLS) {
     if (combo in out) continue;
     if (findOverlapConflicts(out, combo).length > 0) continue;
     out[combo] = command;
