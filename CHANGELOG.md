@@ -45,6 +45,10 @@ versioned for the extension manifest (`manifest.base.json`).
   wrappers collapse to the innermost area. Cross-origin
   frames stay listed (their overflow can't be verified) and highlight
   as `frame?`.
+- Scroll cycle detects same-origin frames whose document doesn't scroll
+  but contain a scrollable panel (e.g. YouTube live chat): the frame
+  becomes a stop and scroll commands drive the inner panel directly,
+  including page steps and top/bottom.
 - Hints inside same-origin frames appear only when the frame is focused:
   cycle onto it with `]w` / `[w` or click into it. The frame itself
   always keeps its hint as the entry point; `;w` reset blurs it and

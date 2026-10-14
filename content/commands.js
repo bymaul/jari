@@ -1,7 +1,7 @@
 import { Url } from "../shared/url.js";
 import { settings } from "./settings.js";
 import { sendMessage, sendMessageWithTimeout, ui } from "./ui.js";
-import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.js";
+import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, frameScrollBox, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.js";
 import { Prompt } from "./prompt.js";
 import { TabManager } from "./tab-manager.js";
 import { Help } from "./help.js";
@@ -49,12 +49,50 @@ function frameScrollBehavior() {
 }
 
 function scrollFrameBy(frame, x, y) {
+  let box;
+  try {
+    box = frameScrollBox(frame);
+  } catch {
+    box = null;
+  }
+  if (box) {
+    if (shouldSmooth()) {
+      smoothScrollBy(box, x, y);
+    } else {
+      try {
+        box.scrollBy({ left: x, top: y, behavior: "instant" });
+      } catch {}
+    }
+    return true;
+  }
   return scrollFrame(frame, (t) =>
     t.scrollBy({ left: x, top: y, behavior: frameScrollBehavior() }),
   );
 }
 
 function scrollFrameTo(frame, top) {
+  let box;
+  try {
+    box = frameScrollBox(frame);
+  } catch {
+    box = null;
+  }
+  if (box) {
+    if (shouldSmooth()) {
+      let pos;
+      try {
+        pos = box.scrollTop || 0;
+      } catch {
+        pos = 0;
+      }
+      smoothScrollBy(box, 0, top - pos);
+    } else {
+      try {
+        box.scrollTo({ top, behavior: "instant" });
+      } catch {}
+    }
+    return true;
+  }
   return scrollFrame(frame, (t) =>
     t.scrollTo({ top, behavior: frameScrollBehavior() }),
   );
@@ -200,10 +238,18 @@ export const commands = {
     run: () => {
       const el = getScrollElement();
       if (isFrame(el)) {
-        const w = frameWindow(el);
+        let box;
+        try {
+          box = frameScrollBox(el);
+        } catch {
+          box = null;
+        }
+        const w = box ? null : frameWindow(el);
         let target;
         try {
-          if (w) {
+          if (box) {
+            target = Math.max(0, (box.scrollHeight || 0) - (box.clientHeight || 0));
+          } else if (w) {
             const doc = w.document.scrollingElement || w.document.documentElement;
             target = Math.max(0, doc.scrollHeight - w.innerHeight);
           } else {

@@ -2,7 +2,7 @@ import "./setup.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-const { Scroll, __smoothFrameMove } = await import("../content/scroll.js");
+const { Scroll, frameScrollBox, __smoothFrameMove } = await import("../content/scroll.js");
 
 const VW = 800;
 const VH = 600;
@@ -157,6 +157,68 @@ test("cycle walks the DOM once per press", () => {
     assert.equal(queries, 2);
   } finally {
     globalThis.document.querySelectorAll = prevQsa;
+  }
+});
+
+function makeChatFrame() {
+  const inner = makeArea();
+  const innerDoc = {
+    scrollingElement: {
+      scrollHeight: 300,
+      clientHeight: 300,
+      scrollWidth: 300,
+      clientWidth: 300,
+    },
+    body: { querySelectorAll: () => [inner] },
+  };
+  const frame = makeFrame();
+  frame.scrollHeight = 200;
+  frame.scrollWidth = 200;
+  frame.contentDocument = innerDoc;
+  return { frame, inner };
+}
+
+function makeDeadFrame() {
+  const frame = makeFrame();
+  frame.scrollHeight = 200;
+  frame.scrollWidth = 200;
+  frame.contentDocument = {
+    scrollingElement: {
+      scrollHeight: 300,
+      clientHeight: 300,
+      scrollWidth: 300,
+      clientWidth: 300,
+    },
+    body: { querySelectorAll: () => [] },
+  };
+  return frame;
+}
+
+test("a frame with a scrollable inner panel is a stop", () => {
+  const { frame } = makeChatFrame();
+  useFixtures([frame]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), frame);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("frameScrollBox resolves the inner panel, null for the rest", () => {
+  const { frame, inner } = makeChatFrame();
+  assert.equal(frameScrollBox(frame), inner);
+  assert.equal(frameScrollBox(makeDeadFrame()), null);
+  assert.equal(frameScrollBox(area), null);
+});
+
+test("a frame with no scrollable content is not a stop", () => {
+  useFixtures([makeDeadFrame()]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), globalThis.window);
+  } finally {
+    restoreFixtures();
   }
 });
 

@@ -125,11 +125,11 @@ function findFrameElements() {
     )
       continue;
     if (!isScrollVisible(el)) continue;
-    if (!isFrameScrollable(el)) continue;
     const vw = window.innerWidth || 0;
     const vh = window.innerHeight || 0;
     if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
       continue;
+    if (!isFrameScrollable(el, rect)) continue;
     frames.push(el);
   }
   return frames;
@@ -140,24 +140,146 @@ export function isFrame(el) {
   return isFrameElement(el);
 }
 
-function isFrameScrollable(el) {
-  let doc;
+function frameDoc(frame) {
   try {
-    doc = el.contentDocument || null;
+    return frame.contentDocument || null;
   } catch {
-    return true;
+    return null;
   }
+}
+
+function docScrolls(doc) {
+  const root =
+    doc.scrollingElement || doc.documentElement || doc.body || null;
+  if (!root) return false;
+  return (
+    root.scrollHeight > root.clientHeight + 1 ||
+    root.scrollWidth > root.clientWidth + 1
+  );
+}
+
+function frameStyleOf(frame, el) {
+  let view;
+  try {
+    view = frame.contentWindow || null;
+  } catch {
+    view = null;
+  }
+  if (view && typeof view.getComputedStyle === "function") {
+    return view.getComputedStyle(el);
+  }
+  return window.getComputedStyle(el);
+}
+
+function frameInnerBoxes(frame, frameRect) {
+  const doc = frameDoc(frame);
+  if (!doc || !doc.body) return [];
+  if (!frameRect) {
+    try {
+      frameRect = frame.getBoundingClientRect();
+    } catch {
+      return [];
+    }
+    if (!frameRect) return [];
+  }
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
+  let nodes;
+  try {
+    nodes = doc.body.querySelectorAll("*") || [];
+  } catch {
+    return [];
+  }
+  const boxes = [];
+  for (const el of nodes) {
+    try {
+      const tag = el.tagName;
+      if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
+      if (
+        el.clientHeight < MIN_SCROLL_AREA_SIZE &&
+        el.clientWidth < MIN_SCROLL_AREA_SIZE
+      )
+        continue;
+      const canY = el.scrollHeight > el.clientHeight + 1;
+      const canX = el.scrollWidth > el.clientWidth + 1;
+      if (!canY && !canX) continue;
+      const style = frameStyleOf(frame, el);
+      if (!isScrollVisible(el, style)) continue;
+      const overflowY = style.overflowY;
+      const overflowX = style.overflowX;
+      const scrollableY =
+        (overflowY === "auto" ||
+          overflowY === "scroll" ||
+          overflowY === "overlay") &&
+        canY;
+      const scrollableX =
+        (overflowX === "auto" ||
+          overflowX === "scroll" ||
+          overflowX === "overlay") &&
+        canX;
+      if (!scrollableY && !scrollableX) continue;
+      let r = null;
+      try {
+        r = el.getBoundingClientRect();
+      } catch {
+        continue;
+      }
+      if (!r) continue;
+      const left = (r.left || 0) + (frameRect.left || 0);
+      const top = (r.top || 0) + (frameRect.top || 0);
+      const right = left + (r.width || 0);
+      const bottom = top + (r.height || 0);
+      if (bottom <= 0 || right <= 0 || top >= vh || left >= vw) continue;
+      const visibleW = Math.min(right, vw) - Math.max(left, 0);
+      const visibleH = Math.min(bottom, vh) - Math.max(top, 0);
+      if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
+        continue;
+      boxes.push({
+        el,
+        overflow:
+          Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) +
+          Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0)),
+      });
+    } catch {
+      continue;
+    }
+  }
+  return boxes;
+}
+
+function isFrameScrollable(el, rect) {
+  const doc = frameDoc(el);
   if (!doc) return true;
   try {
-    const root = doc.scrollingElement || doc.documentElement || doc.body;
-    if (!root) return true;
-    return (
-      root.scrollHeight > root.clientHeight + 1 ||
-      root.scrollWidth > root.clientWidth + 1
-    );
+    if (docScrolls(doc)) return true;
   } catch {
     return true;
   }
+  try {
+    return frameInnerBoxes(el, rect).length > 0;
+  } catch {
+    return true;
+  }
+}
+
+export function frameScrollBox(frame) {
+  if (!frame) return null;
+  const doc = frameDoc(frame);
+  if (!doc) return null;
+  try {
+    if (docScrolls(doc)) return null;
+  } catch {
+    return null;
+  }
+  let best = null;
+  let bestOverflow = 0;
+  for (const box of frameInnerBoxes(frame)) {
+    if (box.overflow > bestOverflow) {
+      bestOverflow = box.overflow;
+      best = box.el;
+    }
+  }
+  return best;
 }
 
 export function focusTarget(el) {
@@ -182,6 +304,10 @@ export function frameWindow(frame) {
 }
 
 export function frameViewportHeight(frame) {
+  try {
+    const box = frameScrollBox(frame);
+    if (box && Number.isFinite(box.clientHeight)) return box.clientHeight;
+  } catch {}
   const w = frameWindow(frame);
   try {
     if (w && Number.isFinite(w.innerHeight)) return w.innerHeight;

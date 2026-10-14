@@ -2375,11 +2375,11 @@
       if (rect.width < MIN_SCROLL_AREA_SIZE || rect.height < MIN_SCROLL_AREA_SIZE)
         continue;
       if (!isScrollVisible(el)) continue;
-      if (!isFrameScrollable(el)) continue;
       const vw = window.innerWidth || 0;
       const vh = window.innerHeight || 0;
       if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
         continue;
+      if (!isFrameScrollable(el, rect)) continue;
       frames.push(el);
     }
     return frames;
@@ -2388,21 +2388,124 @@
     if (!el || el === window) return false;
     return isFrameElement(el);
   }
-  function isFrameScrollable(el) {
-    let doc;
+  function frameDoc(frame) {
     try {
-      doc = el.contentDocument || null;
+      return frame.contentDocument || null;
     } catch {
-      return true;
+      return null;
     }
+  }
+  function docScrolls(doc) {
+    const root = doc.scrollingElement || doc.documentElement || doc.body || null;
+    if (!root) return false;
+    return root.scrollHeight > root.clientHeight + 1 || root.scrollWidth > root.clientWidth + 1;
+  }
+  function frameStyleOf(frame, el) {
+    let view;
+    try {
+      view = frame.contentWindow || null;
+    } catch {
+      view = null;
+    }
+    if (view && typeof view.getComputedStyle === "function") {
+      return view.getComputedStyle(el);
+    }
+    return window.getComputedStyle(el);
+  }
+  function frameInnerBoxes(frame, frameRect) {
+    const doc = frameDoc(frame);
+    if (!doc || !doc.body) return [];
+    if (!frameRect) {
+      try {
+        frameRect = frame.getBoundingClientRect();
+      } catch {
+        return [];
+      }
+      if (!frameRect) return [];
+    }
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    let nodes;
+    try {
+      nodes = doc.body.querySelectorAll("*") || [];
+    } catch {
+      return [];
+    }
+    const boxes = [];
+    for (const el of nodes) {
+      try {
+        const tag = el.tagName;
+        if (tag === "TEXTAREA" || tag === "SELECT" || tag === "INPUT") continue;
+        if (el.clientHeight < MIN_SCROLL_AREA_SIZE && el.clientWidth < MIN_SCROLL_AREA_SIZE)
+          continue;
+        const canY = el.scrollHeight > el.clientHeight + 1;
+        const canX = el.scrollWidth > el.clientWidth + 1;
+        if (!canY && !canX) continue;
+        const style = frameStyleOf(frame, el);
+        if (!isScrollVisible(el, style)) continue;
+        const overflowY = style.overflowY;
+        const overflowX = style.overflowX;
+        const scrollableY = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && canY;
+        const scrollableX = (overflowX === "auto" || overflowX === "scroll" || overflowX === "overlay") && canX;
+        if (!scrollableY && !scrollableX) continue;
+        let r = null;
+        try {
+          r = el.getBoundingClientRect();
+        } catch {
+          continue;
+        }
+        if (!r) continue;
+        const left = (r.left || 0) + (frameRect.left || 0);
+        const top = (r.top || 0) + (frameRect.top || 0);
+        const right = left + (r.width || 0);
+        const bottom = top + (r.height || 0);
+        if (bottom <= 0 || right <= 0 || top >= vh || left >= vw) continue;
+        const visibleW = Math.min(right, vw) - Math.max(left, 0);
+        const visibleH = Math.min(bottom, vh) - Math.max(top, 0);
+        if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
+          continue;
+        boxes.push({
+          el,
+          overflow: Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) + Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0))
+        });
+      } catch {
+        continue;
+      }
+    }
+    return boxes;
+  }
+  function isFrameScrollable(el, rect) {
+    const doc = frameDoc(el);
     if (!doc) return true;
     try {
-      const root = doc.scrollingElement || doc.documentElement || doc.body;
-      if (!root) return true;
-      return root.scrollHeight > root.clientHeight + 1 || root.scrollWidth > root.clientWidth + 1;
+      if (docScrolls(doc)) return true;
     } catch {
       return true;
     }
+    try {
+      return frameInnerBoxes(el, rect).length > 0;
+    } catch {
+      return true;
+    }
+  }
+  function frameScrollBox(frame) {
+    if (!frame) return null;
+    const doc = frameDoc(frame);
+    if (!doc) return null;
+    try {
+      if (docScrolls(doc)) return null;
+    } catch {
+      return null;
+    }
+    let best = null;
+    let bestOverflow = 0;
+    for (const box of frameInnerBoxes(frame)) {
+      if (box.overflow > bestOverflow) {
+        bestOverflow = box.overflow;
+        best = box.el;
+      }
+    }
+    return best;
   }
   function focusTarget(el) {
     if (!el || el === window) return;
@@ -2426,6 +2529,11 @@
     }
   }
   function frameViewportHeight(frame) {
+    try {
+      const box = frameScrollBox(frame);
+      if (box && Number.isFinite(box.clientHeight)) return box.clientHeight;
+    } catch {
+    }
     const w = frameWindow(frame);
     try {
       if (w && Number.isFinite(w.innerHeight)) return w.innerHeight;
@@ -10833,12 +10941,52 @@
     return shouldSmooth() ? "smooth" : "instant";
   }
   function scrollFrameBy(frame, x, y) {
+    let box;
+    try {
+      box = frameScrollBox(frame);
+    } catch {
+      box = null;
+    }
+    if (box) {
+      if (shouldSmooth()) {
+        smoothScrollBy(box, x, y);
+      } else {
+        try {
+          box.scrollBy({ left: x, top: y, behavior: "instant" });
+        } catch {
+        }
+      }
+      return true;
+    }
     return scrollFrame(
       frame,
       (t) => t.scrollBy({ left: x, top: y, behavior: frameScrollBehavior() })
     );
   }
   function scrollFrameTo(frame, top) {
+    let box;
+    try {
+      box = frameScrollBox(frame);
+    } catch {
+      box = null;
+    }
+    if (box) {
+      if (shouldSmooth()) {
+        let pos;
+        try {
+          pos = box.scrollTop || 0;
+        } catch {
+          pos = 0;
+        }
+        smoothScrollBy(box, 0, top - pos);
+      } else {
+        try {
+          box.scrollTo({ top, behavior: "instant" });
+        } catch {
+        }
+      }
+      return true;
+    }
     return scrollFrame(
       frame,
       (t) => t.scrollTo({ top, behavior: frameScrollBehavior() })
@@ -10969,10 +11117,18 @@ ${location.href}`;
       run: () => {
         const el = getScrollElement();
         if (isFrame(el)) {
-          const w = frameWindow(el);
+          let box;
+          try {
+            box = frameScrollBox(el);
+          } catch {
+            box = null;
+          }
+          const w = box ? null : frameWindow(el);
           let target3;
           try {
-            if (w) {
+            if (box) {
+              target3 = Math.max(0, (box.scrollHeight || 0) - (box.clientHeight || 0));
+            } else if (w) {
               const doc = w.document.scrollingElement || w.document.documentElement;
               target3 = Math.max(0, doc.scrollHeight - w.innerHeight);
             } else {
