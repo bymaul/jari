@@ -6,6 +6,8 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-15
+
 ### Added
 
 - Tab manager (`gt`): keyboard-driven floating panel listing every tab
