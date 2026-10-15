@@ -631,6 +631,21 @@
     } catch {}
   }
 
+  function reloadPage(hard) {
+    if (!hard) {
+      try {
+        window.location.reload();
+      } catch {}
+      return;
+    }
+    toast("No cache bypass in demo — normal reload");
+    setTimeout(function () {
+      try {
+        window.location.reload();
+      } catch {}
+    }, 900);
+  }
+
   function isTypingTarget(el) {
     if (!el) return false;
     var tag = el.tagName;
@@ -782,6 +797,14 @@
         try {
           window.history.go(c);
         } catch {}
+        break;
+      case "r":
+        e.preventDefault();
+        reloadPage(false);
+        break;
+      case "R":
+        e.preventDefault();
+        reloadPage(true);
         break;
       case "f":
         e.preventDefault();
