@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jari — try the keys</title>
+<link rel="icon" href="../icons/jari.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="./docs.css" />
+</head>
+<body>
+<header class="demo-header">
+  <div class="demo-brand">
+    <img src="../icons/jari.svg" alt="Jari logo" width="40" height="40" />
+    <div>
+      <h1>Jari <span class="demo-pron">/ja·ri/</span></h1>
+      <p class="demo-tag">Keyboard-driven navigation. Try it right here — no install needed.</p>
+    </div>
+  </div>
+  <nav class="demo-install">
+    <a class="demo-btn" href="https://github.com/bymaul/jari/releases" target="_blank" rel="noopener">Install for Firefox / Chrome</a>
+    <a class="demo-btn demo-btn-ghost" href="https://github.com/bymaul/jari" target="_blank" rel="noopener">GitHub repo</a>
+  </nav>
+</header>
+
+<div class="demo-keys-bar" role="note">
+  <span><kbd>j</kbd><kbd>k</kbd> scroll</span>
+  <span><kbd>f</kbd> follow link</span>
+  <span><kbd>/</kbd> find</span>
+  <span><kbd>v</kbd> select + <kbd>y</kbd> yank</span>
+  <span><kbd>?</kbd> all keys</span>
+</div>
+
+<nav class="demo-docsnav" aria-label="Docs">
+  <a href="./index.html">Playground</a>
+  <a href="./guide.html">Key guide</a>
+  <a href="./install.html">Install</a>
+  <a href="./settings.html">Settings</a>
+  <a href="./privacy.html">Privacy</a>
+</nav>
+
+<main class="demo-main">
+  <article id="playground" class="demo-article" aria-label="Demo article">
+    <h2>Welcome to the Jari playground</h2>
+    <p>
+      This page pretends the Jari extension is installed. Keep your hands on the
+      home row: <strong>jari</strong> lets you scroll with the keyboard, jump to
+      links with hints, search page text with find, and select text with visual
+      mode. Every <strong>keyboard</strong> shortcut below works right now.
+      See the <a href="./guide.html">full key guide</a> for history
+      (<kbd>H</kbd>/<kbd>L</kbd>) and page keys (<kbd>gu</kbd>/<kbd>gU</kbd>).
+    </p>
+    <p>
+      Start with scrolling: press <kbd>j</kbd> and <kbd>k</kbd> a few times, then
+      try <kbd>3j</kbd>, <kbd>d</kbd> for half a page, <kbd>gg</kbd> for the top
+      and <kbd>G</kbd> for the bottom. The keyboard stays in charge the whole time.
+    </p>
+    <h2>Links are just a hint away</h2>
+    <p>
+      Press <kbd>f</kbd> and a yellow label appears on every link. Type the label
+      to follow it — <kbd>f</kbd> opens here, <kbd>F</kbd> opens a new tab, and
+      <kbd>gf</kbd> opens a background tab. Try it:
+      <a href="https://github.com/bymaul/jari">jari repo</a>,
+      <a href="https://github.com/bymaul/jari/releases">releases</a>,
+      <a href="https://github.com/bymaul/jari/issues">issues</a>,
+      <a href="https://github.com/bymaul/jari/blob/main/PRIVACY.md">privacy notes</a>.
+    </p>
+    <p>
+      More targets for longer labels:
+      <a href="https://github.com/bymaul/jari/blob/main/README.md">readme</a>,
+      <a href="https://github.com/bymaul/jari/blob/main/CHANGELOG.md">changelog</a>,
+      <a href="https://github.com/bymaul/jari/security/advisories/new">security</a>,
+      <a href="https://example.com">example.com</a>,
+      <a href="https://example.org">example.org</a>.
+      Buttons work too: <button type="button" data-toast="Bookmarked (not really)">Bookmark</button>
+      <button type="button" data-toast="Copied URL (not really)">Copy URL</button>.
+    </p>
+    <h2>Find in page</h2>
+    <p>
+      Press <kbd>/</kbd>, type <code>keyboard</code> or <code>jari</code>, then
+      <kbd>Enter</kbd>. Step through matches with <kbd>n</kbd> and <kbd>N</kbd>
+      (counts work: <kbd>2n</kbd>). <kbd>Esc</kbd> hides the highlights,
+      <kbd>n</kbd> brings them back, and <kbd>Enter</kbd> on a link match follows it.
+      Search is smart-case: lowercase matches anything, uppercase is exact.
+    </p>
+    <p>
+      The keyboard rewards repetition. A keyboard-first flow means less reaching for
+      the mouse, and jari keeps the keyboard close: scroll, hint, find, yank, repeat.
+      Search this paragraph for <code>keyboard</code> — it appears several times on
+      purpose so <kbd>n</kbd> has somewhere to go.
+    </p>
+    <h2>Visual mode and help</h2>
+    <p>
+      Press <kbd>v</kbd> to drop a caret into this article, move with
+      <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd>, and press <kbd>y</kbd>
+      to yank the selection to your clipboard. <kbd>Esc</kbd> exits. Press
+      <kbd>?</kbd> any time for the full demo cheatsheet.
+    </p>
+    <h2>More room to scroll</h2>
+    <p>
+      This section exists so scrolling has somewhere to go. Press
+      <kbd>j</kbd> ten times and watch the page glide, then <kbd>d</kbd> twice
+      for two half-page jumps. The keyboard never leaves your fingers while the
+      jari playground slides underneath it.
+    </p>
+    <p>
+      Counts multiply everything: <kbd>5j</kbd> drops five steps,
+      <kbd>5k</kbd> climbs back up, <kbd>2d</kbd> falls a full page.
+      Try <kbd>G</kbd> to slam to the bottom, then <kbd>gg</kbd> to snap back
+      to the top. Feel the distance — that is the point of this extra space.
+    </p>
+    <h2>Scrolling deep dive</h2>
+    <p>
+      Half pages are the workhorse of keyboard scrolling. <kbd>d</kbd> moves
+      down half a viewport, <kbd>u</kbd> moves up half a viewport, keeping your
+      eyes near the text you were reading. Walk down this whole article with
+      <kbd>d</kbd> <kbd>d</kbd> <kbd>d</kbd> and back up with <kbd>u</kbd>
+      <kbd>u</kbd> <kbd>u</kbd>.
+    </p>
+    <p>
+      The keyboard rewards small motions compounded. A single <kbd>j</kbd> is a
+      nudge; a <kbd>3j</kbd> is a stride; a <kbd>d</kbd> is a leap. Mix them:
+      <kbd>d</kbd>, <kbd>3j</kbd>, <kbd>j</kbd>, <kbd>u</kbd>. The jari way is
+      always the keyboard, never the scrollbar.
+    </p>
+    <h2>Keep scrolling</h2>
+    <p>
+      Still more page below. Every paragraph here is scroll fodder seeded with
+      the words <code>keyboard</code> and <code>jari</code> so find mode stays
+      useful while you travel. The keyboard got you this far down — let it take
+      you the rest of the way with <kbd>G</kbd>.
+    </p>
+    <p>
+      One more push: hold <kbd>j</kbd> in your mind as a held-down key, tap
+      <kbd>d</kbd> for the final stretch, and land on the install link at the
+      bottom. Then <kbd>gg</kbd> returns you to the start, keyboard only, no
+      mouse, no trackpad, just jari.
+    </p>
+    <p>
+      Done playing? <a href="https://github.com/bymaul/jari/releases">Install jari</a>
+      to get these keys on every page — scrolling, hints, find, and visual mode
+      across Chrome, Edge, and Firefox.
+    </p>
+  </article>
+</main>
+
+<footer class="demo-footer">
+  <span>Demo simulation — real Jari also handles frames, inputs, and counts like <kbd>3j</kbd>.</span>
+  <span><a href="./guide.html">Key guide</a> · <a href="https://github.com/bymaul/jari" target="_blank" rel="noopener">Back to repo</a></span>
+</footer>
+
+<div id="hints" class="demo-hints" aria-hidden="true"></div>
+
+<div id="findbar" class="demo-find" hidden>
+  <span class="demo-find-label">/</span>
+  <input id="findinput" class="demo-find-input" type="text" autocomplete="off" spellcheck="false" aria-label="Find in demo page" />
+  <span id="findstatus" class="demo-find-status"></span>
+</div>
+
+<div id="help" class="demo-help" hidden role="dialog" aria-label="Demo keys">
+  <h2>Demo keys <span class="demo-help-esc">(<kbd>Esc</kbd> or <kbd>?</kbd> closes)</span></h2>
+  <table>
+    <tr><td><kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd></td><td>scroll (prefix a count: <kbd>3j</kbd>)</td></tr>
+    <tr><td><kbd>d</kbd> / <kbd>u</kbd></td><td>half page down / up</td></tr>
+    <tr><td><kbd>gg</kbd> / <kbd>G</kbd></td><td>top / bottom</td></tr>
+    <tr><td><kbd>H</kbd> / <kbd>L</kbd></td><td>history back / forward (counts work: <kbd>2H</kbd>)</td></tr>
+    <tr><td><kbd>gu</kbd> / <kbd>gU</kbd></td><td>parent URL / site root</td></tr>
+    <tr><td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td><td>hint: same tab / new tab / background tab</td></tr>
+    <tr><td><kbd>/</kbd> then <kbd>Enter</kbd></td><td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>close bar, hide highlights</td></tr>
+    <tr><td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td><td>visual select, then yank to clipboard</td></tr>
+    <tr><td><kbd>?</kbd></td><td>this cheatsheet</td></tr>
+  </table>
+</div>
+
+<div class="demo-status" aria-live="polite">
+  <span id="toast" class="demo-toast" hidden></span>
+  <span id="pill" class="demo-pill" hidden></span>
+  <span id="showcmd" class="demo-showcmd" hidden></span>
+</div>
+
+<script src="./docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jari — settings</title>
+<link rel="icon" href="../icons/jari.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="./docs.css" />
+</head>
+<body>
+<header class="demo-header">
+  <div class="demo-brand">
+    <img src="../icons/jari.svg" alt="Jari logo" width="40" height="40" />
+    <div>
+      <h1>Jari <span class="demo-pron">/ja·ri/</span></h1>
+      <p class="demo-tag">Everything rebindable. Open with <kbd>;e</kbd> on any page.</p>
+    </div>
+  </div>
+  <nav class="demo-install">
+    <a class="demo-btn" href="https://github.com/bymaul/jari/releases" target="_blank" rel="noopener">Install for Firefox / Chrome</a>
+    <a class="demo-btn demo-btn-ghost" href="./index.html">Playground</a>
+  </nav>
+</header>
+
+<div class="demo-keys-bar" role="note">
+  <span><kbd>j</kbd><kbd>k</kbd> scroll</span>
+  <span><kbd>f</kbd> follow link</span>
+  <span><kbd>/</kbd> find</span>
+  <span><kbd>?</kbd> all keys</span>
+</div>
+
+<nav class="demo-docsnav" aria-label="Docs">
+  <a href="./index.html">Playground</a>
+  <a href="./guide.html">Key guide</a>
+  <a href="./install.html">Install</a>
+  <a href="./settings.html">Settings</a>
+  <a href="./privacy.html">Privacy</a>
+</nav>
+
+<main class="demo-main">
+  <article id="playground" class="demo-article" aria-label="Settings">
+    <h2>Opening settings</h2>
+    <p>
+      Press <kbd>;e</kbd> on any page (or find Jari under
+      <code>chrome://extensions</code>). Everything below is rebindable: press
+      <kbd>Enter</kbd> on a binding to save it. Overlapping bindings are allowed
+      but flagged — the single key fires first. Digits <code>0-9</code> stay
+      reserved for the repeat count.
+    </p>
+    <h2>Scrolling</h2>
+    <p>
+      Scroll step per <kbd>j</kbd>/<kbd>k</kbd>/<kbd>h</kbd>/<kbd>l</kbd> press,
+      plus a smooth-scroll toggle that animates instead of jumping.
+    </p>
+    <h2>Search</h2>
+    <p>
+      A default engine plus custom <code>keyword query</code> engines
+      (<code>g</code>, <code>yt</code>, <code>gh</code>, <code>wiki</code>,
+      <code>r</code> built in; <code>t</code> stays reserved for tab search).
+      Also here: fuzzy matching for the omnibox, suggestion sources
+      (tabs, history, bookmarks), max results, page-navigation link texts, and
+      previous/next page texts.
+    </p>
+    <h2>Clipboard</h2>
+    <p>
+      Copy title + URL as plain text or a Markdown link
+      (<kbd>yy</kbd> copies the URL, <kbd>Y</kbd> title + URL).
+    </p>
+    <h2>Timing</h2>
+    <p>
+      Sequence timeout for half-typed prefixes and counts, passthrough
+      duration, and the prefix clue: whether available keys show after a prefix
+      like <kbd>g</kbd>, and after what delay.
+    </p>
+    <h2>Hints</h2>
+    <p>
+      Hint characters, color theme (yellow, cyan, dark), label size, and an
+      extra clickable selector for elements Jari should treat as clickable
+      (e.g. <code>div.card</code>).
+    </p>
+    <h2>Keybindings</h2>
+    <p>
+      Every command can hold several bindings. Filter by name or key, show
+      unbound-only, reset per command or all at once. Unbound by default:
+      scroll-page down/up and open-hint-in-current-tab — bind them here if you
+      miss them.
+    </p>
+    <h2>Disabled sites</h2>
+    <p>
+      Hosts where Jari stays off (<code>*.example.com</code> wildcards
+      included). Add them here, or press the toggle on the page itself.
+    </p>
+    <p>
+      Settings sync through your browser — see <a href="./privacy.html">privacy</a>
+      for where they live. New here? Start with the
+      <a href="./install.html">install guide</a>.
+    </p>
+  </article>
+</main>
+
+<footer class="demo-footer">
+  <span>Demo simulation — every link here takes real <kbd>f</kbd> hints.</span>
+  <a href="./index.html">Back to playground</a>
+</footer>
+
+<div id="hints" class="demo-hints" aria-hidden="true"></div>
+
+<div id="findbar" class="demo-find" hidden>
+  <span class="demo-find-label">/</span>
+  <input id="findinput" class="demo-find-input" type="text" autocomplete="off" spellcheck="false" aria-label="Find in demo page" />
+  <span id="findstatus" class="demo-find-status"></span>
+</div>
+
+<div id="help" class="demo-help" hidden role="dialog" aria-label="Demo keys">
+  <h2>Demo keys <span class="demo-help-esc">(<kbd>Esc</kbd> or <kbd>?</kbd> closes)</span></h2>
+  <table>
+    <tr><td><kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd></td><td>scroll (prefix a count: <kbd>3j</kbd>)</td></tr>
+    <tr><td><kbd>d</kbd> / <kbd>u</kbd></td><td>half page down / up</td></tr>
+    <tr><td><kbd>gg</kbd> / <kbd>G</kbd></td><td>top / bottom</td></tr>
+    <tr><td><kbd>H</kbd> / <kbd>L</kbd></td><td>history back / forward (counts work: <kbd>2H</kbd>)</td></tr>
+    <tr><td><kbd>gu</kbd> / <kbd>gU</kbd></td><td>parent URL / site root</td></tr>
+    <tr><td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td><td>hint: same tab / new tab / background tab</td></tr>
+    <tr><td><kbd>/</kbd> then <kbd>Enter</kbd></td><td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>close bar, hide highlights</td></tr>
+    <tr><td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td><td>visual select, then yank to clipboard</td></tr>
+    <tr><td><kbd>?</kbd></td><td>this cheatsheet</td></tr>
+  </table>
+</div>
+
+<div class="demo-status" aria-live="polite">
+  <span id="toast" class="demo-toast" hidden></span>
+  <span id="pill" class="demo-pill" hidden></span>
+  <span id="showcmd" class="demo-showcmd" hidden></span>
+</div>
+
+<script src="./docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jari — privacy</title>
+<link rel="icon" href="../icons/jari.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="./docs.css" />
+</head>
+<body>
+<header class="demo-header">
+  <div class="demo-brand">
+    <img src="../icons/jari.svg" alt="Jari logo" width="40" height="40" />
+    <div>
+      <h1>Jari <span class="demo-pron">/ja·ri/</span></h1>
+      <p class="demo-tag">No data collection. Everything stays on your device.</p>
+    </div>
+  </div>
+  <nav class="demo-install">
+    <a class="demo-btn" href="https://github.com/bymaul/jari/releases" target="_blank" rel="noopener">Install for Firefox / Chrome</a>
+    <a class="demo-btn demo-btn-ghost" href="./index.html">Playground</a>
+  </nav>
+</header>
+
+<div class="demo-keys-bar" role="note">
+  <span><kbd>j</kbd><kbd>k</kbd> scroll</span>
+  <span><kbd>f</kbd> follow link</span>
+  <span><kbd>/</kbd> find</span>
+  <span><kbd>?</kbd> all keys</span>
+</div>
+
+<nav class="demo-docsnav" aria-label="Docs">
+  <a href="./index.html">Playground</a>
+  <a href="./guide.html">Key guide</a>
+  <a href="./install.html">Install</a>
+  <a href="./settings.html">Settings</a>
+  <a href="./privacy.html">Privacy</a>
+</nav>
+
+<main class="demo-main">
+  <article id="playground" class="demo-article" aria-label="Privacy">
+    <h2>No collection, period</h2>
+    <p>
+      Jari does not collect, transmit, sell, or share any personal data.
+      Everything it reads stays on your device. Full text lives in
+      <a href="https://github.com/bymaul/jari/blob/main/PRIVACY.md">PRIVACY.md</a>;
+      report concerns via a private
+      <a href="https://github.com/bymaul/jari/security/advisories/new">security advisory</a>.
+    </p>
+    <h2>What the extension touches, and why</h2>
+    <p>
+      Page content (<code>&lt;all_urls&gt;</code>, all frames) renders hints,
+      scrolling, find, and visual mode — processed in the page and discarded.
+      Tabs, tab groups (Chrome only), and sessions power
+      <kbd>J</kbd>/<kbd>K</kbd> switching, <kbd>x</kbd> close/reopen, and the
+      <kbd>gt</kbd> manager. History and bookmarks feed <kbd>t</kbd> omnibox
+      suggestions. Clipboard read opens a URL from your clipboard
+      (<kbd>gp</kbd>/<kbd>gP</kbd>); clipboard write copies URLs and titles
+      (<kbd>yy</kbd>, <kbd>Y</kbd>, <kbd>yf</kbd>). Screenshots save the
+      viewport to your downloads on your keypress. All of it goes nowhere.
+    </p>
+    <h2>Where settings live</h2>
+    <p>
+      Keybindings and options persist in your browser's synced storage — never
+      sent to us. Find history (<kbd>/</kbd> queries recalled with
+      <kbd>Up</kbd>/<kbd>Down</kbd>) stays in local storage on this device
+      only, never synced. See <a href="./settings.html">settings</a> for what
+      can be configured.
+    </p>
+    <h2>Network use</h2>
+    <p>
+      Jari makes no network requests of its own. The only network activity it
+      can trigger is navigation or search you explicitly request — same as
+      typing in the address bar.
+    </p>
+  </article>
+</main>
+
+<footer class="demo-footer">
+  <span>Demo simulation — every link here takes real <kbd>f</kbd> hints.</span>
+  <a href="./index.html">Back to playground</a>
+</footer>
+
+<div id="hints" class="demo-hints" aria-hidden="true"></div>
+
+<div id="findbar" class="demo-find" hidden>
+  <span class="demo-find-label">/</span>
+  <input id="findinput" class="demo-find-input" type="text" autocomplete="off" spellcheck="false" aria-label="Find in demo page" />
+  <span id="findstatus" class="demo-find-status"></span>
+</div>
+
+<div id="help" class="demo-help" hidden role="dialog" aria-label="Demo keys">
+  <h2>Demo keys <span class="demo-help-esc">(<kbd>Esc</kbd> or <kbd>?</kbd> closes)</span></h2>
+  <table>
+    <tr><td><kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd></td><td>scroll (prefix a count: <kbd>3j</kbd>)</td></tr>
+    <tr><td><kbd>d</kbd> / <kbd>u</kbd></td><td>half page down / up</td></tr>
+    <tr><td><kbd>gg</kbd> / <kbd>G</kbd></td><td>top / bottom</td></tr>
+    <tr><td><kbd>H</kbd> / <kbd>L</kbd></td><td>history back / forward (counts work: <kbd>2H</kbd>)</td></tr>
+    <tr><td><kbd>gu</kbd> / <kbd>gU</kbd></td><td>parent URL / site root</td></tr>
+    <tr><td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td><td>hint: same tab / new tab / background tab</td></tr>
+    <tr><td><kbd>/</kbd> then <kbd>Enter</kbd></td><td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>close bar, hide highlights</td></tr>
+    <tr><td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td><td>visual select, then yank to clipboard</td></tr>
+    <tr><td><kbd>?</kbd></td><td>this cheatsheet</td></tr>
+  </table>
+</div>
+
+<div class="demo-status" aria-live="polite">
+  <span id="toast" class="demo-toast" hidden></span>
+  <span id="pill" class="demo-pill" hidden></span>
+  <span id="showcmd" class="demo-showcmd" hidden></span>
+</div>
+
+<script src="./docs.js"></script>
+</body>
+</html>
