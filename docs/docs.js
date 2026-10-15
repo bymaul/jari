@@ -126,7 +126,7 @@
   }
 
   function visibleTargets() {
-    var nodes = document.querySelectorAll("header a[href], article a[href], article button, footer a[href]");
+    var nodes = document.querySelectorAll("header a[href], nav a[href], article a[href], article button, footer a[href]");
     var out = [];
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
