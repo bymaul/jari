@@ -437,7 +437,7 @@
     { id: "modes", label: "Modes" },
     { id: "help", label: "Help" }
   ];
-  var HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+  var HINT_CHARSET_DEFAULT = "saevrtwyincmp";
   var HINT_THEMES = ["yellow", "cyan", "dark"];
   var HINT_THEME_DEFAULT = "yellow";
   var HINT_FONT_SIZE_DEFAULT = 10;
@@ -575,8 +575,7 @@
       version = 4;
     }
     if (version < 5) {
-      if (d.searchEngines === void 0)
-        d.searchEngines = searchEngineDefaults();
+      if (d.searchEngines === void 0) d.searchEngines = searchEngineDefaults();
       const engines = normalizeSearchEngines(d.searchEngines);
       d.searchEngines = engines;
       d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
@@ -591,8 +590,7 @@
       version = 7;
     }
     if (version < 8) {
-      if (d.pageNavTexts === void 0)
-        d.pageNavTexts = pageNavTextDefaults();
+      if (d.pageNavTexts === void 0) d.pageNavTexts = pageNavTextDefaults();
       d.pageNavTexts = normalizePageNavTexts(d.pageNavTexts);
       d.keymap = migratePageNavBindings(d.keymap);
       version = 8;
@@ -604,6 +602,10 @@
     if (version < 10) {
       d.keymap = migrateV10Bindings(d.keymap);
       version = 10;
+    }
+    if (version < 11) {
+      d.hintChars = migrateHintCharset(d.hintChars);
+      version = 11;
     }
     if (version < 12) {
       d.keymap = migrateV12Bindings(d.keymap);
@@ -732,6 +734,11 @@
       out[combo] = command;
     }
     return out;
+  }
+  var PREVIOUS_HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+  function migrateHintCharset(hintChars) {
+    if (hintChars === PREVIOUS_HINT_CHARSET_DEFAULT) return HINT_CHARSET_DEFAULT;
+    return hintChars;
   }
   function normalizeSettings(data) {
     const d = migrateSettings(data);

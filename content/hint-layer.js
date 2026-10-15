@@ -245,6 +245,13 @@ function resolveLabelBox(home, w, h, placed) {
   return { left: Math.max(0, home.left), top: Math.max(0, home.top), w, h };
 }
 
+export function hintHomeRect(r, bof) {
+  return {
+    left: window.pageXOffset + r.left - bof.left,
+    top: Math.max(r.top + window.pageYOffset - bof.top, 0),
+  };
+}
+
 export function layoutHints(holder, elements, labels, fontSize = HINT_FONT_SIZE_DEFAULT) {
   const bof = (() => {
     try {
@@ -261,10 +268,7 @@ export function layoutHints(holder, elements, labels, fontSize = HINT_FONT_SIZE_
   const links = elements.map((elm, i) => {
     const r = getHintRect(elm);
     const z = getZIndex(elm, zCache);
-    const home = {
-      left: window.pageXOffset + r.left - bof.left,
-      top: Math.max(r.top + window.pageYOffset - bof.top, 0),
-    };
+    const home = hintHomeRect(r, bof);
     const est = estimateLabelBox(labels[i], fontSize);
     const box = resolveLabelBox(home, est.w, est.h, placed);
     placed.push(box);

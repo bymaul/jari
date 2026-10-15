@@ -97,6 +97,35 @@ export function listElements(root, whatToShow, filter) {
   return out;
 }
 
+export function measureElement(e) {
+  let rect;
+  try {
+    rect = e.getBoundingClientRect();
+  } catch {
+    return null;
+  }
+  if (
+    !Number.isFinite(
+      rect.top + rect.bottom + rect.left + rect.right + rect.height,
+    ) ||
+    rect.top > window.innerHeight ||
+    rect.bottom < 0 ||
+    rect.left > window.innerWidth ||
+    rect.right < 0 ||
+    rect.height <= 0
+  ) {
+    return null;
+  }
+  let style;
+  try {
+    style = window.getComputedStyle(e);
+  } catch {
+    return null;
+  }
+  if (style.visibility === "hidden") return null;
+  return { rect, style };
+}
+
 export function getVisibleElements(filter, prefilter) {
   const visibleElements = [];
   for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
@@ -109,36 +138,111 @@ export function getVisibleElements(filter, prefilter) {
       }
       if (!pass) continue;
     }
-    let rect;
+    const measured = measureElement(e);
+    if (!measured) continue;
     try {
-      rect = e.getBoundingClientRect();
-    } catch {
-      continue;
-    }
-    if (
-      !Number.isFinite(
-        rect.top + rect.bottom + rect.left + rect.right + rect.height,
-      ) ||
-      rect.top > window.innerHeight ||
-      rect.bottom < 0 ||
-      rect.left > window.innerWidth ||
-      rect.right < 0 ||
-      rect.height <= 0
-    ) {
-      continue;
-    }
-    let style;
-    try {
-      style = window.getComputedStyle(e);
-    } catch {
-      continue;
-    }
-    if (style.visibility === "hidden") continue;
-    try {
-      filter(e, visibleElements, style);
+      filter(e, visibleElements, measured.style);
     } catch {}
   }
   return visibleElements;
+}
+
+export function collectMutationRoots(mutation, out) {
+  try {
+    const added = mutation.addedNodes || [];
+    for (const n of added) {
+      if (n && n.nodeType === 1) out.push(n);
+    }
+    const t = mutation.target;
+    if (t) {
+      if (t.nodeType === 1) out.push(t);
+      else if (t.parentElement) out.push(t.parentElement);
+    }
+  } catch {}
+}
+
+function pushSubtree(root, seen, pool) {
+  if (
+    !root ||
+    (root.nodeType !== 1 && root.nodeType !== 11) ||
+    seen.has(root)
+  )
+    return;
+  seen.add(root);
+  if (root.nodeType === 1) pool.push(root);
+  let shadow;
+  try {
+    shadow = root.shadowRoot || null;
+  } catch {
+    shadow = null;
+  }
+  let nodes;
+  try {
+    nodes = root.querySelectorAll("*") || [];
+  } catch {
+    nodes = [];
+  }
+  for (const el of nodes) pushSubtree(el, seen, pool);
+  if (shadow) pushSubtree(shadow, seen, pool);
+}
+
+function isLinkCandidate(e) {
+  try {
+    if (e.closest && e.closest(overlaySelectors)) return false;
+  } catch {}
+  try {
+    return !!(
+      e.matches &&
+      e.matches("[href]") &&
+      !e.disabled &&
+      !e.readOnly
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isInputCandidate(e) {
+  try {
+    if (!e.matches || !e.matches(INPUT_SELECTOR)) return false;
+  } catch {
+    return false;
+  }
+  try {
+    if (e.closest && e.closest(overlaySelectors)) return false;
+  } catch {}
+  const type = e.getAttribute
+    ? (e.getAttribute("type") || "").toLowerCase()
+    : "";
+  return type !== "hidden" && !e.disabled;
+}
+
+export function collectNewcomers(roots, requestedMode, known) {
+  const seen = new Set();
+  const pool = [];
+  for (const root of roots || []) {
+    pushSubtree(root, seen, pool);
+  }
+  const out = [];
+  for (const e of pool) {
+    if (known && known.has(e)) continue;
+    if (requestedMode === "click" || requestedMode === "yankText") {
+      if (!prefilterClickable(e, "", null)) continue;
+    } else if (requestedMode === "input") {
+      if (!isInputCandidate(e)) continue;
+    } else {
+      if (!isLinkCandidate(e)) continue;
+    }
+    const measured = measureElement(e);
+    if (!measured) continue;
+    if (requestedMode === "click" || requestedMode === "yankText") {
+      if (!isElementClickable(e, measured.style)) continue;
+    } else if (requestedMode !== "input") {
+      if (!isOpenableLink(e, location.href)) continue;
+    }
+    out.push(e);
+  }
+  return out;
 }
 
 export function filterInvisibleElements(nodes) {
@@ -242,9 +346,9 @@ export function isElementClickable(e, style) {
   return false;
 }
 
-export function filterAncestors(elements) {
-  if (elements.length === 0) return elements;
-  const result = [];
+export function filterAncestors(elements, base = []) {
+  if (elements.length === 0) return base.length > 0 ? [...base] : elements;
+  const result = [...base];
   elements.forEach((e) => {
     if (isExplicitlyRequested(e)) {
       result.push(e);
@@ -634,6 +738,7 @@ export function collectIframeElements(requestedMode) {
       try {
         el._jariViewportRect = t;
         el._jariBase = base;
+        el._jariFrame = frame;
       } catch {}
       out.push(el);
     });

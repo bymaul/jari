@@ -726,7 +726,7 @@
     { id: "modes", label: "Modes" },
     { id: "help", label: "Help" }
   ];
-  var HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+  var HINT_CHARSET_DEFAULT = "saevrtwyincmp";
   var HINT_THEMES = ["yellow", "cyan", "dark"];
   var HINT_THEME_DEFAULT = "yellow";
   var HINT_FONT_SIZE_DEFAULT = 10;
@@ -901,8 +901,7 @@
       version = 4;
     }
     if (version < 5) {
-      if (d.searchEngines === void 0)
-        d.searchEngines = searchEngineDefaults();
+      if (d.searchEngines === void 0) d.searchEngines = searchEngineDefaults();
       const engines = normalizeSearchEngines(d.searchEngines);
       d.searchEngines = engines;
       d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
@@ -917,8 +916,7 @@
       version = 7;
     }
     if (version < 8) {
-      if (d.pageNavTexts === void 0)
-        d.pageNavTexts = pageNavTextDefaults();
+      if (d.pageNavTexts === void 0) d.pageNavTexts = pageNavTextDefaults();
       d.pageNavTexts = normalizePageNavTexts(d.pageNavTexts);
       d.keymap = migratePageNavBindings(d.keymap);
       version = 8;
@@ -930,6 +928,10 @@
     if (version < 10) {
       d.keymap = migrateV10Bindings(d.keymap);
       version = 10;
+    }
+    if (version < 11) {
+      d.hintChars = migrateHintCharset(d.hintChars);
+      version = 11;
     }
     if (version < 12) {
       d.keymap = migrateV12Bindings(d.keymap);
@@ -1058,6 +1060,11 @@
       out[combo] = command;
     }
     return out;
+  }
+  var PREVIOUS_HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+  function migrateHintCharset(hintChars) {
+    if (hintChars === PREVIOUS_HINT_CHARSET_DEFAULT) return HINT_CHARSET_DEFAULT;
+    return hintChars;
   }
   function normalizeSettings(data) {
     const d = migrateSettings(data);
@@ -1809,6 +1816,27 @@
     }
     return out;
   }
+  function measureElement(e) {
+    let rect;
+    try {
+      rect = e.getBoundingClientRect();
+    } catch {
+      return null;
+    }
+    if (!Number.isFinite(
+      rect.top + rect.bottom + rect.left + rect.right + rect.height
+    ) || rect.top > window.innerHeight || rect.bottom < 0 || rect.left > window.innerWidth || rect.right < 0 || rect.height <= 0) {
+      return null;
+    }
+    let style;
+    try {
+      style = window.getComputedStyle(e);
+    } catch {
+      return null;
+    }
+    if (style.visibility === "hidden") return null;
+    return { rect, style };
+  }
   function getVisibleElements(filter, prefilter) {
     const visibleElements = [];
     for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
@@ -1821,30 +1849,99 @@
         }
         if (!pass) continue;
       }
-      let rect;
+      const measured = measureElement(e);
+      if (!measured) continue;
       try {
-        rect = e.getBoundingClientRect();
-      } catch {
-        continue;
-      }
-      if (!Number.isFinite(
-        rect.top + rect.bottom + rect.left + rect.right + rect.height
-      ) || rect.top > window.innerHeight || rect.bottom < 0 || rect.left > window.innerWidth || rect.right < 0 || rect.height <= 0) {
-        continue;
-      }
-      let style;
-      try {
-        style = window.getComputedStyle(e);
-      } catch {
-        continue;
-      }
-      if (style.visibility === "hidden") continue;
-      try {
-        filter(e, visibleElements, style);
+        filter(e, visibleElements, measured.style);
       } catch {
       }
     }
     return visibleElements;
+  }
+  function collectMutationRoots(mutation, out) {
+    try {
+      const added = mutation.addedNodes || [];
+      for (const n of added) {
+        if (n && n.nodeType === 1) out.push(n);
+      }
+      const t = mutation.target;
+      if (t) {
+        if (t.nodeType === 1) out.push(t);
+        else if (t.parentElement) out.push(t.parentElement);
+      }
+    } catch {
+    }
+  }
+  function pushSubtree(root, seen, pool) {
+    if (!root || root.nodeType !== 1 && root.nodeType !== 11 || seen.has(root))
+      return;
+    seen.add(root);
+    if (root.nodeType === 1) pool.push(root);
+    let shadow;
+    try {
+      shadow = root.shadowRoot || null;
+    } catch {
+      shadow = null;
+    }
+    let nodes;
+    try {
+      nodes = root.querySelectorAll("*") || [];
+    } catch {
+      nodes = [];
+    }
+    for (const el of nodes) pushSubtree(el, seen, pool);
+    if (shadow) pushSubtree(shadow, seen, pool);
+  }
+  function isLinkCandidate(e) {
+    try {
+      if (e.closest && e.closest(overlaySelectors)) return false;
+    } catch {
+    }
+    try {
+      return !!(e.matches && e.matches("[href]") && !e.disabled && !e.readOnly);
+    } catch {
+      return false;
+    }
+  }
+  function isInputCandidate(e) {
+    try {
+      if (!e.matches || !e.matches(INPUT_SELECTOR)) return false;
+    } catch {
+      return false;
+    }
+    try {
+      if (e.closest && e.closest(overlaySelectors)) return false;
+    } catch {
+    }
+    const type = e.getAttribute ? (e.getAttribute("type") || "").toLowerCase() : "";
+    return type !== "hidden" && !e.disabled;
+  }
+  function collectNewcomers(roots, requestedMode, known) {
+    const seen = /* @__PURE__ */ new Set();
+    const pool = [];
+    for (const root of roots || []) {
+      pushSubtree(root, seen, pool);
+    }
+    const out = [];
+    for (const e of pool) {
+      if (known && known.has(e)) continue;
+      if (requestedMode === "click" || requestedMode === "yankText") {
+        if (!prefilterClickable(e, "", null)) continue;
+      } else if (requestedMode === "input") {
+        if (!isInputCandidate(e)) continue;
+      } else {
+        if (!isLinkCandidate(e)) continue;
+      }
+      const measured = measureElement(e);
+      if (!measured) continue;
+      if (requestedMode === "click" || requestedMode === "yankText") {
+        if (!isElementClickable(e, measured.style)) continue;
+      } else if (requestedMode !== "input") {
+        if (!isOpenableLink(e, location.href)) continue;
+      }
+      out.push(e);
+    }
+    return out;
   }
   function filterInvisibleElements(nodes) {
     return nodes.filter(
@@ -1928,9 +2025,9 @@
     }
     return false;
   }
-  function filterAncestors(elements2) {
-    if (elements2.length === 0) return elements2;
-    const result = [];
+  function filterAncestors(elements2, base = []) {
+    if (elements2.length === 0) return base.length > 0 ? [...base] : elements2;
+    const result = [...base];
     elements2.forEach((e) => {
       if (isExplicitlyRequested(e)) {
         result.push(e);
@@ -2286,6 +2383,7 @@
         try {
           el._jariViewportRect = t;
           el._jariBase = base;
+          el._jariFrame = frame;
         } catch {
         }
         out.push(el);
@@ -5562,6 +5660,12 @@
     }
     return { left: Math.max(0, home.left), top: Math.max(0, home.top), w, h };
   }
+  function hintHomeRect(r, bof) {
+    return {
+      left: window.pageXOffset + r.left - bof.left,
+      top: Math.max(r.top + window.pageYOffset - bof.top, 0)
+    };
+  }
   function layoutHints(holder2, elements2, labels, fontSize = HINT_FONT_SIZE_DEFAULT) {
     const bof = (() => {
       try {
@@ -5575,10 +5679,7 @@
     const links = elements2.map((elm, i) => {
       const r = getHintRect(elm);
       const z = getZIndex(elm, zCache);
-      const home = {
-        left: window.pageXOffset + r.left - bof.left,
-        top: Math.max(r.top + window.pageYOffset - bof.top, 0)
-      };
+      const home = hintHomeRect(r, bof);
       const est = estimateLabelBox(labels[i], fontSize);
       const box = resolveLabelBox(home, est.w, est.h, placed);
       placed.push(box);
@@ -9207,8 +9308,32 @@
   var resizeHandler = null;
   var mutationObserver = null;
   var regenerateTimer = null;
+  var pendingRoots = [];
+  var forceFullRegen = false;
+  var scrollStopTimer = null;
   var hintPill = null;
   var spaceHeld = false;
+  var commandRunner = null;
+  function setCommandRunner(fn) {
+    commandRunner = fn;
+  }
+  var NON_HINT_SCROLL_COMMANDS = /* @__PURE__ */ new Set([
+    "cycleScrollFrame",
+    "resetScrollTarget"
+  ]);
+  function classifyHintKey(key, { labels = [], prefix: prefix2 = "", keymap = null, charset = "" } = {}) {
+    if (key.length !== 1) return { type: "ignore" };
+    const command = keymap && keymap[key] || (key === "g" ? "scrollToTop" : null);
+    const entry = command && COMMAND_CATALOG[command] || null;
+    if (entry && entry.category === "scrolling" && !NON_HINT_SCROLL_COMMANDS.has(command)) {
+      return { type: "scroll", command };
+    }
+    const lower = key.toLowerCase();
+    if (!charset.includes(lower)) return { type: "ignore" };
+    const next2 = prefix2 + lower.toUpperCase();
+    if (labels.includes(next2)) return { type: "activate", prefix: next2, label: next2 };
+    return { type: "filter", prefix: next2 };
+  }
   function showHintPill() {
     if (hintPill) return;
     try {
@@ -9258,29 +9383,79 @@
     }
     return false;
   }
-  function scheduleRegenerate() {
+  function mergeNewcomers(roots) {
+    let newcomers;
+    try {
+      const known = new Set(elements);
+      newcomers = filterOverlapElements(collectNewcomers(roots, mode3, known));
+      for (const el of collectIframeElements(mode3)) {
+        if (!known.has(el) && !newcomers.includes(el)) newcomers.push(el);
+      }
+    } catch {
+      newcomers = [];
+    }
+    let alive;
+    try {
+      alive = elements.filter((el) => {
+        try {
+          return el.isConnected !== false;
+        } catch {
+          return false;
+        }
+      });
+    } catch {
+      alive = [];
+    }
+    if (newcomers.length === 0 && alive.length === elements.length) {
+      repositionHints();
+      refresh2();
+      return;
+    }
+    const merged = filterAncestors([...alive, ...newcomers]);
+    replaceElements(merged);
+  }
+  function replaceElements(next2) {
+    if (next2.length === 0) {
+      close5();
+      ui.toast("No hints");
+      return;
+    }
+    const capped = next2.length > MAX_HINTS ? prioritizeForViewport(next2).slice(0, MAX_HINTS) : next2;
+    if (capped.length !== next2.length) {
+      ui.toast(`Too many hints (${capped.length} shown)`);
+    }
+    elements = capped;
+    render3();
+    if (holder && !spaceHeld) holder.style.display = "";
+    refresh2();
+  }
+  function scheduleRegenerate(mutations, force) {
+    if (mutations && mutations.length > 0) {
+      for (const m of mutations) collectMutationRoots(m, pendingRoots);
+    }
+    if (force) forceFullRegen = true;
     if (regenerateTimer) return;
     regenerateTimer = setTimeout(() => {
       regenerateTimer = null;
-      if (!active6) return;
-      if (prefix) {
+      if (!active6) {
+        pendingRoots = [];
+        forceFullRegen = false;
+        return;
+      }
+      const roots = pendingRoots;
+      pendingRoots = [];
+      const forced = forceFullRegen;
+      forceFullRegen = false;
+      if (!forced && roots.length > 0) {
+        mergeNewcomers(roots);
+        return;
+      }
+      if (!forced && prefix) {
+        repositionHints();
         refresh2();
         return;
       }
-      const fresh = collectElements(mode3);
-      if (fresh.length === 0) {
-        close5();
-        ui.toast("No hints");
-        return;
-      }
-      const capped = fresh.length > MAX_HINTS ? prioritizeForViewport(fresh).slice(0, MAX_HINTS) : fresh;
-      if (capped.length !== fresh.length) {
-        ui.toast(`Too many hints (${capped.length} shown)`);
-      }
-      elements = capped;
-      render3();
-      if (holder && !spaceHeld) holder.style.display = "";
-      refresh2();
+      replaceElements(collectElements(mode3));
     }, REGENERATE_DELAY);
   }
   function isActive6() {
@@ -9326,6 +9501,11 @@
   function refresh2() {
     if (!active6) return;
     for (const h of hints) {
+      if (h.hiddenByViewport) {
+        h.hintEl.style.opacity = "0";
+        h.hintEl.style.display = "none";
+        continue;
+      }
       if (!prefix) {
         h.hintEl.style.opacity = "1";
         h.hintEl.style.display = "";
@@ -9339,6 +9519,72 @@
         h.hintEl.style.opacity = "0";
         h.hintEl.style.display = "none";
       }
+    }
+  }
+  function currentHintRect(el) {
+    let frame;
+    try {
+      frame = el._jariFrame || null;
+    } catch {
+      frame = null;
+    }
+    let base;
+    try {
+      base = getRealRect(el);
+    } catch {
+      return null;
+    }
+    if (!base) return null;
+    if (!frame) return base;
+    let frect;
+    try {
+      frect = frame.getBoundingClientRect();
+    } catch {
+      return null;
+    }
+    if (!frect) return null;
+    return translateRect(
+      base,
+      (frect.left || 0) + (frame.clientLeft || 0),
+      (frect.top || 0) + (frame.clientTop || 0)
+    );
+  }
+  function repositionHints() {
+    if (!active6 || !holder) return;
+    let bof;
+    try {
+      bof = coordinate(holder);
+    } catch {
+      return;
+    }
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    for (const h of hints) {
+      const r = currentHintRect(h.el);
+      if (!r || r.width <= 0 || r.height <= 0) {
+        h.hiddenByViewport = true;
+        continue;
+      }
+      const home = hintHomeRect(r, bof);
+      try {
+        h.hintEl.style.left = `${home.left}px`;
+        h.hintEl.style.top = `${home.top}px`;
+      } catch {
+      }
+      h.hiddenByViewport = !(r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw);
+    }
+  }
+  function scheduleReposition() {
+    if (repositionRaf !== null) return;
+    try {
+      repositionRaf = requestAnimationFrame(() => {
+        repositionRaf = null;
+        if (!active6) return;
+        repositionHints();
+        refresh2();
+      });
+    } catch {
+      repositionRaf = null;
     }
   }
   function flip() {
@@ -9410,7 +9656,8 @@
     hints = links.map((link) => ({
       el: link.link,
       label: link.label,
-      hintEl: link
+      hintEl: link,
+      hiddenByViewport: false
     }));
     refresh2();
   }
@@ -9436,6 +9683,9 @@
   }
   var scrollLockPrevent = null;
   var keyUpHandler = null;
+  var scrollHandler = null;
+  var repositionRaf = null;
+  var SCROLL_STOP_DELAY = 200;
   function disableScrollLock() {
     if (scrollLockPrevent) return;
     scrollLockPrevent = (e) => {
@@ -9484,12 +9734,35 @@
       clearTimeout(regenerateTimer);
       regenerateTimer = null;
     }
+    pendingRoots = [];
     if (keyUpHandler) {
       try {
         window.removeEventListener("keyup", keyUpHandler, true);
       } catch {
       }
       keyUpHandler = null;
+    }
+    if (scrollHandler) {
+      try {
+        window.removeEventListener("scroll", scrollHandler, { capture: true });
+      } catch {
+      }
+      scrollHandler = null;
+    }
+    try {
+      clearTimeout(scrollStopTimer);
+    } catch {
+    }
+    scrollStopTimer = null;
+    forceFullRegen = false;
+    if (repositionRaf !== null) {
+      try {
+        if (typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(repositionRaf);
+        }
+      } catch {
+      }
+      repositionRaf = null;
     }
     enableScrollLock();
     hideHintPill();
@@ -9508,7 +9781,7 @@
           if (mutations.every(isOwnMutation)) return;
         } catch {
         }
-        scheduleRegenerate();
+        scheduleRegenerate(mutations);
       });
       const target2 = document.body || document.documentElement;
       mutationObserver.observe(target2, {
@@ -9531,6 +9804,26 @@
       scheduleRegenerate();
     };
     window.addEventListener("resize", resizeHandler);
+    scrollHandler = () => {
+      if (!active6) return;
+      scheduleReposition();
+      try {
+        clearTimeout(scrollStopTimer);
+      } catch {
+      }
+      scrollStopTimer = setTimeout(() => {
+        scrollStopTimer = null;
+        if (!active6) return;
+        scheduleRegenerate(null, true);
+      }, SCROLL_STOP_DELAY);
+    };
+    try {
+      window.addEventListener("scroll", scrollHandler, {
+        capture: true,
+        passive: true
+      });
+    } catch {
+    }
   }
   function close5() {
     if (!active6) return;
@@ -9541,6 +9834,7 @@
       try {
         delete el._jariViewportRect;
         delete el._jariBase;
+        delete el._jariFrame;
       } catch {
       }
     }
@@ -9692,15 +9986,25 @@
     }
     if (event.ctrlKey || event.metaKey || event.altKey) return false;
     if (key.length === 1) {
-      const charset = normalizeCharset();
-      const lower = key.toLowerCase();
-      if (charset.includes(lower)) {
+      const decision = classifyHintKey(key, {
+        labels: hints.map((h) => h.label),
+        prefix,
+        keymap: settings.getKeymap(),
+        charset: normalizeCharset()
+      });
+      if (decision.type === "scroll") {
         ui.consume(event);
-        const next2 = prefix + lower.toUpperCase();
-        const exact = hints.find((h) => h.label === next2);
-        prefix = next2;
+        if (commandRunner) commandRunner(decision.command, event);
+        return true;
+      }
+      if (decision.type === "activate" || decision.type === "filter") {
+        ui.consume(event);
+        prefix = decision.prefix;
         refresh2();
-        if (exact) activate2(exact.el);
+        if (decision.type === "activate") {
+          const exact = hints.find((h) => h.label === decision.label);
+          if (exact) activate2(exact.el);
+        }
         return true;
       }
     }
@@ -11251,6 +11555,11 @@ ${location.href}`;
       }
     }
   };
+  setCommandRunner((commandName, event) => {
+    const cmd2 = commands[commandName];
+    if (!cmd2) return;
+    cmd2.run({ count: 1, event });
+  });
 
   // content/clue.js
   var clueEl = null;

@@ -7,7 +7,10 @@ import {
   updateHintText,
   createHintsHost,
   layoutHints,
+  coordinate,
+  hintHomeRect,
 } from "./hint-layer.js";
+import { COMMAND_CATALOG } from "./catalog.js";
 import {
   isEditable,
   isElementDrawn,
@@ -26,6 +29,8 @@ import {
   isOpenableLink,
   collectElements,
   collectIframeElements,
+  collectMutationRoots,
+  collectNewcomers,
   getClickableElements,
   listElements,
   prioritizeForViewport,
@@ -46,8 +51,39 @@ let multipleHits = false;
 let resizeHandler = null;
 let mutationObserver = null;
 let regenerateTimer = null;
+let pendingRoots = [];
+let forceFullRegen = false;
+let scrollStopTimer = null;
 let hintPill = null;
 let spaceHeld = false;
+
+let commandRunner = null;
+export function setCommandRunner(fn) {
+  commandRunner = fn;
+}
+
+const NON_HINT_SCROLL_COMMANDS = new Set([
+  "cycleScrollFrame",
+  "resetScrollTarget",
+]);
+
+export function classifyHintKey(key, { labels = [], prefix = "", keymap = null, charset = "" } = {}) {
+  if (key.length !== 1) return { type: "ignore" };
+  const command = (keymap && keymap[key]) || (key === "g" ? "scrollToTop" : null);
+  const entry = (command && COMMAND_CATALOG[command]) || null;
+  if (
+    entry &&
+    entry.category === "scrolling" &&
+    !NON_HINT_SCROLL_COMMANDS.has(command)
+  ) {
+    return { type: "scroll", command };
+  }
+  const lower = key.toLowerCase();
+  if (!charset.includes(lower)) return { type: "ignore" };
+  const next = prefix + lower.toUpperCase();
+  if (labels.includes(next)) return { type: "activate", prefix: next, label: next };
+  return { type: "filter", prefix: next };
+}
 
 export { normalizeCharset, genLabels };
 
@@ -101,32 +137,84 @@ function isOwnMutation(mutation) {
   return false;
 }
 
-function scheduleRegenerate() {
+function mergeNewcomers(roots) {
+  let newcomers;
+  try {
+    const known = new Set(elements);
+    newcomers = filterOverlapElements(collectNewcomers(roots, mode, known));
+    for (const el of collectIframeElements(mode)) {
+      if (!known.has(el) && !newcomers.includes(el)) newcomers.push(el);
+    }
+  } catch {
+    newcomers = [];
+  }
+  let alive;
+  try {
+    alive = elements.filter((el) => {
+      try {
+        return el.isConnected !== false;
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    alive = [];
+  }
+  if (newcomers.length === 0 && alive.length === elements.length) {
+    repositionHints();
+    refresh();
+    return;
+  }
+  const merged = filterAncestors([...alive, ...newcomers]);
+  replaceElements(merged);
+}
+
+function replaceElements(next) {
+  if (next.length === 0) {
+    close();
+    ui.toast("No hints");
+    return;
+  }
+  const capped =
+    next.length > MAX_HINTS
+      ? prioritizeForViewport(next).slice(0, MAX_HINTS)
+      : next;
+  if (capped.length !== next.length) {
+    ui.toast(`Too many hints (${capped.length} shown)`);
+  }
+  elements = capped;
+  render();
+  if (holder && !spaceHeld) holder.style.display = "";
+  refresh();
+}
+
+function scheduleRegenerate(mutations, force) {
+  if (mutations && mutations.length > 0) {
+    for (const m of mutations) collectMutationRoots(m, pendingRoots);
+  }
+  if (force) forceFullRegen = true;
   if (regenerateTimer) return;
   regenerateTimer = setTimeout(() => {
     regenerateTimer = null;
-    if (!active) return;
-    if (prefix) {
+    if (!active) {
+      pendingRoots = [];
+      forceFullRegen = false;
+      return;
+    }
+    const roots = pendingRoots;
+    pendingRoots = [];
+    const forced = forceFullRegen;
+    forceFullRegen = false;
+    if (!forced && roots.length > 0) {
+      mergeNewcomers(roots);
+      return;
+    }
+    if (!forced && prefix) {
+      repositionHints();
       refresh();
       return;
     }
-    const fresh = collectElements(mode);
-    if (fresh.length === 0) {
-      close();
-      ui.toast("No hints");
-      return;
-    }
-    const capped =
-      fresh.length > MAX_HINTS
-        ? prioritizeForViewport(fresh).slice(0, MAX_HINTS)
-        : fresh;
-    if (capped.length !== fresh.length) {
-      ui.toast(`Too many hints (${capped.length} shown)`);
-    }
-    elements = capped;
-    render();
-    if (holder && !spaceHeld) holder.style.display = "";
-    refresh();
+    replaceElements(collectElements(mode));
   }, REGENERATE_DELAY);
 }
 
@@ -176,6 +264,11 @@ function focusInput(el) {
 function refresh() {
   if (!active) return;
   for (const h of hints) {
+    if (h.hiddenByViewport) {
+      h.hintEl.style.opacity = "0";
+      h.hintEl.style.display = "none";
+      continue;
+    }
     if (!prefix) {
       h.hintEl.style.opacity = "1";
       h.hintEl.style.display = "";
@@ -189,6 +282,79 @@ function refresh() {
       h.hintEl.style.opacity = "0";
       h.hintEl.style.display = "none";
     }
+  }
+}
+
+function currentHintRect(el) {
+  let frame;
+  try {
+    frame = el._jariFrame || null;
+  } catch {
+    frame = null;
+  }
+  let base;
+  try {
+    base = getRealRect(el);
+  } catch {
+    return null;
+  }
+  if (!base) return null;
+  if (!frame) return base;
+  let frect;
+  try {
+    frect = frame.getBoundingClientRect();
+  } catch {
+    return null;
+  }
+  if (!frect) return null;
+  return translateRect(
+    base,
+    (frect.left || 0) + (frame.clientLeft || 0),
+    (frect.top || 0) + (frame.clientTop || 0),
+  );
+}
+
+function repositionHints() {
+  if (!active || !holder) return;
+  let bof;
+  try {
+    bof = coordinate(holder);
+  } catch {
+    return;
+  }
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
+  for (const h of hints) {
+    const r = currentHintRect(h.el);
+    if (!r || r.width <= 0 || r.height <= 0) {
+      h.hiddenByViewport = true;
+      continue;
+    }
+    const home = hintHomeRect(r, bof);
+    try {
+      h.hintEl.style.left = `${home.left}px`;
+      h.hintEl.style.top = `${home.top}px`;
+    } catch {}
+    h.hiddenByViewport = !(
+      r.bottom > 0 &&
+      r.top < vh &&
+      r.right > 0 &&
+      r.left < vw
+    );
+  }
+}
+
+function scheduleReposition() {
+  if (repositionRaf !== null) return;
+  try {
+    repositionRaf = requestAnimationFrame(() => {
+      repositionRaf = null;
+      if (!active) return;
+      repositionHints();
+      refresh();
+    });
+  } catch {
+    repositionRaf = null;
   }
 }
 
@@ -269,6 +435,7 @@ function render() {
     el: link.link,
     label: link.label,
     hintEl: link,
+    hiddenByViewport: false,
   }));
   refresh();
 }
@@ -294,6 +461,10 @@ function flashElement(el) {
 
 let scrollLockPrevent = null;
 let keyUpHandler = null;
+let scrollHandler = null;
+let repositionRaf = null;
+
+const SCROLL_STOP_DELAY = 200;
 
 function disableScrollLock() {
   if (scrollLockPrevent) return;
@@ -341,11 +512,31 @@ function stopTracking() {
     clearTimeout(regenerateTimer);
     regenerateTimer = null;
   }
+  pendingRoots = [];
   if (keyUpHandler) {
     try {
       window.removeEventListener("keyup", keyUpHandler, true);
     } catch {}
     keyUpHandler = null;
+  }
+  if (scrollHandler) {
+    try {
+      window.removeEventListener("scroll", scrollHandler, { capture: true });
+    } catch {}
+    scrollHandler = null;
+  }
+  try {
+    clearTimeout(scrollStopTimer);
+  } catch {}
+  scrollStopTimer = null;
+  forceFullRegen = false;
+  if (repositionRaf !== null) {
+    try {
+      if (typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(repositionRaf);
+      }
+    } catch {}
+    repositionRaf = null;
   }
   enableScrollLock();
   hideHintPill();
@@ -363,7 +554,7 @@ function startTracking() {
       try {
         if (mutations.every(isOwnMutation)) return;
       } catch {}
-      scheduleRegenerate();
+      scheduleRegenerate(mutations);
     });
     const target = document.body || document.documentElement;
     mutationObserver.observe(target, {
@@ -384,6 +575,24 @@ function startTracking() {
     scheduleRegenerate();
   };
   window.addEventListener("resize", resizeHandler);
+  scrollHandler = () => {
+    if (!active) return;
+    scheduleReposition();
+    try {
+      clearTimeout(scrollStopTimer);
+    } catch {}
+    scrollStopTimer = setTimeout(() => {
+      scrollStopTimer = null;
+      if (!active) return;
+      scheduleRegenerate(null, true);
+    }, SCROLL_STOP_DELAY);
+  };
+  try {
+    window.addEventListener("scroll", scrollHandler, {
+      capture: true,
+      passive: true,
+    });
+  } catch {}
 }
 
 function close() {
@@ -395,6 +604,7 @@ function close() {
     try {
       delete el._jariViewportRect;
       delete el._jariBase;
+      delete el._jariFrame;
     } catch {}
   }
   elements = [];
@@ -561,15 +771,25 @@ function onKeyDown(event) {
   }
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   if (key.length === 1) {
-    const charset = normalizeCharset();
-    const lower = key.toLowerCase();
-    if (charset.includes(lower)) {
+    const decision = classifyHintKey(key, {
+      labels: hints.map((h) => h.label),
+      prefix,
+      keymap: settings.getKeymap(),
+      charset: normalizeCharset(),
+    });
+    if (decision.type === "scroll") {
       ui.consume(event);
-      const next = prefix + lower.toUpperCase();
-      const exact = hints.find((h) => h.label === next);
-      prefix = next;
+      if (commandRunner) commandRunner(decision.command, event);
+      return true;
+    }
+    if (decision.type === "activate" || decision.type === "filter") {
+      ui.consume(event);
+      prefix = decision.prefix;
       refresh();
-      if (exact) activate(exact.el);
+      if (decision.type === "activate") {
+        const exact = hints.find((h) => h.label === decision.label);
+        if (exact) activate(exact.el);
+      }
       return true;
     }
   }

@@ -30,7 +30,8 @@ Bindings chain into sequences of any length.
   `[[`/`]]` previous/next page
   (customizable link texts in settings)
 - Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
-  (hints inside a frame appear only once the frame is focused - cycle onto it with `w` or click into it)
+  (hints inside a frame appear only once the frame is focused - cycle onto it with `w` or click into it;
+  `j`/`k` and other scrolling keys scroll the page while hints are open (cycle/reset excluded); `g` goes to top)
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
   `Up`/`Down` history)
 - Visual: `v`/`V` visual/line mode (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`^`/`$`,

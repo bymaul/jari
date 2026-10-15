@@ -124,7 +124,7 @@ export const categories = [
   { id: "help", label: "Help" },
 ];
 
-export const HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+export const HINT_CHARSET_DEFAULT = "saevrtwyincmp";
 
 export const HINT_THEMES = ["yellow", "cyan", "dark"];
 export const HINT_THEME_DEFAULT = "yellow";
@@ -380,8 +380,7 @@ export function migrateSettings(data) {
   // v4 -> v5: customizable search engines seeded from the previous
   // hardcoded list, with the default engine for bare queries.
   if (version < 5) {
-    if (d.searchEngines === undefined)
-      d.searchEngines = searchEngineDefaults();
+    if (d.searchEngines === undefined) d.searchEngines = searchEngineDefaults();
     const engines = normalizeSearchEngines(d.searchEngines);
     d.searchEngines = engines;
     d.defaultEngine = normalizeDefaultEngine(d.defaultEngine, engines);
@@ -408,8 +407,7 @@ export function migrateSettings(data) {
   // clobbered. Like the v4 backfill, an intentionally unbound command
   // may gain the new bind.
   if (version < 8) {
-    if (d.pageNavTexts === undefined)
-      d.pageNavTexts = pageNavTextDefaults();
+    if (d.pageNavTexts === undefined) d.pageNavTexts = pageNavTextDefaults();
     d.pageNavTexts = normalizePageNavTexts(d.pageNavTexts);
     d.keymap = migratePageNavBindings(d.keymap);
     version = 8;
@@ -428,7 +426,13 @@ export function migrateSettings(data) {
     d.keymap = migrateV10Bindings(d.keymap);
     version = 10;
   }
-  // v10 -> v11: reserved for the hint-charset refresh (unreleased branch).
+  // v10 -> v11: the default hint charset drops hjkl (those keys scroll in
+  // hints mode now) plus d/g collisions. A stored charset equal to the
+  // old default moves over; custom charsets are never clobbered.
+  if (version < 11) {
+    d.hintChars = migrateHintCharset(d.hintChars);
+    version = 11;
+  }
   // v11 -> v12: backward scroll-area cycle is gone and forward cycle
   // moves to w (bare), replacing ]w. The w combo fills only where free,
   // so custom rebinds are never clobbered; ]w binds to the same command
@@ -574,6 +578,13 @@ export function migrateV12Bindings(keymap) {
     out[combo] = command;
   }
   return out;
+}
+
+const PREVIOUS_HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
+
+export function migrateHintCharset(hintChars) {
+  if (hintChars === PREVIOUS_HINT_CHARSET_DEFAULT) return HINT_CHARSET_DEFAULT;
+  return hintChars;
 }
 
 export function normalizeSettings(data) {

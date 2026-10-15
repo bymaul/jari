@@ -3,7 +3,8 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
 const { settings } = await import("../content/settings.js");
-const { genLabels, normalizeCharset, __testHelpers } = await import("../content/hints.js");
+const { genLabels, normalizeCharset, classifyHintKey, __testHelpers } = await import("../content/hints.js");
+const { collectMutationRoots, collectNewcomers } = await import("../content/hints-elements.js");
 const { HINT_CHARSET_DEFAULT, keymapDefaults } = await import("../content/keymap.js");
 
 const { isExplicitlyRequested, isElementClickable, collectIframeElements } =
@@ -127,6 +128,139 @@ test("iframe inners are hinted only for the focused frame", () => {
     globalThis.window.getComputedStyle = prevStyle;
     globalThis.window.innerWidth = prevW;
     globalThis.window.innerHeight = prevH;
+  }
+});
+
+test("classifyHintKey routes scrolling keys before label matching", () => {
+  const keymap = { j: "scrollDown", G: "scrollToBottom", f: "hintClick" };
+  const ctx = { keymap, charset: "saewcmpf" };
+  assert.deepEqual(classifyHintKey("j", { ...ctx, labels: [], prefix: "" }), {
+    type: "scroll",
+    command: "scrollDown",
+  });
+  assert.deepEqual(classifyHintKey("f", { ...ctx, labels: ["F", "FA"], prefix: "" }), {
+    type: "activate",
+    prefix: "F",
+    label: "F",
+  });
+  assert.deepEqual(classifyHintKey("e", { ...ctx, labels: ["S", "SA"], prefix: "S" }), {
+    type: "filter",
+    prefix: "SE",
+  });
+  assert.deepEqual(classifyHintKey("x", { ...ctx, labels: [], prefix: "" }), {
+    type: "ignore",
+  });
+  assert.deepEqual(classifyHintKey("Enter", { ...ctx, labels: [], prefix: "" }), {
+    type: "ignore",
+  });
+});
+
+test("classifyHintKey sends unbound g to the top", () => {
+  const keymap = { j: "scrollDown" };
+  assert.deepEqual(classifyHintKey("g", { labels: ["G"], prefix: "", keymap, charset: "saewcmp" }), {
+    type: "scroll",
+    command: "scrollToTop",
+  });
+  assert.deepEqual(
+    classifyHintKey("g", { labels: ["G"], prefix: "", keymap: { g: "hintClick" }, charset: "saewcmp" }),
+    { type: "ignore" },
+  );
+});
+
+test("classifyHintKey never diverts cycle or reset commands", () => {
+  const keymap = { w: "cycleScrollFrame", ";": "resetScrollTarget" };
+  const ctx = { labels: ["W", "WA"], prefix: "", keymap, charset: "saewcmp" };
+  assert.deepEqual(classifyHintKey("w", ctx), {
+    type: "activate",
+    prefix: "W",
+    label: "W",
+  });
+  assert.deepEqual(
+    classifyHintKey("w", { ...ctx, labels: ["WA"] }),
+    { type: "filter", prefix: "W" },
+  );
+  assert.deepEqual(classifyHintKey(";", ctx), { type: "ignore" });
+});
+
+test("collectMutationRoots gathers added subtrees and changed targets", () => {
+  const added = { nodeType: 1 };
+  const target = { nodeType: 1 };
+  const textParent = { nodeType: 1 };
+  const out = [];
+  collectMutationRoots(
+    { addedNodes: [added, { nodeType: 3 }], target },
+    out,
+  );
+  collectMutationRoots(
+    { addedNodes: [], target: { nodeType: 3, parentElement: textParent } },
+    out,
+  );
+  collectMutationRoots(null, out);
+  assert.deepEqual(out, [added, target, textParent]);
+});
+
+test("collectNewcomers accepts visible clickables and skips the rest", () => {
+  const prevW = globalThis.window.innerWidth;
+  const prevH = globalThis.window.innerHeight;
+  const prevStyle = globalThis.window.getComputedStyle;
+  globalThis.window.innerWidth = 800;
+  globalThis.window.innerHeight = 600;
+  globalThis.window.getComputedStyle = () => ({
+    opacity: "1",
+    visibility: "visible",
+    display: "block",
+    cursor: "default",
+    overflowY: "visible",
+    overflowX: "visible",
+  });
+  const stubEl = (over = {}) => ({
+    nodeType: 1,
+    tagName: "DIV",
+    matches: () => true,
+    closest: () => null,
+    getAttribute: () => null,
+    disabled: false,
+    readOnly: false,
+    isContentEditable: false,
+    getRootNode: () => ({ host: null }),
+    parentElement: null,
+    contains: () => false,
+    shadowRoot: null,
+    getBoundingClientRect: () => ({
+      left: 10,
+      top: 10,
+      right: 100,
+      bottom: 30,
+      width: 90,
+      height: 20,
+    }),
+    querySelectorAll: () => [],
+    ...over,
+  });
+  try {
+    const good = stubEl();
+    const hidden = stubEl({
+      getBoundingClientRect: () => ({
+        left: 10,
+        top: 2000,
+        right: 100,
+        bottom: 2020,
+        width: 90,
+        height: 20,
+      }),
+    });
+    const plain = stubEl({ matches: () => false });
+    const root = stubEl({ querySelectorAll: () => [good, hidden, plain] });
+    assert.deepEqual(collectNewcomers([root], "click", new Set([good])), [root]);
+    assert.deepEqual(collectNewcomers([root], "click", new Set()), [root, good]);
+    assert.deepEqual(collectNewcomers([], "click", new Set()), []);
+    const input = stubEl({ tagName: "INPUT", type: "text" });
+    const inputRoot = stubEl({ matches: () => false, querySelectorAll: () => [input] });
+    assert.deepEqual(collectNewcomers([inputRoot], "input", new Set()), [input]);
+  } finally {
+    globalThis.window.innerWidth = prevW;
+    globalThis.window.innerHeight = prevH;
+    globalThis.window.getComputedStyle = prevStyle;
   }
 });
 

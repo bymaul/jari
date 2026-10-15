@@ -5,7 +5,7 @@ import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWind
 import { Prompt } from "./prompt.js";
 import { TabManager } from "./tab-manager.js";
 import { Help } from "./help.js";
-import { Hints } from "./hints.js";
+import { Hints, setCommandRunner } from "./hints.js";
 import { Find } from "./find.js";
 import { Visual } from "./visual.js";
 import { COMMAND_CATALOG } from "./catalog.js";
@@ -366,3 +366,9 @@ export const commands = {
     },
   },
 };
+
+setCommandRunner((commandName, event) => {
+  const cmd = commands[commandName];
+  if (!cmd) return;
+  cmd.run({ count: 1, event });
+});

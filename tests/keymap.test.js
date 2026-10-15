@@ -58,6 +58,20 @@ test("migrateV12Bindings lands w for cycling without clobbering customs", () => 
   assert.equal(s.keymap["[w"], undefined);
 });
 
+test("migrateHintCharset moves only the old default charset", () => {
+  assert.equal(Jari.migrateHintCharset("sadjklewcmpgh"), Jari.HINT_CHARSET_DEFAULT);
+  assert.equal(Jari.migrateHintCharset("abc"), "abc");
+  assert.equal(Jari.migrateHintCharset(undefined), undefined);
+});
+
+test("normalizeSettings migrates stored v10 data to the new hint charset", () => {
+  const s = Jari.normalizeSettings({ schemaVersion: 10, hintChars: "sadjklewcmpgh" });
+  assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(s.hintChars, Jari.HINT_CHARSET_DEFAULT);
+  const custom = Jari.normalizeSettings({ schemaVersion: 10, hintChars: "abc" });
+  assert.equal(custom.hintChars, "abc");
+});
+
 test("rebinding away a default key removes the default binding", () => {
   const s = Jari.normalizeSettings({ keymap: { z: "passthroughKeys" } });
   assert.equal(s.keymap.z, "passthroughKeys");

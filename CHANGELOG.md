@@ -46,6 +46,15 @@ versioned for the extension manifest (`manifest.base.json`).
   wrappers collapse to the innermost area. Cross-origin
   frames stay listed (their overflow can't be verified) and highlight
   as `frame?`.
+- Hints keep scrolling: `j`/`k`/`h`/`l` and other scrolling keys scroll
+  the page while hints are open (movement only — cycle and reset never
+  fire there). The default hint charset is now `saevrtwyincmp`, which
+  shares no letters with the scrolling keys, so every label stays
+  typeable; stored charsets equal to the old default migrate forward,
+  custom ones are untouched. Bare `g` scrolls to the
+  top while hints are open. Labels track scrolling live and hide when
+  their targets leave the viewport; when scrolling stops, hints fully
+  re-collect so newly loaded content gains labels without reopening.
 - Scroll cycle detects same-origin frames whose document doesn't scroll
   but contain a scrollable panel (e.g. YouTube live chat): the frame
   becomes a stop and scroll commands drive the inner panel directly,
