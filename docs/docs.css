@@ -11,6 +11,19 @@
   --accent-border: #c38a22;
   --mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
   --page-width: 1080px;
+  --jari-cmplt-bg: #1e1e26;
+  --jari-cmplt-fg: #d9d9de;
+  --jari-cmplt-font-size: 9pt;
+  --jari-cmplt-font-family: monospace;
+  --jari-cmplt-option-height: 1.4em;
+  --jari-cmdl-font-family: monospace;
+  --jari-cmdl-font-size: 9pt;
+  --jari-cmdl-line-height: 1.5;
+  --jari-header-font-size: 9pt;
+  --jari-header-font-weight: bold;
+  --jari-accent: #e0a363;
+  --jari-of-fg: #cdcdcd;
+  --jari-of-bg: #333738;
 }
 
 * { box-sizing: border-box; }
@@ -225,6 +238,113 @@ kbd {
 
 .demo-find-hit { background: rgba(224, 163, 99, 0.45); color: #1a1a1a; }
 .demo-find-current { background: var(--accent); color: #1a1a1a; outline: 1px solid var(--accent-border); }
+
+.jari-overlay {
+  all: initial;
+  display: block;
+  contain: layout paint;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2147483646;
+  box-sizing: border-box;
+  background: var(--jari-cmplt-bg, #f5f5f7);
+  color: var(--jari-cmplt-fg, #333738);
+  font-family: var(--jari-cmplt-font-family, monospace);
+  font-size: var(--jari-cmplt-font-size, 9pt);
+  max-height: 75vh;
+  overflow: hidden;
+  text-align: left;
+  pointer-events: auto;
+}
+.jari-overlay.jari-prompt[hidden] { display: none; }
+.jari-prompt {
+  background: #1c1c24;
+  color: #cdcdcd;
+  font-size: var(--jari-cmplt-font-size, 9pt);
+  font-family: var(--jari-cmplt-font-family, monospace);
+  outline: none;
+}
+.jari-prompt input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--jari-cmdl-font-family, monospace);
+  font-size: var(--jari-cmdl-font-size, 9pt);
+  line-height: var(--jari-cmdl-line-height, 1.5);
+  color: #cdcdcd;
+  background: #1c1c24;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  text-align: left;
+  padding: 0 0 0 0.5ex;
+  margin: 0;
+}
+.jari-prompt input:focus,
+.jari-prompt input:focus-visible,
+.jari-prompt input:active {
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+.jari-prompt-header {
+  display: block;
+  background: #252530;
+  color: #cdcdcd;
+  font-size: var(--jari-header-font-size, 9pt);
+  font-weight: var(--jari-header-font-weight, bold);
+  border-bottom: 1px solid #333738;
+  padding: 0 0.5ex;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+}
+.jari-prompt-list {
+  display: block;
+  contain: layout paint;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow: auto;
+  border-bottom: 1px solid #333738;
+  text-align: left;
+}
+.jari-prompt-list li {
+  display: block;
+  height: var(--jari-cmplt-option-height, 1.4em);
+  line-height: var(--jari-cmplt-option-height, 1.4em);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 0.5ex;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.jari-prompt-list li .url {
+  color: #878787;
+  background: transparent;
+  text-decoration: none;
+  margin-left: 1em;
+}
+.jari-prompt-list li.selected,
+.jari-prompt-list li.selected .url {
+  color: var(--jari-of-fg, #cdcdcd);
+  background: var(--jari-of-bg, #333738);
+}
+.jari-prompt-list li .jari-match,
+.jari-prompt-list li.selected .jari-match {
+  color: var(--jari-accent, #e0a363);
+  font-weight: bold;
+}
+.jari-overlay ::selection {
+  background: var(--jari-accent, #e0a363);
+  color: #1a1a1a;
+}
 
 .demo-article ::selection,
 .demo-help ::selection {

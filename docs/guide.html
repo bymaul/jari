@@ -96,6 +96,17 @@
       link match follows it. Smart-case: lowercase matches anything, uppercase
       is exact.
     </p>
+    <h2>Omnibox</h2>
+    <p>
+      <kbd>t</kbd> opens the go-to prompt. Empty, it lists every link on this
+      page; typing filters by title or URL. <kbd>Up</kbd>/<kbd>Down</kbd> move,
+      <kbd>Enter</kbd> follows, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> opens a new
+      tab, <kbd>Esc</kbd> closes. A keyword plus query
+      (<code>g cats</code>, <code>yt demo</code>, <code>gh jari</code>,
+      <code>wiki keyboard</code>, <code>r vim</code>) searches that engine
+      instead. Sources here are this page's links plus engines — your real
+      tabs, history, and bookmarks appear only with the extension installed.
+    </p>
     <h2>Visual</h2>
     <p>
       <kbd>v</kbd> drops a caret, <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd>
@@ -104,7 +115,7 @@
     </p>
     <h2>Beyond the demo — needs the install</h2>
     <p>
-      Tabs (<kbd>t</kbd> omnibox, <kbd>J</kbd>/<kbd>K</kbd> switch,
+      Tabs (<kbd>T</kbd> incognito, <kbd>J</kbd>/<kbd>K</kbd> switch,
       <kbd>x</kbd> close, <kbd>gt</kbd> manager), <kbd>yy</kbd> copy URL,
       screenshots (<kbd>gss</kbd>/<kbd>gsp</kbd>/<kbd>gsr</kbd>), page jumps
       (<kbd>[[</kbd>/<kbd>]]</kbd>), and settings (<kbd>;e</kbd>) need the real
@@ -119,6 +130,12 @@
 </footer>
 
 <div id="hints" class="demo-hints" aria-hidden="true"></div>
+
+<div id="prompt" class="jari-overlay jari-prompt" hidden>
+  <ul id="promptlist" class="jari-prompt-list"></ul>
+  <div class="jari-prompt-header">Open</div>
+  <input id="promptinput" type="text" autocomplete="off" spellcheck="false" placeholder="Search links, URL, or keyword query" aria-label="Go to page link or search" />
+</div>
 
 <div id="findbar" class="demo-find" hidden>
   <span class="demo-find-label">/</span>
@@ -136,6 +153,7 @@
     <tr><td><kbd>gu</kbd> / <kbd>gU</kbd></td><td>parent URL / site root</td></tr>
     <tr><td><kbd>r</kbd> / <kbd>R</kbd></td><td>reload (cache bypass needs the extension)</td></tr>
     <tr><td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td><td>hint: same tab / new tab / background tab</td></tr>
+    <tr><td><kbd>t</kbd></td><td>go to this page0027s links, or search an engine</td></tr>
     <tr><td><kbd>/</kbd> then <kbd>Enter</kbd></td><td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>close bar, hide highlights</td></tr>
     <tr><td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td><td>visual select, then yank to clipboard</td></tr>

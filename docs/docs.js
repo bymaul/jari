@@ -10,6 +10,20 @@
   var toastEl = document.getElementById("toast");
   var pill = document.getElementById("pill");
   var showcmdEl = document.getElementById("showcmd");
+  var promptEl = document.getElementById("prompt");
+  var promptList = document.getElementById("promptlist");
+  var promptInput = document.getElementById("promptinput");
+  var promptOpen = false;
+  var promptEntries = [];
+  var promptFiltered = [];
+  var promptIdx = 0;
+  var ENGINES = [
+    { k: "g", name: "Google", url: "https://www.google.com/search?q=" },
+    { k: "yt", name: "YouTube", url: "https://www.youtube.com/results?search_query=" },
+    { k: "gh", name: "GitHub", url: "https://github.com/search?q=" },
+    { k: "wiki", name: "Wikipedia", url: "https://en.wikipedia.org/wiki/Special:Search?search=" },
+    { k: "r", name: "Reddit", url: "https://www.reddit.com/search/?q=" },
+  ];
 
   var CHARSET = "saevrtwyincmp";
   var LINE_PX = 60;
@@ -454,6 +468,146 @@
     } catch {}
   }
 
+  function collectPromptEntries() {
+    var nodes = document.querySelectorAll("header a[href], nav a[href], article a[href], footer a[href]");
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var href = nodes[i].getAttribute("href");
+      if (!href || seen[href]) continue;
+      seen[href] = true;
+      var title = "";
+      try {
+        title = (nodes[i].textContent || "").trim().replace(/\s+/g, " ");
+      } catch {}
+      out.push({ title: title || href, url: href });
+    }
+    return out;
+  }
+
+  function engineFor(q) {
+    var m = /^(\S+)\s+(.+)$/.exec(q);
+    if (!m) return null;
+    for (var i = 0; i < ENGINES.length; i++) {
+      if (ENGINES[i].k === m[1]) return { engine: ENGINES[i], query: m[2] };
+    }
+    return null;
+  }
+
+  function renderPromptList() {
+    var q = promptInput.value;
+    promptList.textContent = "";
+    for (var i = 0; i < promptFiltered.length; i++) {
+      var e = promptFiltered[i];
+      var li = document.createElement("li");
+      if (i === promptIdx) li.className = "selected";
+      li.dataset.idx = String(i);
+      var title = document.createElement("span");
+      title.className = "title";
+      var url = document.createElement("span");
+      url.className = "url";
+      if (e.engine) {
+        title.textContent = e.title;
+        url.textContent = "";
+      } else {
+        appendMatch(title, e.title, q);
+        appendMatch(url, e.url, q);
+      }
+      li.appendChild(title);
+      li.appendChild(url);
+      promptList.appendChild(li);
+    }
+    var sel = promptList.querySelector(".selected");
+    if (sel) {
+      try {
+        sel.scrollIntoView({ block: "nearest" });
+      } catch {}
+    }
+  }
+
+  function appendMatch(parent, text, q) {
+    if (!q) {
+      parent.textContent = text;
+      return;
+    }
+    var hay = text.toLowerCase();
+    var needle = q.toLowerCase();
+    var from = 0;
+    while (true) {
+      var at = hay.indexOf(needle, from);
+      if (at === -1) break;
+      if (at > from) parent.appendChild(document.createTextNode(text.slice(from, at)));
+      var m = document.createElement("span");
+      m.className = "jari-match";
+      m.textContent = text.slice(at, at + needle.length);
+      parent.appendChild(m);
+      from = at + Math.max(1, needle.length);
+    }
+    if (from < text.length) parent.appendChild(document.createTextNode(text.slice(from)));
+  }
+
+  function filterPrompt() {
+    var needle = promptInput.value.toLowerCase();
+    promptFiltered = [];
+    var eng = engineFor(promptInput.value);
+    if (eng && eng.query) {
+      promptFiltered.push({
+        title: "Search " + eng.engine.k + " for \"" + eng.query + "\"",
+        url: eng.engine.url + encodeURIComponent(eng.query),
+        engine: true,
+      });
+    }
+    for (var i = 0; i < promptEntries.length && promptFiltered.length < 50; i++) {
+      var e = promptEntries[i];
+      if (!needle || e.title.toLowerCase().indexOf(needle) !== -1 || e.url.toLowerCase().indexOf(needle) !== -1) {
+        promptFiltered.push(e);
+      }
+    }
+    if (promptIdx >= promptFiltered.length) promptIdx = 0;
+    renderPromptList();
+  }
+
+  function followPrompt(idx, newTab) {
+    var e = promptFiltered[idx];
+    if (!e) return;
+    closePrompt();
+    if (newTab) {
+      window.open(e.url, "_blank", "noopener");
+      toast("Opened in new tab — demo stays open");
+      return;
+    }
+    try {
+      window.location.href = e.url;
+    } catch {}
+  }
+
+  function openPrompt() {
+    promptOpen = true;
+    countBuf = "";
+    pendingG = false;
+    promptEntries = collectPromptEntries();
+    promptIdx = 0;
+    promptEl.hidden = false;
+    promptInput.value = "";
+    filterPrompt();
+    try {
+      promptInput.focus({ preventScroll: true });
+    } catch {
+      promptInput.focus();
+    }
+  }
+
+  function closePrompt() {
+    promptOpen = false;
+    promptEl.hidden = true;
+    try {
+      promptInput.blur();
+    } catch {}
+    try {
+      document.body.focus({ preventScroll: true });
+    } catch {}
+  }
+
   function caretRect() {
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
@@ -678,6 +832,39 @@
     }
   });
 
+  promptInput.addEventListener("input", function () {
+    promptIdx = 0;
+    filterPrompt();
+  });
+
+  promptInput.addEventListener("keydown", function (e) {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      followPrompt(promptIdx, e.ctrlKey || e.metaKey);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closePrompt();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (promptFiltered.length > 0) {
+        promptIdx = (promptIdx + 1) % promptFiltered.length;
+        renderPromptList();
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (promptFiltered.length > 0) {
+        promptIdx = (promptIdx - 1 + promptFiltered.length) % promptFiltered.length;
+        renderPromptList();
+      }
+    }
+  });
+
+  promptList.addEventListener("click", function (e) {
+    var li = e.target && e.target.closest ? e.target.closest("li") : null;
+    if (li && li.dataset.idx !== undefined) followPrompt(Number(li.dataset.idx), false);
+  });
+
   article.addEventListener("click", function (e) {
     var b = e.target && e.target.closest ? e.target.closest("button[data-toast]") : null;
     if (b) toast(b.getAttribute("data-toast") || "Done");
@@ -688,6 +875,8 @@
     var active = document.activeElement;
 
     if (findOpen) return;
+
+    if (promptOpen) return;
 
     if (isTypingTarget(active) && active !== document.body) {
       if (e.key === "Escape") {
@@ -754,6 +943,11 @@
         setPill();
         return;
       }
+      if (e.key === "t") {
+        toast("Tab manager needs the extension");
+        setPill();
+        return;
+      }
       setPill();
     }
 
@@ -813,6 +1007,10 @@
       case "F":
         e.preventDefault();
         openHints(true, false);
+        return;
+      case "t":
+        e.preventDefault();
+        openPrompt();
         return;
       case "/":
         e.preventDefault();
