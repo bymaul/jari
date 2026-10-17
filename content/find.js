@@ -6,7 +6,7 @@ import { getLinkAncestor } from "./hints-elements.js";
 import {
   detectHighlightSupport,
   clearHighlightNames,
-} from "./highlight.js";
+} from "./highlight.ts";
 import { buildMatcher, hasUpperCase } from "./find/matcher.ts";
 import { collectTextNodes } from "./find/collect.ts";
 import { Visual } from "./visual.js";

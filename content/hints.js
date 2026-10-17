@@ -9,7 +9,7 @@ import {
   layoutHints,
   coordinate,
   hintHomeRect,
-} from "./hint-layer.js";
+} from "./hint-layer.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 import {
   isEditable,

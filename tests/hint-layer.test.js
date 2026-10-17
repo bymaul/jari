@@ -2,7 +2,7 @@ import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
 
-const { hintHomeRect } = await import("../content/hint-layer.js");
+const { hintHomeRect } = await import("../content/hint-layer.ts");
 
 test("hintHomeRect converts viewport rects to holder coordinates", () => {
   const prevX = globalThis.window.pageXOffset;

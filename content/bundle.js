@@ -5281,7 +5281,7 @@
   };
   register("tab-manager", { close: close2, onKeyDown: onKeyDown2, isActive: isActive2 });
 
-  // content/highlight.js
+  // content/highlight.ts
   function detectHighlightSupport() {
     try {
       return typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
@@ -5436,7 +5436,7 @@
     return out;
   }
 
-  // content/hint-layer.js
+  // content/hint-layer.ts
   function normalizeCharset() {
     const s = settings.getHintChars();
     if (!s) return HINT_CHARSET_DEFAULT;

@@ -7,7 +7,7 @@ import {
   updateHintText,
   createHintsHost,
   layoutHints,
-} from "./hint-layer.js";
+} from "./hint-layer.ts";
 import { getLinkAncestor, isEditable } from "./hints-elements.js";
 import { collectVisualTextElements } from "./visual/collect.js";
 import {

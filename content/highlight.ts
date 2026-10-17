@@ -1,6 +1,4 @@
-/* global CSS, Highlight */
-
-export function detectHighlightSupport() {
+export function detectHighlightSupport(): boolean {
   try {
     return (
       typeof CSS !== "undefined" &&
@@ -12,7 +10,7 @@ export function detectHighlightSupport() {
   }
 }
 
-export function clearHighlightNames(...names) {
+export function clearHighlightNames(...names: string[]): void {
   try {
     if (CSS.highlights) {
       for (const name of names) CSS.highlights.delete(name);
@@ -20,13 +18,13 @@ export function clearHighlightNames(...names) {
   } catch {}
 }
 
-export function unwrapSpans(spans) {
+export function unwrapSpans(spans: HTMLElement[]): void {
   for (const span of spans) {
     try {
       const parent = span.parentNode;
       if (!parent) continue;
       const text = span.textContent;
-      const tn = document.createTextNode(text);
+      const tn = document.createTextNode(text as string);
       parent.replaceChild(tn, span);
       parent.normalize();
     } catch {}

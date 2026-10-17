@@ -2,13 +2,13 @@ import { settings } from "./settings.ts";
 import { HINT_CHARSET_DEFAULT, HINT_FONT_SIZE_DEFAULT, HINT_FONT_SIZE_MAX, HINT_FONT_SIZE_MIN } from "./keymap.ts";
 import { getHintRect, getRealRect } from "./hints-elements.js";
 
-export function normalizeCharset() {
+export function normalizeCharset(): string {
   const s = settings.getHintChars();
   if (!s) return HINT_CHARSET_DEFAULT;
   return s.toLowerCase();
 }
 
-export function genLabels(count, charset) {
+export function genLabels(count: number, charset?: string): string[] {
   const chars = (charset || normalizeCharset()).toUpperCase().split("");
   if (count <= 0 || chars.length < 2) return [];
   if (count <= chars.length) return chars.slice(0, count);
@@ -30,7 +30,10 @@ export function genLabels(count, charset) {
   return labels.slice(head, head + count);
 }
 
-export function getZIndex(node, cache) {
+export function getZIndex(
+  node: HTMLElement | null | undefined,
+  cache?: Map<Node, number>,
+): number {
   try {
     return zIndexOf(node, cache || new Map());
   } catch {
@@ -38,7 +41,7 @@ export function getZIndex(node, cache) {
   }
 }
 
-function zIndexOf(node, cache) {
+function zIndexOf(node: Node | null, cache: Map<Node, number>): number {
   if (
     !node ||
     node === document.body ||
@@ -46,16 +49,16 @@ function zIndexOf(node, cache) {
     node.nodeType === 11
   )
     return 0;
-  if (cache.has(node)) return cache.get(node);
+  if (cache.has(node)) return cache.get(node)!;
   const v = parseInt(
-    window.getComputedStyle(node).getPropertyValue("z-index"),
+    window.getComputedStyle(node as Element).getPropertyValue("z-index"),
   );
   const total = (isNaN(v) || v < 0 ? 0 : v) + zIndexOf(node.parentNode, cache);
   cache.set(node, total);
   return total;
 }
 
-export function placeHintsHost(host) {
+export function placeHintsHost(host: HTMLElement): void {
   try {
     const topLayer = document.querySelector("dialog[open]");
     if (topLayer) {
@@ -75,7 +78,9 @@ export function placeHintsHost(host) {
   (document.documentElement || document.body).appendChild(host);
 }
 
-export function coordinate(holderEl) {
+export function coordinate(
+  holderEl: HTMLElement,
+): { top: number; left: number } {
   const probe = document.createElement("div");
   probe.style.position = "absolute";
   probe.style.top = "0";
@@ -93,7 +98,11 @@ export function coordinate(holderEl) {
   return ret;
 }
 
-export function updateHintText(hintEl, label, typed) {
+export function updateHintText(
+  hintEl: HTMLElement,
+  label: string,
+  typed?: string,
+): void {
   hintEl.textContent = "";
   if (!typed) {
     hintEl.textContent = label;
@@ -112,7 +121,25 @@ export function updateHintText(hintEl, label, typed) {
   }
 }
 
-const HINT_THEMES = {
+export interface HintLink extends HTMLDivElement {
+  /** Stylesheet z-index kept as an expando for consumers. */
+  zIndex: string;
+  label: string;
+  link: Element;
+  targetEl: Element;
+}
+
+interface LabelBox {
+  left: number;
+  top: number;
+  w: number;
+  h: number;
+}
+
+const HINT_THEMES: Record<
+  string,
+  { border: string; background: string; color: string; matched: string }
+> = {
   yellow: {
     border: "var(--jari-accent-border, #c38a22)",
     background: "linear-gradient(#fff785, #ffc542)",
@@ -133,13 +160,13 @@ const HINT_THEMES = {
   },
 };
 
-function hintFontSize(raw) {
+function hintFontSize(raw: unknown): number {
   const n = Number(raw);
   if (!Number.isFinite(n)) return HINT_FONT_SIZE_DEFAULT;
   return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, Math.round(n)));
 }
 
-function hintCss(theme, fontSize) {
+function hintCss(theme: string, fontSize: unknown): string {
   const t = HINT_THEMES[theme] || HINT_THEMES.yellow;
   const size = hintFontSize(fontSize);
   return `
@@ -169,7 +196,10 @@ function hintCss(theme, fontSize) {
   `;
 }
 
-export function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFAULT) {
+export function createHintsHost(
+  theme = "yellow",
+  fontSize = HINT_FONT_SIZE_DEFAULT,
+): { host: HTMLDivElement; holder: HTMLElement } {
   const host = document.createElement("div");
   host.className = "jari-hints-host";
   host.style.position = "fixed";
@@ -183,10 +213,10 @@ export function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFA
   try {
     host.attachShadow({ mode: "open" });
   } catch {
-    host.shadowRoot = host;
+    (host as { shadowRoot?: unknown }).shadowRoot = host;
   }
 
-  const shadow = host.shadowRoot;
+  const shadow = host.shadowRoot!;
   const style = document.createElement("style");
   style.textContent = hintCss(theme, fontSize);
   shadow.appendChild(style);
@@ -199,7 +229,10 @@ export function createHintsHost(theme = "yellow", fontSize = HINT_FONT_SIZE_DEFA
   return { host, holder };
 }
 
-function estimateLabelBox(label, fontSize) {
+function estimateLabelBox(
+  label: unknown,
+  fontSize: unknown,
+): { w: number; h: number } {
   const size = hintFontSize(fontSize);
   return {
     w: Math.ceil(String(label).length * size * 0.62 + 10),
@@ -207,7 +240,7 @@ function estimateLabelBox(label, fontSize) {
   };
 }
 
-function boxesOverlap(a, b) {
+function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
   return (
     a.left < b.left + b.w &&
     b.left < a.left + a.w &&
@@ -225,7 +258,12 @@ const LABEL_SHIFTS = [
   [0, 36],
 ];
 
-function resolveLabelBox(home, w, h, placed) {
+function resolveLabelBox(
+  home: { left: number; top: number },
+  w: number,
+  h: number,
+  placed: LabelBox[],
+): LabelBox {
   for (const [dx, dy] of LABEL_SHIFTS) {
     const box = {
       left: Math.max(0, home.left + dx),
@@ -245,14 +283,22 @@ function resolveLabelBox(home, w, h, placed) {
   return { left: Math.max(0, home.left), top: Math.max(0, home.top), w, h };
 }
 
-export function hintHomeRect(r, bof) {
+export function hintHomeRect(
+  r: { left: number; top: number },
+  bof: { top: number; left: number },
+): { left: number; top: number } {
   return {
     left: window.pageXOffset + r.left - bof.left,
     top: Math.max(r.top + window.pageYOffset - bof.top, 0),
   };
 }
 
-export function layoutHints(holder, elements, labels, fontSize = HINT_FONT_SIZE_DEFAULT) {
+export function layoutHints(
+  holder: HTMLElement,
+  elements: Element[],
+  labels: string[],
+  fontSize = HINT_FONT_SIZE_DEFAULT,
+): HintLink[] {
   const bof = (() => {
     try {
       return coordinate(holder);
@@ -263,8 +309,8 @@ export function layoutHints(holder, elements, labels, fontSize = HINT_FONT_SIZE_
 
   // Estimated boxes are close enough for de-collision (monospace labels);
   // the measured second pass below corrects any residual overlap.
-  const placed = [];
-  const zCache = new Map();
+  const placed: LabelBox[] = [];
+  const zCache = new Map<Element, number>();
   const links = elements.map((elm, i) => {
     const r = getHintRect(elm);
     const z = getZIndex(elm, zCache);
@@ -272,7 +318,7 @@ export function layoutHints(holder, elements, labels, fontSize = HINT_FONT_SIZE_
     const est = estimateLabelBox(labels[i], fontSize);
     const box = resolveLabelBox(home, est.w, est.h, placed);
     placed.push(box);
-    const link = document.createElement("div");
+    const link = document.createElement("div") as HintLink;
     link.className = "jari-hint";
     link.textContent = labels[i];
     link.dataset.label = labels[i];
