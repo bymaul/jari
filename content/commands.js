@@ -8,7 +8,7 @@ import { Help } from "./help.js";
 import { Hints, setCommandRunner } from "./hints.js";
 import { Find } from "./find.js";
 import { Visual } from "./visual.js";
-import { COMMAND_CATALOG } from "./catalog.js";
+import { COMMAND_CATALOG } from "./catalog.ts";
 import { goPage } from "./page-nav.js";
 import { Palette } from "./palette.js";
 import { Shot } from "./shot.js";

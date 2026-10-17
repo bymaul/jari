@@ -45,6 +45,26 @@ Status: proposed (2026-10). Incremental JS -> TS rewrite with a DX layer.
 5. **`tsc --noEmit` as the type gate; esbuild never checks types.** Editor hover
    and safe refactors fall out once the settings/protocol types land.
 
+## Progress log
+
+Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
+
+- Phase 0 + `shared/url.ts` + tooling: `2c302e8`.
+- 40-action message contract (Phase 1 #1 partial: protocol typed, handlers still
+  JS so `background/main.ts` dispatches through a loose Handler type; full
+  exhaustiveness lands when `background/*` migrate): `058a836`.
+- Phase 1 #2 settings schema: `shared/*` pure-logic modules `bd26f9a`, then
+  `content/keymap.ts` + `content/settings.ts` + `tests/keymap.test.ts` `a9c298a`.
+  `Settings`/`RawSettings` live in keymap.ts; RawSettings fields are plain
+  (non-optional) because every access is guard-first; migrate helpers return
+  `Record<string, string>` with a passthrough cast on the invalid-input guard.
+- Phase 2 order so far: `content/scroll.ts` `a472293`, `content/rank.ts` +
+  `tests/rank.test.ts` `11c1435` (rankMatches has a true/false overload split),
+  `content/find/{matcher,collect}.ts` + matcher test `028117e`.
+- Test-file policy: pure-logic suites migrate to `.test.ts`; fixture-heavy
+  DOM/globalThis-stub suites (e.g. tests/find-collect.test.js) stay `.js` and
+  import the `.ts` modules directly.
+
 ## Phases
 
 ### Phase 0 — tooling (1 PR, no source changes)

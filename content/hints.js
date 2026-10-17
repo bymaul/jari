@@ -10,7 +10,7 @@ import {
   coordinate,
   hintHomeRect,
 } from "./hint-layer.js";
-import { COMMAND_CATALOG } from "./catalog.js";
+import { COMMAND_CATALOG } from "./catalog.ts";
 import {
   isEditable,
   isElementDrawn,

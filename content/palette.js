@@ -1,4 +1,4 @@
-import { COMMAND_CATALOG } from "./catalog.js";
+import { COMMAND_CATALOG } from "./catalog.ts";
 import { deepActiveElement, displayCombo, keysForCommand } from "./keymap.ts";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.ts";
 import { settings } from "./settings.ts";

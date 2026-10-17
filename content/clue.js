@@ -1,6 +1,6 @@
 import { displayCombo, getPrefixEntries } from "./keymap.ts";
 import { settings } from "./settings.ts";
-import { COMMAND_CATALOG } from "./catalog.js";
+import { COMMAND_CATALOG } from "./catalog.ts";
 
 let clueEl = null;
 let clueTimer = null;

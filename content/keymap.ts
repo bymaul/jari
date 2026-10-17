@@ -16,7 +16,7 @@ import {
   type PageNavTexts,
 } from "../shared/page-nav-texts.ts";
 import { normalizeSitePattern } from "../shared/url.ts";
-import { COMMAND_CATALOG } from "./catalog.js";
+import { COMMAND_CATALOG } from "./catalog.ts";
 
 export const SETTINGS_SCHEMA_VERSION = 12;
 

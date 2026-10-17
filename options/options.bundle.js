@@ -283,7 +283,7 @@
     return host;
   }
 
-  // content/catalog.js
+  // content/catalog.ts
   var COMMAND_CATALOG = {
     scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
     scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },

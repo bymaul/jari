@@ -1,3 +1,11 @@
+export interface CommandDef {
+  /** UI grouping; mirrors the help/palette column categories. */
+  category: string;
+  label: string;
+  /** Count-qualified key repeats (e.g. 3j) are safe for this command. */
+  repeatable?: boolean;
+}
+
 export const COMMAND_CATALOG = {
 
   scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
@@ -70,4 +78,6 @@ export const COMMAND_CATALOG = {
   showCommandPalette: { category: "help", label: "Run command by name" },
   openSettings: { category: "help", label: "Open settings" },
   openExtensions: { category: "help", label: "Open extensions page" },
-};
+} satisfies Record<string, CommandDef>;
+
+export type CommandName = keyof typeof COMMAND_CATALOG;
