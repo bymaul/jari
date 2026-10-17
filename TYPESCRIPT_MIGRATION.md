@@ -60,7 +60,15 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   `Record<string, string>` with a passthrough cast on the invalid-input guard.
 - Phase 2 order so far: `content/scroll.ts` `a472293`, `content/rank.ts` +
   `tests/rank.test.ts` `11c1435` (rankMatches has a true/false overload split),
-  `content/find/{matcher,collect}.ts` + matcher test `028117e`.
+  `content/find/{matcher,collect}.ts` + matcher test `028117e`,
+  `content/{highlight,hint-layer}.ts` `213b419`, `content/hints-elements.ts`
+  `19e8051` (RectLike + JariElement expando types; `disabled`/`readOnly` count
+  on modern lib.dom's Element so no casts needed there),
+  `content/clue.ts` `634c659`,
+  `background/{utils,windows,bookmarks,suggest,handlers}.ts` `dff18e1`
+  (StoredSettings = Partial<RawSettings> & {updatedAt?}; handlers typed against
+  protocol payloads; `background/tabs.ts` is the remaining blocker for the
+  exhaustive router).
 - Test-file policy: pure-logic suites migrate to `.test.ts`; fixture-heavy
   DOM/globalThis-stub suites (e.g. tests/find-collect.test.js) stay `.js` and
   import the `.ts` modules directly.
