@@ -14,7 +14,7 @@ import { Overlays } from "./overlays.js";
 import { isEditable } from "./hints-elements.ts";
 import { Find, __resetFindState } from "./find.js";
 import { __resetVisualState } from "./visual.js";
-import { Clue, __resetClueState } from "./clue.js";
+import { Clue, __resetClueState } from "./clue.ts";
 
 let pendingCount = "";
 let pendingKeys = "";

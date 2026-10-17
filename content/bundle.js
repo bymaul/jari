@@ -11562,7 +11562,7 @@ ${location.href}`;
     cmd2.run({ count: 1, event });
   });
 
-  // content/clue.js
+  // content/clue.ts
   var clueEl = null;
   var clueTimer = null;
   var activePrefix = null;

@@ -1,17 +1,20 @@
 import { displayCombo, getPrefixEntries } from "./keymap.ts";
 import { settings } from "./settings.ts";
-import { COMMAND_CATALOG } from "./catalog.ts";
+import { COMMAND_CATALOG, type CommandDef } from "./catalog.ts";
 
-let clueEl = null;
-let clueTimer = null;
-let activePrefix = null;
-let renderPrefix = null;
+let clueEl: HTMLDivElement | null = null;
+let clueTimer: ReturnType<typeof setTimeout> | null = null;
+let activePrefix: string | null = null;
+let renderPrefix: string | null = null;
 let renderCount = "";
-let listEl = null;
-let titleEl = null;
+let listEl: HTMLDivElement | null = null;
+let titleEl: HTMLDivElement | null = null;
 
-function commandLabel(commandName) {
-  return COMMAND_CATALOG[commandName]?.label || commandName;
+function commandLabel(commandName: string): string {
+  return (
+    (COMMAND_CATALOG as Record<string, CommandDef | undefined>)[commandName]
+      ?.label || commandName
+  );
 }
 
 function isVisible() {
@@ -40,14 +43,14 @@ function hide() {
   }
 }
 
-function displaySuffix(suffix) {
+function displaySuffix(suffix: string): string {
   if (suffix === " ") return "<Space>";
   return suffix.length > 1
     ? `${suffix[0]} ▸ ${suffix.slice(1)}`
     : suffix;
 }
 
-function paint() {
+function paint(): void {
   if (!clueEl || !listEl || !titleEl) return;
   const rows = getPrefixEntries(settings.getKeymap(), renderPrefix);
   titleEl.textContent =
@@ -71,7 +74,7 @@ function paint() {
   }
 }
 
-function render(prefix, countStr) {
+function render(prefix: string, countStr?: string): void {
   const keymap = settings.getKeymap();
   const entries = getPrefixEntries(keymap, prefix);
   if (entries.length === 0) return;
@@ -102,7 +105,7 @@ function render(prefix, countStr) {
   } catch {}
 }
 
-function schedule(prefix, countStr = "") {
+function schedule(prefix: string, countStr = ""): void {
   hide();
   if (!settings.isClueEnabled()) return;
   const entries = getPrefixEntries(settings.getKeymap(), prefix);
@@ -119,7 +122,7 @@ function schedule(prefix, countStr = "") {
   }, delay);
 }
 
-function refresh(prefix, countStr = "") {
+function refresh(prefix: string, countStr = ""): void {
   if (!settings.isClueEnabled()) return;
   if (!isVisible()) {
     schedule(prefix, countStr);
@@ -130,7 +133,7 @@ function refresh(prefix, countStr = "") {
   paint();
 }
 
-function getActivePrefix() {
+function getActivePrefix(): string | null {
   return activePrefix;
 }
 
@@ -142,6 +145,6 @@ export const Clue = {
   getActivePrefix,
 };
 
-export function __resetClueState() {
+export function __resetClueState(): void {
   hide();
 }
