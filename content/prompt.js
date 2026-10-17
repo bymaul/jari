@@ -1,6 +1,6 @@
 import { Url, normalizeUrl } from "../shared/url.ts";
 import { parseEngineKeyword } from "../shared/search-engines.ts";
-import { rankMatches } from "./rank.js";
+import { rankMatches } from "./rank.ts";
 import { settings } from "./settings.ts";
 import { sendMessage, createShadowHost, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";

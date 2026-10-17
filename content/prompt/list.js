@@ -1,4 +1,4 @@
-import { fuzzyIndices, substringIndices } from "../rank.js";
+import { fuzzyIndices, substringIndices } from "../rank.ts";
 import { settings } from "../settings.ts";
 import { renderText } from "./shared.js";
 

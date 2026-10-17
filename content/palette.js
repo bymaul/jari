@@ -1,6 +1,6 @@
 import { COMMAND_CATALOG } from "./catalog.js";
 import { deepActiveElement, displayCombo, keysForCommand } from "./keymap.ts";
-import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
+import { fuzzyIndices, rankMatches, substringIndices } from "./rank.ts";
 import { settings } from "./settings.ts";
 import { createShadowHost, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";

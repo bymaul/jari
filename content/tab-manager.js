@@ -1,4 +1,4 @@
-import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
+import { fuzzyIndices, rankMatches, substringIndices } from "./rank.ts";
 import { parseEngineKeyword } from "../shared/search-engines.ts";
 import { normalizeUrl, Url } from "../shared/url.ts";
 import { settings } from "./settings.ts";

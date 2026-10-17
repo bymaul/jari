@@ -6,7 +6,7 @@ import {
   parseQuery,
   rankMatches,
   substringMatch,
-} from "../content/rank.js";
+} from "../content/rank.ts";
 
 test("fuzzyMatch returns null when chars are missing or out of order", () => {
   assert.equal(fuzzyMatch("xyz", "abcdef"), null);
@@ -15,16 +15,16 @@ test("fuzzyMatch returns null when chars are missing or out of order", () => {
 });
 
 test("fuzzyMatch reports matched indices in order", () => {
-  assert.deepEqual(fuzzyMatch("fb", "foo bar").indices, [0, 4]);
-  assert.deepEqual(fuzzyMatch("gt", "gtx").indices, [0, 1]);
+  assert.deepEqual(fuzzyMatch("fb", "foo bar")!.indices, [0, 4]);
+  assert.deepEqual(fuzzyMatch("gt", "gtx")!.indices, [0, 1]);
 });
 
 test("fuzzyMatch prefers consecutive runs and word starts", () => {
-  const consecutive = fuzzyMatch("ab", "abxx").score;
-  const scattered = fuzzyMatch("ab", "axb").score;
+  const consecutive = fuzzyMatch("ab", "abxx")!.score;
+  const scattered = fuzzyMatch("ab", "axb")!.score;
   assert.ok(consecutive > scattered);
-  const wordStart = fuzzyMatch("ab", "ab").score;
-  const midWord = fuzzyMatch("ab", "cab").score;
+  const wordStart = fuzzyMatch("ab", "ab")!.score;
+  const midWord = fuzzyMatch("ab", "cab")!.score;
   assert.ok(wordStart > midWord);
 });
 
@@ -93,7 +93,7 @@ test("rankMatches finds youtube from the ytb shorthand", () => {
 
 test("fuzzyMatch skips terms with chars missing from the target", () => {
   assert.equal(fuzzyMatch("foo qzx", "foo bar"), null);
-  assert.deepEqual(fuzzyMatch("f", "foo").indices, [0]);
+  assert.deepEqual(fuzzyMatch("f", "foo")!.indices, [0]);
   assert.deepEqual(fuzzyIndices("foo qzx", "foo bar"), [0, 1, 2]);
   assert.deepEqual(fuzzyIndices("qzx", "foo bar"), []);
 });

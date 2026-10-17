@@ -2950,7 +2950,7 @@
   } catch {
   }
 
-  // content/rank.js
+  // content/rank.ts
   var SCORE_BASE = 2;
   var SCORE_RUN = 12;
   var SCORE_BOUNDARY = 8;
@@ -3211,7 +3211,11 @@
     if (!c) return 0;
     return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
   }
-  var SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
+  var SOURCE_RANK = {
+    tab: 0,
+    history: 1,
+    bookmark: 2
+  };
   function rankMatches(query5, list, fuzzy = true) {
     const q = String(query5).trim();
     if (!q) return [...list];
@@ -3235,7 +3239,7 @@
       const fScore = frequencyScore(item);
       const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
       return { item, match: { ...match, score: totalScore, baseScore }, span: match.indices.length > 0 ? last - first + 1 : 0, hayLength: hay.length, totalScore };
-    }).filter(Boolean).sort((a, b) => {
+    }).filter((r) => r !== null).sort((a, b) => {
       if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
       if (b.match.baseScore !== a.match.baseScore) return b.match.baseScore - a.match.baseScore;
       if (a.span !== b.span) return a.span - b.span;

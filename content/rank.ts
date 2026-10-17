@@ -5,10 +5,31 @@ const SCORE_CAMEL = 14;
 const SCORE_GAP = -3;
 const SCORE_LEADING = -1;
 
-function normalizeWithMap(s) {
+interface RankItem {
+  title?: string;
+  url?: string;
+  source?: string;
+  lastVisit?: number;
+  lastAccessed?: number;
+  lastVisitTime?: number;
+  dateAdded?: number;
+  visitCount?: number;
+  typedCount?: number;
+  typedVisits?: number;
+}
+
+interface RankMatch {
+  item: RankItem;
+  match: { score: number; indices: number[]; baseScore: number };
+  span: number;
+  hayLength: number;
+  totalScore: number;
+}
+
+function normalizeWithMap(s: unknown): { norm: string; map: number[] } {
   const src = String(s).toLowerCase();
   let norm = "";
-  const map = [];
+  const map: number[] = [];
   for (let i = 0; i < src.length; i++) {
     let chunk = src[i];
     try {
@@ -24,17 +45,17 @@ function normalizeWithMap(s) {
   return { norm, map };
 }
 
-function normalizeForMatch(s) {
+function normalizeForMatch(s: unknown): string {
   try {
     return normalizeWithMap(s).norm;
   } catch {
     return String(s).toLowerCase();
   }
 }
-export function parseQuery(query) {
+export function parseQuery(query: unknown) {
   const normalized = normalizeForMatch(query);
-  const phrases = [];
-  const exclude = [];
+  const phrases: string[] = [];
+  const exclude: string[] = [];
   const withoutExcludedPhrases = normalized.replace(/-"([^"]+)"/g, (_, p) => {
     const t = p.trim();
     if (t) exclude.push(t);
@@ -46,7 +67,7 @@ export function parseQuery(query) {
     return " ";
   });
   const rawTerms = withoutPhrases.replace(/"/g, " ").trim().split(/\s+/).filter(Boolean);
-  const include = [];
+  const include: string[] = [];
   for (const t of rawTerms) {
     if (t.startsWith("-") && t.length > 1) exclude.push(t.slice(1));
     else include.push(t);
@@ -54,7 +75,7 @@ export function parseQuery(query) {
   return { include, exclude, phrases };
 }
 
-function isBoundaryAt(t, i) {
+function isBoundaryAt(t: string, i: number): boolean {
   if (i === 0) return true;
   const prev = t[i - 1];
   try {
@@ -64,19 +85,19 @@ function isBoundaryAt(t, i) {
     return !/[\w]/.test(prev);
   }
 }
-function extractHost(url) {
+function extractHost(url: unknown): string {
   if (!url) return "";
   try {
-    const u = new URL(url);
+    const u = new URL(url as string);
     return u.hostname || "";
   } catch {
     const m = String(url).match(/^(?:https?:\/\/)?([^/]+)/i);
     if (!m) return "";
-    return m[1].split("@").pop().split(":")[0];
+    return m[1].split("@").pop()!.split(":")[0];
   }
 }
 
-function charBonus(t, text, map, i) {
+function charBonus(t: string, text: string, map: number[], i: number): number {
   let s = SCORE_BASE;
   if (isBoundaryAt(t, i)) s += SCORE_BOUNDARY;
   else {
@@ -86,14 +107,19 @@ function charBonus(t, text, map, i) {
   return s;
 }
 
-function bestAlignment(term, t, text, map) {
+function bestAlignment(
+  term: string,
+  t: string,
+  text: string,
+  map: number[],
+): { score: number; indices: number[] } | null {
   const n = t.length;
   const q = term.length;
   if (q === 0 || q > n) return null;
-  const toOriginal = (indices) => indices.map((i) => map[i]);
-  const bonus = new Array(n);
+  const toOriginal = (indices: number[]) => indices.map((i) => map[i]);
+  const bonus: number[] = new Array(n);
   for (let i = 0; i < n; i++) bonus[i] = charBonus(t, text, map, i);
-  let dpPrev = new Array(n).fill(Number.NEGATIVE_INFINITY);
+  let dpPrev: number[] = new Array(n).fill(Number.NEGATIVE_INFINITY);
   for (let i = 0; i < n; i++) {
     if (t[i] === term[0]) dpPrev[i] = bonus[i] + SCORE_LEADING * i;
   }
@@ -106,10 +132,10 @@ function bestAlignment(term, t, text, map) {
     if (best === -1) return null;
     return { score: dpPrev[best], indices: toOriginal([best]) };
   }
-  const backs = new Array(q).fill(null);
+  const backs: number[][] = new Array(q).fill(null);
   for (let j = 1; j < q; j++) {
-    const dpCurr = new Array(n).fill(Number.NEGATIVE_INFINITY);
-    const bp = new Array(n).fill(-1);
+    const dpCurr: number[] = new Array(n).fill(Number.NEGATIVE_INFINITY);
+    const bp: number[] = new Array(n).fill(-1);
     let bestVal = Number.NEGATIVE_INFINITY;
     let bestIdx = -1;
     for (let i = 0; i < n; i++) {
@@ -147,7 +173,7 @@ function bestAlignment(term, t, text, map) {
     if (end === -1 || dpPrev[i] > dpPrev[end]) end = i;
   }
   if (end === -1 || dpPrev[end] === Number.NEGATIVE_INFINITY) return null;
-  const indices = new Array(q);
+  const indices: number[] = new Array(q);
   let cur = end;
   for (let j = q - 1; j >= 1; j--) {
     indices[j] = cur;
@@ -157,7 +183,7 @@ function bestAlignment(term, t, text, map) {
   return { score: dpPrev[end], indices: toOriginal(indices) };
 }
 
-function matchPreamble(query, text) {
+function matchPreamble(query: unknown, text: string) {
   const { include, exclude, phrases } = parseQuery(query);
   const { norm: t, map } = normalizeWithMap(text);
   if (exclude.some((ex) => t.includes(ex))) return null;
@@ -166,7 +192,7 @@ function matchPreamble(query, text) {
 
 // Every term char must occur in the target for any alignment to exist.
 // Used to skip the O(term x target) DP on guaranteed misses.
-function termImpossible(term, tChars) {
+function termImpossible(term: string, tChars: Set<string>): boolean {
   for (let i = 0; i < term.length; i++) {
     if (!tChars.has(term[i])) return true;
   }
@@ -176,7 +202,12 @@ function termImpossible(term, tChars) {
 // Null for terms that cannot match, so callers keep their exact
 // semantics (fuzzyMatch rejects, fuzzyIndices ignores). Single-char
 // terms skip the set build: their DP is already a single O(n) pass.
-function alignTerms(include, t, text, map) {
+function alignTerms(
+  include: string[],
+  t: string,
+  text: string,
+  map: number[],
+): ({ score: number; indices: number[] } | null)[] {
   const multi = include.some((term) => term.length > 1);
   const tChars = multi ? new Set(t) : null;
   return include.map((term) =>
@@ -186,7 +217,12 @@ function alignTerms(include, t, text, map) {
   );
 }
 
-function collectPhraseIndices(phrases, t, indices, map) {
+function collectPhraseIndices(
+  phrases: string[],
+  t: string,
+  indices: number[],
+  map: number[],
+): boolean {
   for (const ph of phrases) {
     if (!t.includes(ph)) return false;
     let idx = t.indexOf(ph);
@@ -198,7 +234,7 @@ function collectPhraseIndices(phrases, t, indices, map) {
   return true;
 }
 
-export function fuzzyMatch(query, text) {
+export function fuzzyMatch(query: unknown, text: string) {
   const pre = matchPreamble(query, text);
   if (!pre) return null;
   const { include, exclude, phrases, t, map } = pre;
@@ -210,28 +246,28 @@ export function fuzzyMatch(query, text) {
   if (results.some((r) => !r)) return null;
   let total = 0;
   for (const ph of phrases) total += 10 + ph.length * 2;
-  const indices = [];
+  const indices: number[] = [];
   collectPhraseIndices(phrases, t, indices, map);
   results.forEach((r) => {
-    total += r.score;
-    indices.push(...r.indices);
+    total += r!.score;
+    indices.push(...r!.indices);
   });
   indices.sort((a, b) => a - b);
   return { score: total, indices };
 }
 
-export function fuzzyIndices(query, text) {
+export function fuzzyIndices(query: unknown, text: string): number[] {
   const pre = matchPreamble(query, text);
   if (!pre) return [];
   const { include, phrases, t, map } = pre;
-  const indices = [];
+  const indices: number[] = [];
   if (!collectPhraseIndices(phrases, t, indices, map)) return [];
   const results = alignTerms(include, t, text, map);
   for (const r of results) if (r) indices.push(...r.indices);
   return indices.sort((a, b) => a - b);
 }
 
-export function substringMatch(query, text) {
+export function substringMatch(query: unknown, text: string): boolean {
   const pre = matchPreamble(query, text);
   if (!pre) return false;
   const { include, exclude, phrases, t } = pre;
@@ -239,13 +275,14 @@ export function substringMatch(query, text) {
   if (phrases.some((ph) => !t.includes(ph))) return false;
   return include.every((term) => t.includes(term));
 }
-export function substringIndices(query, text) {
+
+export function substringIndices(query: unknown, text: string): number[] {
   const pre = matchPreamble(query, text);
   if (!pre) return [];
   const { include, phrases, t, map } = pre;
   if (include.length === 0 && phrases.length === 0) return [];
   if (phrases.some((ph) => !t.includes(ph))) return [];
-  const indices = [];
+  const indices: number[] = [];
   collectPhraseIndices(phrases, t, indices, map);
   for (const term of include) {
     let idx = t.indexOf(term);
@@ -256,12 +293,16 @@ export function substringIndices(query, text) {
   }
   return [...new Set(indices)].sort((a, b) => a - b);
 }
-function substringFieldBonus(queryTerms, field, base) {
+function substringFieldBonus(
+  queryTerms: string[],
+  field: unknown,
+  base: number,
+): number {
   if (!field || queryTerms.length === 0) return 0;
   const f = normalizeForMatch(field);
   return queryTerms.every((t) => f.includes(t)) ? base : 0;
 }
-function recencyScore(item) {
+function recencyScore(item: RankItem): number {
   const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
   if (!ts) return 0;
   const days = (Date.now() - ts) / 86400000;
@@ -270,16 +311,36 @@ function recencyScore(item) {
   const typedBonus = item.typedVisits ? 2 : (item.typedCount ? 1 : 0);
   return base + typedBonus;
 }
-function frequencyScore(item) {
+
+function frequencyScore(item: RankItem): number {
   const visit = item.visitCount || 0;
   const typed = item.typedCount || item.typedVisits || 0;
   const c = visit + typed * 1.5;
   if (!c) return 0;
   return Math.log2(1 + c) * 1.2 + (typed ? 1 : 0);
 }
-const SOURCE_RANK = { tab: 0, history: 1, bookmark: 2 };
 
-export function rankMatches(query, list, fuzzy = true) {
+const SOURCE_RANK = {
+  tab: 0,
+  history: 1,
+  bookmark: 2,
+} as Record<string, number>;
+
+export function rankMatches(
+  query: unknown,
+  list: RankItem[],
+  fuzzy: false,
+): RankItem[];
+export function rankMatches(
+  query: unknown,
+  list: RankItem[],
+  fuzzy?: boolean,
+): RankMatch[];
+export function rankMatches(
+  query: unknown,
+  list: RankItem[],
+  fuzzy = true,
+): RankMatch[] | RankItem[] {
   const q = String(query).trim();
   if (!q) return [...list];
   if (!fuzzy) {
@@ -304,14 +365,15 @@ export function rankMatches(query, list, fuzzy = true) {
       const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
       return { item, match: { ...match, score: totalScore, baseScore }, span: match.indices.length > 0 ? last - first + 1 : 0, hayLength: hay.length, totalScore };
     })
-    .filter(Boolean)
+    .filter((r: RankMatch | null): r is RankMatch => r !== null)
     .sort((a, b) => {
       if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
       if (b.match.baseScore !== a.match.baseScore) return b.match.baseScore - a.match.baseScore;
       if (a.span !== b.span) return a.span - b.span;
       if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
       return (
-        (SOURCE_RANK[a.item.source] ?? 3) - (SOURCE_RANK[b.item.source] ?? 3)
+        (SOURCE_RANK[a.item.source as string] ?? 3) -
+        (SOURCE_RANK[b.item.source as string] ?? 3)
       );
     });
 }
