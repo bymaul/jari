@@ -2,7 +2,7 @@ import { COMMAND_CATALOG } from "./catalog.js";
 import { deepActiveElement, displayCombo, keysForCommand } from "./keymap.js";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { settings } from "./settings.js";
-import { createShadowHost, ui } from "./ui.js";
+import { createShadowHost, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";
 import { register, touch } from "./overlays.js";
 

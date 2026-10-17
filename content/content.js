@@ -8,7 +8,7 @@ import {
 } from "./keymap.js";
 import { settings } from "./settings.js";
 import { SHOW_HELP_ACTION } from "../popup/site.js";
-import { ui } from "./ui.js";
+import { ui } from "./ui.ts";
 import { commands, setModeActions } from "./commands.js";
 import { Overlays } from "./overlays.js";
 import { isEditable } from "./hints-elements.js";

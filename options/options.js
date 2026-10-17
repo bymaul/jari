@@ -19,7 +19,7 @@ import { searchEngineDefaults } from "../shared/search-engines.js";
 import { pageNavTextDefaults } from "../shared/page-nav-texts.js";
 import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
-import { ui } from "../content/ui.js";
+import { ui } from "../content/ui.ts";
 import { renderEngines, initEngines } from "./engines.js";
 import { renderPagenav, initPagenav } from "./pagenav.js";
 

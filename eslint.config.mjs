@@ -24,6 +24,10 @@ export default tseslint.config(
     // blocks below until each file moves over).
     files: ["**/*.ts"],
     extends: [tseslint.configs.recommended],
+    rules: {
+      // Clipboard/capture/screenshot fallbacks intentionally swallow errors.
+      "no-empty": ["error", { allowEmptyCatch: true }],
+    },
   },
   {
     // build.js is a plain Node script, not a browser content script.

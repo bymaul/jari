@@ -43,7 +43,7 @@ const distFiles = [
 await buildOne("content", "content.js", "bundle.js", buildBanner);
 await buildOne("options", "options.js", "options.bundle.js", buildBanner);
 await buildOne("popup", "popup.js", "popup.bundle.js", buildBanner);
-await buildOne("background", "main.js", "background.js", buildBanner);
+await buildOne("background", "main.ts", "background.js", buildBanner);
 
 console.log("Wrote content/bundle.js");
 console.log("Wrote options/options.bundle.js");

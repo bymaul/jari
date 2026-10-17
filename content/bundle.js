@@ -1392,7 +1392,7 @@
     toggleSiteEnabled
   };
 
-  // content/ui.js
+  // content/ui.ts
   function sendMessage(action, payload = {}) {
     return new Promise((resolve) => {
       try {
@@ -1442,7 +1442,7 @@
     return statusStack;
   }
   var toastEl = null;
-  var toastTimer = null;
+  var toastTimer;
   function toast(message) {
     if (!toastEl) {
       toastEl = document.createElement("div");
@@ -1492,7 +1492,7 @@
     }
   }
   var showcmdEl = null;
-  var flashTimer = null;
+  var flashTimer;
   function showcmd(text) {
     if (!text) {
       clearTimeout(flashTimer);
@@ -1669,7 +1669,8 @@
     for (const sel of CAPTURE_HIDE_SELECTORS) {
       try {
         const els = document.querySelectorAll(sel) || [];
-        for (const el of els) {
+        for (const node of els) {
+          const el = node;
           if (!el || !el.style) continue;
           hidden.push([el, el.style.display]);
           try {
@@ -1705,10 +1706,17 @@
     table.appendChild(tbody);
     return table;
   }
-  function buildCategorizedGrid(byCategory, { columnCount = 3, gridClass, columnClass, headerClass, renderEntries }) {
+  function buildCategorizedGrid(byCategory, {
+    columnCount = 3,
+    gridClass,
+    columnClass,
+    headerClass,
+    renderEntries
+  }) {
     const grid = document.createElement("div");
     grid.className = gridClass;
-    for (const cats of balanceCategories(byCategory, columnCount)) {
+    const columns = balanceCategories(byCategory, columnCount);
+    for (const cats of columns) {
       const col = document.createElement("div");
       col.className = columnClass;
       for (const cat of cats) {

@@ -1,4 +1,4 @@
-import { sendMessageWithTimeout, ui } from "./ui.js";
+import { sendMessageWithTimeout, ui } from "./ui.ts";
 import { register, touch } from "./overlays.js";
 import {
   normalizeRect,

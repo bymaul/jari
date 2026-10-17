@@ -2,7 +2,7 @@ import { Url, normalizeUrl } from "../shared/url.ts";
 import { parseEngineKeyword } from "../shared/search-engines.js";
 import { rankMatches } from "./rank.js";
 import { settings } from "./settings.js";
-import { sendMessage, createShadowHost, ui } from "./ui.js";
+import { sendMessage, createShadowHost, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";
 import { renderList as renderPromptList, move as movePrompt } from "./prompt/list.js";
 export { promptCss, renderText };

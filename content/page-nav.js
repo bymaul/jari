@@ -1,6 +1,6 @@
 import { getClickableElements } from "./hints-elements.js";
 import { settings } from "./settings.js";
-import { ui } from "./ui.js";
+import { ui } from "./ui.ts";
 
 function normText(value) {
   return String(value || "").trim().toLowerCase();

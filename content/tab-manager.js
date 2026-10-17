@@ -2,7 +2,7 @@ import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { parseEngineKeyword } from "../shared/search-engines.js";
 import { normalizeUrl, Url } from "../shared/url.ts";
 import { settings } from "./settings.js";
-import { createShadowHost, sendMessageWithTimeout, ui } from "./ui.js";
+import { createShadowHost, sendMessageWithTimeout, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";
 import { register, touch } from "./overlays.js";
 

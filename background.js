@@ -1479,7 +1479,7 @@
     openExtensions
   };
 
-  // background/main.js
+  // background/main.ts
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const handler = handlers[message && message.action];
     if (!handler) return;

@@ -1,5 +1,5 @@
 import { overlaySelectors, queryAll } from "./keymap.js";
-import { ui } from "./ui.js";
+import { ui } from "./ui.ts";
 import { FRAME_SELECTOR, isFrameElement } from "./hints-elements.js";
 import { MIN_SCROLL_AREA_SIZE } from "../shared/constants.js";
 import { settings } from "./settings.js";

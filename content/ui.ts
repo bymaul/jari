@@ -1,6 +1,10 @@
 import { balanceCategories, displayCombo } from "./keymap.js";
+import type { Action, MessagePayload, MessageResponse } from "../shared/protocol.ts";
 
-export function sendMessage(action, payload = {}) {
+export function sendMessage<A extends Action>(
+  action: A,
+  payload: MessagePayload<A> = {} as MessagePayload<A>,
+): Promise<MessageResponse<A> | null> {
   return new Promise((resolve) => {
     try {
       chrome.runtime.sendMessage({ action, ...payload }, (response) => {
@@ -15,11 +19,11 @@ export function sendMessage(action, payload = {}) {
 
 const CAPTURE_MESSAGE_TIMEOUT_MS = 8000;
 
-export function sendMessageWithTimeout(
-  action,
-  payload = {},
+export function sendMessageWithTimeout<A extends Action>(
+  action: A,
+  payload: MessagePayload<A> = {} as MessagePayload<A>,
   timeoutMs = CAPTURE_MESSAGE_TIMEOUT_MS,
-) {
+): Promise<MessageResponse<A> | null> {
   const cap =
     Number.isFinite(timeoutMs) && timeoutMs >= 0
       ? timeoutMs
@@ -59,10 +63,10 @@ function statusContainer() {
   return statusStack;
 }
 
-let toastEl = null;
-let toastTimer = null;
+let toastEl: HTMLDivElement | null = null;
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
-function toast(message) {
+function toast(message: string) {
   if (!toastEl) {
     toastEl = document.createElement("div");
     toastEl.className = "jari-toast";
@@ -71,12 +75,12 @@ function toast(message) {
   toastEl.textContent = message;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
-    toastEl.remove();
+    toastEl!.remove();
     toastEl = null;
   }, 1500);
 }
 
-async function copyText(text) {
+async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
@@ -94,7 +98,7 @@ async function copyText(text) {
   }
 }
 
-function withHiddenTextarea(fn) {
+function withHiddenTextarea(fn: (ta: HTMLTextAreaElement) => unknown) {
   const ta = document.createElement("textarea");
   ta.style.position = "fixed";
   ta.style.opacity = "0";
@@ -110,16 +114,16 @@ function withHiddenTextarea(fn) {
     ta.remove();
     if (prevFocus) {
       try {
-        safeFocus(prevFocus, { preventScroll: true });
+        safeFocus(prevFocus as HTMLElement, { preventScroll: true });
       } catch {}
     }
   }
 }
 
-let showcmdEl = null;
-let flashTimer = null;
+let showcmdEl: HTMLDivElement | null = null;
+let flashTimer: ReturnType<typeof setTimeout> | undefined;
 
-function showcmd(text) {
+function showcmd(text: string | null) {
   if (!text) {
     clearTimeout(flashTimer);
     if (showcmdEl) {
@@ -136,18 +140,18 @@ function showcmd(text) {
   showcmdEl.textContent = displayCombo(text);
 }
 
-function flash(text, ms = 600) {
+function flash(text: string | null, ms = 600) {
   showcmd(text);
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => showcmd(null), ms);
 }
 
-function consume(event) {
+function consume(event: Event) {
   event.preventDefault();
   event.stopImmediatePropagation();
 }
 
-function safeFocus(el, opts) {
+function safeFocus(el: HTMLElement, opts: FocusOptions) {
   try {
     el.focus(opts);
   } catch {
@@ -157,7 +161,7 @@ function safeFocus(el, opts) {
   }
 }
 
-function eventView(el) {
+function eventView(el: Element): Window {
   try {
     const doc = el.ownerDocument;
     if (doc && doc.defaultView) return doc.defaultView;
@@ -165,7 +169,7 @@ function eventView(el) {
   return window;
 }
 
-function pointerEvent(el, type, x, y, buttons) {
+function pointerEvent(el: Element, type: string, x: number, y: number, buttons: number) {
   const view = eventView(el);
   try {
     if (typeof PointerEvent === "function") {
@@ -196,7 +200,7 @@ function pointerEvent(el, type, x, y, buttons) {
   });
 }
 
-function mouseEvent(el, type, x, y, buttons) {
+function mouseEvent(el: Element, type: string, x: number, y: number, buttons: number) {
   return new MouseEvent(type, {
     bubbles: true,
     cancelable: true,
@@ -209,7 +213,7 @@ function mouseEvent(el, type, x, y, buttons) {
   });
 }
 
-function dispatchClick(el) {
+function dispatchClick(el: Element) {
   let x = 0;
   let y = 0;
   try {
@@ -226,7 +230,7 @@ function dispatchClick(el) {
     () => el.dispatchEvent(mouseEvent(el, "mouseover", x, y, 0)),
     () => el.dispatchEvent(pointerEvent(el, "pointerdown", x, y, 1)),
     () => el.dispatchEvent(mouseEvent(el, "mousedown", x, y, 1)),
-    () => safeFocus(el, { preventScroll: true }),
+    () => safeFocus(el as HTMLElement, { preventScroll: true }),
     () => el.dispatchEvent(pointerEvent(el, "pointerup", x, y, 0)),
     () => el.dispatchEvent(mouseEvent(el, "mouseup", x, y, 0)),
     () => el.dispatchEvent(mouseEvent(el, "click", x, y, 0)),
@@ -238,7 +242,7 @@ function dispatchClick(el) {
   }
 }
 
-function focusFrameElement(el) {
+function focusFrameElement(el: HTMLIFrameElement) {
   try {
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
   } catch {}
@@ -249,7 +253,11 @@ function focusFrameElement(el) {
   } catch {}
 }
 
-export function createShadowHost(hostClass, cssText, zIndex = "2147483646") {
+export function createShadowHost(
+  hostClass: string,
+  cssText: string,
+  zIndex = "2147483646",
+): { host: HTMLDivElement; shadow: ShadowRoot | HTMLDivElement } {
   const host = document.createElement("div");
   if (hostClass) host.className = hostClass;
   host.style.position = "fixed";
@@ -263,7 +271,8 @@ export function createShadowHost(hostClass, cssText, zIndex = "2147483646") {
   try {
     host.attachShadow({ mode: "open" });
   } catch {
-    host.shadowRoot = host;
+    (host as { shadowRoot: ShadowRoot | null }).shadowRoot =
+      host as unknown as ShadowRoot;
   }
   const shadow = host.shadowRoot || host;
   try {
@@ -291,12 +300,13 @@ const CAPTURE_HIDE_SELECTORS = [
   ".jari-flash",
 ];
 
-export function hideOverlaysForCapture() {
-  const hidden = [];
+export function hideOverlaysForCapture(): () => void {
+  const hidden: [HTMLElement, string][] = [];
   for (const sel of CAPTURE_HIDE_SELECTORS) {
     try {
       const els = document.querySelectorAll(sel) || [];
-      for (const el of els) {
+      for (const node of els) {
+        const el = node as HTMLElement;
         if (!el || !el.style) continue;
         hidden.push([el, el.style.display]);
         try {
@@ -317,7 +327,11 @@ export function hideOverlaysForCapture() {
   };
 }
 
-function buildCategoryTable(cat, headerClass, renderBody) {
+function buildCategoryTable(
+  cat: { label: string },
+  headerClass: string,
+  renderBody: (tbody: HTMLElement) => void,
+): HTMLTableElement {
   const table = document.createElement("table");
   const tbody = document.createElement("tbody");
   const headerRow = document.createElement("tr");
@@ -332,13 +346,29 @@ function buildCategoryTable(cat, headerClass, renderBody) {
   return table;
 }
 
-function buildCategorizedGrid(
-  byCategory,
-  { columnCount = 3, gridClass, columnClass, headerClass, renderEntries },
-) {
+function buildCategorizedGrid<E>(
+  byCategory: Map<string, E[]>,
+  {
+    columnCount = 3,
+    gridClass,
+    columnClass,
+    headerClass,
+    renderEntries,
+  }: {
+    columnCount?: number;
+    gridClass: string;
+    columnClass: string;
+    headerClass: string;
+    renderEntries: (tbody: HTMLElement, entries: E[]) => void;
+  },
+): HTMLDivElement {
   const grid = document.createElement("div");
   grid.className = gridClass;
-  for (const cats of balanceCategories(byCategory, columnCount)) {
+  const columns = balanceCategories(byCategory, columnCount) as {
+    id: string;
+    label: string;
+  }[][];
+  for (const cats of columns) {
     const col = document.createElement("div");
     col.className = columnClass;
     for (const cat of cats) {

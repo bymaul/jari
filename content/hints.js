@@ -1,4 +1,4 @@
-import { sendMessage, ui } from "./ui.js";
+import { sendMessage, ui } from "./ui.ts";
 import { register, touch } from "./overlays.js";
 import { settings } from "./settings.js";
 import {

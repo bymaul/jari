@@ -1,5 +1,5 @@
 import { settings } from "./settings.js";
-import { ui, createShadowHost } from "./ui.js";
+import { ui, createShadowHost } from "./ui.ts";
 import { COMMAND_CATALOG } from "./catalog.js";
 import { deepActiveElement, displayCombo } from "./keymap.js";
 import { register, touch } from "./overlays.js";

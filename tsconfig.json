@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "types": ["node", "chrome"]
   },
-  "include": ["shared", "tests"]
+  "include": ["shared/**/*", "tests/**/*.ts"]
 }

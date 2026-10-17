@@ -1,6 +1,6 @@
 /* global NodeFilter */
 import { register, touch } from "./overlays.js";
-import { ui } from "./ui.js";
+import { ui } from "./ui.ts";
 import {
   normalizeCharset,
   genLabels,

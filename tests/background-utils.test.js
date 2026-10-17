@@ -1,4 +1,4 @@
-import "./setup.mjs";
+import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
 import { clampCount, getStoredSettings } from "../background/utils.js";

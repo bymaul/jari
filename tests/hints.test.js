@@ -1,4 +1,4 @@
-import "./setup.mjs";
+import "./setup.ts";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
