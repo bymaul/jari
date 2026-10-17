@@ -1,4 +1,9 @@
-export const PAGE_NAV_TEXT_DEFAULTS = {
+export interface PageNavTexts {
+  next: string[];
+  prev: string[];
+}
+
+export const PAGE_NAV_TEXT_DEFAULTS: PageNavTexts = {
   next: ["Next", "Next page", "More results", "›", "»"],
   prev: ["Previous", "Prev", "Previous page", "‹", "«"],
 };
@@ -6,17 +11,20 @@ export const PAGE_NAV_TEXT_DEFAULTS = {
 export const MAX_PAGE_NAV_TEXTS = 20;
 export const PAGE_NAV_TEXT_MAX = 100;
 
-export function pageNavTextDefaults() {
+export function pageNavTextDefaults(): PageNavTexts {
   return {
     next: PAGE_NAV_TEXT_DEFAULTS.next.slice(),
     prev: PAGE_NAV_TEXT_DEFAULTS.prev.slice(),
   };
 }
 
-export function normalizePageNavTextList(raw, fallback) {
-  const list = Array.isArray(raw) ? raw : fallback;
-  const seen = new Set();
-  const out = [];
+export function normalizePageNavTextList(
+  raw: unknown,
+  fallback: string[],
+): string[] {
+  const list: unknown[] = Array.isArray(raw) ? raw : fallback;
+  const seen = new Set<string>();
+  const out: string[] = [];
   for (const entry of list) {
     if (out.length >= MAX_PAGE_NAV_TEXTS) break;
     const text = String(entry || "").trim();
@@ -29,11 +37,12 @@ export function normalizePageNavTextList(raw, fallback) {
   return out.length > 0 ? out : fallback.slice();
 }
 
-export function normalizePageNavTexts(raw) {
+export function normalizePageNavTexts(raw: unknown): PageNavTexts {
   const defaults = pageNavTextDefaults();
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+  const doc = raw as { next?: unknown; prev?: unknown };
   return {
-    next: normalizePageNavTextList(raw.next, defaults.next),
-    prev: normalizePageNavTextList(raw.prev, defaults.prev),
+    next: normalizePageNavTextList(doc.next, defaults.next),
+    prev: normalizePageNavTextList(doc.prev, defaults.prev),
   };
 }

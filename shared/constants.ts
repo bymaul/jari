@@ -1,10 +1,10 @@
-export const suggestionSources = ["tab", "history", "bookmark"];
+export const suggestionSources: string[] = ["tab", "history", "bookmark"];
 
 export const maxResultsDefault = 20;
 export const maxResultsMin = 5;
 export const maxResultsMax = 100;
 
-export function clampMaxResults(n) {
+export function clampMaxResults(n: number): number {
   const v = Math.floor(n);
   if (!Number.isFinite(v)) return maxResultsDefault;
   return Math.min(maxResultsMax, Math.max(maxResultsMin, v));

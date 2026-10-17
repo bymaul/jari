@@ -1,5 +1,5 @@
 import { Url, normalizeUrl } from "../shared/url.ts";
-import { parseEngineKeyword } from "../shared/search-engines.js";
+import { parseEngineKeyword } from "../shared/search-engines.ts";
 import { rankMatches } from "./rank.js";
 import { settings } from "./settings.js";
 import { sendMessage, createShadowHost, ui } from "./ui.ts";

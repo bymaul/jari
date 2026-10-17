@@ -3,7 +3,7 @@ import {
   MAX_PAGE_NAV_TEXTS,
   PAGE_NAV_TEXT_MAX,
   pageNavTextDefaults,
-} from "../shared/page-nav-texts.js";
+} from "../shared/page-nav-texts.ts";
 
 const pagenavNextEl = document.querySelector("#pagenav-next");
 const pagenavPrevEl = document.querySelector("#pagenav-prev");

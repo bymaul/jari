@@ -2,7 +2,7 @@
 
 "use strict";
 (() => {
-  // shared/tlds.js
+  // shared/tlds.ts
   var knownTlds = new Set(
     `
   aaa aarp abb abbott abbvie abc able abogado abudhabi ac academy accenture

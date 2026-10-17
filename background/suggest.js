@@ -1,9 +1,9 @@
-import { clampMaxResults, suggestionSources } from "../shared/constants.js";
+import { clampMaxResults, suggestionSources } from "../shared/constants.ts";
 import {
   buildEngineUrl,
   normalizeDefaultEngine,
   normalizeSearchEngines,
-} from "../shared/search-engines.js";
+} from "../shared/search-engines.ts";
 import { getStoredSettings } from "./utils.js";
 import { openInIncognito } from "./windows.js";
 

@@ -2,17 +2,17 @@ import {
   clampMaxResults,
   maxResultsDefault,
   suggestionSources,
-} from "../shared/constants.js";
+} from "../shared/constants.ts";
 import {
   DEFAULT_SEARCH_ENGINE,
   normalizeDefaultEngine,
   normalizeSearchEngines,
   searchEngineDefaults,
-} from "../shared/search-engines.js";
+} from "../shared/search-engines.ts";
 import {
   normalizePageNavTexts,
   pageNavTextDefaults,
-} from "../shared/page-nav-texts.js";
+} from "../shared/page-nav-texts.ts";
 import { normalizeSitePattern } from "../shared/url.ts";
 import { COMMAND_CATALOG } from "./catalog.js";
 

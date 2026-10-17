@@ -17,7 +17,7 @@ export const blockedUrlSchemes = new Set([
   "view-source",
 ]);
 
-import { knownTlds } from "./tlds.js";
+import { knownTlds } from "./tlds.ts";
 
 const fileExtensionDenylist = new Set([
   "js","ts","jsx","tsx","mjs","cjs","json","css","scss","less","html","htm","md","markdown","txt","csv","xml","yaml","yml","toml","ini","conf","config","sh","bash","zsh","fish","py","rb","php","java","c","cpp","h","hpp","cs","go","rs","swift","kt","kts","dart","vue","svelte","astro","lua","pl","pm","r","sql","db","sqlite","log","lock","env","gitignore","dockerignore","gradle","makefile","cmake",

@@ -2,7 +2,7 @@ import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
 import { clampCount, getStoredSettings } from "../background/utils.js";
-import { suggestionSources } from "../shared/constants.js";
+import { suggestionSources } from "../shared/constants.ts";
 
 test("background/utils direct import: clampCount", () => {
   assert.equal(clampCount(1), 1);

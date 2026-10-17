@@ -15,8 +15,8 @@ import {
   settingsDefaults,
 } from "../content/keymap.js";
 import { normalizeSitePattern } from "../shared/url.ts";
-import { searchEngineDefaults } from "../shared/search-engines.js";
-import { pageNavTextDefaults } from "../shared/page-nav-texts.js";
+import { searchEngineDefaults } from "../shared/search-engines.ts";
+import { pageNavTextDefaults } from "../shared/page-nav-texts.ts";
 import { COMMAND_CATALOG } from "../content/catalog.js";
 import { settings } from "../content/settings.js";
 import { ui } from "../content/ui.ts";

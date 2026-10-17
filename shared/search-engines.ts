@@ -1,4 +1,9 @@
-export const SEARCH_ENGINE_DEFAULTS = [
+export interface SearchEngine {
+  keyword: string;
+  url: string;
+}
+
+export const SEARCH_ENGINE_DEFAULTS: SearchEngine[] = [
   { keyword: "g", url: "https://www.google.com/search?q=%s" },
   { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
   { keyword: "gh", url: "https://github.com/search?q=%s" },
@@ -16,21 +21,22 @@ export const SEARCH_KEYWORD_RE = /^[a-z0-9_]{1,16}$/;
 export const SEARCH_ENGINE_URL_MAX = 500;
 export const RESERVED_ENGINE_KEYWORDS = ["t"];
 
-export function searchEngineDefaults() {
+export function searchEngineDefaults(): SearchEngine[] {
   return SEARCH_ENGINE_DEFAULTS.map((e) => ({ ...e }));
 }
 
-export function validateSearchEngine(entry) {
+export function validateSearchEngine(entry: unknown): string | null {
   if (!entry || typeof entry !== "object")
     return "Engine must have a keyword and URL.";
-  const keyword = String(entry.keyword || "").toLowerCase();
+  const e = entry as Record<string, unknown>;
+  const keyword = String(e.keyword || "").toLowerCase();
   if (!SEARCH_KEYWORD_RE.test(keyword)) {
     return "Keyword must be 1-16 letters, digits, or underscores.";
   }
   if (RESERVED_ENGINE_KEYWORDS.includes(keyword)) {
     return `Keyword "${keyword}" is reserved for tab search.`;
   }
-  const url = String(entry.url || "").trim();
+  const url = String(e.url || "").trim();
   if (!/^https?:\/\//i.test(url)) {
     return "URL must start with http:// or https://.";
   }
@@ -43,10 +49,10 @@ export function validateSearchEngine(entry) {
   return null;
 }
 
-export function normalizeSearchEngines(raw) {
+export function normalizeSearchEngines(raw: unknown): SearchEngine[] {
   if (!Array.isArray(raw)) return searchEngineDefaults();
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<string>();
+  const out: SearchEngine[] = [];
   for (const entry of raw) {
     if (out.length >= MAX_SEARCH_ENGINES) break;
     if (validateSearchEngine(entry)) continue;
@@ -58,7 +64,10 @@ export function normalizeSearchEngines(raw) {
   return out.length > 0 ? out : searchEngineDefaults();
 }
 
-export function normalizeDefaultEngine(raw, engines) {
+export function normalizeDefaultEngine(
+  raw: unknown,
+  engines: SearchEngine[],
+): string {
   const list =
     Array.isArray(engines) && engines.length > 0
       ? engines
@@ -68,7 +77,10 @@ export function normalizeDefaultEngine(raw, engines) {
   return list[0].keyword;
 }
 
-export function parseEngineKeyword(query, engines) {
+export function parseEngineKeyword(
+  query: string,
+  engines: SearchEngine[],
+): { keyword: string; rest: string; url: string } | null {
   const m = String(query || "")
     .trim()
     .match(/^(\w+)\s+(.*\S)/);
@@ -78,7 +90,11 @@ export function parseEngineKeyword(query, engines) {
   return { keyword: m[1].toLowerCase(), rest: m[2], url };
 }
 
-export function buildEngineUrl(engines, keyword, query) {
+export function buildEngineUrl(
+  engines: SearchEngine[],
+  keyword: string,
+  query: string,
+): string | null {
   const kw = String(keyword || "").toLowerCase();
   const engine = (engines || []).find((e) => e && e.keyword === kw);
   if (!engine) return null;

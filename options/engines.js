@@ -3,7 +3,7 @@ import {
   MAX_SEARCH_ENGINES,
   searchEngineDefaults,
   validateSearchEngine,
-} from "../shared/search-engines.js";
+} from "../shared/search-engines.ts";
 import { settingsDefaults } from "../content/keymap.js";
 
 const engineListEl = document.querySelector("#engine-list");

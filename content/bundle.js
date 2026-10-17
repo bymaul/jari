@@ -2,7 +2,7 @@
 
 "use strict";
 (() => {
-  // shared/constants.js
+  // shared/constants.ts
   var suggestionSources = ["tab", "history", "bookmark"];
   var maxResultsDefault = 20;
   var maxResultsMin = 5;
@@ -14,7 +14,7 @@
   }
   var MIN_SCROLL_AREA_SIZE = 16;
 
-  // shared/search-engines.js
+  // shared/search-engines.ts
   var SEARCH_ENGINE_DEFAULTS = [
     { keyword: "g", url: "https://www.google.com/search?q=%s" },
     { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
@@ -36,14 +36,15 @@
   function validateSearchEngine(entry) {
     if (!entry || typeof entry !== "object")
       return "Engine must have a keyword and URL.";
-    const keyword = String(entry.keyword || "").toLowerCase();
+    const e = entry;
+    const keyword = String(e.keyword || "").toLowerCase();
     if (!SEARCH_KEYWORD_RE.test(keyword)) {
       return "Keyword must be 1-16 letters, digits, or underscores.";
     }
     if (RESERVED_ENGINE_KEYWORDS.includes(keyword)) {
       return `Keyword "${keyword}" is reserved for tab search.`;
     }
-    const url = String(entry.url || "").trim();
+    const url = String(e.url || "").trim();
     if (!/^https?:\/\//i.test(url)) {
       return "URL must start with http:// or https://.";
     }
@@ -89,7 +90,7 @@
     return String(engine.url).replaceAll("%s", encodeURIComponent(query5));
   }
 
-  // shared/page-nav-texts.js
+  // shared/page-nav-texts.ts
   var PAGE_NAV_TEXT_DEFAULTS = {
     next: ["Next", "Next page", "More results", "\u203A", "\xBB"],
     prev: ["Previous", "Prev", "Previous page", "\u2039", "\xAB"]
@@ -120,13 +121,14 @@
   function normalizePageNavTexts(raw) {
     const defaults = pageNavTextDefaults();
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+    const doc = raw;
     return {
-      next: normalizePageNavTextList(raw.next, defaults.next),
-      prev: normalizePageNavTextList(raw.prev, defaults.prev)
+      next: normalizePageNavTextList(doc.next, defaults.next),
+      prev: normalizePageNavTextList(doc.prev, defaults.prev)
     };
   }
 
-  // shared/tlds.js
+  // shared/tlds.ts
   var knownTlds = new Set(
     `
   aaa aarp abb abbott abbvie abc able abogado abudhabi ac academy accenture

@@ -29,7 +29,7 @@
     return synced || local || {};
   }
 
-  // shared/tlds.js
+  // shared/tlds.ts
   var knownTlds = new Set(
     `
   aaa aarp abb abbott abbvie abc able abogado abudhabi ac academy accenture
@@ -1200,7 +1200,7 @@
     }
   }
 
-  // shared/constants.js
+  // shared/constants.ts
   var suggestionSources = ["tab", "history", "bookmark"];
   var maxResultsDefault = 20;
   var maxResultsMin = 5;
@@ -1211,7 +1211,7 @@
     return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
   }
 
-  // shared/search-engines.js
+  // shared/search-engines.ts
   var SEARCH_ENGINE_DEFAULTS = [
     { keyword: "g", url: "https://www.google.com/search?q=%s" },
     { keyword: "yt", url: "https://www.youtube.com/results?search_query=%s" },
@@ -1232,14 +1232,15 @@
   function validateSearchEngine(entry) {
     if (!entry || typeof entry !== "object")
       return "Engine must have a keyword and URL.";
-    const keyword = String(entry.keyword || "").toLowerCase();
+    const e = entry;
+    const keyword = String(e.keyword || "").toLowerCase();
     if (!SEARCH_KEYWORD_RE.test(keyword)) {
       return "Keyword must be 1-16 letters, digits, or underscores.";
     }
     if (RESERVED_ENGINE_KEYWORDS.includes(keyword)) {
       return `Keyword "${keyword}" is reserved for tab search.`;
     }
-    const url = String(entry.url || "").trim();
+    const url = String(e.url || "").trim();
     if (!/^https?:\/\//i.test(url)) {
       return "URL must start with http:// or https://.";
     }
