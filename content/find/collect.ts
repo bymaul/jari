@@ -5,7 +5,7 @@ import { isElementDrawn } from "../hints-elements.js";
 
 const SKIP_SELECTOR = `${overlaySelectors}, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay, [aria-hidden="true"], [hidden]`;
 
-function shouldSkipNode(node) {
+function shouldSkipNode(node: Node): boolean {
   const parent = node.parentElement;
   if (!parent) return true;
   const tag = parent.tagName;
@@ -14,7 +14,9 @@ function shouldSkipNode(node) {
     if (parent.closest && parent.closest(SKIP_SELECTOR)) return true;
   } catch {}
   try {
-    const root = parent.getRootNode && parent.getRootNode();
+    const root = (parent.getRootNode && parent.getRootNode()) as {
+      host?: ShadowRoot;
+    };
     if (root && root.host && root.host.classList) {
       const host = root.host;
       if (
@@ -28,8 +30,8 @@ function shouldSkipNode(node) {
         return true;
     }
   } catch {}
-  let rect;
-  let style;
+  let rect: DOMRect | null;
+  let style: CSSStyleDeclaration | null;
   try {
     rect = parent.getBoundingClientRect();
   } catch {
@@ -48,8 +50,8 @@ function shouldSkipNode(node) {
   return false;
 }
 
-export function collectTextNodes() {
-  const out = [];
+export function collectTextNodes(): Node[] {
+  const out: Node[] = [];
   const rootEl = document.body || document.documentElement;
   if (!rootEl) return out;
   try {
@@ -72,8 +74,8 @@ export function collectTextNodes() {
     }
   } catch {}
   try {
-    const visit = (root) => {
-      let els;
+    const visit = (root: Document | ShadowRoot): void => {
+      let els: NodeListOf<Element>;
       try {
         els = root.querySelectorAll("*");
       } catch { return; }
@@ -102,7 +104,7 @@ export function collectTextNodes() {
         }
         if (el.tagName === "IFRAME") {
           try {
-            const doc = el.contentDocument;
+            const doc = (el as HTMLIFrameElement).contentDocument;
             if (doc && doc.body) {
               const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
                 acceptNode(n) {

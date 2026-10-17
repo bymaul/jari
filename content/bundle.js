@@ -5298,7 +5298,7 @@
     }
   }
 
-  // content/find/matcher.js
+  // content/find/matcher.ts
   function hasUpperCase(s) {
     return /\p{Lu}/u.test(s);
   }
@@ -5309,7 +5309,7 @@
     return new RegExp(src, flags);
   }
 
-  // content/find/collect.js
+  // content/find/collect.ts
   var SKIP_SELECTOR = `${overlaySelectors}, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay, [aria-hidden="true"], [hidden]`;
   function shouldSkipNode(node) {
     const parent = node.parentElement;

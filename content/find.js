@@ -7,8 +7,8 @@ import {
   detectHighlightSupport,
   clearHighlightNames,
 } from "./highlight.js";
-import { buildMatcher, hasUpperCase } from "./find/matcher.js";
-import { collectTextNodes } from "./find/collect.js";
+import { buildMatcher, hasUpperCase } from "./find/matcher.ts";
+import { collectTextNodes } from "./find/collect.ts";
 import { Visual } from "./visual.js";
 
 export { buildMatcher, hasUpperCase };

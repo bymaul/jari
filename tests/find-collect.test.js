@@ -1,7 +1,7 @@
 import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
-import { collectTextNodes } from "../content/find/collect.js";
+import { collectTextNodes } from "../content/find/collect.ts";
 
 function fakeParent(tag, className = "", closestImpl = null) {
   return {
