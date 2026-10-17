@@ -2,7 +2,7 @@ import "./setup.ts";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-const { Scroll, frameScrollBox, __smoothFrameMove } = await import("../content/scroll.js");
+const { Scroll, frameScrollBox, __smoothFrameMove } = await import("../content/scroll.ts");
 
 const VW = 800;
 const VH = 600;

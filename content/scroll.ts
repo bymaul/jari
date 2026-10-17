@@ -4,19 +4,22 @@ import { FRAME_SELECTOR, isFrameElement } from "./hints-elements.js";
 import { MIN_SCROLL_AREA_SIZE } from "../shared/constants.ts";
 import { settings } from "./settings.ts";
 
-let target = null;
+let target: Element | null = null;
 
 const HIGHLIGHT_MS = 400;
 
-function getTarget() {
+function getTarget(): Element | Window {
   if (target !== null && !target.isConnected) {
     target = null;
   }
   return target === null ? window : target;
 }
 
-function isScrollVisible(el, selfStyle) {
-  let node = el;
+function isScrollVisible(
+  el: Element,
+  selfStyle?: CSSStyleDeclaration,
+): boolean {
+  let node: Element | null | undefined = el;
   let first = true;
   while (node) {
     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -30,7 +33,8 @@ function isScrollVisible(el, selfStyle) {
       if (parseFloat(style.opacity) === 0) return false;
     }
     first = false;
-    node = node.getRootNode().host || node.parentElement;
+    const root = node.getRootNode() as { host?: Element | null };
+    node = root.host || node.parentElement;
   }
   return true;
 }
@@ -50,9 +54,12 @@ const NON_SCROLL_TAGS = new Set([
   "TEMPLATE",
 ]);
 
-function findScrollableElements() {
-  const areas = [];
-  const roots = new Set([document.documentElement, document.body]);
+function findScrollableElements(): Element[] {
+  const areas: Element[] = [];
+  const roots = new Set<Element>([
+    document.documentElement,
+    document.body as HTMLElement,
+  ]);
   const vw = window.innerWidth || 0;
   const vh = window.innerHeight || 0;
 
@@ -65,7 +72,7 @@ function findScrollableElements() {
       el.clientWidth < MIN_SCROLL_AREA_SIZE
     )
       continue;
-    let rect;
+    let rect: DOMRect | undefined;
     try {
       rect = el.getBoundingClientRect();
     } catch {
@@ -106,13 +113,13 @@ function findScrollableElements() {
   return areas;
 }
 
-function findFrameElements() {
-  const frames = [];
+function findFrameElements(): HTMLIFrameElement[] {
+  const frames: HTMLIFrameElement[] = [];
   for (const el of queryAll(FRAME_SELECTOR)) {
     try {
       if (el.closest && el.closest(overlaySelectors)) continue;
     } catch {}
-    let rect;
+    let rect: DOMRect | undefined;
     try {
       rect = el.getBoundingClientRect();
     } catch {
@@ -129,18 +136,18 @@ function findFrameElements() {
     const vh = window.innerHeight || 0;
     if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
       continue;
-    if (!isFrameScrollable(el, rect)) continue;
-    frames.push(el);
+    if (!isFrameScrollable(el as HTMLIFrameElement, rect)) continue;
+    frames.push(el as HTMLIFrameElement);
   }
   return frames;
 }
 
-export function isFrame(el) {
+export function isFrame(el: Element | Window | null | undefined): boolean {
   if (!el || el === window) return false;
   return isFrameElement(el);
 }
 
-function frameDoc(frame) {
+function frameDoc(frame: HTMLIFrameElement): Document | null {
   try {
     return frame.contentDocument || null;
   } catch {
@@ -148,7 +155,7 @@ function frameDoc(frame) {
   }
 }
 
-function docScrolls(doc) {
+function docScrolls(doc: Document): boolean {
   const root =
     doc.scrollingElement || doc.documentElement || doc.body || null;
   if (!root) return false;
@@ -158,8 +165,11 @@ function docScrolls(doc) {
   );
 }
 
-function frameStyleOf(frame, el) {
-  let view;
+function frameStyleOf(
+  frame: HTMLIFrameElement,
+  el: Element,
+): CSSStyleDeclaration {
+  let view: Window | null;
   try {
     view = frame.contentWindow || null;
   } catch {
@@ -171,7 +181,10 @@ function frameStyleOf(frame, el) {
   return window.getComputedStyle(el);
 }
 
-function frameInnerBoxes(frame, frameRect) {
+function frameInnerBoxes(
+  frame: HTMLIFrameElement,
+  frameRect?: DOMRect | null,
+): { el: Element; overflow: number }[] {
   const doc = frameDoc(frame);
   if (!doc || !doc.body) return [];
   if (!frameRect) {
@@ -184,13 +197,13 @@ function frameInnerBoxes(frame, frameRect) {
   }
   const vw = window.innerWidth || 0;
   const vh = window.innerHeight || 0;
-  let nodes;
+  let nodes: NodeListOf<Element>;
   try {
     nodes = doc.body.querySelectorAll("*") || [];
   } catch {
     return [];
   }
-  const boxes = [];
+  const boxes: { el: Element; overflow: number }[] = [];
   for (const el of nodes) {
     try {
       const tag = el.tagName;
@@ -218,7 +231,7 @@ function frameInnerBoxes(frame, frameRect) {
           overflowX === "overlay") &&
         canX;
       if (!scrollableY && !scrollableX) continue;
-      let r = null;
+      let r: DOMRect | null = null;
       try {
         r = el.getBoundingClientRect();
       } catch {
@@ -247,7 +260,10 @@ function frameInnerBoxes(frame, frameRect) {
   return boxes;
 }
 
-function isFrameScrollable(el, rect) {
+function isFrameScrollable(
+  el: HTMLIFrameElement,
+  rect?: DOMRect | null,
+): boolean {
   const doc = frameDoc(el);
   if (!doc) return true;
   try {
@@ -262,7 +278,7 @@ function isFrameScrollable(el, rect) {
   }
 }
 
-export function frameScrollBox(frame) {
+export function frameScrollBox(frame: HTMLIFrameElement): Element | null {
   if (!frame) return null;
   const doc = frameDoc(frame);
   if (!doc) return null;
@@ -271,7 +287,7 @@ export function frameScrollBox(frame) {
   } catch {
     return null;
   }
-  let best = null;
+  let best: Element | null = null;
   let bestOverflow = 0;
   for (const box of frameInnerBoxes(frame)) {
     if (box.overflow > bestOverflow) {
@@ -282,20 +298,20 @@ export function frameScrollBox(frame) {
   return best;
 }
 
-export function focusTarget(el) {
+export function focusTarget(el: Element | Window | null | undefined): void {
   if (!el || el === window) return;
   try {
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
   } catch {}
   if (!isFrame(el)) return;
-  ui.safeFocus(el, { preventScroll: true });
+  ui.safeFocus(el as HTMLElement, { preventScroll: true });
   try {
-    const win = el.contentWindow;
+    const win = (el as HTMLIFrameElement).contentWindow;
     if (win && typeof win.focus === "function") win.focus();
   } catch {}
 }
 
-export function frameWindow(frame) {
+export function frameWindow(frame: HTMLIFrameElement): Window | null {
   try {
     return frame.contentWindow || null;
   } catch {
@@ -303,7 +319,7 @@ export function frameWindow(frame) {
   }
 }
 
-export function frameViewportHeight(frame) {
+export function frameViewportHeight(frame: HTMLIFrameElement): number {
   try {
     const box = frameScrollBox(frame);
     if (box && Number.isFinite(box.clientHeight)) return box.clientHeight;
@@ -328,34 +344,34 @@ function isTopFrame() {
 function releaseFrameFocus() {
   try {
     const active = document.activeElement;
-    if (active && isFrame(active)) active.blur();
+    if (active && isFrame(active)) (active as HTMLElement).blur();
   } catch {}
   try {
     window.focus();
   } catch {}
 }
 
-function forwardCycleToTop(dir) {
+function forwardCycleToTop(dir?: number) {
   try {
-    window.top.postMessage({ type: CYCLE_FROM_FRAME, dir }, "*");
+    (window.top as Window).postMessage({ type: CYCLE_FROM_FRAME, dir }, "*");
   } catch {}
   try {
     if (
       document.activeElement &&
       typeof document.activeElement.blur === "function"
     ) {
-      document.activeElement.blur();
+      (document.activeElement as HTMLElement).blur();
     }
   } catch {}
   try {
     window.blur();
   } catch {}
   try {
-    window.top.focus();
+    (window.top as Window).focus();
   } catch {}
 }
 
-function pageCanScroll() {
+function pageCanScroll(): boolean {
   const el = document.scrollingElement || document.documentElement;
   if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
   const y = window.getComputedStyle(el).overflowY;
@@ -369,7 +385,7 @@ function pageCanScroll() {
 
 const DIALOG_SELECTOR = 'dialog[open], [role="dialog"], [aria-modal="true"]';
 
-function isDialogStop(el) {
+function isDialogStop(el: Element | Window | null | undefined): boolean {
   if (!el || el === window) return false;
   try {
     if (el.tagName === "DIALOG") return true;
@@ -385,7 +401,7 @@ function isDialogStop(el) {
   return false;
 }
 
-function currentStops() {
+function currentStops(): (Element | null)[] {
   const areas = dedupeNestedAreas(findScrollableElements());
   const frames = findFrameElements();
   const pageScrolls = pageCanScroll();
@@ -394,7 +410,7 @@ function currentStops() {
   return [...new Set(stops)];
 }
 
-function rectTopLeft(el) {
+function rectTopLeft(el: Element): { top: number; left: number } | null {
   try {
     const r = el.getBoundingClientRect();
     if (!r) return null;
@@ -404,7 +420,7 @@ function rectTopLeft(el) {
   }
 }
 
-function sortStopsVisually(stops) {
+function sortStopsVisually(stops: Element[]): Element[] {
   return stops
     .map((el, i) => ({ el, i, pos: rectTopLeft(el) }))
     .sort((a, b) => {
@@ -418,9 +434,9 @@ function sortStopsVisually(stops) {
     .map(({ el }) => el);
 }
 
-function dedupeNestedAreas(areas) {
-  const kept = [];
-  const contains = (outer, inner) => {
+function dedupeNestedAreas(areas: Element[]): Element[] {
+  const kept: Element[] = [];
+  const contains = (outer: Element, inner: Element): boolean => {
     try {
       return (
         outer !== inner &&
@@ -442,10 +458,10 @@ function dedupeNestedAreas(areas) {
   return kept;
 }
 
-function isUnverifiedFrame(el) {
+function isUnverifiedFrame(el: Element): boolean {
   if (!isFrame(el)) return false;
   try {
-    return !el.contentDocument;
+    return !(el as HTMLIFrameElement).contentDocument;
   } catch {
     return true;
   }
@@ -475,32 +491,32 @@ function cycle(steps = 1) {
   showHighlight(stops);
 }
 
-function scrollHeightOf(el) {
+function scrollHeightOf(el: Element | Window): number {
   return el === window
     ? (document.scrollingElement || document.documentElement || document.body).scrollHeight
     : el.scrollHeight;
 }
 
-function clientHeightOf(el) {
+function clientHeightOf(el: Element | Window): number {
   return el === window ? window.innerHeight : el.clientHeight;
 }
 
-function scrollPosOf(el) {
+function scrollPosOf(el: Element | Window): { x: number; y: number } {
   return el === window
     ? { x: window.scrollX, y: window.scrollY }
     : { x: el.scrollLeft, y: el.scrollTop };
 }
 
-let highlightEl = null;
-let highlightTimer = null;
+let highlightEl: HTMLDivElement | null = null;
+let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
-function showHighlight(precomputedStops) {
+function showHighlight(precomputedStops?: (Element | null)[]): void {
   const area = getTarget();
   const stops = precomputedStops || currentStops();
   const pos = stops.indexOf(area === window ? null : area);
   const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
   if (!document.body) return;
-  let rect;
+  let rect: { left: number; top: number; width: number; height: number };
   if (area === window) {
     rect = {
       left: 0,
@@ -555,14 +571,20 @@ function reset() {
   showHighlight();
 }
 
-let smoothState = null;
+let smoothState: {
+  el: Element | Window;
+  x: number;
+  y: number;
+  rafId: ReturnType<typeof requestAnimationFrame> | null;
+  last: number | null;
+} | null = null;
 
 const SMOOTH_BASE_MS = 1000 / 60;
 const SMOOTH_FRACTION = 0.4;
 const SMOOTH_CAP = 80;
 const SMOOTH_MAX_DT_MS = 100;
 
-function prefersReducedMotion() {
+function prefersReducedMotion(): boolean {
   try {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   } catch {
@@ -570,7 +592,7 @@ function prefersReducedMotion() {
   }
 }
 
-function flushSmoothQueue() {
+function flushSmoothQueue(): void {
   if (!smoothState) return;
   const { el, x, y } = smoothState;
   smoothState = null;
@@ -580,7 +602,11 @@ function flushSmoothQueue() {
   } catch {}
 }
 
-export function smoothScrollBy(el, x, y) {
+export function smoothScrollBy(
+  el: Element | Window,
+  x: number,
+  y: number,
+): void {
   if (smoothState === null) {
     smoothState = { el, x: 0, y: 0, rafId: null, last: null };
   } else if (smoothState.el !== el) {
@@ -598,7 +624,7 @@ export function smoothScrollBy(el, x, y) {
 // of "40% per 60fps frame". Identical feel at 60fps, but dropped frames
 // cover proportionally more instead of slowing the whole motion down the
 // way a fixed per-frame share does under load.
-export function __smoothFrameMove(pending, dt) {
+export function __smoothFrameMove(pending: number, dt: number): number {
   const step = Number.isFinite(dt) && dt > 0 ? dt : SMOOTH_BASE_MS;
   const frac = 1 - Math.pow(1 - SMOOTH_FRACTION, step / SMOOTH_BASE_MS);
   const cap = SMOOTH_CAP * (step / SMOOTH_BASE_MS);
@@ -606,7 +632,7 @@ export function __smoothFrameMove(pending, dt) {
   return Math.sign(pending) * Math.max(1, Math.min(cap, want));
 }
 
-function smoothScrollStep(t) {
+function smoothScrollStep(t: number): void {
   if (!smoothState) return;
   smoothState.rafId = null;
   const { el } = smoothState;
@@ -645,13 +671,13 @@ function smoothScrollStep(t) {
   smoothState.rafId = requestAnimationFrame(smoothScrollStep);
 }
 
-export function shouldSmooth() {
+export function shouldSmooth(): boolean {
   return settings.isSmoothScroll() && !prefersReducedMotion();
 }
 
 export const Scroll = { getTarget, cycle, reset, showHighlight };
 
-function handleCycleMessage(event) {
+function handleCycleMessage(event: MessageEvent): void {
   if (!isTopFrame()) return;
   const data = event && event.data;
   if (!data || data.type !== CYCLE_FROM_FRAME) return;
@@ -659,9 +685,9 @@ function handleCycleMessage(event) {
   cycle(data.dir === -1 ? -1 : 1);
 }
 
-function isChildFrameWindow(win) {
+function isChildFrameWindow(win: unknown): boolean {
   if (!win || win === window) return false;
-  let frames;
+  let frames: Iterable<Element>;
   try {
     frames = document.querySelectorAll
       ? document.querySelectorAll(FRAME_SELECTOR)
@@ -671,7 +697,7 @@ function isChildFrameWindow(win) {
   }
   for (const el of frames) {
     try {
-      if (el.contentWindow === win) return true;
+      if ((el as HTMLIFrameElement).contentWindow === win) return true;
     } catch {}
   }
   return false;

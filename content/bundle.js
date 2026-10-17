@@ -2372,7 +2372,7 @@
     return out;
   }
 
-  // content/scroll.js
+  // content/scroll.ts
   var target = null;
   var HIGHLIGHT_MS = 400;
   function getTarget() {
@@ -2393,7 +2393,8 @@
         if (parseFloat(style.opacity) === 0) return false;
       }
       first = false;
-      node = node.getRootNode().host || node.parentElement;
+      const root = node.getRootNode();
+      node = root.host || node.parentElement;
     }
     return true;
   }
@@ -2413,7 +2414,10 @@
   ]);
   function findScrollableElements() {
     const areas = [];
-    const roots = /* @__PURE__ */ new Set([document.documentElement, document.body]);
+    const roots = /* @__PURE__ */ new Set([
+      document.documentElement,
+      document.body
+    ]);
     const vw = window.innerWidth || 0;
     const vh = window.innerHeight || 0;
     for (const el of queryAll("*")) {
@@ -2783,7 +2787,7 @@
     return el === window ? { x: window.scrollX, y: window.scrollY } : { x: el.scrollLeft, y: el.scrollTop };
   }
   var highlightEl = null;
-  var highlightTimer = null;
+  var highlightTimer;
   function showHighlight(precomputedStops) {
     const area = getTarget();
     const stops = precomputedStops || currentStops();
