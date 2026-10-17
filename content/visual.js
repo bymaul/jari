@@ -8,7 +8,7 @@ import {
   createHintsHost,
   layoutHints,
 } from "./hint-layer.ts";
-import { getLinkAncestor, isEditable } from "./hints-elements.js";
+import { getLinkAncestor, isEditable } from "./hints-elements.ts";
 import { collectVisualTextElements } from "./visual/collect.js";
 import {
   isUsableCaretRect,

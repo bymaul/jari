@@ -4,7 +4,7 @@ import {
   filterInvisibleElements,
   filterOverlapElements,
   filterAncestors,
-} from "../hints-elements.js";
+} from "../hints-elements.ts";
 
 export function collectVisualTextElements() {
   let elements = getVisibleElements((e, v) => {

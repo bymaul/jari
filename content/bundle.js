@@ -1722,7 +1722,7 @@
     hideOverlaysForCapture
   };
 
-  // content/hints-elements.js
+  // content/hints-elements.ts
   var SHOW_ELEMENT = 1;
   var CLICKABLE_SELECTOR = "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
   var INPUT_SELECTOR = 'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
@@ -1772,7 +1772,8 @@
       const walker = document.createTreeWalker(root, whatToShow, {
         acceptNode(node2) {
           try {
-            if (node2.tagName && NON_RENDERED_TAGS.has(node2.tagName)) return 3;
+            if (node2.tagName && NON_RENDERED_TAGS.has(node2.tagName))
+              return 3;
           } catch {
           }
           return 1;
@@ -1786,7 +1787,9 @@
         }
         if (node.shadowRoot) {
           try {
-            out.push(...listElements(node.shadowRoot, whatToShow, filter));
+            out.push(
+              ...listElements(node.shadowRoot, whatToShow, filter)
+            );
           } catch {
           }
         }
@@ -2015,7 +2018,8 @@
       }
       for (let j = 0; j < result.length; j++) {
         if (result[j].contains(e)) {
-          if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
+          if (result[j].tagName !== "A" || !result[j].href)
+            result[j] = e;
           return;
         } else if (result[j].shadowRoot && result[j].shadowRoot.contains(e)) {
           return;
@@ -2030,7 +2034,8 @@
   function filterOverlapElements(elements2) {
     elements2 = elements2.filter((e) => {
       const be = getRealRect(e);
-      if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
+      if (e.disabled || e.readOnly || !isElementDrawn(e, be))
+        return false;
       if (e.matches && e.matches("input, textarea, select, form") || e.contentEditable === "true" || isExplicitlyRequested(e))
         return true;
       try {
@@ -2108,12 +2113,16 @@
     const raw = el.getAttribute ? el.getAttribute("href") ?? el.getAttribute("xlink:href") : null;
     if (raw != null && (raw.startsWith("#") || raw.trim() === "")) return null;
     try {
-      if (typeof el.href === "string" && el.href) return el.href;
+      if (typeof el.href === "string" && el.href)
+        return el.href;
     } catch {
     }
     if (!raw) return null;
     try {
-      const url = new URL(raw, base || el._jariBase || location.href);
+      const url = new URL(
+        raw,
+        base || el._jariBase || location.href
+      );
       return url.href;
     } catch {
       return null;
@@ -2158,7 +2167,8 @@
         cur = parent;
       } else {
         const root = cur.getRootNode && cur.getRootNode();
-        if (root && root.host) cur = root.host;
+        const host6 = root ? root.host : null;
+        if (host6) cur = host6;
         else break;
       }
     }
@@ -2226,7 +2236,8 @@
   }
   function getHintRect(el) {
     try {
-      if (el && el._jariViewportRect) return el._jariViewportRect;
+      if (el && el._jariViewportRect)
+        return el._jariViewportRect;
     } catch {
     }
     return getRealRect(el);
@@ -2242,27 +2253,28 @@
     const vw = window.innerWidth || 0;
     const vh = window.innerHeight || 0;
     for (const frame of frames) {
+      const htmlFrame = frame;
       try {
-        if (frame.closest && frame.closest(overlaySelectors)) continue;
+        if (htmlFrame.closest && htmlFrame.closest(overlaySelectors)) continue;
       } catch {
       }
       let doc;
       try {
-        doc = frame.contentDocument;
+        doc = htmlFrame.contentDocument;
       } catch {
         continue;
       }
       if (!doc || !doc.body) continue;
       let rect;
       try {
-        rect = frame.getBoundingClientRect();
+        rect = htmlFrame.getBoundingClientRect();
       } catch {
         continue;
       }
       if (!rect) continue;
       if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
         continue;
-      out.push({ frame, doc, rect });
+      out.push({ frame: htmlFrame, doc, rect });
     }
     return out;
   }
@@ -2361,9 +2373,10 @@
         if (el.disabled || el.readOnly) return;
         if (!innerPointVisible(el, be)) return;
         try {
-          el._jariViewportRect = t;
-          el._jariBase = base;
-          el._jariFrame = frame;
+          const jel = el;
+          jel._jariViewportRect = t;
+          jel._jariBase = base;
+          jel._jariFrame = frame;
         } catch {
         }
         out.push(el);

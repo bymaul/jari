@@ -2,7 +2,7 @@
 
 import { isWordChar, findNextWordEnd } from "./word.js";
 import { collectVisualTextElements } from "./collect.js";
-import { getRealRect } from "../hints-elements.js";
+import { getRealRect } from "../hints-elements.ts";
 
 function getSelection() {
   return window.getSelection();

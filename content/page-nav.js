@@ -1,4 +1,4 @@
-import { getClickableElements } from "./hints-elements.js";
+import { getClickableElements } from "./hints-elements.ts";
 import { settings } from "./settings.ts";
 import { ui } from "./ui.ts";
 

@@ -6,21 +6,38 @@ import { settings } from "./settings.ts";
 // loads where NodeFilter is undefined (unit tests).
 const SHOW_ELEMENT = 1;
 
+/** Rect-shaped plain object; DOMRect is structurally compatible. */
+type RectLike = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
+/** Jari expandos stored on hint targets (see collectIframeElements). */
+interface JariElement extends Element {
+  _jariBase?: string;
+  _jariViewportRect?: RectLike;
+  _jariFrame?: Element;
+}
+
 export const CLICKABLE_SELECTOR =
   "a, button, select, input, textarea, summary, *[onclick], *[contenteditable=true], *.jfk-button, *.goog-flat-menu-button, *[role=button], *[role=link], *[role=menuitem], *[role=option], *[role=switch], *[role=tab], *[role=checkbox], *[role=combobox], *[role=menuitemcheckbox], *[role=menuitemradio]";
 export const INPUT_SELECTOR =
   'input:not([disabled]):not([type=hidden]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="searchbox"], [role="combobox"]';
 export const FRAME_SELECTOR = "iframe,frame";
 
-const openableCache = new Map();
+const openableCache = new Map<string, boolean>();
 
-export function isFrameElement(el) {
+export function isFrameElement(el: Element | null | undefined): boolean {
   if (!el) return false;
   const tag = el.tagName;
   return tag === "IFRAME" || tag === "FRAME";
 }
 
-export function isEditable(el) {
+export function isEditable(el: Element | null | undefined): boolean {
   if (!el) return false;
   const tag = el.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
@@ -31,7 +48,11 @@ export function isEditable(el) {
   return false;
 }
 
-export function isElementDrawn(e, rect, style) {
+export function isElementDrawn(
+  e: Element,
+  rect?: DOMRect | null,
+  style?: CSSStyleDeclaration,
+): boolean {
   const min = isEditable(e) ? 1 : 4;
   rect = rect || e.getBoundingClientRect();
   const st = style || window.getComputedStyle(e);
@@ -39,11 +60,14 @@ export function isElementDrawn(e, rect, style) {
     rect.width > min &&
     rect.height > min &&
     (parseFloat(st.opacity) > 0.1 ||
-      (e.tagName === "INPUT" && e.type !== "text"))
+      (e.tagName === "INPUT" && (e as HTMLInputElement).type !== "text"))
   );
 }
 
-export function isElementPartiallyInViewport(el, ignoreSize) {
+export function isElementPartiallyInViewport(
+  el: Element,
+  ignoreSize?: boolean,
+): boolean {
   const rect = el.getBoundingClientRect();
   const windowHeight =
     window.innerHeight || document.documentElement.clientHeight;
@@ -69,14 +93,22 @@ const NON_RENDERED_TAGS = new Set([
   "TEMPLATE",
 ]);
 
-export function listElements(root, whatToShow, filter) {
-  const out = [];
+export function listElements(
+  root: Node,
+  whatToShow: number,
+  filter: (node: Node) => boolean,
+): Node[] {
+  const out: Node[] = [];
   try {
     // Numeric codes: NodeFilter may be undefined in unit tests.
     const walker = document.createTreeWalker(root, whatToShow, {
       acceptNode(node) {
         try {
-          if (node.tagName && NON_RENDERED_TAGS.has(node.tagName)) return 3;
+          if (
+            (node as Element).tagName &&
+            NON_RENDERED_TAGS.has((node as Element).tagName)
+          )
+            return 3;
         } catch {}
         return 1;
       },
@@ -86,9 +118,11 @@ export function listElements(root, whatToShow, filter) {
       try {
         if (filter(node)) out.push(node);
       } catch {}
-      if (node.shadowRoot) {
+      if ((node as Element).shadowRoot) {
         try {
-          out.push(...listElements(node.shadowRoot, whatToShow, filter));
+          out.push(
+            ...listElements((node as Element).shadowRoot!, whatToShow, filter),
+          );
         } catch {}
       }
       node = walker.nextNode();
@@ -97,8 +131,10 @@ export function listElements(root, whatToShow, filter) {
   return out;
 }
 
-export function measureElement(e) {
-  let rect;
+export function measureElement(
+  e: Element,
+): { rect: DOMRect; style: CSSStyleDeclaration } | null {
+  let rect: DOMRect;
   try {
     rect = e.getBoundingClientRect();
   } catch {
@@ -116,7 +152,7 @@ export function measureElement(e) {
   ) {
     return null;
   }
-  let style;
+  let style: CSSStyleDeclaration;
   try {
     style = window.getComputedStyle(e);
   } catch {
@@ -126,8 +162,11 @@ export function measureElement(e) {
   return { rect, style };
 }
 
-export function getVisibleElements(filter, prefilter) {
-  const visibleElements = [];
+export function getVisibleElements(
+  filter: (e: Element, out: Element[], style: CSSStyleDeclaration) => void,
+  prefilter?: (e: Element) => boolean,
+): Element[] {
+  const visibleElements: Element[] = [];
   for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
     if (prefilter) {
       let pass;
@@ -147,7 +186,10 @@ export function getVisibleElements(filter, prefilter) {
   return visibleElements;
 }
 
-export function collectMutationRoots(mutation, out) {
+export function collectMutationRoots(
+  mutation: MutationRecord,
+  out: Node[],
+): void {
   try {
     const added = mutation.addedNodes || [];
     for (const n of added) {
@@ -161,7 +203,11 @@ export function collectMutationRoots(mutation, out) {
   } catch {}
 }
 
-function pushSubtree(root, seen, pool) {
+function pushSubtree(
+  root: Node | null,
+  seen: Set<Node>,
+  pool: Element[],
+): void {
   if (
     !root ||
     (root.nodeType !== 1 && root.nodeType !== 11) ||
@@ -169,16 +215,16 @@ function pushSubtree(root, seen, pool) {
   )
     return;
   seen.add(root);
-  if (root.nodeType === 1) pool.push(root);
-  let shadow;
+  if (root.nodeType === 1) pool.push(root as Element);
+  let shadow: ShadowRoot | null;
   try {
-    shadow = root.shadowRoot || null;
+    shadow = (root as Element).shadowRoot || null;
   } catch {
     shadow = null;
   }
-  let nodes;
+  let nodes: ArrayLike<Element>;
   try {
-    nodes = root.querySelectorAll("*") || [];
+    nodes = (root as Element | ShadowRoot).querySelectorAll("*") || [];
   } catch {
     nodes = [];
   }
@@ -186,7 +232,7 @@ function pushSubtree(root, seen, pool) {
   if (shadow) pushSubtree(shadow, seen, pool);
 }
 
-function isLinkCandidate(e) {
+function isLinkCandidate(e: Element): boolean {
   try {
     if (e.closest && e.closest(overlaySelectors)) return false;
   } catch {}
@@ -194,15 +240,15 @@ function isLinkCandidate(e) {
     return !!(
       e.matches &&
       e.matches("[href]") &&
-      !e.disabled &&
-      !e.readOnly
+      !(e as HTMLInputElement).disabled &&
+      !(e as HTMLInputElement).readOnly
     );
   } catch {
     return false;
   }
 }
 
-function isInputCandidate(e) {
+function isInputCandidate(e: Element): boolean {
   try {
     if (!e.matches || !e.matches(INPUT_SELECTOR)) return false;
   } catch {
@@ -214,12 +260,16 @@ function isInputCandidate(e) {
   const type = e.getAttribute
     ? (e.getAttribute("type") || "").toLowerCase()
     : "";
-  return type !== "hidden" && !e.disabled;
+  return type !== "hidden" && !(e as HTMLInputElement).disabled;
 }
 
-export function collectNewcomers(roots, requestedMode, known) {
-  const seen = new Set();
-  const pool = [];
+export function collectNewcomers(
+  roots: (Node | null)[],
+  requestedMode: string,
+  known?: Set<Element> | null,
+): Element[] {
+  const seen = new Set<Node>();
+  const pool: Element[] = [];
   for (const root of roots || []) {
     pushSubtree(root, seen, pool);
   }
@@ -245,7 +295,7 @@ export function collectNewcomers(roots, requestedMode, known) {
   return out;
 }
 
-export function filterInvisibleElements(nodes) {
+export function filterInvisibleElements(nodes: Element[]): Element[] {
   return nodes.filter(
     (n) =>
       n.offsetHeight &&
@@ -256,7 +306,7 @@ export function filterInvisibleElements(nodes) {
   );
 }
 
-export function getRealRect(elm) {
+export function getRealRect(elm: Element): DOMRect {
   try {
     if (elm.childElementCount === 0) {
       const r = elm.getClientRects();
@@ -278,7 +328,7 @@ export function getRealRect(elm) {
   }
 }
 
-export function isExplicitlyRequested(e) {
+export function isExplicitlyRequested(e: Element): boolean {
   let selector;
   try {
     selector = settings.getClickableSelector() || "";
@@ -293,8 +343,8 @@ export function isExplicitlyRequested(e) {
   }
 }
 
-export function viewportScore(el) {
-  let rect;
+export function viewportScore(el: Element): number {
+  let rect: RectLike;
   try {
     rect = getHintRect(el);
   } catch {
@@ -313,7 +363,7 @@ export function viewportScore(el) {
   return (coverage >= 0.99 ? 0 : 1e9) + Math.hypot(cx, cy);
 }
 
-export function prioritizeForViewport(elements) {
+export function prioritizeForViewport(elements: Element[]): Element[] {
   return elements
     .map((el, i) => ({ el, i, score: viewportScore(el) }))
     .sort((a, b) => a.score - b.score || a.i - b.i)
@@ -327,7 +377,10 @@ function matchesClickableSelector(e) {
   return isExplicitlyRequested(e);
 }
 
-export function isElementClickable(e, style) {
+export function isElementClickable(
+  e: Element,
+  style?: CSSStyleDeclaration,
+): boolean {
   if (matchesClickableSelector(e)) return true;
   try {
     const st = style || window.getComputedStyle(e);
@@ -346,9 +399,12 @@ export function isElementClickable(e, style) {
   return false;
 }
 
-export function filterAncestors(elements, base = []) {
+export function filterAncestors(
+  elements: Element[],
+  base: Element[] = [],
+): Element[] {
   if (elements.length === 0) return base.length > 0 ? [...base] : elements;
-  const result = [...base];
+  const result: Element[] = [...base];
   elements.forEach((e) => {
     if (isExplicitlyRequested(e)) {
       result.push(e);
@@ -356,7 +412,11 @@ export function filterAncestors(elements, base = []) {
     }
     for (let j = 0; j < result.length; j++) {
       if (result[j].contains(e)) {
-        if (result[j].tagName !== "A" || !result[j].href) result[j] = e;
+        if (
+          result[j].tagName !== "A" ||
+          !(result[j] as HTMLAnchorElement).href
+        )
+          result[j] = e;
         return;
       } else if (result[j].shadowRoot && result[j].shadowRoot.contains(e)) {
         return;
@@ -369,10 +429,15 @@ export function filterAncestors(elements, base = []) {
   return result;
 }
 
-export function filterOverlapElements(elements) {
+export function filterOverlapElements(elements: Element[]): Element[] {
   elements = elements.filter((e) => {
     const be = getRealRect(e);
-    if (e.disabled || e.readOnly || !isElementDrawn(e, be)) return false;
+    if (
+      (e as HTMLInputElement).disabled ||
+      (e as HTMLInputElement).readOnly ||
+      !isElementDrawn(e, be)
+    )
+      return false;
     if (
       (e.matches &&
         e.matches("input, textarea, select, form")) ||
@@ -383,9 +448,9 @@ export function filterOverlapElements(elements) {
     try {
       if (e.closest && e.closest(overlaySelectors)) return false;
     } catch {}
-    const el = e
-      .getRootNode()
-      .elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
+    const el = (
+      e.getRootNode() as Document | ShadowRoot
+    ).elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
     return (
       !el ||
       (el.shadowRoot &&
@@ -397,7 +462,11 @@ export function filterOverlapElements(elements) {
   return filterAncestors(elements);
 }
 
-function matchesHintSelector(e, selectorString, pattern) {
+function matchesHintSelector(
+  e: Element,
+  selectorString: string,
+  pattern: RegExp | null | undefined,
+): boolean {
   if (!selectorString && !pattern) return true;
   try {
     if (selectorString && e.matches && e.matches(selectorString)) return true;
@@ -417,7 +486,11 @@ function matchesHintSelector(e, selectorString, pattern) {
   return false;
 }
 
-function prefilterClickable(e, selectorString, pattern) {
+function prefilterClickable(
+  e: Element,
+  selectorString: string,
+  pattern: RegExp | null | undefined,
+): boolean {
   try {
     if (e.closest && e.closest(overlaySelectors)) return false;
   } catch {}
@@ -431,8 +504,11 @@ function prefilterClickable(e, selectorString, pattern) {
   }
 }
 
-export function getClickableElements(selectorString = "", pattern = null) {
-  let elements = getVisibleElements(
+export function getClickableElements(
+  selectorString = "",
+  pattern: RegExp | null = null,
+): Element[] {
+  let elements: Element[] = getVisibleElements(
     (e, v, style) => {
       if (isElementClickable(e, style)) v.push(e);
     },
@@ -445,38 +521,45 @@ export function getClickableElements(selectorString = "", pattern = null) {
   return elements;
 }
 
-export function getFrameElements() {
+export function getFrameElements(): Element[] {
   const raw = queryAll(FRAME_SELECTOR);
-  const out = [];
+  const out: Element[] = [];
   for (const el of raw) {
     try {
       if (el.closest && el.closest(overlaySelectors)) continue;
     } catch {}
     out.push(el);
   }
-  let elements = filterInvisibleElements(out);
+  let elements: Element[] = filterInvisibleElements(out);
   elements = filterOverlapElements(elements);
   return elements;
 }
 
-export function getHref(el, base) {
+export function getHref(
+  el: Element,
+  base?: string,
+): string | null {
   const raw = el.getAttribute
     ? (el.getAttribute("href") ?? el.getAttribute("xlink:href"))
     : null;
   if (raw != null && (raw.startsWith("#") || raw.trim() === "")) return null;
   try {
-    if (typeof el.href === "string" && el.href) return el.href;
+    if (typeof (el as HTMLAnchorElement).href === "string" && (el as HTMLAnchorElement).href)
+      return (el as HTMLAnchorElement).href;
   } catch {}
   if (!raw) return null;
   try {
-    const url = new URL(raw, base || el._jariBase || location.href);
+    const url = new URL(
+      raw,
+      base || (el as JariElement)._jariBase || location.href,
+    );
     return url.href;
   } catch {
     return null;
   }
 }
 
-export function isOpenableLink(el, base) {
+export function isOpenableLink(el: Element, base?: string): boolean {
   const href = getHref(el, base);
   if (!href) return false;
   const cached = openableCache.get(href);
@@ -494,9 +577,12 @@ export function isOpenableLink(el, base) {
   return openable;
 }
 
-export function getLinkAncestor(el, base) {
+export function getLinkAncestor(
+  el: Element | null,
+  base?: string,
+): Element | null {
   if (!el) return null;
-  const docBase = base || el._jariBase;
+  const docBase = base || (el as JariElement)._jariBase;
   if (el.closest) {
     try {
       const a = el.closest("a");
@@ -505,25 +591,31 @@ export function getLinkAncestor(el, base) {
       if (hrefEl && isOpenableLink(hrefEl, docBase)) return hrefEl;
     } catch {}
   }
-  let cur = el;
+  let cur: Element | null = el;
   while (cur) {
     if (cur.tagName === "A" && isOpenableLink(cur, docBase)) return cur;
-    if (cur.getAttribute && cur.getAttribute("href") && isOpenableLink(cur, docBase))
+    if (
+      cur.getAttribute &&
+      cur.getAttribute("href") &&
+      isOpenableLink(cur, docBase)
+    )
       return cur;
     const parent = cur.parentElement;
     if (parent) {
       cur = parent;
     } else {
       const root = cur.getRootNode && cur.getRootNode();
-      if (root && root.host) cur = root.host;
+      const host =
+        root ? (root as unknown as { host?: Element }).host : null;
+      if (host) cur = host;
       else break;
     }
   }
   return null;
 }
 
-export function getLinkElements() {
-  let elements = getVisibleElements(
+export function getLinkElements(): Element[] {
+  let elements: Element[] = getVisibleElements(
     (e, v) => {
       v.push(e);
     },
@@ -549,25 +641,25 @@ export function getLinkElements() {
   return elements;
 }
 
-export function getInputElements() {
+export function getInputElements(): Element[] {
   const raw = queryAll(INPUT_SELECTOR);
-  const out = [];
+  const out: Element[] = [];
   for (const el of raw) {
     if (el.closest && el.closest(overlaySelectors)) continue;
     const type = el.getAttribute
       ? (el.getAttribute("type") || "").toLowerCase()
       : "";
     if (type === "hidden") continue;
-    if (el.disabled) continue;
+    if ((el as HTMLInputElement).disabled) continue;
     out.push(el);
   }
-  let elements = filterInvisibleElements(out);
+  let elements: Element[] = filterInvisibleElements(out);
   elements = filterOverlapElements(elements);
   return elements;
 }
 
-export function collectElements(requestedMode) {
-  let raw = [];
+export function collectElements(requestedMode: string): Element[] {
+  let raw: Element[] = [];
   if (requestedMode === "click") raw = getClickableElements();
   else if (
     requestedMode === "open" ||
@@ -586,7 +678,11 @@ export function collectElements(requestedMode) {
   return raw;
 }
 
-export function translateRect(rect, dx, dy) {
+export function translateRect(
+  rect: DOMRect,
+  dx: number,
+  dy: number,
+): RectLike {
   return {
     left: rect.left + dx,
     top: rect.top + dy,
@@ -597,15 +693,20 @@ export function translateRect(rect, dx, dy) {
   };
 }
 
-export function getHintRect(el) {
+export function getHintRect(el: Element): RectLike {
   try {
-    if (el && el._jariViewportRect) return el._jariViewportRect;
+    if (el && (el as JariElement)._jariViewportRect)
+      return (el as JariElement)._jariViewportRect!;
   } catch {}
   return getRealRect(el);
 }
 
-function getAccessibleFrameDocs() {
-  const out = [];
+function getAccessibleFrameDocs(): {
+  frame: HTMLIFrameElement;
+  doc: Document;
+  rect: DOMRect;
+}[] {
+  const out: { frame: HTMLIFrameElement; doc: Document; rect: DOMRect }[] = [];
   let frames;
   try {
     frames = queryAll(FRAME_SELECTOR);
@@ -615,33 +716,34 @@ function getAccessibleFrameDocs() {
   const vw = window.innerWidth || 0;
   const vh = window.innerHeight || 0;
   for (const frame of frames) {
+    const htmlFrame = frame as HTMLIFrameElement;
     try {
-      if (frame.closest && frame.closest(overlaySelectors)) continue;
+      if (htmlFrame.closest && htmlFrame.closest(overlaySelectors)) continue;
     } catch {}
-    let doc;
+    let doc: Document | null;
     try {
-      doc = frame.contentDocument;
+      doc = htmlFrame.contentDocument;
     } catch {
       continue;
     }
     if (!doc || !doc.body) continue;
-    let rect;
+    let rect: DOMRect;
     try {
-      rect = frame.getBoundingClientRect();
+      rect = htmlFrame.getBoundingClientRect();
     } catch {
       continue;
     }
     if (!rect) continue;
     if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
       continue;
-    out.push({ frame, doc, rect });
+    out.push({ frame: htmlFrame, doc, rect });
   }
   return out;
 }
 
-function eachInnerElement(doc, fn) {
-  const visit = (root) => {
-    let nodes;
+function eachInnerElement(doc: Document, fn: (el: Element) => void): void {
+  const visit = (root: Document | ShadowRoot | Element): void => {
+    let nodes: NodeListOf<Element>;
     try {
       nodes = root.querySelectorAll("*");
     } catch {
@@ -659,7 +761,10 @@ function eachInnerElement(doc, fn) {
   } catch {}
 }
 
-function innerPointVisible(el, be) {
+function innerPointVisible(
+  el: Element,
+  be: RectLike,
+): boolean {
   try {
     const doc = el.ownerDocument;
     if (!doc || typeof doc.elementFromPoint !== "function") return true;
@@ -673,7 +778,7 @@ function innerPointVisible(el, be) {
   }
 }
 
-function matchesInnerInput(el) {
+function matchesInnerInput(el: Element): boolean {
   try {
     if (!el.matches || !el.matches(INPUT_SELECTOR)) return false;
   } catch {
@@ -682,10 +787,10 @@ function matchesInnerInput(el) {
   const type = el.getAttribute
     ? (el.getAttribute("type") || "").toLowerCase()
     : "";
-  return type !== "hidden" && !el.disabled;
+  return type !== "hidden" && !(el as HTMLInputElement).disabled;
 }
 
-function matchesInnerLink(el, base) {
+function matchesInnerLink(el: Element, base?: string): boolean {
   try {
     if (!el.matches || !el.matches("[href]")) return false;
   } catch {
@@ -694,11 +799,11 @@ function matchesInnerLink(el, base) {
   return !el.disabled && !el.readOnly && isOpenableLink(el, base);
 }
 
-export function collectIframeElements(requestedMode) {
-  const out = [];
+export function collectIframeElements(requestedMode: string): Element[] {
+  const out: Element[] = [];
   const vw = window.innerWidth || 0;
   const vh = window.innerHeight || 0;
-  let focused;
+  let focused: Element | null;
   try {
     focused = deepActiveElement();
   } catch {
@@ -736,9 +841,10 @@ export function collectIframeElements(requestedMode) {
       if (el.disabled || el.readOnly) return;
       if (!innerPointVisible(el, be)) return;
       try {
-        el._jariViewportRect = t;
-        el._jariBase = base;
-        el._jariFrame = frame;
+        const jel = el as JariElement;
+        jel._jariViewportRect = t;
+        jel._jariBase = base;
+        jel._jariFrame = frame;
       } catch {}
       out.push(el);
     });

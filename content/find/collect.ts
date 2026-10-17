@@ -1,7 +1,7 @@
 /* global NodeFilter */
 
 import { overlaySelectors } from "../keymap.ts";
-import { isElementDrawn } from "../hints-elements.js";
+import { isElementDrawn } from "../hints-elements.ts";
 
 const SKIP_SELECTOR = `${overlaySelectors}, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-hints-host, .jari-help, .jari-help-host, .jari-help-list, .jari-help-columns, .jari-overlay, [aria-hidden="true"], [hidden]`;
 

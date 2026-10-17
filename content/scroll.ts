@@ -1,6 +1,6 @@
 import { overlaySelectors, queryAll } from "./keymap.ts";
 import { ui } from "./ui.ts";
-import { FRAME_SELECTOR, isFrameElement } from "./hints-elements.js";
+import { FRAME_SELECTOR, isFrameElement } from "./hints-elements.ts";
 import { MIN_SCROLL_AREA_SIZE } from "../shared/constants.ts";
 import { settings } from "./settings.ts";
 

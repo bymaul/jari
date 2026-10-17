@@ -35,7 +35,7 @@ import {
   listElements,
   prioritizeForViewport,
   viewportScore,
-} from "./hints-elements.js";
+} from "./hints-elements.ts";
 
 const MAX_HINTS = 800;
 const REGENERATE_DELAY = 150;

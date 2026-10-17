@@ -4,7 +4,7 @@ import assert from "node:assert";
 
 const { settings } = await import("../content/settings.ts");
 const { genLabels, normalizeCharset, classifyHintKey, __testHelpers } = await import("../content/hints.js");
-const { collectMutationRoots, collectNewcomers } = await import("../content/hints-elements.js");
+const { collectMutationRoots, collectNewcomers } = await import("../content/hints-elements.ts");
 const { HINT_CHARSET_DEFAULT, keymapDefaults } = await import("../content/keymap.ts");
 
 const { isExplicitlyRequested, isElementClickable, collectIframeElements } =
