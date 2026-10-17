@@ -1,5 +1,5 @@
 import { fuzzyIndices, substringIndices } from "../rank.js";
-import { settings } from "../settings.js";
+import { settings } from "../settings.ts";
 import { renderText } from "./shared.js";
 
 function makeSpan(className) {

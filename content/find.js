@@ -1,7 +1,7 @@
 /* global CSS, Highlight */
 import { register, touch } from "./overlays.js";
 import { ui, createShadowHost } from "./ui.ts";
-import { deepActiveElement } from "./keymap.js";
+import { deepActiveElement } from "./keymap.ts";
 import { getLinkAncestor } from "./hints-elements.js";
 import {
   detectHighlightSupport,

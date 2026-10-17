@@ -348,7 +348,7 @@
     openExtensions: { category: "help", label: "Open extensions page" }
   };
 
-  // content/keymap.js
+  // content/keymap.ts
   var SETTINGS_SCHEMA_VERSION = 12;
   var Events = {
     listeners: {},
@@ -746,7 +746,9 @@
   function normalizeSettings(data) {
     const d = migrateSettings(data);
     const storedKeymap = {};
-    for (const [key, command] of Object.entries(d.keymap || {})) {
+    for (const [key, command] of Object.entries(
+      d.keymap || {}
+    )) {
       if (typeof key !== "string" || key.length === 0) continue;
       if (!Object.hasOwn(COMMAND_CATALOG, command)) continue;
       storedKeymap[key] = command;
@@ -796,7 +798,10 @@
     return browserTrappedCombos.has(combo);
   }
   function balanceCategories(byCategory, columnCount = 3) {
-    const columns = Array.from({ length: columnCount }, () => []);
+    const columns = Array.from(
+      { length: columnCount },
+      () => []
+    );
     const columnRows = columns.map(() => 0);
     const ordered = [...categories || []].sort((a, b) => {
       const rowsA = byCategory.get(a.id);
@@ -827,7 +832,7 @@
     return list;
   }
 
-  // content/settings.js
+  // content/settings.ts
   var STORAGE_KEY = "settings";
   var persistedLocal = false;
   var state = {
@@ -857,34 +862,13 @@
     clueDelayMs: settingsDefaults.clueDelayMs
   };
   function merge(data) {
-    const s = normalizeSettings(data);
-    state.schemaVersion = s.schemaVersion;
-    state.keymap = s.keymap;
-    state.disabledSites = s.disabledSites;
-    state.scrollStep = s.scrollStep;
-    state.smoothScroll = s.smoothScroll;
-    state.fuzzyMatching = s.fuzzyMatching;
-    state.timeoutMs = s.timeoutMs;
-    state.passthroughMs = s.passthroughMs;
-    state.suggestionSources = s.suggestionSources;
-    state.maxResults = s.maxResults;
-    state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
-    state.defaultEngine = s.defaultEngine;
-    state.pageNavTexts = {
-      next: s.pageNavTexts.next.slice(),
-      prev: s.pageNavTexts.prev.slice()
-    };
-    state.copyFormat = s.copyFormat;
-    state.hintChars = s.hintChars;
-    state.clickableSelector = s.clickableSelector;
-    state.hintTheme = s.hintTheme;
-    state.hintFontSize = s.hintFontSize;
-    state.clueEnabled = s.clueEnabled;
-    state.clueDelayMs = s.clueDelayMs;
-    state.updatedAt = data && Number.isFinite(data.updatedAt) ? data.updatedAt : state.updatedAt;
+    Object.assign(state, normalizeSettings(data));
+    const at = data?.updatedAt;
+    if (typeof at === "number" && Number.isFinite(at)) state.updatedAt = at;
   }
   function storedAt(data) {
-    return data && Number.isFinite(data.updatedAt) ? data.updatedAt : 0;
+    const at = data?.updatedAt;
+    return typeof at === "number" && Number.isFinite(at) ? at : 0;
   }
   function pickNewest(synced, local) {
     if (synced && local) {
@@ -916,34 +900,19 @@
   }
   function snapshot() {
     return {
-      schemaVersion: state.schemaVersion,
-      updatedAt: state.updatedAt,
+      ...state,
       keymap: { ...state.keymap },
       disabledSites: state.disabledSites.slice(),
-      scrollStep: state.scrollStep,
-      smoothScroll: state.smoothScroll,
-      fuzzyMatching: state.fuzzyMatching,
-      timeoutMs: state.timeoutMs,
-      passthroughMs: state.passthroughMs,
       suggestionSources: state.suggestionSources.slice(),
-      maxResults: state.maxResults,
       searchEngines: state.searchEngines.map((e) => ({ ...e })),
-      defaultEngine: state.defaultEngine,
       pageNavTexts: {
         next: state.pageNavTexts.next.slice(),
         prev: state.pageNavTexts.prev.slice()
-      },
-      copyFormat: state.copyFormat,
-      hintChars: state.hintChars,
-      clickableSelector: state.clickableSelector,
-      hintTheme: state.hintTheme,
-      hintFontSize: state.hintFontSize,
-      clueEnabled: state.clueEnabled,
-      clueDelayMs: state.clueDelayMs
+      }
     };
   }
   function isQuotaError(err) {
-    return /quota/i.test(String(err && err.message || err || ""));
+    return /quota/i.test(String(err?.message || err || ""));
   }
   async function persist() {
     state.updatedAt = Date.now();

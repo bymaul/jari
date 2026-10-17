@@ -1,7 +1,7 @@
 /* global Image */
 
 import { sendMessageWithTimeout, ui } from "./ui.ts";
-import { queryAll } from "./keymap.js";
+import { queryAll } from "./keymap.ts";
 import {
   isScreenshotable,
   isScreenshotDataUrl,

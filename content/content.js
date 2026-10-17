@@ -5,8 +5,8 @@ import {
   isPrefixKey,
   modifierKeys,
   parseRepeatCount,
-} from "./keymap.js";
-import { settings } from "./settings.js";
+} from "./keymap.ts";
+import { settings } from "./settings.ts";
 import { SHOW_HELP_ACTION } from "../popup/site.js";
 import { ui } from "./ui.ts";
 import { commands, setModeActions } from "./commands.js";

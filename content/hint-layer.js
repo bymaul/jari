@@ -1,5 +1,5 @@
-import { settings } from "./settings.js";
-import { HINT_CHARSET_DEFAULT, HINT_FONT_SIZE_DEFAULT, HINT_FONT_SIZE_MAX, HINT_FONT_SIZE_MIN } from "./keymap.js";
+import { settings } from "./settings.ts";
+import { HINT_CHARSET_DEFAULT, HINT_FONT_SIZE_DEFAULT, HINT_FONT_SIZE_MAX, HINT_FONT_SIZE_MIN } from "./keymap.ts";
 import { getHintRect, getRealRect } from "./hints-elements.js";
 
 export function normalizeCharset() {

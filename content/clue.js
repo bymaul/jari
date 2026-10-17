@@ -1,5 +1,5 @@
-import { displayCombo, getPrefixEntries } from "./keymap.js";
-import { settings } from "./settings.js";
+import { displayCombo, getPrefixEntries } from "./keymap.ts";
+import { settings } from "./settings.ts";
 import { COMMAND_CATALOG } from "./catalog.js";
 
 let clueEl = null;

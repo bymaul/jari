@@ -1,6 +1,6 @@
 import { sendMessage, ui } from "./ui.ts";
 import { register, touch } from "./overlays.js";
-import { settings } from "./settings.js";
+import { settings } from "./settings.ts";
 import {
   normalizeCharset,
   genLabels,

@@ -3,16 +3,22 @@ import {
   SETTINGS_SCHEMA_VERSION,
   keymapDefaults,
   normalizeSettings,
+  type HintTheme,
+  type Settings,
   settingsDefaults,
-} from "./keymap.js";
+} from "./keymap.ts";
+import type { PageNavTexts } from "../shared/page-nav-texts.ts";
+import type { SearchEngine } from "../shared/search-engines.ts";
 import { matchesSitePattern, pageSiteKey } from "../shared/url.ts";
 import { toggleSiteInList } from "../popup/site.js";
 
 const STORAGE_KEY = "settings";
 
+type SettingsState = Settings & { updatedAt: number };
+
 let persistedLocal = false;
 
-const state = {
+const state: SettingsState = {
   schemaVersion: SETTINGS_SCHEMA_VERSION,
   updatedAt: 0,
   keymap: { ...keymapDefaults },
@@ -39,42 +45,24 @@ const state = {
   clueDelayMs: settingsDefaults.clueDelayMs,
 };
 
-function merge(data) {
-  const s = normalizeSettings(data);
-  state.schemaVersion = s.schemaVersion;
-  state.keymap = s.keymap;
-  state.disabledSites = s.disabledSites;
-  state.scrollStep = s.scrollStep;
-  state.smoothScroll = s.smoothScroll;
-  state.fuzzyMatching = s.fuzzyMatching;
-  state.timeoutMs = s.timeoutMs;
-  state.passthroughMs = s.passthroughMs;
-  state.suggestionSources = s.suggestionSources;
-  state.maxResults = s.maxResults;
-  state.searchEngines = s.searchEngines.map((e) => ({ ...e }));
-  state.defaultEngine = s.defaultEngine;
-  state.pageNavTexts = {
-    next: s.pageNavTexts.next.slice(),
-    prev: s.pageNavTexts.prev.slice(),
-  };
-  state.copyFormat = s.copyFormat;
-  state.hintChars = s.hintChars;
-  state.clickableSelector = s.clickableSelector;
-  state.hintTheme = s.hintTheme;
-  state.hintFontSize = s.hintFontSize;
-  state.clueEnabled = s.clueEnabled;
-  state.clueDelayMs = s.clueDelayMs;
-  state.updatedAt =
-    data && Number.isFinite(data.updatedAt) ? data.updatedAt : state.updatedAt;
+function merge(data: unknown) {
+  Object.assign(state, normalizeSettings(data));
+  const at = (data as { updatedAt?: unknown } | null)?.updatedAt;
+  if (typeof at === "number" && Number.isFinite(at)) state.updatedAt = at;
 }
 
-function storedAt(data) {
-  return data && Number.isFinite(data.updatedAt) ? data.updatedAt : 0;
+function storedAt(data: { updatedAt?: unknown } | null): number {
+  const at = data?.updatedAt;
+  return typeof at === "number" && Number.isFinite(at) ? at : 0;
 }
 
-function pickNewest(synced, local) {
+function pickNewest(
+  synced: unknown,
+  local: unknown,
+): { area: "sync" | "local" | "none"; data: unknown } {
   if (synced && local) {
-    return storedAt(local) > storedAt(synced)
+    return storedAt(local as { updatedAt?: number } | null) >
+      storedAt(synced as { updatedAt?: number } | null)
       ? { area: "local", data: local }
       : { area: "sync", data: synced };
   }
@@ -83,7 +71,7 @@ function pickNewest(synced, local) {
   return { area: "none", data: null };
 }
 
-async function readOne(area) {
+async function readOne(area: "sync" | "local"): Promise<unknown | null> {
   try {
     const stored = await chrome.storage[area].get(STORAGE_KEY);
     if (stored && stored[STORAGE_KEY]) return stored[STORAGE_KEY];
@@ -104,37 +92,22 @@ async function load() {
   }
 }
 
-function snapshot() {
+function snapshot(): SettingsState {
   return {
-    schemaVersion: state.schemaVersion,
-    updatedAt: state.updatedAt,
+    ...state,
     keymap: { ...state.keymap },
     disabledSites: state.disabledSites.slice(),
-    scrollStep: state.scrollStep,
-    smoothScroll: state.smoothScroll,
-    fuzzyMatching: state.fuzzyMatching,
-    timeoutMs: state.timeoutMs,
-    passthroughMs: state.passthroughMs,
     suggestionSources: state.suggestionSources.slice(),
-    maxResults: state.maxResults,
     searchEngines: state.searchEngines.map((e) => ({ ...e })),
-    defaultEngine: state.defaultEngine,
     pageNavTexts: {
       next: state.pageNavTexts.next.slice(),
       prev: state.pageNavTexts.prev.slice(),
     },
-    copyFormat: state.copyFormat,
-    hintChars: state.hintChars,
-    clickableSelector: state.clickableSelector,
-    hintTheme: state.hintTheme,
-    hintFontSize: state.hintFontSize,
-    clueEnabled: state.clueEnabled,
-    clueDelayMs: state.clueDelayMs,
   };
 }
 
-function isQuotaError(err) {
-  return /quota/i.test(String((err && err.message) || err || ""));
+function isQuotaError(err: unknown) {
+  return /quota/i.test(String((err as { message?: unknown })?.message || err || ""));
 }
 
 async function persist() {
@@ -154,11 +127,11 @@ function isPersistedLocally() {
   return persistedLocal;
 }
 
-function set(patch) {
+function set(patch: Partial<Settings>) {
   merge(normalizeSettings({ ...state, ...patch }));
 }
 
-async function update(patch) {
+async function update(patch: Partial<Settings>) {
   const prev = snapshot();
   set(patch);
   try {
@@ -181,78 +154,78 @@ function isDisabled() {
   );
 }
 
-function getDisabledSites() {
+function getDisabledSites(): string[] {
   return state.disabledSites.slice();
 }
 
-function getScrollStep() {
+function getScrollStep(): number {
   return state.scrollStep;
 }
 
-function isSmoothScroll() {
+function isSmoothScroll(): boolean {
   return state.smoothScroll;
 }
 
-function isFuzzyMatching() {
+function isFuzzyMatching(): boolean {
   return state.fuzzyMatching;
 }
 
-function getTimeoutMs() {
+function getTimeoutMs(): number {
   return state.timeoutMs;
 }
 
-function getPassthroughMs() {
+function getPassthroughMs(): number {
   return state.passthroughMs;
 }
 
-function getSuggestionSources() {
+function getSuggestionSources(): string[] {
   return state.suggestionSources;
 }
 
-function getMaxResults() {
+function getMaxResults(): number {
   return state.maxResults;
 }
 
-function getSearchEngines() {
+function getSearchEngines(): SearchEngine[] {
   return state.searchEngines.map((e) => ({ ...e }));
 }
 
-function getDefaultEngine() {
+function getDefaultEngine(): string {
   return state.defaultEngine;
 }
 
-function getPageNavTexts() {
+function getPageNavTexts(): PageNavTexts {
   return {
     next: state.pageNavTexts.next.slice(),
     prev: state.pageNavTexts.prev.slice(),
   };
 }
 
-function getCopyFormat() {
+function getCopyFormat(): "plain" | "markdown" {
   return state.copyFormat;
 }
 
-function getHintChars() {
+function getHintChars(): string {
   return state.hintChars;
 }
 
-function getClickableSelector() {
+function getClickableSelector(): string {
   return state.clickableSelector;
 }
 
-function getHintTheme() {
+function getHintTheme(): HintTheme {
   return state.hintTheme;
 }
 
-function getHintFontSize() {
+function getHintFontSize(): number {
   return state.hintFontSize;
 }
 
-function isClueEnabled() {
+function isClueEnabled(): boolean {
   return state.clueEnabled;
 }
 
-function getClueDelayMs() {
+function getClueDelayMs(): number {
   return state.clueDelayMs;
 }
 

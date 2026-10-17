@@ -1,4 +1,4 @@
-import { settings } from "../content/settings.js";
+import { settings } from "../content/settings.ts";
 import {
   MAX_PAGE_NAV_TEXTS,
   PAGE_NAV_TEXT_MAX,

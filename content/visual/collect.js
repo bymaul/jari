@@ -1,4 +1,4 @@
-import { overlaySelectors } from "../keymap.js";
+import { overlaySelectors } from "../keymap.ts";
 import {
   getVisibleElements,
   filterInvisibleElements,

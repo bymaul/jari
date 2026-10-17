@@ -8,27 +8,80 @@ import {
   normalizeDefaultEngine,
   normalizeSearchEngines,
   searchEngineDefaults,
+  type SearchEngine,
 } from "../shared/search-engines.ts";
 import {
   normalizePageNavTexts,
   pageNavTextDefaults,
+  type PageNavTexts,
 } from "../shared/page-nav-texts.ts";
 import { normalizeSitePattern } from "../shared/url.ts";
 import { COMMAND_CATALOG } from "./catalog.js";
 
 export const SETTINGS_SCHEMA_VERSION = 12;
 
+// Normalized settings shape — the single schema island. RawSettings is the
+// doc-typed input contract for migrate/normalize; every field access there
+// sits behind its original runtime guard.
+export interface Settings {
+  schemaVersion: number;
+  keymap: Record<string, string>;
+  disabledSites: string[];
+  scrollStep: number;
+  smoothScroll: boolean;
+  fuzzyMatching: boolean;
+  timeoutMs: number;
+  passthroughMs: number;
+  suggestionSources: string[];
+  maxResults: number;
+  searchEngines: SearchEngine[];
+  defaultEngine: string;
+  pageNavTexts: PageNavTexts;
+  copyFormat: "plain" | "markdown";
+  hintChars: string;
+  clickableSelector: string;
+  hintTheme: HintTheme;
+  hintFontSize: number;
+  clueEnabled: boolean;
+  clueDelayMs: number;
+}
+
+export interface RawSettings {
+  schemaVersion: number;
+  keymap: unknown;
+  disabledSites: string[];
+  scrollStep: number;
+  smoothScroll: boolean;
+  fuzzyMatching: boolean;
+  timeoutMs: number;
+  passthroughMs: number;
+  suggestionSources: string[];
+  maxResults: number;
+  searchEngines: unknown;
+  defaultEngine: string;
+  pageNavTexts: unknown;
+  copyFormat: "plain" | "markdown";
+  hintChars: string;
+  clickableSelector: string;
+  hintTheme: string;
+  hintFontSize: number;
+  clueEnabled: boolean;
+  clueDelayMs: number;
+}
+
+type EventListener = (...args: unknown[]) => void;
+
 export const Events = {
-  listeners: {},
-  on(event, fn) {
+  listeners: {} as Record<string, EventListener[]>,
+  on(event: string, fn: EventListener) {
     (this.listeners[event] ||= []).push(fn);
   },
-  emit(event, ...args) {
+  emit(event: string, ...args: unknown[]) {
     for (const fn of this.listeners[event] || []) fn(...args);
   },
 };
 
-export const keymapDefaults = {
+export const keymapDefaults: Record<string, string> = {
   j: "scrollDown",
   k: "scrollUp",
   h: "scrollLeft",
@@ -127,12 +180,16 @@ export const categories = [
 export const HINT_CHARSET_DEFAULT = "saevrtwyincmp";
 
 export const HINT_THEMES = ["yellow", "cyan", "dark"];
-export const HINT_THEME_DEFAULT = "yellow";
+export type HintTheme = "yellow" | "cyan" | "dark";
+export const HINT_THEME_DEFAULT: HintTheme = "yellow";
 export const HINT_FONT_SIZE_DEFAULT = 10;
 export const HINT_FONT_SIZE_MIN = 8;
 export const HINT_FONT_SIZE_MAX = 20;
 
-export const settingsDefaults = {
+export const settingsDefaults: Omit<
+  Settings,
+  "schemaVersion" | "keymap" | "disabledSites"
+> = {
   scrollStep: 120,
   smoothScroll: false,
 
@@ -179,23 +236,27 @@ export const modifierKeys = new Set([
 
 export const clearingKeys = new Set(["Backspace", "Delete"]);
 
-export function isReservedCombo(combo) {
+export function isReservedCombo(combo: string): boolean {
   return /^[0-9]$/.test(combo);
 }
 
-export function displayCombo(combo) {
+export function displayCombo(combo: string): string {
   if (typeof combo !== "string" || combo === "") return combo;
   if (combo === " ") return "<Space>";
   return combo.replaceAll(" ", " <Space>");
 }
 
-export function findBindingConflict(keymap, combo, commandName) {
+export function findBindingConflict(
+  keymap: Record<string, string>,
+  combo: string,
+  commandName: string,
+): string | null {
   const existing = keymap[combo];
   if (existing && existing !== commandName) return existing;
   return null;
 }
 
-export function isBindablePrefixStarter(combo) {
+export function isBindablePrefixStarter(combo: unknown): boolean {
   if (!combo || typeof combo !== "string") return false;
   if (combo.includes("+")) return false;
   if (combo.length !== 1) return false;
@@ -203,8 +264,12 @@ export function isBindablePrefixStarter(combo) {
   return true;
 }
 
-export function findOverlapConflicts(keymap, combo) {
-  const out = [];
+export function findOverlapConflicts(
+  keymap: Record<string, string>,
+  combo: string,
+): { key: string; command: string; kind: "shadows" | "shadowed-by" }[] {
+  const out: { key: string; command: string; kind: "shadows" | "shadowed-by" }[] =
+    [];
   if (!combo || typeof combo !== "string") return out;
   if (combo.includes("+")) return out;
   for (const [key, command] of Object.entries(keymap || {})) {
@@ -220,13 +285,16 @@ export function findOverlapConflicts(keymap, combo) {
   return out;
 }
 
-export function keysForCommand(keymap, commandName) {
+export function keysForCommand(
+  keymap: Record<string, string>,
+  commandName: string,
+): string[] {
   return Object.entries(keymap)
     .filter(([, cmd]) => cmd === commandName)
     .map(([key]) => key);
 }
 
-export function isPrefixKey(keymap, key) {
+export function isPrefixKey(keymap: Record<string, string>, key: string) {
   if (!key || typeof key !== "string") return false;
   if (key.includes("+")) return false;
   if (/^[0-9]$/.test(key)) return false;
@@ -237,8 +305,10 @@ export function isPrefixKey(keymap, key) {
   return false;
 }
 
-export function getDynamicPrefixes(keymap) {
-  const out = new Set();
+export function getDynamicPrefixes(
+  keymap: Record<string, string>,
+): Set<string> {
+  const out = new Set<string>();
   for (const combo of Object.keys(keymap || {})) {
     if (combo.includes("+")) continue;
     if (combo.length < 2) continue;
@@ -250,8 +320,11 @@ export function getDynamicPrefixes(keymap) {
   return out;
 }
 
-export function getPrefixEntries(keymap, prefix) {
-  const entries = [];
+export function getPrefixEntries(
+  keymap: Record<string, string>,
+  prefix: string,
+): { suffix: string; full: string; command: string }[] {
+  const entries: { suffix: string; full: string; command: string }[] = [];
   if (!prefix || typeof prefix !== "string") return entries;
   if (prefix.includes("+")) return entries;
   for (const [combo, command] of Object.entries(keymap || {})) {
@@ -268,8 +341,15 @@ export function getPrefixEntries(keymap, prefix) {
   return entries;
 }
 
-export function canonicalKey(event) {
-  const parts = [];
+interface KeyEventLike {
+  key: string;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+}
+
+export function canonicalKey(event: KeyEventLike): string {
+  const parts: string[] = [];
   if (event.ctrlKey) parts.push("ctrl");
   if (event.altKey) parts.push("alt");
   if (event.metaKey) parts.push("meta");
@@ -277,15 +357,15 @@ export function canonicalKey(event) {
   return parts.join("+");
 }
 
-export function parseRepeatCount(raw) {
-  const n = parseInt(raw, 10);
+export function parseRepeatCount(raw: string | undefined): number {
+  const n = parseInt(raw as string, 10);
   return Number.isNaN(n) ? 1 : Math.max(1, n);
 }
 
 export const overlaySelectors =
   ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host, .jari-tab-manager-host";
 
-export function deepActiveElement() {
+export function deepActiveElement(): Element | null {
   let el = document.activeElement;
   while (el && el.shadowRoot && el.shadowRoot.activeElement) {
     el = el.shadowRoot.activeElement;
@@ -293,9 +373,12 @@ export function deepActiveElement() {
   return el;
 }
 
-export function queryAll(selector, onShadowRoot) {
-  const out = [];
-  const visit = (root) => {
+export function queryAll(
+  selector: string,
+  onShadowRoot?: (root: ShadowRoot) => void,
+): Element[] {
+  const out: Element[] = [];
+  const visit = (root: Document | ShadowRoot | Element): void => {
     for (const el of root.querySelectorAll("*")) {
       if (el.matches(selector)) out.push(el);
       if (el.shadowRoot) {
@@ -308,7 +391,7 @@ export function queryAll(selector, onShadowRoot) {
   return out;
 }
 
-export function normalizeClickableSelector(raw) {
+export function normalizeClickableSelector(raw: unknown): string {
   if (typeof raw !== "string") return settingsDefaults.clickableSelector;
   const selector = raw.trim().slice(0, 500);
   if (!selector) return "";
@@ -322,17 +405,17 @@ export function normalizeClickableSelector(raw) {
   return selector;
 }
 
-export function normalizeHintTheme(raw) {
-  return HINT_THEMES.includes(raw) ? raw : HINT_THEME_DEFAULT;
+export function normalizeHintTheme(raw: unknown): HintTheme {
+  return HINT_THEMES.includes(raw as string) ? (raw as HintTheme) : HINT_THEME_DEFAULT;
 }
 
-export function normalizeHintFontSize(raw) {
+export function normalizeHintFontSize(raw: unknown): number {
   const n = Math.round(Number(raw));
   if (!Number.isFinite(n)) return settingsDefaults.hintFontSize;
   return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, n));
 }
 
-export function normalizeHintChars(raw) {
+export function normalizeHintChars(raw: unknown): string {
   if (typeof raw !== "string") return settingsDefaults.hintChars;
   const chars = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
   const deduped = [...new Set(chars)].join("");
@@ -340,8 +423,8 @@ export function normalizeHintChars(raw) {
   return deduped;
 }
 
-export function migrateSettings(data) {
-  const d = { ...(data || {}) };
+export function migrateSettings(data: unknown): RawSettings {
+  const d = { ...((data || {}) as object) } as RawSettings;
   let version = 0;
   if (Number.isInteger(d.schemaVersion) && d.schemaVersion > 0) {
     version = Math.min(d.schemaVersion, SETTINGS_SCHEMA_VERSION);
@@ -430,7 +513,7 @@ export function migrateSettings(data) {
   // hints mode now) plus d/g collisions. A stored charset equal to the
   // old default moves over; custom charsets are never clobbered.
   if (version < 11) {
-    d.hintChars = migrateHintCharset(d.hintChars);
+    d.hintChars = migrateHintCharset(d.hintChars) as string;
     version = 11;
   }
   // v11 -> v12: backward scroll-area cycle is gone and forward cycle
@@ -445,12 +528,12 @@ export function migrateSettings(data) {
   return d;
 }
 
-export function backfillNewBindings(keymap) {
+export function backfillNewBindings(keymap: unknown): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
-    return keymap;
+    return keymap as Record<string, string>;
   }
   const used = new Set(Object.values(keymap));
-  const out = { ...keymap };
+  const out = { ...keymap } as Record<string, string>;
   for (const [combo, command] of Object.entries(keymapDefaults)) {
     if (used.has(command)) continue;
     if (combo in out) continue;
@@ -460,16 +543,16 @@ export function backfillNewBindings(keymap) {
   return out;
 }
 
-const YANK_BINDING_SWAPS = [
+const YANK_BINDING_SWAPS: [string, string, string][] = [
   ["yfa", "yf", "hintYank"],
   ["yft", "yF", "hintYankText"],
 ];
 
-export function migrateYankBindings(keymap) {
+export function migrateYankBindings(keymap: unknown): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
-    return keymap;
+    return keymap as Record<string, string>;
   }
-  const out = { ...keymap };
+  const out = { ...keymap } as Record<string, string>;
   for (const [oldCombo, newCombo, command] of YANK_BINDING_SWAPS) {
     if (out[oldCombo] === command && !(newCombo in out)) {
       delete out[oldCombo];
@@ -485,17 +568,17 @@ const REMOVED_FIND_COMMANDS = new Set([
   "toggleFindCase",
 ]);
 
-const HALF_PAGE_FILLS = [
+const HALF_PAGE_FILLS: [string, string][] = [
   ["d", "scrollHalfPageDown"],
   ["u", "scrollHalfPageUp"],
 ];
 
-export function migrateRemovedFindToggles(keymap) {
+export function migrateRemovedFindToggles(keymap: unknown): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
-    return keymap;
+    return keymap as Record<string, string>;
   }
-  const out = {};
-  for (const [combo, command] of Object.entries(keymap)) {
+  const out: Record<string, string> = {};
+  for (const [combo, command] of Object.entries(keymap as Record<string, string>)) {
     if (REMOVED_FIND_COMMANDS.has(command)) continue;
     out[combo] = command;
   }
@@ -509,17 +592,17 @@ export function migrateRemovedFindToggles(keymap) {
   return out;
 }
 
-const V8_DEFAULT_FILLS = [
+const V8_DEFAULT_FILLS: [string, string][] = [
   ["[[", "prevPage"],
   ["]]", "nextPage"],
   [":", "showCommandPalette"],
 ];
 
-export function migratePageNavBindings(keymap) {
+export function migratePageNavBindings(keymap: unknown): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
-    return keymap;
+    return keymap as Record<string, string>;
   }
-  const out = { ...keymap };
+  const out = { ...keymap } as Record<string, string>;
   const used = new Set(Object.values(out));
   for (const [combo, command] of V8_DEFAULT_FILLS) {
     if (combo in out || used.has(command)) continue;
@@ -530,17 +613,17 @@ export function migratePageNavBindings(keymap) {
   return out;
 }
 
-const V9_DEFAULT_FILLS = [
+const V9_DEFAULT_FILLS: [string, string][] = [
   ["gss", "screenshotFullPage"],
   ["gsp", "screenshotPage"],
   ["gsr", "screenshotRegion"],
 ];
 
-export function migrateV9Bindings(keymap) {
+export function migrateV9Bindings(keymap: unknown): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
-    return keymap;
+    return keymap as Record<string, string>;
   }
-  const out = { ...keymap };
+  const out = { ...keymap } as Record<string, string>;
   for (const [combo, command] of V9_DEFAULT_FILLS) {
     if (combo in out) continue;
     if (findOverlapConflicts(out, combo).length > 0) continue;
@@ -549,13 +632,13 @@ export function migrateV9Bindings(keymap) {
   return out;
 }
 
-const V10_DEFAULT_FILLS = [["gt", "openTabManager"]];
+const V10_DEFAULT_FILLS: [string, string][] = [["gt", "openTabManager"]];
 
-export function migrateV10Bindings(keymap) {
+export function migrateV10Bindings(keymap: unknown): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
-    return keymap;
+    return keymap as Record<string, string>;
   }
-  const out = { ...keymap };
+  const out = { ...keymap } as Record<string, string>;
   for (const [combo, command] of V10_DEFAULT_FILLS) {
     if (combo in out) continue;
     if (findOverlapConflicts(out, combo).length > 0) continue;
@@ -564,13 +647,13 @@ export function migrateV10Bindings(keymap) {
   return out;
 }
 
-const V12_DEFAULT_FILLS = [["w", "cycleScrollFrame"]];
+const V12_DEFAULT_FILLS: [string, string][] = [["w", "cycleScrollFrame"]];
 
-export function migrateV12Bindings(keymap) {
+export function migrateV12Bindings(keymap: unknown): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
-    return keymap;
+    return keymap as Record<string, string>;
   }
-  const out = { ...keymap };
+  const out = { ...keymap } as Record<string, string>;
   if (out["]w"] === "cycleScrollFrame") delete out["]w"];
   for (const [combo, command] of V12_DEFAULT_FILLS) {
     if (combo in out) continue;
@@ -582,15 +665,17 @@ export function migrateV12Bindings(keymap) {
 
 const PREVIOUS_HINT_CHARSET_DEFAULT = "sadjklewcmpgh";
 
-export function migrateHintCharset(hintChars) {
+export function migrateHintCharset(hintChars: unknown): unknown {
   if (hintChars === PREVIOUS_HINT_CHARSET_DEFAULT) return HINT_CHARSET_DEFAULT;
   return hintChars;
 }
 
-export function normalizeSettings(data) {
+export function normalizeSettings(data: unknown): Settings {
   const d = migrateSettings(data);
-  const storedKeymap = {};
-  for (const [key, command] of Object.entries(d.keymap || {})) {
+  const storedKeymap: Record<string, string> = {};
+  for (const [key, command] of Object.entries(
+    (d.keymap || {}) as Record<string, string>,
+  )) {
     if (typeof key !== "string" || key.length === 0) continue;
     if (!Object.hasOwn(COMMAND_CATALOG, command)) continue;
     storedKeymap[key] = command;
@@ -669,13 +754,19 @@ export const browserTrappedCombos = new Set([
   "ctrl+shift+c",
 ]);
 
-export function isBrowserTrapped(combo) {
+export function isBrowserTrapped(combo: string): boolean {
   return browserTrappedCombos.has(combo);
 }
 
-export function balanceCategories(byCategory, columnCount = 3) {
-  const columns = Array.from({ length: columnCount }, () => []);
-  const columnRows = columns.map(() => 0);
+export function balanceCategories(
+  byCategory: Map<string, unknown[]>,
+  columnCount = 3,
+): { id: string; label: string }[][] {
+  const columns: { id: string; label: string }[][] = Array.from(
+    { length: columnCount },
+    () => [],
+  );
+  const columnRows: number[] = columns.map(() => 0);
   const ordered = [...(categories || [])].sort((a, b) => {
     const rowsA = byCategory.get(a.id);
     const rowsB = byCategory.get(b.id);

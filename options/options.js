@@ -13,12 +13,12 @@ import {
   modifierKeys,
   normalizeHintChars,
   settingsDefaults,
-} from "../content/keymap.js";
+} from "../content/keymap.ts";
 import { normalizeSitePattern } from "../shared/url.ts";
 import { searchEngineDefaults } from "../shared/search-engines.ts";
 import { pageNavTextDefaults } from "../shared/page-nav-texts.ts";
 import { COMMAND_CATALOG } from "../content/catalog.js";
-import { settings } from "../content/settings.js";
+import { settings } from "../content/settings.ts";
 import { ui } from "../content/ui.ts";
 import { renderEngines, initEngines } from "./engines.js";
 import { renderPagenav, initPagenav } from "./pagenav.js";

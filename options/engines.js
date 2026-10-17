@@ -1,10 +1,10 @@
-import { settings } from "../content/settings.js";
+import { settings } from "../content/settings.ts";
 import {
   MAX_SEARCH_ENGINES,
   searchEngineDefaults,
   validateSearchEngine,
 } from "../shared/search-engines.ts";
-import { settingsDefaults } from "../content/keymap.js";
+import { settingsDefaults } from "../content/keymap.ts";
 
 const engineListEl = document.querySelector("#engine-list");
 const defaultEngineEl = document.querySelector("#default-engine");

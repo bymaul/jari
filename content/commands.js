@@ -1,5 +1,5 @@
 import { Url } from "../shared/url.ts";
-import { settings } from "./settings.js";
+import { settings } from "./settings.ts";
 import { sendMessage, sendMessageWithTimeout, ui } from "./ui.ts";
 import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, frameScrollBox, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.js";
 import { Prompt } from "./prompt.js";

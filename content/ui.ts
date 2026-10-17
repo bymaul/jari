@@ -1,4 +1,4 @@
-import { balanceCategories, displayCombo } from "./keymap.js";
+import { balanceCategories, displayCombo } from "./keymap.ts";
 import type { Action, MessagePayload, MessageResponse } from "../shared/protocol.ts";
 
 export function sendMessage<A extends Action>(
@@ -364,10 +364,7 @@ function buildCategorizedGrid<E>(
 ): HTMLDivElement {
   const grid = document.createElement("div");
   grid.className = gridClass;
-  const columns = balanceCategories(byCategory, columnCount) as {
-    id: string;
-    label: string;
-  }[][];
+  const columns = balanceCategories(byCategory, columnCount);
   for (const cats of columns) {
     const col = document.createElement("div");
     col.className = columnClass;

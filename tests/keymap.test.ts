@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import * as Jari from "../content/keymap.js";
+import * as Jari from "../content/keymap.ts";
 
 test("canonicalKey orders modifiers and keeps the bare key", () => {
   assert.equal(Jari.canonicalKey({ key: "g" }), "g");

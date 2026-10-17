@@ -1,5 +1,5 @@
 import { getClickableElements } from "./hints-elements.js";
-import { settings } from "./settings.js";
+import { settings } from "./settings.ts";
 import { ui } from "./ui.ts";
 
 function normText(value) {

@@ -1,7 +1,7 @@
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { parseEngineKeyword } from "../shared/search-engines.ts";
 import { normalizeUrl, Url } from "../shared/url.ts";
-import { settings } from "./settings.js";
+import { settings } from "./settings.ts";
 import { createShadowHost, sendMessageWithTimeout, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";
 import { register, touch } from "./overlays.js";
