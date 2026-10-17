@@ -46,7 +46,7 @@ globalThis.chrome.bookmarks = {
   },
 };
 
-const { suggest } = await import("../background/suggest.js");
+const { suggest } = await import("../background/suggest.ts");
 
 test("bookmark suggestions refresh after a bookmark change", async () => {
   assert.deepEqual(Object.keys(listeners).sort(), [

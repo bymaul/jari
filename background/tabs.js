@@ -1,7 +1,7 @@
 import { normalizeUrl } from "../shared/url.ts";
-import { clampCount } from "./utils.js";
-import { bookmarkedUrlKeys, bookmarkUrlKey } from "./bookmarks.js";
-import { focusWindow, moveTabIntoWindowAndFocus, openInIncognito } from "./windows.js";
+import { clampCount } from "./utils.ts";
+import { bookmarkedUrlKeys, bookmarkUrlKey } from "./bookmarks.ts";
+import { focusWindow, moveTabIntoWindowAndFocus, openInIncognito } from "./windows.ts";
 
 function resolveTarget(url) {
   if (url === undefined) return { ok: true, target: undefined };

@@ -1,4 +1,4 @@
-import { handlers } from "./handlers.js";
+import { handlers } from "./handlers.ts";
 import type { Action } from "../shared/protocol.ts";
 
 // Handlers live in JS until each module migrates, so they are dispatched with

@@ -2,7 +2,7 @@
 
 "use strict";
 (() => {
-  // background/utils.js
+  // background/utils.ts
   function clampCount(count, max = 20) {
     const n = Math.floor(count);
     return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : 1;
@@ -337,7 +337,7 @@
     return null;
   }
 
-  // background/bookmarks.js
+  // background/bookmarks.ts
   async function findBookmarkBarId() {
     let roots;
     try {
@@ -474,7 +474,7 @@
     return removed > 0 ? { ok: true, removed, skipped } : { ok: false, removed, skipped };
   }
 
-  // background/windows.js
+  // background/windows.ts
   async function focusWindow(windowId, context = "focusWindow") {
     try {
       const win = await chrome.windows.get(windowId);
@@ -1279,7 +1279,7 @@
     return String(engine.url).replaceAll("%s", encodeURIComponent(query));
   }
 
-  // background/suggest.js
+  // background/suggest.ts
   async function getSuggestSettings() {
     const settings = await getStoredSettings();
     const sources = settings && settings.suggestionSources;
@@ -1290,7 +1290,9 @@
   }
   async function getDefaultSearchUrl(text) {
     const settings = await getStoredSettings();
-    const engines = normalizeSearchEngines(settings && settings.searchEngines);
+    const engines = normalizeSearchEngines(
+      settings && settings.searchEngines
+    );
     const keyword = normalizeDefaultEngine(
       settings && settings.defaultEngine,
       engines
@@ -1421,7 +1423,12 @@
     const items = Array.from(map.values());
     return items.slice(0, maxResults);
   }
-  async function search(sender, { query = "", newTab = true, incognito = false, background = false } = {}) {
+  async function search(sender, {
+    query = "",
+    newTab = true,
+    incognito = false,
+    background = false
+  } = {}) {
     const text = query.trim();
     if (!text) return { ok: false };
     const url = await getDefaultSearchUrl(text);
@@ -1436,7 +1443,7 @@
     return { ok: true };
   }
 
-  // background/handlers.js
+  // background/handlers.ts
   var handlers = {
     createTab,
     openIncognitoTab,

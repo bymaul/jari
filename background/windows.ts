@@ -1,4 +1,7 @@
-export async function focusWindow(windowId, context = "focusWindow") {
+export async function focusWindow(
+  windowId: number,
+  context = "focusWindow",
+): Promise<void> {
   try {
     const win = await chrome.windows.get(windowId);
     if (win && win.state === "minimized") {
@@ -11,7 +14,7 @@ export async function focusWindow(windowId, context = "focusWindow") {
   }
 }
 
-export async function maximizeWindow(windowId) {
+export async function maximizeWindow(windowId: number): Promise<void> {
   try {
     await chrome.windows.update(windowId, { state: "maximized" });
   } catch (err) {
@@ -19,17 +22,19 @@ export async function maximizeWindow(windowId) {
   }
 }
 
-export async function openInIncognito(url) {
+export async function openInIncognito(
+  url?: string,
+): Promise<{ ok: true; id?: number } | { ok: false }> {
   const windows = await chrome.windows.getAll({});
   const incognito = (windows || []).find((win) => win && win.incognito);
   if (incognito) {
     const tab = await chrome.tabs.create(
       url
-        ? { windowId: incognito.id, url, active: true }
-        : { windowId: incognito.id, active: true },
+        ? { windowId: incognito.id as number, url, active: true }
+        : { windowId: incognito.id as number, active: true },
     );
-    await focusWindow(incognito.id, "openInIncognito");
-    await maximizeWindow(incognito.id);
+    await focusWindow(incognito.id as number, "openInIncognito");
+    await maximizeWindow(incognito.id as number);
     return tab ? { ok: true, id: tab.id } : { ok: false };
   }
   const win = await chrome.windows.create(
@@ -40,12 +45,16 @@ export async function openInIncognito(url) {
   return win ? { ok: true, id: win.id } : { ok: false };
 }
 
-export async function moveTabIntoWindowAndFocus(tabId, targetWindowId, context) {
+export async function moveTabIntoWindowAndFocus(
+  tabId: number,
+  targetWindowId: number,
+  context: string,
+): Promise<void> {
   await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
   const tabs = await chrome.tabs.query({ windowId: targetWindowId });
   const last = tabs[tabs.length - 1];
   if (last) {
     await focusWindow(targetWindowId, context);
-    await chrome.tabs.update(last.id, { active: true });
+    await chrome.tabs.update(last.id as number, { active: true });
   }
 }

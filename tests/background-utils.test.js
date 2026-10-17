@@ -1,7 +1,7 @@
 import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
-import { clampCount, getStoredSettings } from "../background/utils.js";
+import { clampCount, getStoredSettings } from "../background/utils.ts";
 import { suggestionSources } from "../shared/constants.ts";
 
 test("background/utils direct import: clampCount", () => {

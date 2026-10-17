@@ -1,7 +1,7 @@
-import { clampCount } from "./utils.js";
+import { clampCount } from "./utils.ts";
 import * as tabs from "./tabs.js";
-import { bookmarkManagerTabs, unbookmarkManagerTabs } from "./bookmarks.js";
-import { suggest, search } from "./suggest.js";
+import { bookmarkManagerTabs, unbookmarkManagerTabs } from "./bookmarks.ts";
+import { suggest, search } from "./suggest.ts";
 
 export { clampCount };
 

@@ -4,8 +4,8 @@ import {
   normalizeDefaultEngine,
   normalizeSearchEngines,
 } from "../shared/search-engines.ts";
-import { getStoredSettings } from "./utils.js";
-import { openInIncognito } from "./windows.js";
+import { getStoredSettings } from "./utils.ts";
+import { openInIncognito } from "./windows.ts";
 
 async function getSuggestSettings() {
   const settings = await getStoredSettings();
@@ -21,9 +21,11 @@ async function getSuggestSettings() {
   };
 }
 
-async function getDefaultSearchUrl(text) {
+async function getDefaultSearchUrl(text: string): Promise<string> {
   const settings = await getStoredSettings();
-  const engines = normalizeSearchEngines(settings && settings.searchEngines);
+  const engines = normalizeSearchEngines(
+    settings && settings.searchEngines,
+  );
   const keyword = normalizeDefaultEngine(
     settings && settings.defaultEngine,
     engines,
@@ -34,13 +36,18 @@ async function getDefaultSearchUrl(text) {
   );
 }
 
-let bookmarkDataCache = null;
+interface BookmarkData {
+  entries: { title: string; url: string; parentId?: string; dateAdded: number }[];
+  folderMap: Map<string, string[]>;
+}
 
-export function clearBookmarkDataCache() {
+let bookmarkDataCache: BookmarkData | null = null;
+
+export function clearBookmarkDataCache(): void {
   bookmarkDataCache = null;
 }
 
-function registerBookmarkInvalidation() {
+function registerBookmarkInvalidation(): void {
   try {
     const bookmarks = chrome.bookmarks;
     if (!bookmarks) return;
@@ -61,13 +68,16 @@ function registerBookmarkInvalidation() {
 
 registerBookmarkInvalidation();
 
-async function getBookmarkData() {
+async function getBookmarkData(): Promise<BookmarkData> {
   if (bookmarkDataCache) return bookmarkDataCache;
   try {
     const tree = await chrome.bookmarks.getTree();
-    const folderMap = new Map();
-    const entries = [];
-    function walk(nodes, path) {
+    const folderMap = new Map<string, string[]>();
+    const entries: BookmarkData["entries"] = [];
+    function walk(
+      nodes: chrome.bookmarks.BookmarkTreeNode[],
+      path: string[],
+    ): void {
       for (const node of nodes) {
         if (node.children) {
           const nextPath = [...path, node.title].filter(Boolean);
@@ -91,10 +101,18 @@ async function getBookmarkData() {
   return bookmarkDataCache;
 }
 
-export async function suggest(_, { query = "" } = {}) {
+export async function suggest(
+  _: unknown,
+  { query = "" }: { query?: string } = {},
+): Promise<Suggestion[]> {
   const q = query.trim();
-  const map = new Map();
-  function push(title, url, source, extra = {}) {
+  const map = new Map<string, Suggestion>();
+  function push(
+    title?: string,
+    url?: string,
+    source?: Suggestion["source"],
+    extra = {} as Partial<Suggestion>,
+  ): void {
     if (!url) return;
     const existing = map.get(url);
     if (existing) {
@@ -106,7 +124,7 @@ export async function suggest(_, { query = "" } = {}) {
       if (!existing.title || existing.title === existing.url) existing.title = title || url;
       return;
     }
-    map.set(url, { title: title || url, url, source, ...extra });
+    map.set(url, { title: title || url, url, source, ...extra } as Suggestion);
   }
   const { sources, maxResults } = await getSuggestSettings();
   if (sources.includes("tab")) {
@@ -132,7 +150,7 @@ export async function suggest(_, { query = "" } = {}) {
       try {
         const { folderMap } = await getBookmarkData();
         const bms = await chrome.bookmarks.search("");
-        const withPath = bms.filter(bm => bm.url).map(bm => ({ bm, path: folderMap.get(bm.parentId) || [] }));
+        const withPath = bms.filter(bm => bm.url).map(bm => ({ bm, path: folderMap.get(bm.parentId as string) || [] }));
         withPath.sort((a,b) => (b.bm.dateAdded||0)-(a.bm.dateAdded||0));
         for (const {bm, path} of withPath.slice(0, 8)) push(bm.title, bm.url, "bookmark", { dateAdded: bm.dateAdded || 0, folderPath: path.join(" / ") });
       } catch (err) {
@@ -152,7 +170,7 @@ export async function suggest(_, { query = "" } = {}) {
       try {
         const { entries, folderMap } = await getBookmarkData();
         for (const entry of entries) {
-          const path = folderMap.get(entry.parentId) || [];
+          const path = folderMap.get(entry.parentId as string) || [];
           push(entry.title, entry.url, "bookmark", { dateAdded: entry.dateAdded, folderPath: path.join(" / ") });
         }
       } catch (err) {
@@ -165,9 +183,19 @@ export async function suggest(_, { query = "" } = {}) {
 }
 
 export async function search(
-  sender,
-  { query = "", newTab = true, incognito = false, background = false } = {},
-) {
+  sender: chrome.runtime.MessageSender,
+  {
+    query = "",
+    newTab = true,
+    incognito = false,
+    background = false,
+  }: {
+    query?: string;
+    newTab?: boolean;
+    incognito?: boolean;
+    background?: boolean;
+  } = {},
+): Promise<{ ok: true; id?: number } | { ok: false; error?: string }> {
   const text = query.trim();
   if (!text) return { ok: false };
   const url = await getDefaultSearchUrl(text);

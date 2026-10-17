@@ -1,7 +1,7 @@
 import "./setup.ts";
 import { test, afterEach } from "node:test";
 import assert from "node:assert";
-import { clampCount, handlers } from "../background/handlers.js";
+import { clampCount, handlers } from "../background/handlers.ts";
 
 test("clampCount bounds and normalizes the count", () => {
   assert.equal(clampCount(1), 1);
