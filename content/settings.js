@@ -5,7 +5,7 @@ import {
   normalizeSettings,
   settingsDefaults,
 } from "./keymap.js";
-import { matchesSitePattern, pageSiteKey } from "../shared/url.js";
+import { matchesSitePattern, pageSiteKey } from "../shared/url.ts";
 import { toggleSiteInList } from "../popup/site.js";
 
 const STORAGE_KEY = "settings";

@@ -14,7 +14,7 @@ import {
   normalizeHintChars,
   settingsDefaults,
 } from "../content/keymap.js";
-import { normalizeSitePattern } from "../shared/url.js";
+import { normalizeSitePattern } from "../shared/url.ts";
 import { searchEngineDefaults } from "../shared/search-engines.js";
 import { pageNavTextDefaults } from "../shared/page-nav-texts.js";
 import { COMMAND_CATALOG } from "../content/catalog.js";

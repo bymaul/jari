@@ -1,6 +1,6 @@
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.js";
 import { parseEngineKeyword } from "../shared/search-engines.js";
-import { normalizeUrl, Url } from "../shared/url.js";
+import { normalizeUrl, Url } from "../shared/url.ts";
 import { settings } from "./settings.js";
 import { createShadowHost, sendMessageWithTimeout, ui } from "./ui.js";
 import { promptCss, renderText } from "./prompt/shared.js";

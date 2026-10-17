@@ -1,4 +1,4 @@
-import { Url, normalizeUrl } from "../shared/url.js";
+import { Url, normalizeUrl } from "../shared/url.ts";
 import { parseEngineKeyword } from "../shared/search-engines.js";
 import { rankMatches } from "./rank.js";
 import { settings } from "./settings.js";

@@ -23,7 +23,7 @@ const fileExtensionDenylist = new Set([
   "js","ts","jsx","tsx","mjs","cjs","json","css","scss","less","html","htm","md","markdown","txt","csv","xml","yaml","yml","toml","ini","conf","config","sh","bash","zsh","fish","py","rb","php","java","c","cpp","h","hpp","cs","go","rs","swift","kt","kts","dart","vue","svelte","astro","lua","pl","pm","r","sql","db","sqlite","log","lock","env","gitignore","dockerignore","gradle","makefile","cmake",
 ]);
 
-function isValidHostname(host) {
+function isValidHostname(host: string): boolean {
   if (!host) return false;
   let lower = host.toLowerCase();
   if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
@@ -52,7 +52,7 @@ function isValidHostname(host) {
   return true;
 }
 
-function isBareNavigableHostname(host) {
+function isBareNavigableHostname(host: string): boolean {
   if (!isValidHostname(host)) return false;
   let lower = host.toLowerCase();
   if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
@@ -65,7 +65,7 @@ function isBareNavigableHostname(host) {
   return knownTlds.has(tld);
 }
 
-export function normalizeUrl(raw) {
+export function normalizeUrl(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const url = raw.trim();
   if (!url || /\s/.test(url)) return null;
@@ -90,7 +90,7 @@ export function normalizeUrl(raw) {
     if (!isBareNavigableHostname(hostPart)) return null;
     const hostPort = url.split(/[/?#]/)[0];
     if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return null;
-    const bareTld = hostPart.toLowerCase().split(".").pop();
+    const bareTld = hostPart.toLowerCase().split(".").pop()!;
     if (!url.includes("/") && !url.includes(":") && !url.includes("?") && !url.includes("#") && fileExtensionDenylist.has(bareTld)) return null;
     try {
       const u = new URL("https://" + url);
@@ -123,7 +123,7 @@ export function normalizeUrl(raw) {
 }
 
 export const Url = {
-  parentUrlOf(href) {
+  parentUrlOf(href: string): string {
     try {
       const url = new URL(href);
       let path = url.pathname;
@@ -139,7 +139,7 @@ export const Url = {
     }
   },
 
-  rootUrlOf(href) {
+  rootUrlOf(href: string): string {
     try {
       const url = new URL(href);
       url.pathname = "/";
@@ -151,7 +151,7 @@ export const Url = {
     }
   },
 
-  isSamePath(a, b) {
+  isSamePath(a: string, b: string): boolean {
     try {
       return new URL(a).pathname === new URL(b).pathname;
     } catch {
@@ -159,7 +159,7 @@ export const Url = {
     }
   },
 
-  looksLikeUrl(text) {
+  looksLikeUrl(text: string): boolean {
     const s = text.trim();
     if (!s || /\s/.test(s)) return false;
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
@@ -201,7 +201,7 @@ export const Url = {
     if (!isBareNavigableHostname(hostPart)) return false;
     const hostPort = s.split(/[/?#]/)[0];
     if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return false;
-    const tld = hostPart.toLowerCase().split(".").pop();
+    const tld = hostPart.toLowerCase().split(".").pop()!;
     if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
     try {
       const u = new URL("https://" + s);
@@ -209,7 +209,7 @@ export const Url = {
     } catch { return false; }
   },
 
-  suggestionTerm(query) {
+  suggestionTerm(query: string): string {
     const idx = query.search(/\s/);
     if (idx === -1) return query;
     return Url.looksLikeUrl(query.slice(0, idx))
@@ -218,7 +218,7 @@ export const Url = {
   },
 };
 
-export function normalizeHost(raw) {
+export function normalizeHost(raw: string): string {
   let host = raw.trim().toLowerCase();
   if (!host) return "";
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host)) {
@@ -236,7 +236,7 @@ export function normalizeHost(raw) {
     : "";
 }
 
-export function normalizeSitePattern(raw) {
+export function normalizeSitePattern(raw: unknown): string {
   if (typeof raw !== "string") return "";
   const pattern = raw.trim().toLowerCase();
   if (!pattern) return "";
@@ -248,7 +248,7 @@ export function normalizeSitePattern(raw) {
   return normalizeHost(pattern);
 }
 
-export function matchesSitePattern(hostname, pattern, protocol = "") {
+export function matchesSitePattern(hostname: string, pattern: string, protocol = ""): boolean {
   if (!pattern) return false;
   const host = (hostname || "").toLowerCase();
   if (pattern === "file://") return protocol === "file:";
@@ -259,7 +259,7 @@ export function matchesSitePattern(hostname, pattern, protocol = "") {
   return host === pattern.toLowerCase();
 }
 
-export function pageSiteKey(hostname, protocol = "") {
+export function pageSiteKey(hostname: string, protocol = ""): string {
   const host = hostname || "";
   if (!host && protocol === "file:") return "file://";
   return host;

@@ -1,7 +1,7 @@
 import {
   matchesSitePattern,
   pageSiteKey,
-} from "../shared/url.js";
+} from "../shared/url.ts";
 
 export const SHOW_HELP_ACTION = "jari-show-help";
 

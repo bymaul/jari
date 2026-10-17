@@ -1,4 +1,4 @@
-import { normalizeUrl } from "../shared/url.js";
+import { normalizeUrl } from "../shared/url.ts";
 import { clampCount } from "./utils.js";
 import { bookmarkedUrlKeys, bookmarkUrlKey } from "./bookmarks.js";
 import { focusWindow, moveTabIntoWindowAndFocus, openInIncognito } from "./windows.js";

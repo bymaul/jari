@@ -9,7 +9,7 @@ import {
   pageSiteKey,
   urlSchemes,
   Url,
-} from "../shared/url.js";
+} from "../shared/url.ts";
 
 test("normalizeUrl assumes https for bare hosts", () => {
   assert.equal(normalizeUrl("acme.com"), "https://acme.com");

@@ -4,8 +4,9 @@
 // service worker (background.js) is still a classic script and `chrome` is
 // the only extension-specific global.
 import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
   {
     ignores: [
       "**/node_modules/**",
@@ -18,6 +19,12 @@ export default [
     ],
   },
   js.configs.recommended,
+  {
+    // TypeScript modules (JS -> TS migration in progress; JS stays on the
+    // blocks below until each file moves over).
+    files: ["**/*.ts"],
+    extends: [tseslint.configs.recommended],
+  },
   {
     // build.js is a plain Node script, not a browser content script.
     files: ["build.js"],
@@ -85,4 +92,4 @@ export default [
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
-];
+);

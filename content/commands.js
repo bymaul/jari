@@ -1,4 +1,4 @@
-import { Url } from "../shared/url.js";
+import { Url } from "../shared/url.ts";
 import { settings } from "./settings.js";
 import { sendMessage, sendMessageWithTimeout, ui } from "./ui.js";
 import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, frameScrollBox, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.js";

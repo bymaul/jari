@@ -13,7 +13,7 @@ import {
   normalizePageNavTexts,
   pageNavTextDefaults,
 } from "../shared/page-nav-texts.js";
-import { normalizeSitePattern } from "../shared/url.js";
+import { normalizeSitePattern } from "../shared/url.ts";
 import { COMMAND_CATALOG } from "./catalog.js";
 
 export const SETTINGS_SCHEMA_VERSION = 12;

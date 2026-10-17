@@ -1,5 +1,5 @@
 import { deepActiveElement, overlaySelectors, queryAll } from "./keymap.js";
-import { blockedUrlSchemes } from "../shared/url.js";
+import { blockedUrlSchemes } from "../shared/url.ts";
 import { settings } from "./settings.js";
 
 // NodeFilter.SHOW_ELEMENT is 1 by spec; spelled out so this module also
