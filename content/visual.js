@@ -29,7 +29,7 @@ import {
   fallbackMoveWordEnd,
   fallbackExtendWordEnd,
   fallbackMoveLine,
-} from "./visual/motion.js";
+} from "./visual/motion.ts";
 
 let active = false;
 let mode = "visual"; // "visual" | "line" | "caret"

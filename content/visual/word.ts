@@ -1,6 +1,6 @@
 /* global NodeFilter */
 
-export function isWordChar(ch: string): boolean {
+export function isWordChar(ch: string | null | undefined): boolean {
   return !!ch && /[\p{L}\p{N}_]/u.test(ch);
 }
 

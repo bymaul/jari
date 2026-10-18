@@ -6057,7 +6057,7 @@
     return null;
   }
 
-  // content/visual/motion.js
+  // content/visual/motion.ts
   function getSelection() {
     return window.getSelection();
   }
@@ -6506,7 +6506,7 @@
             return NodeFilter.FILTER_ACCEPT;
           }
         });
-        let first = walker.nextNode();
+        const first = walker.nextNode();
         if (!first) return false;
         const targetNode = dir < 0 ? (() => {
           let last = first;

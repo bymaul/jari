@@ -4,50 +4,50 @@ import { isWordChar, findNextWordEnd } from "./word.ts";
 import { collectVisualTextElements } from "./collect.ts";
 import { getRealRect } from "../hints-elements.ts";
 
-function getSelection() {
+function getSelection(): Selection | null {
   return window.getSelection();
 }
 
-export function charAtFocus() {
+export function charAtFocus(): string | null | undefined {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return null;
   const node = sel.focusNode;
   const off = sel.focusOffset;
   if (node.nodeType === Node.TEXT_NODE) {
-    if (off < node.nodeValue.length) return node.nodeValue[off];
+    if (off < node.nodeValue!.length) return node.nodeValue![off];
     const walker = document.createTreeWalker(
-      document.body,
+      document.body!,
       NodeFilter.SHOW_TEXT,
     );
     walker.currentNode = node;
     const nxt = walker.nextNode();
-    if (nxt && nxt.nodeValue.length > 0) return nxt.nodeValue[0];
+    if (nxt && nxt.nodeValue!.length > 0) return nxt.nodeValue![0];
     return null;
   }
   return null;
 }
 
-export function charBeforeFocus() {
+export function charBeforeFocus(): string | null | undefined {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return null;
   const node = sel.focusNode;
   const off = sel.focusOffset;
   if (node.nodeType === Node.TEXT_NODE) {
-    if (off > 0) return node.nodeValue[off - 1];
+    if (off > 0) return node.nodeValue![off - 1];
     const walker = document.createTreeWalker(
-      document.body,
+      document.body!,
       NodeFilter.SHOW_TEXT,
     );
     walker.currentNode = node;
     const prev = walker.previousNode();
-    if (prev && prev.nodeValue.length > 0)
-      return prev.nodeValue[prev.nodeValue.length - 1];
+    if (prev && prev.nodeValue!.length > 0)
+      return prev.nodeValue![prev.nodeValue!.length - 1];
     return null;
   }
   return null;
 }
 
-export function getBlockAncestor(node) {
+export function getBlockAncestor(node: Node | null): HTMLElement | null {
   let el = node && node.parentElement ? node.parentElement : null;
   while (el) {
     try {
@@ -71,7 +71,7 @@ export function getBlockAncestor(node) {
   return node && node.parentElement ? node.parentElement : document.body;
 }
 
-export function fallbackMoveChar(dir) {
+export function fallbackMoveChar(dir: number): void {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
   try {
@@ -88,12 +88,12 @@ export function fallbackMoveChar(dir) {
       }
     }
     if (node.nodeType !== Node.TEXT_NODE) return;
-    const text = node.nodeValue;
+    const text = node.nodeValue!;
     let newOffset = offset + dir;
     let newNode = node;
     if (newOffset < 0) {
       const walker = document.createTreeWalker(
-        document.body,
+        document.body!,
         NodeFilter.SHOW_TEXT,
       );
       walker.currentNode = node;
@@ -106,7 +106,7 @@ export function fallbackMoveChar(dir) {
       }
     } else if (newOffset > text.length) {
       const walker = document.createTreeWalker(
-        document.body,
+        document.body!,
         NodeFilter.SHOW_TEXT,
       );
       walker.currentNode = node;
@@ -144,7 +144,7 @@ export function fallbackMoveChar(dir) {
   } catch {}
 }
 
-export function fallbackMoveCaret(dir) {
+export function fallbackMoveCaret(dir: number): void {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
   try {
@@ -161,12 +161,12 @@ export function fallbackMoveCaret(dir) {
       }
     }
     if (node.nodeType !== Node.TEXT_NODE) return;
-    const text = node.nodeValue;
+    const text = node.nodeValue!;
     let newOffset = offset + dir;
     let newNode = node;
     if (newOffset < 0) {
       const walker = document.createTreeWalker(
-        document.body,
+        document.body!,
         NodeFilter.SHOW_TEXT,
       );
       walker.currentNode = node;
@@ -179,7 +179,7 @@ export function fallbackMoveCaret(dir) {
       }
     } else if (newOffset > text.length) {
       const walker = document.createTreeWalker(
-        document.body,
+        document.body!,
         NodeFilter.SHOW_TEXT,
       );
       walker.currentNode = node;
@@ -199,7 +199,7 @@ export function fallbackMoveCaret(dir) {
   } catch {}
 }
 
-export function fallbackMoveWord(dir) {
+export function fallbackMoveWord(dir: number): boolean {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return false;
   const maxSteps = 800;
@@ -227,7 +227,7 @@ export function fallbackMoveWord(dir) {
   return false;
 }
 
-export function fallbackExtendWord(dir) {
+export function fallbackExtendWord(dir: number): boolean {
   const maxSteps = 800;
   const startIsWord = isWordChar(charAtFocus());
   let inInitialWord = startIsWord && dir > 0;
@@ -244,16 +244,16 @@ export function fallbackExtendWord(dir) {
         if (i > 0) return true;
       }
     }
-    const prevNode = getSelection().focusNode;
-    const prevOff = getSelection().focusOffset;
+    const prevNode = getSelection()!.focusNode;
+    const prevOff = getSelection()!.focusOffset;
     fallbackMoveChar(dir);
     const s = getSelection();
-    if (s.focusNode === prevNode && s.focusOffset === prevOff) return false;
+    if (s!.focusNode === prevNode && s!.focusOffset === prevOff) return false;
   }
   return false;
 }
 
-function setPosition(node, offset, isCaret) {
+function setPosition(node: Node, offset: number, isCaret: boolean): void {
   const sel = getSelection();
   if (!sel) return;
   offset = Math.max(
@@ -291,53 +291,56 @@ function setPosition(node, offset, isCaret) {
   sel.addRange(r);
 }
 
-export function fallbackLineBoundary(dir, forCaret) {
+export function fallbackLineBoundary(
+  dir: number,
+  forCaret: boolean,
+): boolean {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return false;
   const block = getBlockAncestor(sel.focusNode);
   if (!block) return false;
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) {
+    acceptNode(n: Node) {
       if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
-  let first = null;
-  let last = null;
-  let node;
+  let first: Node | null = null;
+  let last: Node | null = null;
+  let node: Node | null;
   while ((node = walker.nextNode())) {
     if (!first) first = node;
     last = node;
   }
   if (!first || !last) return false;
-  let targetNode;
-  let targetOffset;
+  let targetNode: Node;
+  let targetOffset: number;
   if (dir < 0) {
     targetNode = first;
     targetOffset = 0;
     if (!forCaret) {
-      const txt = targetNode.nodeValue;
+      const txt = targetNode.nodeValue!;
       let off = 0;
       while (off < txt.length && /\s/.test(txt[off])) off++;
       targetOffset = off;
     }
   } else {
     targetNode = last;
-    targetOffset = last.nodeValue.length;
+    targetOffset = last.nodeValue!.length;
   }
   setPosition(targetNode, targetOffset, forCaret);
   return true;
 }
 
-export function fallbackFirstNonBlank(forCaret) {
+export function fallbackFirstNonBlank(forCaret: boolean): boolean {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return false;
   const block = getBlockAncestor(sel.focusNode);
   if (!block) return false;
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-  let node;
+  let node: Node | null;
   while ((node = walker.nextNode())) {
-    const txt = node.nodeValue;
+    const txt = node.nodeValue!;
     for (let i = 0; i < txt.length; i++) {
       if (!/\s/.test(txt[i])) {
         setPosition(node, i, forCaret);
@@ -348,37 +351,40 @@ export function fallbackFirstNonBlank(forCaret) {
   return fallbackLineBoundary(-1, forCaret);
 }
 
-export function fallbackDocBoundary(dir, isCaret) {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  let first = null;
-  let last = null;
-  let n;
+export function fallbackDocBoundary(dir: number, isCaret: boolean): boolean {
+  const walker = document.createTreeWalker(document.body!, NodeFilter.SHOW_TEXT);
+  let first: Node | null = null;
+  let last: Node | null = null;
+  let n: Node | null;
   while ((n = walker.nextNode())) {
-    if (!n.nodeValue.trim()) continue;
+    if (!n.nodeValue!.trim()) continue;
     if (!first) first = n;
     last = n;
   }
   if (!first || !last) return false;
   if (dir < 0) setPosition(first, 0, isCaret);
-  else setPosition(last, last.nodeValue.length, isCaret);
+  else setPosition(last, last.nodeValue!.length, isCaret);
   return true;
 }
 
-export function fallbackMoveWordEnd(count, isCaret) {
+export function fallbackMoveWordEnd(count: number, isCaret: boolean): boolean {
   const pos = findNextWordEnd(count);
   if (!pos) return false;
   setPosition(pos.node, pos.offset, isCaret);
   return true;
 }
 
-export function fallbackExtendWordEnd(count, isCaret) {
+export function fallbackExtendWordEnd(
+  count: number,
+  isCaret: boolean,
+): boolean {
   const pos = findNextWordEnd(count);
   if (!pos) return false;
   setPosition(pos.node, pos.offset + 1, isCaret);
   return true;
 }
 
-export function fallbackMoveLine(dir, forCaret) {
+export function fallbackMoveLine(dir: number, forCaret: boolean): boolean {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return false;
   try {
@@ -388,7 +394,7 @@ export function fallbackMoveLine(dir, forCaret) {
     const x = rect.left + 2;
     const lineH = Math.max(12, rect.height) || 16;
     const y = dir < 0 ? rect.top - lineH * 0.6 : rect.bottom + lineH * 0.6;
-    let newRange = null;
+    let newRange: Range | null = null;
     if (document.caretRangeFromPoint) {
       newRange = document.caretRangeFromPoint(x, y);
     } else if (document.caretPositionFromPoint) {
@@ -422,11 +428,11 @@ export function fallbackMoveLine(dir, forCaret) {
         }
         const r = document.createRange();
         try {
-          r.setStart(anchorNode, anchorOffset);
+          r.setStart(anchorNode!, anchorOffset);
           r.setEnd(newRange.startContainer, newRange.startOffset);
         } catch {
           r.setStart(newRange.startContainer, newRange.startOffset);
-          r.setEnd(anchorNode, anchorOffset);
+          r.setEnd(anchorNode!, anchorOffset);
         }
         sel.removeAllRanges();
         sel.addRange(r);
@@ -435,9 +441,9 @@ export function fallbackMoveLine(dir, forCaret) {
     }
   } catch {}
   try {
-    const curRect = getSelection().getRangeAt(0).getBoundingClientRect();
+    const curRect = getSelection()!.getRangeAt(0).getBoundingClientRect();
     const candidates = collectVisualTextElements();
-    let best = null;
+    let best: Element | null = null;
     let bestDist = Infinity;
     for (const el of candidates) {
       const r = getRealRect(el);
@@ -468,24 +474,24 @@ export function fallbackMoveLine(dir, forCaret) {
     }
     if (best) {
       const walker = document.createTreeWalker(best, NodeFilter.SHOW_TEXT, {
-        acceptNode(n) {
+        acceptNode(n: Node) {
           if (!n.nodeValue || !n.nodeValue.trim())
             return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
         },
       });
-      let first = walker.nextNode();
+      const first = walker.nextNode();
       if (!first) return false;
       const targetNode =
         dir < 0
           ? (() => {
               let last = first;
-              let n2;
+              let n2: Node | null;
               while ((n2 = walker.nextNode())) last = n2;
               return last;
             })()
           : first;
-      const targetOffset = dir < 0 ? targetNode.nodeValue.length : 0;
+      const targetOffset = dir < 0 ? targetNode.nodeValue!.length : 0;
       setPosition(targetNode, targetOffset, forCaret);
       return true;
     }
