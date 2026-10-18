@@ -240,7 +240,9 @@ export function isReservedCombo(combo: string): boolean {
   return /^[0-9]$/.test(combo);
 }
 
-export function displayCombo(combo: string): string {
+export function displayCombo(combo: string): string;
+export function displayCombo(combo: string | null): string | null;
+export function displayCombo(combo: string | null): string | null {
   if (typeof combo !== "string" || combo === "") return combo;
   if (combo === " ") return "<Space>";
   return combo.replaceAll(" ", " <Space>");
@@ -322,7 +324,7 @@ export function getDynamicPrefixes(
 
 export function getPrefixEntries(
   keymap: Record<string, string>,
-  prefix: string,
+  prefix: string | null,
 ): { suffix: string; full: string; command: string }[] {
   const entries: { suffix: string; full: string; command: string }[] = [];
   if (!prefix || typeof prefix !== "string") return entries;

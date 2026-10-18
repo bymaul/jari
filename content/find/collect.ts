@@ -15,7 +15,7 @@ function shouldSkipNode(node: Node): boolean {
   } catch {}
   try {
     const root = (parent.getRootNode && parent.getRootNode()) as {
-      host?: ShadowRoot;
+      host?: Element;
     };
     if (root && root.host && root.host.classList) {
       const host = root.host;

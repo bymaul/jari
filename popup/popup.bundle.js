@@ -187,7 +187,9 @@
   }
   function isSiteDisabled(disabledSites, host, protocol) {
     const list = Array.isArray(disabledSites) ? disabledSites : [];
-    return list.some((pattern) => matchesSitePattern(host, pattern, protocol));
+    return list.some(
+      (pattern) => matchesSitePattern(host, pattern, protocol)
+    );
   }
   function toggleSiteInList(disabledSites, key) {
     const list = Array.isArray(disabledSites) ? disabledSites.slice() : [];

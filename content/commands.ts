@@ -10,6 +10,7 @@ import { Find } from "./find.js";
 import { Visual } from "./visual.js";
 import { COMMAND_CATALOG } from "./catalog.ts";
 import { goPage } from "./page-nav.ts";
+import type { CommandDef, CommandName } from "./catalog.ts";
 import { Palette } from "./palette.js";
 import { Shot } from "./shot.js";
 import { captureFullPage } from "./scrollshot.js";
@@ -18,19 +19,35 @@ import { downloadUrl, waitForPaint, isScreenshotable, isScreenshotDataUrl } from
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;
 
-let ignoreToggle = () => {};
-let passthroughEnter = () => {};
-export function setModeActions({ ignore, passthrough } = {}) {
+/** Runtime shape of a dispatched command: the catalog def plus its runner. */
+export interface CommandContext {
+  count: number;
+  /** Synthetic dispatch (help banner, ignore-mode remap) has no key event. */
+  event?: KeyboardEvent;
+}
+
+interface CommandImpl extends CommandDef {
+  run(c: CommandContext): void;
+}
+
+let ignoreToggle: () => void = () => {};
+let passthroughEnter: () => void = () => {};
+export function setModeActions(
+  { ignore, passthrough }: { ignore?: () => void; passthrough?: () => void } = {},
+): void {
   if (ignore) ignoreToggle = ignore;
   if (passthrough) passthroughEnter = passthrough;
 }
 
-function getScrollElement() {
+function getScrollElement(): Element | Window {
   return Scroll.getTarget();
 }
 
-function scrollFrame(frame, apply) {
-  const w = frameWindow(frame);
+function scrollFrame(
+  frame: Element,
+  apply: (target: Window | Element) => void,
+): boolean {
+  const w = frameWindow(frame as HTMLIFrameElement);
   if (w) {
     try {
       apply(w);
@@ -44,14 +61,14 @@ function scrollFrame(frame, apply) {
   return false;
 }
 
-function frameScrollBehavior() {
+function frameScrollBehavior(): ScrollBehavior {
   return shouldSmooth() ? "smooth" : "instant";
 }
 
-function scrollFrameBy(frame, x, y) {
-  let box;
+function scrollFrameBy(frame: Element, x: number, y: number): boolean {
+  let box: Element | null;
   try {
-    box = frameScrollBox(frame);
+    box = frameScrollBox(frame as HTMLIFrameElement);
   } catch {
     box = null;
   }
@@ -70,10 +87,10 @@ function scrollFrameBy(frame, x, y) {
   );
 }
 
-function scrollFrameTo(frame, top) {
-  let box;
+function scrollFrameTo(frame: Element, top: number): boolean {
+  let box: Element | null;
   try {
-    box = frameScrollBox(frame);
+    box = frameScrollBox(frame as HTMLIFrameElement);
   } catch {
     box = null;
   }
@@ -98,10 +115,14 @@ function scrollFrameTo(frame, top) {
   );
 }
 
-function scrollBy({ x = 0, y = 0, count = 1 }) {
+function scrollBy({
+  x = 0,
+  y = 0,
+  count = 1,
+}: { x?: number; y?: number; count?: number }): void {
   const el = getScrollElement();
   if (isFrame(el)) {
-    scrollFrameBy(el, x * count, y * count);
+    scrollFrameBy(el as Element, x * count, y * count);
     return;
   }
   if (shouldSmooth()) {
@@ -111,18 +132,18 @@ function scrollBy({ x = 0, y = 0, count = 1 }) {
   }
 }
 
-async function copyToClipboard(text, message) {
+async function copyToClipboard(text: string, message: string): Promise<void> {
   const ok = await ui.copyText(text);
   ui.toast(ok ? message : "Copy failed");
 }
 
-function copyTitleAndUrlText() {
+function copyTitleAndUrlText(): string {
   return settings.getCopyFormat() === "markdown"
     ? `[${document.title}](${location.href})`
     : `${document.title}\n${location.href}`;
 }
 
-function readClipboardText() {
+function readClipboardText(): Promise<string> {
   let text = "";
   try {
     ui.withHiddenTextarea((ta) => {
@@ -137,22 +158,29 @@ function readClipboardText() {
   }
 }
 
-function scrollPageBy(ratio, direction) {
+function scrollPageBy(
+  ratio: number,
+  direction: number,
+): (c: CommandContext) => void {
   return (c) => {
     const el = getScrollElement();
-    const h = isFrame(el) ? frameViewportHeight(el) : clientHeightOf(el);
+    const h = isFrame(el)
+      ? frameViewportHeight(el as HTMLIFrameElement)
+      : clientHeightOf(el);
     scrollBy({ y: direction * h * ratio, count: c.count });
   };
 }
 
-async function openClipboardWith(action) {
+async function openClipboardWith(
+  action: "navigate" | "openInBackgroundTab",
+): Promise<void> {
   const text = await readClipboardText();
   if (!text) return ui.toast("Clipboard empty");
   const res = await sendMessage(action, { url: text });
   if (res && !res.ok) ui.toast("Not a URL");
 }
 
-function isFirefox() {
+function isFirefox(): boolean {
   try {
     return /firefox/i.test(navigator.userAgent || "");
   } catch {
@@ -160,7 +188,7 @@ function isFirefox() {
   }
 }
 
-function addonsBlockedHint() {
+function addonsBlockedHint(): string {
   let mac = false;
   try {
     mac =
@@ -172,7 +200,7 @@ function addonsBlockedHint() {
     : "Firefox blocks this - press Ctrl+Shift+A for Add-ons Manager";
 }
 
-function goTo(urlFn) {
+function goTo(urlFn: (href: string) => string): void {
   const target = urlFn(location.href);
   if (Url.isSamePath(target, location.href)) return ui.toast("Already at root");
   sendMessage("navigate", { url: target });
@@ -180,7 +208,7 @@ function goTo(urlFn) {
 
 let screenshotCapturing = false;
 
-async function screenshotPage() {
+async function screenshotPage(): Promise<void> {
   if (!isScreenshotable()) {
     ui.toast("Cannot screenshot this page");
     return;
@@ -211,11 +239,14 @@ async function screenshotPage() {
   }
 }
 
-function cmd(name, run) {
+function cmd(
+  name: CommandName,
+  run: (c: CommandContext) => void,
+): CommandImpl {
   return { ...COMMAND_CATALOG[name], run };
 }
 
-export const commands = {
+export const commands: Record<string, CommandImpl> = {
 
   scrollDown: cmd("scrollDown", (c) => scrollBy({ y: settings.getScrollStep(), count: c.count })),
   scrollUp: cmd("scrollUp", (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count })),
@@ -226,7 +257,7 @@ export const commands = {
     run: () => {
       const el = getScrollElement();
       if (isFrame(el)) {
-        scrollFrameTo(el, 0);
+        scrollFrameTo(el as Element, 0);
         return;
       }
       if (shouldSmooth()) smoothScrollBy(el, 0, -scrollPosOf(el).y);
@@ -240,11 +271,11 @@ export const commands = {
       if (isFrame(el)) {
         let box;
         try {
-          box = frameScrollBox(el);
+          box = frameScrollBox(el as HTMLIFrameElement);
         } catch {
           box = null;
         }
-        const w = box ? null : frameWindow(el);
+        const w = box ? null : frameWindow(el as HTMLIFrameElement);
         let target;
         try {
           if (box) {
@@ -258,7 +289,7 @@ export const commands = {
         } catch {
           target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
         }
-        scrollFrameTo(el, target);
+        scrollFrameTo(el as Element, target);
         return;
       }
       const target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
@@ -289,7 +320,12 @@ export const commands = {
   moveTabToWindow: {
     ...COMMAND_CATALOG.moveTabToWindow,
     run: async () => {
-      const res = await sendMessage("moveTabToWindow");
+      const res: {
+        ok?: boolean;
+        movedToWindow?: boolean;
+        movedToNewWindow?: boolean;
+        needWindowChoice?: boolean;
+      } | null = await sendMessage("moveTabToWindow");
       if (!res || !res.ok) {
         ui.toast("No window available");
         return;
@@ -367,7 +403,7 @@ export const commands = {
   },
 };
 
-setCommandRunner((commandName, event) => {
+setCommandRunner((commandName: string, event: KeyboardEvent) => {
   const cmd = commands[commandName];
   if (!cmd) return;
   cmd.run({ count: 1, event });

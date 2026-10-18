@@ -144,7 +144,7 @@ function findFrameElements(): HTMLIFrameElement[] {
 
 export function isFrame(el: Element | Window | null | undefined): boolean {
   if (!el || el === window) return false;
-  return isFrameElement(el);
+  return isFrameElement(el as Element);
 }
 
 function frameDoc(frame: HTMLIFrameElement): Document | null {
@@ -301,7 +301,7 @@ export function frameScrollBox(frame: HTMLIFrameElement): Element | null {
 export function focusTarget(el: Element | Window | null | undefined): void {
   if (!el || el === window) return;
   try {
-    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    (el as Element).scrollIntoView({ block: "nearest", inline: "nearest" });
   } catch {}
   if (!isFrame(el)) return;
   ui.safeFocus(el as HTMLElement, { preventScroll: true });
@@ -358,7 +358,7 @@ function forwardCycleToTop(dir?: number) {
   try {
     if (
       document.activeElement &&
-      typeof document.activeElement.blur === "function"
+      typeof (document.activeElement as HTMLElement).blur === "function"
     ) {
       (document.activeElement as HTMLElement).blur();
     }
@@ -388,12 +388,15 @@ const DIALOG_SELECTOR = 'dialog[open], [role="dialog"], [aria-modal="true"]';
 function isDialogStop(el: Element | Window | null | undefined): boolean {
   if (!el || el === window) return false;
   try {
-    if (el.tagName === "DIALOG") return true;
-    if (typeof el.getAttribute === "function") {
-      if (el.getAttribute("role") === "dialog") return true;
-      if (el.getAttribute("aria-modal") === "true") return true;
+    if ((el as Element).tagName === "DIALOG") return true;
+    if (typeof (el as Element).getAttribute === "function") {
+      if ((el as Element).getAttribute("role") === "dialog") return true;
+      if ((el as Element).getAttribute("aria-modal") === "true") return true;
     }
-    if (typeof el.closest === "function" && el.closest(DIALOG_SELECTOR))
+    if (
+      typeof (el as Element).closest === "function" &&
+      (el as Element).closest(DIALOG_SELECTOR)
+    )
       return true;
   } catch {
     return false;
@@ -494,17 +497,17 @@ function cycle(steps = 1) {
 function scrollHeightOf(el: Element | Window): number {
   return el === window
     ? (document.scrollingElement || document.documentElement || document.body).scrollHeight
-    : el.scrollHeight;
+    : (el as Element).scrollHeight;
 }
 
 function clientHeightOf(el: Element | Window): number {
-  return el === window ? window.innerHeight : el.clientHeight;
+  return el === window ? window.innerHeight : (el as Element).clientHeight;
 }
 
 function scrollPosOf(el: Element | Window): { x: number; y: number } {
   return el === window
     ? { x: window.scrollX, y: window.scrollY }
-    : { x: el.scrollLeft, y: el.scrollTop };
+    : { x: (el as Element).scrollLeft, y: (el as Element).scrollTop };
 }
 
 let highlightEl: HTMLDivElement | null = null;
@@ -513,7 +516,7 @@ let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 function showHighlight(precomputedStops?: (Element | null)[]): void {
   const area = getTarget();
   const stops = precomputedStops || currentStops();
-  const pos = stops.indexOf(area === window ? null : area);
+  const pos = stops.indexOf(area === window ? null : (area as Element));
   const count = pos === -1 ? "" : `${pos + 1}/${stops.length}`;
   if (!document.body) return;
   let rect: { left: number; top: number; width: number; height: number };
@@ -526,7 +529,7 @@ function showHighlight(precomputedStops?: (Element | null)[]): void {
     };
   } else {
     try {
-      rect = area.getBoundingClientRect();
+      rect = (area as Element).getBoundingClientRect();
     } catch {
       return;
     }
@@ -546,7 +549,7 @@ function showHighlight(precomputedStops?: (Element | null)[]): void {
   label.className = "jari-scroll-highlight-label";
   let kind = "current scroll area";
   if (area === window) kind = "global scroll";
-  else if (isFrame(area)) kind = isUnverifiedFrame(area) ? "frame?" : "frame";
+  else if (isFrame(area)) kind = isUnverifiedFrame(area as Element) ? "frame?" : "frame";
   else if (isDialogStop(area)) kind = "dialog scroll area";
   label.textContent = kind;
   el.appendChild(label);

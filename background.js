@@ -1206,7 +1206,7 @@
   var maxResultsMin = 5;
   var maxResultsMax = 100;
   function clampMaxResults(n) {
-    const v = Math.floor(n);
+    const v = Math.floor(n ?? NaN);
     if (!Number.isFinite(v)) return maxResultsDefault;
     return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
   }

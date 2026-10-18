@@ -9,7 +9,7 @@ import {
 import { settings } from "./settings.ts";
 import { SHOW_HELP_ACTION } from "../popup/site.ts";
 import { ui } from "./ui.ts";
-import { commands, setModeActions } from "./commands.js";
+import { commands, setModeActions } from "./commands.ts";
 import { Overlays } from "./overlays.ts";
 import { isEditable } from "./hints-elements.ts";
 import { Find, __resetFindState } from "./find.js";
@@ -37,7 +37,7 @@ function clearPending(): void {
 }
 
 function restartTimer(): void {
-  clearTimeout(timer);
+  clearTimeout(timer ?? undefined);
   timer = null;
   const timeoutMs = settings.getTimeoutMs();
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return;
@@ -70,7 +70,7 @@ function toggleIgnore(): boolean {
 }
 
 function restartPassthroughTimer(): void {
-  clearTimeout(passthroughTimer);
+  clearTimeout(passthroughTimer ?? undefined);
   passthroughTimer = null;
   const passthroughMs = settings.getPassthroughMs();
   if (Number.isFinite(passthroughMs) && passthroughMs > 0) {
@@ -90,7 +90,7 @@ function enterPassthrough(): void {
 
 function exitPassthrough(): void {
   if (!passthroughMode) return;
-  clearTimeout(passthroughTimer);
+  clearTimeout(passthroughTimer ?? undefined);
   passthroughTimer = null;
   passthroughMode = false;
   hidePill("passthrough");
@@ -175,7 +175,7 @@ function handleKeydown(event: KeyboardEvent): boolean | undefined {
   const overlay = Overlays.active();
   if (overlay) {
     Clue.hide();
-    const handled = overlay.onKeyDown(event);
+    const handled = overlay.onKeyDown!(event);
     if (isJariUiTarget(event)) event.stopPropagation();
     return handled;
   }
@@ -337,8 +337,8 @@ boot();
 export { handleKeydown };
 
 export function __resetState(): void {
-  clearTimeout(timer);
-  clearTimeout(passthroughTimer);
+  clearTimeout(timer ?? undefined);
+  clearTimeout(passthroughTimer ?? undefined);
   timer = null;
   passthroughTimer = null;
   pendingCount = "";

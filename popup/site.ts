@@ -55,11 +55,13 @@ export function parseTabSite(rawUrl: unknown): TabSite {
 
 export function isSiteDisabled(
   disabledSites: unknown,
-  host: unknown,
-  protocol: unknown,
+  host: string,
+  protocol: string,
 ): boolean {
   const list: unknown[] = Array.isArray(disabledSites) ? disabledSites : [];
-  return list.some((pattern) => matchesSitePattern(host, pattern, protocol));
+  return list.some((pattern) =>
+    matchesSitePattern(host, pattern as string, protocol),
+  );
 }
 
 export function toggleSiteInList(disabledSites: unknown, key: string): string[] {

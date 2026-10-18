@@ -41,7 +41,7 @@ export function isEditable(el: Element | null | undefined): boolean {
   if (!el) return false;
   const tag = el.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-  if (el.isContentEditable) return true;
+  if ((el as HTMLElement).isContentEditable) return true;
   const role = el.getAttribute ? el.getAttribute("role") : null;
   if (role === "textbox" || role === "searchbox" || role === "combobox")
     return true;
@@ -97,8 +97,8 @@ export function listElements(
   root: Node,
   whatToShow: number,
   filter: (node: Node) => boolean,
-): Node[] {
-  const out: Node[] = [];
+): Element[] {
+  const out: Element[] = [];
   try {
     // Numeric codes: NodeFilter may be undefined in unit tests.
     const walker = document.createTreeWalker(root, whatToShow, {
@@ -116,7 +116,7 @@ export function listElements(
     let node = walker.nextNode();
     while (node) {
       try {
-        if (filter(node)) out.push(node);
+        if (filter(node)) out.push(node as Element);
       } catch {}
       if ((node as Element).shadowRoot) {
         try {
@@ -222,7 +222,7 @@ function pushSubtree(
   } catch {
     shadow = null;
   }
-  let nodes: ArrayLike<Element>;
+  let nodes: Iterable<Element>;
   try {
     nodes = (root as Element | ShadowRoot).querySelectorAll("*") || [];
   } catch {
@@ -298,8 +298,8 @@ export function collectNewcomers(
 export function filterInvisibleElements(nodes: Element[]): Element[] {
   return nodes.filter(
     (n) =>
-      n.offsetHeight &&
-      n.offsetWidth &&
+      (n as HTMLElement).offsetHeight &&
+      (n as HTMLElement).offsetWidth &&
       !n.getAttribute("disabled") &&
       isElementPartiallyInViewport(n) &&
       window.getComputedStyle(n).visibility !== "hidden",
@@ -370,7 +370,7 @@ export function prioritizeForViewport(elements: Element[]): Element[] {
     .map(({ el }) => el);
 }
 
-function matchesClickableSelector(e) {
+function matchesClickableSelector(e: Element) {
   try {
     if (e.matches && e.matches(CLICKABLE_SELECTOR)) return true;
   } catch {}
@@ -418,7 +418,7 @@ export function filterAncestors(
         )
           result[j] = e;
         return;
-      } else if (result[j].shadowRoot && result[j].shadowRoot.contains(e)) {
+      } else if (result[j].shadowRoot && result[j].shadowRoot!.contains(e)) {
         return;
       } else if (e.contains(result[j])) {
         return;
@@ -441,7 +441,7 @@ export function filterOverlapElements(elements: Element[]): Element[] {
     if (
       (e.matches &&
         e.matches("input, textarea, select, form")) ||
-      e.contentEditable === "true" ||
+      (e as HTMLElement).contentEditable === "true" ||
       isExplicitlyRequested(e)
     )
       return true;
@@ -474,7 +474,7 @@ function matchesHintSelector(
   if (pattern) {
     try {
       pattern.lastIndex = 0;
-      const text = e.innerText || "";
+      const text = (e as HTMLElement).innerText || "";
       if (pattern.test(text)) return true;
       const label = e.getAttribute ? e.getAttribute("aria-label") : "";
       if (label) {
@@ -600,12 +600,12 @@ export function getLinkAncestor(
       isOpenableLink(cur, docBase)
     )
       return cur;
-    const parent = cur.parentElement;
+    const parent: Element | null = cur.parentElement;
     if (parent) {
       cur = parent;
     } else {
-      const root = cur.getRootNode && cur.getRootNode();
-      const host =
+      const root: unknown = cur.getRootNode && cur.getRootNode();
+      const host: Element | null | undefined =
         root ? (root as unknown as { host?: Element }).host : null;
       if (host) cur = host;
       else break;
@@ -624,8 +624,8 @@ export function getLinkElements(): Element[] {
         return !!(
           e.matches &&
           e.matches("[href]") &&
-          !e.disabled &&
-          !e.readOnly
+          !(e as HTMLInputElement).disabled &&
+          !(e as HTMLInputElement).readOnly
         );
       } catch {
         return false;
@@ -796,7 +796,11 @@ function matchesInnerLink(el: Element, base?: string): boolean {
   } catch {
     return false;
   }
-  return !el.disabled && !el.readOnly && isOpenableLink(el, base);
+  return (
+    !(el as HTMLInputElement).disabled &&
+    !(el as HTMLInputElement).readOnly &&
+    isOpenableLink(el, base)
+  );
 }
 
 export function collectIframeElements(requestedMode: string): Element[] {
@@ -838,7 +842,7 @@ export function collectIframeElements(requestedMode: string): Element[] {
       try {
         if (el.closest && el.closest(overlaySelectors)) return;
       } catch {}
-      if (el.disabled || el.readOnly) return;
+      if ((el as HTMLInputElement).disabled || (el as HTMLInputElement).readOnly) return;
       if (!innerPointVisible(el, be)) return;
       try {
         const jel = el as JariElement;

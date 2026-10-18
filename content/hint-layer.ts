@@ -31,7 +31,7 @@ export function genLabels(count: number, charset?: string): string[] {
 }
 
 export function getZIndex(
-  node: HTMLElement | null | undefined,
+  node: Element | null | undefined,
   cache?: Map<Node, number>,
 ): number {
   try {
@@ -41,7 +41,10 @@ export function getZIndex(
   }
 }
 
-function zIndexOf(node: Node | null, cache: Map<Node, number>): number {
+function zIndexOf(
+  node: Node | null | undefined,
+  cache: Map<Node, number>,
+): number {
   if (
     !node ||
     node === document.body ||

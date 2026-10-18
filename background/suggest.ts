@@ -1,3 +1,4 @@
+import type { Suggestion } from "../shared/protocol.ts";
 import { clampMaxResults, suggestionSources } from "../shared/constants.ts";
 import {
   buildEngineUrl,

@@ -30,8 +30,8 @@ export function sendMessageWithTimeout<A extends Action>(
       : CAPTURE_MESSAGE_TIMEOUT_MS;
   return new Promise((resolve) => {
     let settled = false;
-    let timer = null;
-    const done = (value) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const done = (value: MessageResponse<A> | null) => {
       if (settled) return;
       settled = true;
       try {
@@ -52,7 +52,7 @@ export function sendMessageWithTimeout<A extends Action>(
   });
 }
 
-let statusStack = null;
+let statusStack: HTMLDivElement | null = null;
 function statusContainer() {
   if (!statusStack) {
     statusStack = document.createElement("div");

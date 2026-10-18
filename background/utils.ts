@@ -27,8 +27,12 @@ export async function getStoredSettings(): Promise<StoredSettings> {
     readStoredSettings("local"),
   ]);
   if (synced && local) {
-    const syncAt = Number.isFinite(synced.updatedAt) ? synced.updatedAt : 0;
-    const localAt = Number.isFinite(local.updatedAt) ? local.updatedAt : 0;
+    const syncAt = Number.isFinite(synced.updatedAt)
+      ? (synced.updatedAt as number)
+      : 0;
+    const localAt = Number.isFinite(local.updatedAt)
+      ? (local.updatedAt as number)
+      : 0;
     return localAt > syncAt ? local : synced;
   }
   return (synced || local || {}) as StoredSettings;

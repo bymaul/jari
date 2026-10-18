@@ -15,5 +15,12 @@
     "skipLibCheck": true,
     "types": ["node", "chrome"]
   },
-  "include": ["shared/**/*", "tests/**/*.ts"]
+  "include": [
+    "shared/**/*",
+    "content/**/*.ts",
+    "background/**/*.ts",
+    "popup/**/*.ts",
+    "options/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }

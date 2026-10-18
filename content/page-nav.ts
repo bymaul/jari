@@ -20,7 +20,7 @@ function elementLabel(el: Element): { text: string; aria: string } {
   try {
     text = el.textContent || "";
   } catch {}
-  let aria = "";
+  let aria: string | null = "";
   try {
     aria = el.getAttribute ? el.getAttribute("aria-label") : "";
   } catch {}

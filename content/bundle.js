@@ -8,7 +8,7 @@
   var maxResultsMin = 5;
   var maxResultsMax = 100;
   function clampMaxResults(n) {
-    const v = Math.floor(n);
+    const v = Math.floor(n ?? NaN);
     if (!Number.isFinite(v)) return maxResultsDefault;
     return Math.min(maxResultsMax, Math.max(maxResultsMin, v));
   }
@@ -11230,7 +11230,7 @@
     }
   }
 
-  // content/commands.js
+  // content/commands.ts
   var PAGE_RATIO = 0.9;
   var HALF_RATIO = 0.5;
   var ignoreToggle = () => {
@@ -11315,7 +11315,11 @@
       (t) => t.scrollTo({ top, behavior: frameScrollBehavior() })
     );
   }
-  function scrollBy({ x = 0, y = 0, count = 1 }) {
+  function scrollBy({
+    x = 0,
+    y = 0,
+    count = 1
+  }) {
     const el = getScrollElement();
     if (isFrame(el)) {
       scrollFrameBy(el, x * count, y * count);
@@ -11709,7 +11713,7 @@ ${location.href}`;
     Clue.hide();
   }
   function restartTimer() {
-    clearTimeout(timer);
+    clearTimeout(timer ?? void 0);
     timer = null;
     const timeoutMs = settings.getTimeoutMs();
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return;
@@ -11738,7 +11742,7 @@ ${location.href}`;
     return ignoreMode;
   }
   function restartPassthroughTimer() {
-    clearTimeout(passthroughTimer);
+    clearTimeout(passthroughTimer ?? void 0);
     passthroughTimer = null;
     const passthroughMs = settings.getPassthroughMs();
     if (Number.isFinite(passthroughMs) && passthroughMs > 0) {
@@ -11755,7 +11759,7 @@ ${location.href}`;
   }
   function exitPassthrough() {
     if (!passthroughMode) return;
-    clearTimeout(passthroughTimer);
+    clearTimeout(passthroughTimer ?? void 0);
     passthroughTimer = null;
     passthroughMode = false;
     hidePill3("passthrough");
@@ -11956,8 +11960,8 @@ ${location.href}`;
   setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
   boot();
   function __resetState() {
-    clearTimeout(timer);
-    clearTimeout(passthroughTimer);
+    clearTimeout(timer ?? void 0);
+    clearTimeout(passthroughTimer ?? void 0);
     timer = null;
     passthroughTimer = null;
     pendingCount3 = "";
