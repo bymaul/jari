@@ -20,7 +20,7 @@ import { pageNavTextDefaults } from "../shared/page-nav-texts.ts";
 import { COMMAND_CATALOG } from "../content/catalog.ts";
 import { settings } from "../content/settings.ts";
 import { ui } from "../content/ui.ts";
-import { renderEngines, initEngines } from "./engines.js";
+import { renderEngines, initEngines } from "./engines.ts";
 import { renderPagenav, initPagenav } from "./pagenav.ts";
 
 const tableEl = document.querySelector("#keymap-table");

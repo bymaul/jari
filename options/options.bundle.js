@@ -1374,7 +1374,7 @@
     hideOverlaysForCapture
   };
 
-  // options/engines.js
+  // options/engines.ts
   var engineListEl = document.querySelector("#engine-list");
   var defaultEngineEl = document.querySelector("#default-engine");
   var addEngineBtn = document.querySelector("#add-engine");
@@ -1418,7 +1418,7 @@
   function status(message) {
     if (!statusEl) return;
     statusEl.textContent = message;
-    clearTimeout(statusEl._timer);
+    clearTimeout(statusEl._timer ?? void 0);
     statusEl._timer = setTimeout(() => {
       statusEl.textContent = "";
     }, 2500);

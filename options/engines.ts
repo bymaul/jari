@@ -4,16 +4,32 @@ import {
   searchEngineDefaults,
   validateSearchEngine,
 } from "../shared/search-engines.ts";
+import type { SearchEngine } from "../shared/search-engines.ts";
 import { settingsDefaults } from "../content/keymap.ts";
+import type { Settings } from "../content/keymap.ts";
 
-const engineListEl = document.querySelector("#engine-list");
-const defaultEngineEl = document.querySelector("#default-engine");
-const addEngineBtn = document.querySelector("#add-engine");
-const resetEnginesBtn = document.querySelector("#reset-engines");
-const statusEl = document.querySelector("#status");
-const saveStateEl = document.querySelector("#save-state");
+type EngineRowData = {
+  kwEl: HTMLInputElement;
+  urlEl: HTMLInputElement;
+  keyword: string;
+  url: string;
+};
 
-function setSaveState(mode, message) {
+const engineListEl = document.querySelector<HTMLElement>("#engine-list");
+const defaultEngineEl =
+  document.querySelector<HTMLSelectElement>("#default-engine");
+const addEngineBtn = document.querySelector<HTMLButtonElement>("#add-engine");
+const resetEnginesBtn =
+  document.querySelector<HTMLButtonElement>("#reset-engines");
+const statusEl = document.querySelector<
+  HTMLElement & { _timer?: ReturnType<typeof setTimeout> }
+>("#status");
+const saveStateEl = document.querySelector<HTMLElement>("#save-state");
+
+function setSaveState(
+  mode: "saving" | "failed" | "warn" | "saved",
+  message?: string,
+): void {
   if (!saveStateEl) return;
   saveStateEl.classList.remove("saving", "failed", "warn");
   if (mode === "saving") {
@@ -31,7 +47,7 @@ function setSaveState(mode, message) {
   }
 }
 
-function savedState() {
+function savedState(): void {
   if (settings.isPersistedLocally()) {
     setSaveState("warn", "Saved on this device only — browser sync is full");
   } else {
@@ -39,7 +55,7 @@ function savedState() {
   }
 }
 
-async function savePatch(patch) {
+async function savePatch(patch: Partial<Settings>): Promise<boolean> {
   setSaveState("saving");
   try {
     await settings.update(patch);
@@ -51,36 +67,36 @@ async function savePatch(patch) {
   return true;
 }
 
-function status(message) {
+function status(message: string): void {
   if (!statusEl) return;
   statusEl.textContent = message;
-  clearTimeout(statusEl._timer);
+  clearTimeout(statusEl._timer ?? undefined);
   statusEl._timer = setTimeout(() => {
     statusEl.textContent = "";
   }, 2500);
 }
 
-function showFieldError(id, message) {
+function showFieldError(id: string, message: string): void {
   const el = document.querySelector(`#${id}`);
   if (!el) return;
   el.textContent = message;
-  el.hidden = false;
+  (el as HTMLElement).hidden = false;
 }
 
-function clearFieldError(id) {
+function clearFieldError(id: string): void {
   const el = document.querySelector(`#${id}`);
   if (!el) return;
   el.textContent = "";
-  el.hidden = true;
+  (el as HTMLElement).hidden = true;
 }
 
-function markInvalid(el, invalid) {
+function markInvalid(el: Element | null, invalid: boolean): void {
   if (!el) return;
   if (invalid) el.setAttribute("aria-invalid", "true");
   else el.removeAttribute("aria-invalid");
 }
 
-function engineRow(keyword, url) {
+function engineRow(keyword: string, url: string): HTMLLIElement {
   const li = document.createElement("li");
   const kwEl = document.createElement("input");
   kwEl.type = "text";
@@ -114,12 +130,12 @@ function engineRow(keyword, url) {
   return li;
 }
 
-function readEngineRows() {
-  const rows = [];
+function readEngineRows(): EngineRowData[] {
+  const rows: EngineRowData[] = [];
   if (!engineListEl) return rows;
   for (const li of engineListEl.children) {
-    const kwEl = li.querySelector(".engine-keyword");
-    const urlEl = li.querySelector(".engine-url");
+    const kwEl = li.querySelector<HTMLInputElement>(".engine-keyword");
+    const urlEl = li.querySelector<HTMLInputElement>(".engine-url");
     if (!kwEl || !urlEl) continue;
     rows.push({
       kwEl,
@@ -131,7 +147,7 @@ function readEngineRows() {
   return rows;
 }
 
-export function renderEngines() {
+export function renderEngines(): void {
   if (!engineListEl) return;
   engineListEl.textContent = "";
   clearFieldError("error-engines");
@@ -141,7 +157,7 @@ export function renderEngines() {
   syncDefaultEngineOptions();
 }
 
-function syncDefaultEngineOptions() {
+function syncDefaultEngineOptions(): void {
   if (!defaultEngineEl) return;
   const engines = settings.getSearchEngines();
   defaultEngineEl.textContent = "";
@@ -154,13 +170,13 @@ function syncDefaultEngineOptions() {
   defaultEngineEl.value = settings.getDefaultEngine();
 }
 
-function failEngines(message, badEls) {
+function failEngines(message: string, badEls?: Element[]): void {
   for (const el of badEls || []) markInvalid(el, true);
   showFieldError("error-engines", `${message} (not saved)`);
   status(`Search engines: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
 }
 
-function commitEngines() {
+function commitEngines(): void {
   const rows = readEngineRows();
   for (const row of rows) {
     markInvalid(row.kwEl, false);
@@ -168,8 +184,8 @@ function commitEngines() {
   }
   clearFieldError("error-engines");
   const complete = rows.filter((r) => r.keyword !== "" && r.url !== "");
-  const seen = new Set();
-  const list = [];
+  const seen = new Set<string>();
+  const list: SearchEngine[] = [];
   for (const row of complete) {
     const problem = validateSearchEngine({
       keyword: row.keyword,
@@ -214,7 +230,7 @@ function commitEngines() {
   });
 }
 
-function removeEngine(li) {
+function removeEngine(li: HTMLLIElement): void {
   const rows = readEngineRows();
   if (rows.length <= 1) {
     failEngines("At least one search engine is required", []);
@@ -235,7 +251,7 @@ function removeEngine(li) {
   commitEngines();
 }
 
-function addEngine() {
+function addEngine(): void {
   if (!engineListEl) return;
   clearFieldError("error-engines");
   if (engineListEl.children.length >= MAX_SEARCH_ENGINES) {
@@ -247,10 +263,10 @@ function addEngine() {
   }
   const li = engineRow("", "");
   engineListEl.appendChild(li);
-  li.querySelector(".engine-keyword").focus();
+  li.querySelector<HTMLInputElement>(".engine-keyword")!.focus();
 }
 
-function resetEngines() {
+function resetEngines(): void {
   savePatch({
     searchEngines: searchEngineDefaults(),
     defaultEngine: settingsDefaults.defaultEngine,
@@ -262,11 +278,11 @@ function resetEngines() {
   });
 }
 
-export function initEngines() {
+export function initEngines(): void {
   addEngineBtn?.addEventListener("click", addEngine);
   resetEnginesBtn?.addEventListener("click", resetEngines);
   defaultEngineEl?.addEventListener("change", () =>
-    savePatch({ defaultEngine: defaultEngineEl.value }).then(() => {
+    savePatch({ defaultEngine: defaultEngineEl!.value }).then(() => {
       syncDefaultEngineOptions();
     }),
   );
