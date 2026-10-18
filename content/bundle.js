@@ -10264,7 +10264,7 @@
   };
   register("palette", { close: close6, onKeyDown: onKeyDown7, isActive: isActive7 });
 
-  // content/screenshot.js
+  // content/screenshot.ts
   var UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
   var PNG_DATA_URL_PREFIX = "data:image/png;base64,";
   var IMAGE_LOAD_TIMEOUT_MS = 5e3;
@@ -10465,7 +10465,7 @@
     };
   }
   function scaleRect(rect, dpr) {
-    const s = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+    const s = dpr !== void 0 && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
     const parts = rect ? [rect.left, rect.top, rect.width, rect.height].map(Number) : [NaN, NaN, NaN, NaN];
     if (!parts.every(Number.isFinite)) return { x: 0, y: 0, w: 1, h: 1 };
     const [left, top, width, height] = parts;
@@ -10526,7 +10526,7 @@
             let sy = src.y;
             let sw = src.w;
             let sh = src.h;
-            if (Number.isFinite(naturalW) && naturalW > 0 && Number.isFinite(naturalH) && naturalH > 0) {
+            if (naturalW !== void 0 && Number.isFinite(naturalW) && naturalW > 0 && naturalH !== void 0 && Number.isFinite(naturalH) && naturalH > 0) {
               sx = Math.min(Math.max(0, src.x), Math.max(0, naturalW - 1));
               sy = Math.min(Math.max(0, src.y), Math.max(0, naturalH - 1));
               sw = Math.min(sw, Math.max(1, naturalW - sx));

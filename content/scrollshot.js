@@ -9,7 +9,7 @@ import {
   waitForPaint,
   waitForMediaReady,
   computeSlices,
-} from "./screenshot.js";
+} from "./screenshot.ts";
 
 const SETTLE_MS = 120;
 const IMAGE_LOAD_TIMEOUT_MS = 5000;

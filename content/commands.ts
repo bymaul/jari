@@ -14,7 +14,7 @@ import type { CommandDef, CommandName } from "./catalog.ts";
 import { Palette } from "./palette.js";
 import { Shot } from "./shot.js";
 import { captureFullPage } from "./scrollshot.js";
-import { downloadUrl, waitForPaint, isScreenshotable, isScreenshotDataUrl } from "./screenshot.js";
+import { downloadUrl, waitForPaint, isScreenshotable, isScreenshotDataUrl } from "./screenshot.ts";
 
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;

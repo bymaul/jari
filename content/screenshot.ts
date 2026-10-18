@@ -8,7 +8,7 @@ const MAX_CANVAS_SIDE = 8000;
 const MAX_CANVAS_PIXELS = 16000000;
 const FILENAME_PATTERN = /^jari-[a-z0-9-]{0,64}\.png$/;
 
-export function isScreenshotable() {
+export function isScreenshotable(): boolean {
   try {
     return !UNSCREENSHOTABLE_PROTOCOLS.test(location.protocol || "");
   } catch {
@@ -16,11 +16,11 @@ export function isScreenshotable() {
   }
 }
 
-export function isScreenshotDataUrl(value) {
+export function isScreenshotDataUrl(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(PNG_DATA_URL_PREFIX);
 }
 
-export function sanitizeHostForFilename(host) {
+export function sanitizeHostForFilename(host: unknown): string {
   const s = String(host || "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -28,16 +28,19 @@ export function sanitizeHostForFilename(host) {
   return s.slice(0, 40);
 }
 
-export function screenshotFilename(date = new Date(), host = "") {
+export function screenshotFilename(
+  date: Date = new Date(),
+  host: string = "",
+): string {
   const d =
     date instanceof Date && Number.isFinite(date.getTime()) ? date : new Date();
-  const pad = (n) => String(n).padStart(2, "0");
+  const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
   const h = sanitizeHostForFilename(host);
   return h ? `jari-${h}-${stamp}.png` : `jari-${stamp}.png`;
 }
 
-function pageHost() {
+function pageHost(): string {
   try {
     return location.hostname || "";
   } catch {
@@ -45,11 +48,14 @@ function pageHost() {
   }
 }
 
-export function pageScreenshotFilename(date = new Date()) {
+export function pageScreenshotFilename(date: Date = new Date()): string {
   return screenshotFilename(date, pageHost());
 }
 
-export function downloadUrl(url, filename = pageScreenshotFilename()) {
+export function downloadUrl(
+  url: unknown,
+  filename: string = pageScreenshotFilename(),
+): boolean {
   if (
     typeof url !== "string" ||
     (!url.startsWith("blob:") && !url.startsWith("data:image/"))
@@ -77,13 +83,15 @@ export function downloadUrl(url, filename = pageScreenshotFilename()) {
   }
 }
 
-export async function waitForPaint({ timeoutMs = PAINT_TIMEOUT_MS } = {}) {
+export async function waitForPaint(
+  { timeoutMs = PAINT_TIMEOUT_MS } = {},
+): Promise<void> {
   const cap =
     Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : PAINT_TIMEOUT_MS;
   try {
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       let done = false;
-      let timer = null;
+      let timer: ReturnType<typeof setTimeout> | null = null;
       const finish = () => {
         if (done) return;
         done = true;
@@ -105,11 +113,14 @@ export async function waitForPaint({ timeoutMs = PAINT_TIMEOUT_MS } = {}) {
   } catch {}
 }
 
-export function downloadBlob(blob, filename = pageScreenshotFilename()) {
+export function downloadBlob(
+  blob: unknown,
+  filename: string = pageScreenshotFilename(),
+): boolean {
   if (!blob || typeof blob !== "object") return false;
   let url;
   try {
-    url = URL.createObjectURL(blob);
+    url = URL.createObjectURL(blob as Blob);
   } catch {
     return false;
   }
@@ -129,7 +140,9 @@ export function downloadBlob(blob, filename = pageScreenshotFilename()) {
   return ok;
 }
 
-export async function waitForMediaReady({ timeoutMs = 1500 } = {}) {
+export async function waitForMediaReady(
+  { timeoutMs = 1500 } = {},
+): Promise<void> {
   const cap = Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : 1500;
   const deadline = Date.now() + cap;
   try {
@@ -153,7 +166,7 @@ export async function waitForMediaReady({ timeoutMs = 1500 } = {}) {
       const imgs = document.images || [];
       const count = Math.min(imgs.length || 0, 500);
       for (let i = 0; i < count; i++) {
-        const img = imgs[i];
+        const img = imgs[i] as HTMLImageElement;
         try {
           if (img.complete) continue;
         } catch {
@@ -180,7 +193,12 @@ export async function waitForMediaReady({ timeoutMs = 1500 } = {}) {
   }
 }
 
-export function computeSlices(totalH, vh, maxSlices = 8, maxH = 8000) {
+export function computeSlices(
+  totalH: number,
+  vh: number,
+  maxSlices = 8,
+  maxH = 8000,
+): { slices: number[]; truncated: boolean } {
   const total = Number.isFinite(totalH) && totalH > 0 ? totalH : 0;
   const limit =
     Number.isFinite(maxH) && maxH > 0 ? Math.min(maxH, 8000) : 8000;
@@ -202,7 +220,12 @@ export function computeSlices(totalH, vh, maxSlices = 8, maxH = 8000) {
 
 const ZERO_RECT = { left: 0, top: 0, width: 0, height: 0 };
 
-export function normalizeRect(a, b, vw, vh) {
+export function normalizeRect(
+  a?: { x?: unknown; y?: unknown } | null,
+  b?: { x?: unknown; y?: unknown } | null,
+  vw?: unknown,
+  vh?: unknown,
+): { left: number; top: number; width: number; height: number } {
   const coords = [
     a ? a.x : NaN,
     a ? a.y : NaN,
@@ -225,8 +248,12 @@ export function normalizeRect(a, b, vw, vh) {
   };
 }
 
-export function scaleRect(rect, dpr) {
-  const s = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+export function scaleRect(
+  rect?: { left?: unknown; top?: unknown; width?: unknown; height?: unknown } | null,
+  dpr?: number,
+): { x: number; y: number; w: number; h: number } {
+  const s =
+    dpr !== undefined && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
   const parts = rect
     ? [rect.left, rect.top, rect.width, rect.height].map(Number)
     : [NaN, NaN, NaN, NaN];
@@ -240,11 +267,15 @@ export function scaleRect(rect, dpr) {
   };
 }
 
-export function cropDataUrl(dataUrl, rect, { timeoutMs = IMAGE_LOAD_TIMEOUT_MS } = {}) {
+export function cropDataUrl(
+  dataUrl: unknown,
+  rect?: { width?: unknown; height?: unknown } | null,
+  { timeoutMs = IMAGE_LOAD_TIMEOUT_MS } = {},
+): Promise<Blob | null> {
   return new Promise((resolve) => {
     let settled = false;
-    let timer = null;
-    const done = (value) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const done = (value: Blob | null) => {
       if (settled) return;
       settled = true;
       try {
@@ -304,8 +335,10 @@ export function cropDataUrl(dataUrl, rect, { timeoutMs = IMAGE_LOAD_TIMEOUT_MS }
           let sw = src.w;
           let sh = src.h;
           if (
+            naturalW !== undefined &&
             Number.isFinite(naturalW) &&
             naturalW > 0 &&
+            naturalH !== undefined &&
             Number.isFinite(naturalH) &&
             naturalH > 0
           ) {

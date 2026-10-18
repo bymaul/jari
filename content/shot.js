@@ -6,7 +6,7 @@ import {
   downloadBlob,
   waitForPaint,
   isScreenshotDataUrl,
-} from "./screenshot.js";
+} from "./screenshot.ts";
 
 const STEP = 16;
 const SHIFT_STEP = 1;
