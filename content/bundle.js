@@ -5843,7 +5843,7 @@
     return out;
   }
 
-  // content/visual/caret-geometry.js
+  // content/visual/caret-geometry.ts
   function isUsableCaretRect(rect) {
     return !!rect && Number.isFinite(rect.left) && Number.isFinite(rect.top) && typeof rect.height === "number" && rect.height > 0;
   }
@@ -5952,7 +5952,10 @@
     return { before, after };
   }
   function readAdjacentTextCharRect(focusNode, wantBefore, wantAfter) {
-    const out = { before: null, after: null };
+    const out = {
+      before: null,
+      after: null
+    };
     try {
       if (typeof Node === "undefined" || typeof NodeFilter === "undefined" || !document.body) {
         return out;

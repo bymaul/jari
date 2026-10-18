@@ -16,7 +16,7 @@ import {
   lineHeightForElement,
   resolveCaretGeometry,
   readNeighborCharRects,
-} from "./visual/caret-geometry.js";
+} from "./visual/caret-geometry.ts";
 import { isWordChar, findNextWordEnd } from "./visual/word.ts";
 import {
   fallbackMoveChar,

@@ -1,6 +1,18 @@
 /* global NodeFilter */
 
-export function isUsableCaretRect(rect) {
+/** Loose caret/rect shape: callers pass DOMRects, client-rect lists, or
+ *  synthetic geometry; only the measured fields are read at runtime. */
+export type CaretRect = {
+  left?: number;
+  top?: number;
+  right?: number;
+  height?: number;
+  width?: number;
+};
+
+export function isUsableCaretRect(
+  rect: CaretRect | null | undefined,
+): rect is CaretRect {
   return (
     !!rect &&
     Number.isFinite(rect.left) &&
@@ -10,7 +22,9 @@ export function isUsableCaretRect(rect) {
   );
 }
 
-export function firstUsableRect(list) {
+export function firstUsableRect(
+  list?: CaretRect[] | DOMRectList | null,
+): CaretRect | null {
   if (!list || typeof list.length !== "number") return null;
   for (const r of list) {
     if (isUsableCaretRect(r)) return r;
@@ -18,7 +32,7 @@ export function firstUsableRect(list) {
   return null;
 }
 
-export function lineHeightForElement(el) {
+export function lineHeightForElement(el: Element | null): number {
   try {
     if (
       el &&
@@ -43,7 +57,14 @@ export function resolveCaretGeometry({
   after,
   parentRect,
   fallbackHeight,
-}) {
+}: {
+  collapsed?: CaretRect | null;
+  clientRects?: DOMRectList | CaretRect[] | null;
+  before?: CaretRect | null;
+  after?: CaretRect | null;
+  parentRect?: CaretRect | null;
+  fallbackHeight?: number;
+}): CaretRect | null {
   if (isUsableCaretRect(collapsed)) {
     return {
       left: collapsed.left,
@@ -75,7 +96,7 @@ export function resolveCaretGeometry({
     Number.isFinite(parentRect.top)
   ) {
     const height =
-      Number.isFinite(fallbackHeight) && fallbackHeight > 0
+      Number.isFinite(fallbackHeight) && (fallbackHeight as number) > 0
         ? fallbackHeight
         : 16;
     return {
@@ -88,7 +109,11 @@ export function resolveCaretGeometry({
   return null;
 }
 
-export function readSingleCharRect(node, start, end) {
+export function readSingleCharRect(
+  node: Node,
+  start: number,
+  end: number,
+): CaretRect | null {
   try {
     const r = document.createRange();
     r.setStart(node, start);
@@ -101,9 +126,12 @@ export function readSingleCharRect(node, start, end) {
   return null;
 }
 
-export function readNeighborCharRects(focusNode, focusOffset) {
-  let before = null;
-  let after = null;
+export function readNeighborCharRects(
+  focusNode: Node | null | undefined,
+  focusOffset: number,
+): { before: CaretRect | null; after: CaretRect | null } {
+  let before: CaretRect | null = null;
+  let after: CaretRect | null = null;
   try {
     if (
       !focusNode ||
@@ -131,8 +159,15 @@ export function readNeighborCharRects(focusNode, focusOffset) {
   return { before, after };
 }
 
-export function readAdjacentTextCharRect(focusNode, wantBefore, wantAfter) {
-  const out = { before: null, after: null };
+export function readAdjacentTextCharRect(
+  focusNode: Node,
+  wantBefore: boolean,
+  wantAfter: boolean,
+): { before: CaretRect | null; after: CaretRect | null } {
+  const out: { before: CaretRect | null; after: CaretRect | null } = {
+    before: null,
+    after: null,
+  };
   try {
     if (
       typeof Node === "undefined" ||
