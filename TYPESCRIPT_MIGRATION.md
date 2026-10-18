@@ -75,7 +75,10 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   `7728f5c` (key dispatcher: run()/handleKeydown typed, pills map,
   `__jariOptionsRecording` window cast), `content/overlays.ts` `c97ec16`
   (OverlayApi contract; register keeps modal-defaults-true via destructuring),
-  `content/commands.ts` + tsconfig gate repair `df238f2`.
+  `content/commands.ts` + tsconfig gate repair `df238f2`,
+  `content/screenshot.ts` `56e2ec3` (guard-first unknown payloads;
+  isScreenshotDataUrl is a `value is string` predicate so cropDataUrl narrows
+  dataUrl; keep non-optional defaulted params so emitted JS is unchanged).
 - GATE BUG FIXED in `df238f2`: tsconfig `include` covered only
   `shared/**/*` + `tests/**/*.ts`, so all Phase-2 content/background TS files
   passed `tsc --noEmit` without being in the program (only keymap/rank/
