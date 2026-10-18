@@ -50,9 +50,9 @@ Status: proposed (2026-10). Incremental JS -> TS rewrite with a DX layer.
 Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
 
 - Phase 0 + `shared/url.ts` + tooling: `2c302e8`.
-- 40-action message contract (Phase 1 #1 partial: protocol typed, handlers still
-  JS so `background/main.ts` dispatches through a loose Handler type; full
-  exhaustiveness lands when `background/*` migrate): `058a836`.
+- 40-action message contract (Phase 1 #1 complete: protocol typed `058a836` and
+  since `dfc14e6` `background/main.ts` is an exhaustive per-action router —
+  adding an action without a handler is a compile error): `058a836`.
 - Phase 1 #2 settings schema: `shared/*` pure-logic modules `bd26f9a`, then
   `content/keymap.ts` + `content/settings.ts` + `tests/keymap.test.ts` `a9c298a`.
   `Settings`/`RawSettings` live in keymap.ts; RawSettings fields are plain
@@ -78,7 +78,20 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   `content/commands.ts` + tsconfig gate repair `df238f2`,
   `content/screenshot.ts` `56e2ec3` (guard-first unknown payloads;
   isScreenshotDataUrl is a `value is string` predicate so cropDataUrl narrows
-  dataUrl; keep non-optional defaulted params so emitted JS is unchanged).
+  dataUrl; keep non-optional defaulted params so emitted JS is unchanged),
+  `background/tabs.ts` `c2da6a2` (all handlers typed per-action with
+  MessagePayload/MessageResponse; @types/chrome models multi-id tab APIs as
+  non-empty `[number, ...number[]]` tuples while the real browser takes plain
+  arrays — one identity `asTabIds` cast helper covers group/ungroup/move;
+  legacy Firefox-only `tabs.goBack`/`goForward` absent from @types go through
+  a Record cast alias in goHistory; the one runtime-visible delta is that
+  identity helper plus an alias — everything else erased; windows.ts
+  `moveTabIntoWindowAndFocus` param widened to `number | number[]`),
+  `background/main.ts` `dfc14e6` (Phase 1 #1 complete: handlers assigned to
+  `{ [A in Action]: HandlerFor<A> }` built from Messages payload/response
+  lookups — a missing action or drifting handler signature now fails tsc;
+  runtime dispatch unchanged). `background/` is fully typed; no loose Handler
+  seam remains.
 - GATE BUG FIXED in `df238f2`: tsconfig `include` covered only
   `shared/**/*` + `tests/**/*.ts`, so all Phase-2 content/background TS files
   passed `tsc --noEmit` without being in the program (only keymap/rank/
