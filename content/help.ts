@@ -9,28 +9,39 @@ import { Find } from "./find.ts";
 const STEP = 50;
 const COLUMNS = 3;
 
+type HelpCell = HTMLTableCellElement & { _jariOrig?: string | null };
+
+type HelpEntry = {
+  tr: HTMLTableRowElement;
+  keyTd: HelpCell;
+  labelTd: HelpCell;
+  haystack: string;
+};
+
+type SearchMatch = { entry: HelpEntry; span: HTMLSpanElement };
+
 let active = false;
-let host = null;
-let overlay = null;
-let listEl = null;
-let barEl = null;
-let statusEl = null;
-let inputEl = null;
-let restoreFocus = null;
-let entries = [];
+let host: HTMLDivElement | null = null;
+let overlay: HTMLDivElement | null = null;
+let listEl: HTMLDivElement | null = null;
+let barEl: HTMLDivElement | null = null;
+let statusEl: HTMLSpanElement | null = null;
+let inputEl: HTMLInputElement | null = null;
+let restoreFocus: Element | null = null;
+let entries: HelpEntry[] = [];
 let query = '';
-let matches = [];
+let matches: SearchMatch[] = [];
 let currentIdx = 0;
 let gPending = false;
 
 const HINTS_FILTER = 'Enter done | Esc cancel';
 const HINTS_NAV = 'j/k scroll | / filter | n/N jump | esc close';
 
-function isActive() {
+function isActive(): boolean {
   return active;
 }
 
-function open() {
+function open(): void {
   if (active) return;
   active = true;
   touch("help");
@@ -39,12 +50,12 @@ function open() {
   } catch {}
   restoreFocus = document.activeElement;
   render();
-  overlay.tabIndex = -1;
-  ui.safeFocus(overlay, { preventScroll: true });
+  overlay!.tabIndex = -1;
+  ui.safeFocus(overlay!, { preventScroll: true });
   updateStatus();
 }
 
-function filterFocused() {
+function filterFocused(): boolean {
   if (!inputEl) return false;
   try {
     return deepActiveElement() === inputEl;
@@ -53,12 +64,12 @@ function filterFocused() {
   }
 }
 
-function focusOverlay() {
+function focusOverlay(): void {
   if (!overlay) return;
   ui.safeFocus(overlay, { preventScroll: true });
 }
 
-function openFilter() {
+function openFilter(): void {
   if (inputEl) return;
   const input = document.createElement('input');
   input.type = 'text';
@@ -80,7 +91,7 @@ function openFilter() {
     applySearch();
   });
   inputEl = input;
-  barEl.insertBefore(input, statusEl);
+  barEl!.insertBefore(input, statusEl);
   ui.safeFocus(input, { preventScroll: true });
   try {
     input.select();
@@ -88,7 +99,7 @@ function openFilter() {
   updateStatus();
 }
 
-function closeFilter() {
+function closeFilter(): void {
   if (!inputEl) return;
   try {
     inputEl.remove();
@@ -101,7 +112,7 @@ function closeFilter() {
   updateStatus();
 }
 
-function helpCss() {
+function helpCss(): string {
   return (
     promptCss() +
     `
@@ -213,7 +224,7 @@ function helpCss() {
   );
 }
 
-function render() {
+function render(): void {
   const created = createShadowHost("jari-help-host", helpCss());
   host = created.host;
   const shadow = created.shadow;
@@ -230,18 +241,23 @@ function render() {
   matches = [];
   currentIdx = 0;
 
-  const byCommand = new Map();
+  const byCommand = new Map<string, string[]>();
   for (const [key, commandName] of Object.entries(settings.getKeymap())) {
     if (!byCommand.has(commandName)) byCommand.set(commandName, []);
-    byCommand.get(commandName).push(key);
+    byCommand.get(commandName)!.push(key);
   }
 
-  const byCategory = new Map();
+  type CategoryRow = {
+    keys: string[];
+    label: string;
+    commandName: string;
+  };
+  const byCategory = new Map<string, CategoryRow[]>();
   for (const [commandName, meta] of Object.entries(COMMAND_CATALOG)) {
     const keys = byCommand.get(commandName) || [];
     const id = meta.category || "other";
     if (!byCategory.has(id)) byCategory.set(id, []);
-    byCategory.get(id).push({ keys, label: meta.label, commandName });
+    byCategory.get(id)!.push({ keys, label: meta.label, commandName });
   }
 
   listEl = document.createElement('div');
@@ -291,7 +307,7 @@ function render() {
   shadow.appendChild(overlay);
 }
 
-function updateStatus() {
+function updateStatus(): void {
   if (!statusEl) return;
   const hints = inputEl ? HINTS_FILTER : HINTS_NAV;
   const q = (query || '').trim();
@@ -304,12 +320,12 @@ function updateStatus() {
   statusEl.textContent = `${count} | ${hints}`;
 }
 
-function saveOriginal(td) {
+function saveOriginal(td: HelpCell): string | null {
   if (td._jariOrig === undefined) td._jariOrig = td.textContent;
   return td._jariOrig;
 }
 
-function restoreCell(td) {
+function restoreCell(td: HelpCell): void {
   if (td._jariOrig !== undefined) {
     try {
       td.textContent = td._jariOrig;
@@ -318,7 +334,7 @@ function restoreCell(td) {
   }
 }
 
-function clearSearchHighlights() {
+function clearSearchHighlights(): void {
   for (const entry of entries) {
     restoreCell(entry.keyTd);
     restoreCell(entry.labelTd);
@@ -327,10 +343,10 @@ function clearSearchHighlights() {
   currentIdx = 0;
 }
 
-function highlightCell(td, q) {
-  const orig = saveOriginal(td);
+function highlightCell(td: HelpCell, q: string): HTMLSpanElement[] {
+  const orig = saveOriginal(td)!;
   const lower = orig.toLowerCase();
-  const parts = [];
+  const parts: { text: string; match: boolean }[] = [];
   let pos = 0;
   let found = false;
   while (true) {
@@ -364,19 +380,19 @@ function highlightCell(td, q) {
   return spans;
 }
 
-function markCurrent() {
+function markCurrent(): void {
   for (const m of matches) m.span.className = 'jari-find-hit';
   if (matches.length > 0) matches[currentIdx].span.className = 'jari-find-current';
 }
 
-function scrollMatchIntoView() {
+function scrollMatchIntoView(): void {
   if (matches.length === 0) return;
   try {
     matches[currentIdx].entry.tr.scrollIntoView({ block: 'nearest' });
   } catch {}
 }
 
-function applySearch() {
+function applySearch(): void {
   clearSearchHighlights();
   const q = query.toLowerCase();
   if (q) {
@@ -396,7 +412,7 @@ function applySearch() {
   scrollMatchIntoView();
 }
 
-function stepMatch(delta) {
+function stepMatch(delta: number): void {
   if (matches.length === 0) return;
   const len = matches.length;
   currentIdx = (((currentIdx + delta) % len) + len) % len;
@@ -405,13 +421,13 @@ function stepMatch(delta) {
   scrollMatchIntoView();
 }
 
-function clearFilter() {
+function clearFilter(): void {
   query = '';
   if (inputEl) inputEl.value = '';
   clearSearchHighlights();
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): boolean | void {
   if (!active) return false;
   const key = event.key;
   if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
@@ -467,32 +483,32 @@ function onKeyDown(event) {
   }
   if (gPending) {
     gPending = false;
-    if (key === 'g') listEl.scrollTo(0, 0);
+    if (key === 'g') listEl!.scrollTo(0, 0);
     return;
   }
   if (event.ctrlKey) {
-    if (key === 'd') listEl.scrollBy(0, listEl.clientHeight * 0.5);
-    else if (key === 'u') listEl.scrollBy(0, -listEl.clientHeight * 0.5);
-    else if (key === 'f') listEl.scrollBy(0, listEl.clientHeight * 0.9);
-    else if (key === 'b') listEl.scrollBy(0, -listEl.clientHeight * 0.9);
+    if (key === 'd') listEl!.scrollBy(0, listEl!.clientHeight * 0.5);
+    else if (key === 'u') listEl!.scrollBy(0, -listEl!.clientHeight * 0.5);
+    else if (key === 'f') listEl!.scrollBy(0, listEl!.clientHeight * 0.9);
+    else if (key === 'b') listEl!.scrollBy(0, -listEl!.clientHeight * 0.9);
     return;
   }
   switch (key) {
     case 'G':
-      listEl.scrollTo(0, listEl.scrollHeight);
+      listEl!.scrollTo(0, listEl!.scrollHeight);
       break;
     case 'j':
     case 'ArrowDown':
-      listEl.scrollBy(0, STEP);
+      listEl!.scrollBy(0, STEP);
       break;
     case 'k':
     case 'ArrowUp':
-      listEl.scrollBy(0, -STEP);
+      listEl!.scrollBy(0, -STEP);
       break;
   }
 }
 
-function close() {
+function close(): void {
   try {
     clearSearchHighlights();
   } catch {}
@@ -519,7 +535,7 @@ function close() {
     document.activeElement !== restoreFocus
   ) {
     try {
-      ui.safeFocus(restoreFocus, { preventScroll: true });
+      ui.safeFocus(restoreFocus as HTMLElement, { preventScroll: true });
     } catch {}
   }
   restoreFocus = null;

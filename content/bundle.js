@@ -8847,7 +8847,7 @@
     historyDraft = "";
   }
 
-  // content/help.js
+  // content/help.ts
   var STEP = 50;
   var COLUMNS = 3;
   var active5 = false;
