@@ -1,7 +1,7 @@
 /* global NodeFilter */
 
 import { isWordChar, findNextWordEnd } from "./word.ts";
-import { collectVisualTextElements } from "./collect.js";
+import { collectVisualTextElements } from "./collect.ts";
 import { getRealRect } from "../hints-elements.ts";
 
 function getSelection() {

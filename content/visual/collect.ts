@@ -6,7 +6,7 @@ import {
   filterAncestors,
 } from "../hints-elements.ts";
 
-export function collectVisualTextElements() {
+export function collectVisualTextElements(): Element[] {
   let elements = getVisibleElements((e, v) => {
     try {
       if (e.closest && e.closest(overlaySelectors)) return;
@@ -75,7 +75,7 @@ export function collectVisualTextElements() {
   elements = filterAncestors(elements);
   const scored = elements
     .map((el) => {
-      const text = el.textContent.trim();
+      const text = el.textContent!.trim();
       const rect = el.getBoundingClientRect();
       const area = rect.width * rect.height;
       let score = 0;
@@ -103,8 +103,8 @@ export function collectVisualTextElements() {
       return { el, score, area };
     })
     .sort((a, b) => b.score - a.score || a.area - b.area);
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<Element>();
+  const out: Element[] = [];
   for (const { el } of scored) {
     if (seen.has(el)) continue;
     seen.add(el);
@@ -112,7 +112,7 @@ export function collectVisualTextElements() {
     if (out.length >= 350) break;
   }
   if (out.length > 250) {
-    return out.filter((e) => e.textContent.trim().length >= 10).slice(0, 250);
+    return out.filter((e) => e.textContent!.trim().length >= 10).slice(0, 250);
   }
   return out;
 }

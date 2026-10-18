@@ -5757,7 +5757,7 @@
     return links;
   }
 
-  // content/visual/collect.js
+  // content/visual/collect.ts
   function collectVisualTextElements() {
     let elements2 = getVisibleElements((e, v) => {
       try {

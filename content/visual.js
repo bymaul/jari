@@ -9,7 +9,7 @@ import {
   layoutHints,
 } from "./hint-layer.ts";
 import { getLinkAncestor, isEditable } from "./hints-elements.ts";
-import { collectVisualTextElements } from "./visual/collect.js";
+import { collectVisualTextElements } from "./visual/collect.ts";
 import {
   isUsableCaretRect,
   firstUsableRect,
