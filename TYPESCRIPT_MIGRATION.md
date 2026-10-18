@@ -62,13 +62,31 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   `tests/rank.test.ts` `11c1435` (rankMatches has a true/false overload split),
   `content/find/{matcher,collect}.ts` + matcher test `028117e`,
   `content/{highlight,hint-layer}.ts` `213b419`, `content/hints-elements.ts`
-  `19e8051` (RectLike + JariElement expando types; `disabled`/`readOnly` count
-  on modern lib.dom's Element so no casts needed there),
+  `19e8051` (RectLike + JariElement expando types; `disabled`/`readOnly`
+  needed `HTMLInputElement` duck casts — they are NOT on lib.dom's
+  `HTMLElement`),
   `content/clue.ts` `634c659`,
   `background/{utils,windows,bookmarks,suggest,handlers}.ts` `dff18e1`
   (StoredSettings = Partial<RawSettings> & {updatedAt?}; handlers typed against
   protocol payloads; `background/tabs.ts` is the remaining blocker for the
-  exhaustive router).
+  exhaustive router),
+  `content/page-nav.ts` `b7109d0`, `popup/site.ts` `33cc9c7` (TabSite
+  interface shared with settings.ts/content.ts), `content/content.ts`
+  `7728f5c` (key dispatcher: run()/handleKeydown typed, pills map,
+  `__jariOptionsRecording` window cast), `content/overlays.ts` `c97ec16`
+  (OverlayApi contract; register keeps modal-defaults-true via destructuring),
+  `content/commands.ts` + tsconfig gate repair `df238f2`.
+- GATE BUG FIXED in `df238f2`: tsconfig `include` covered only
+  `shared/**/*` + `tests/**/*.ts`, so all Phase-2 content/background TS files
+  passed `tsc --noEmit` without being in the program (only keymap/rank/
+  catalog/find-matcher were reachable through tests). Commands ranked 42
+  implicit-any errors; 111 errors total across 12 files fixed with erased
+  syntax alone (union casts at `Element | Window` scroll boundaries,
+  `HTMLInputElement` duck casts for `disabled`/`readOnly`,
+  getRootNode/host annotations, Suggestion type import, clampMaxResults
+  optional param, `clearTimeout(timer ?? undefined)` emit). From this commit
+  on, `npm run check` is real for every TS file; `.js` files pulled in via
+  imports are not checked (checkJs false) but do enter type inference.
 - Test-file policy: pure-logic suites migrate to `.test.ts`; fixture-heavy
   DOM/globalThis-stub suites (e.g. tests/find-collect.test.js) stay `.js` and
   import the `.ts` modules directly.
