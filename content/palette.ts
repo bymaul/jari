@@ -5,25 +5,36 @@ import { settings } from "./settings.ts";
 import { createShadowHost, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.ts";
 import { register, touch } from "./overlays.ts";
+import type { CommandContext } from "./commands.ts";
+
+/** One palette row: the command plus its bound-key summary. */
+type PaletteItem = {
+  name: string;
+  title: string;
+  url: string;
+  detail: string;
+};
+
+type CommandTable = Record<string, { run: (ctx: CommandContext) => void }>;
 
 let active = false;
-let host = null;
-let overlay = null;
-let inputEl = null;
-let listEl = null;
-let source = [];
-let filtered = [];
+let host: HTMLDivElement | null = null;
+let overlay: HTMLDivElement | null = null;
+let inputEl: HTMLInputElement | null = null;
+let listEl: HTMLUListElement | null = null;
+let source: PaletteItem[] = [];
+let filtered: PaletteItem[] = [];
 let selected = 0;
 let query = "";
-let restoreFocus = null;
-let commandTable = null;
+let restoreFocus: Element | null = null;
+let commandTable: CommandTable | null = null;
 
-function isActive() {
+function isActive(): boolean {
   return active;
 }
 
-export function buildCommandSource(keymap) {
-  const out = [];
+export function buildCommandSource(keymap: Record<string, string> | null) {
+  const out: PaletteItem[] = [];
   for (const [name, meta] of Object.entries(COMMAND_CATALOG)) {
     const keys = keysForCommand(keymap || {}, name);
     out.push({
@@ -36,21 +47,27 @@ export function buildCommandSource(keymap) {
   return out;
 }
 
-export function filterCommands(items, q, fuzzy = true) {
+export function filterCommands(
+  items: PaletteItem[],
+  q: string,
+  fuzzy = true,
+): PaletteItem[] {
   const trimmed = String(q || "").trim();
   if (!trimmed) return [...items];
   const ranked = rankMatches(trimmed, items, fuzzy);
-  return fuzzy ? ranked.map((x) => x.item) : ranked;
+  return fuzzy
+    ? (ranked.map((x) => x.item) as PaletteItem[])
+    : (ranked as unknown as PaletteItem[]);
 }
 
-function handleInput() {
-  query = inputEl.value.trim();
+function handleInput(): void {
+  query = inputEl!.value.trim();
   filtered = filterCommands(source, query, settings.isFuzzyMatching());
   selected = 0;
   renderList();
 }
 
-function open(table) {
+function open(table?: CommandTable | null): void {
   if (active) return;
   commandTable = table || null;
   source = buildCommandSource(settings.getKeymap());
@@ -91,7 +108,7 @@ function open(table) {
   ui.safeFocus(inputEl, { preventScroll: true });
 }
 
-function renderRow(item) {
+function renderRow(item: PaletteItem): HTMLLIElement {
   const li = document.createElement("li");
   const title = document.createElement("span");
   title.className = "title";
@@ -114,28 +131,28 @@ function renderRow(item) {
   return li;
 }
 
-function renderList() {
+function renderList(): void {
   const rows = filtered.slice(0, settings.getMaxResults());
-  listEl.textContent = "";
-  for (const row of rows) listEl.appendChild(renderRow(row));
+  listEl!.textContent = "";
+  for (const row of rows) listEl!.appendChild(renderRow(row));
   highlight();
 }
 
-function highlight() {
-  Array.from(listEl.children).forEach((li, i) =>
+function highlight(): void {
+  Array.from(listEl!.children).forEach((li, i) =>
     li.classList.toggle("selected", i === selected),
   );
-  const el = listEl.children[selected];
+  const el = listEl!.children[selected];
   if (el) el.scrollIntoView({ block: "nearest" });
 }
 
-function move(delta) {
+function move(delta: number): void {
   if (filtered.length === 0) return;
   selected = (selected + delta + filtered.length) % filtered.length;
   highlight();
 }
 
-function activate() {
+function activate(): void {
   const item = filtered[selected];
   const table = commandTable;
   close();
@@ -145,8 +162,8 @@ function activate() {
   cmd.run({ count: 1 });
 }
 
-function onKeyDown(event) {
-  let focused;
+function onKeyDown(event: KeyboardEvent): void {
+  let focused: Element | null;
   try {
     focused = deepActiveElement();
   } catch {
@@ -190,7 +207,7 @@ function onKeyDown(event) {
   }
 }
 
-function close() {
+function close(): void {
   if (host) {
     try {
       host.remove();
@@ -212,7 +229,7 @@ function close() {
     restoreFocus.isConnected &&
     document.activeElement !== restoreFocus
   ) {
-    ui.safeFocus(restoreFocus, { preventScroll: true });
+    ui.safeFocus(restoreFocus as HTMLElement, { preventScroll: true });
   }
   restoreFocus = null;
 }

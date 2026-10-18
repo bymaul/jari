@@ -10127,7 +10127,7 @@
     ui.dispatchClick(el);
   }
 
-  // content/palette.js
+  // content/palette.ts
   var active7 = false;
   var host5 = null;
   var overlay5 = null;
