@@ -8007,7 +8007,7 @@
     clearPendingKeyTimers();
   }
 
-  // content/find.js
+  // content/find.ts
   var MAX_MATCHES = 1500;
   var active4 = false;
   var host3 = null;
@@ -8046,7 +8046,7 @@
     });
   }
   function scheduleFindRebuild() {
-    clearTimeout(findObserverTimer);
+    clearTimeout(findObserverTimer ?? void 0);
     findObserverTimer = setTimeout(() => {
       try {
         if (active4 && pendingQuery) {
@@ -8083,7 +8083,7 @@
     }
   }
   function stopFindObserver() {
-    clearTimeout(findObserverTimer);
+    clearTimeout(findObserverTimer ?? void 0);
     findObserverTimer = null;
     if (findObserver) {
       try {
@@ -8309,7 +8309,7 @@
     highlightsHidden = false;
     pendingQuery = q;
     const query5 = (q || "").trim();
-    clearTimeout(inputDebounce);
+    clearTimeout(inputDebounce ?? void 0);
     if (!query5) {
       matches = [];
       currentIdx = 0;
@@ -8523,7 +8523,7 @@
   }
   function closeBar() {
     if (!active4) return;
-    clearTimeout(inputDebounce);
+    clearTimeout(inputDebounce ?? void 0);
     inputDebounce = null;
     const wasInput = inputEl2;
     const wasHost = host3;
@@ -8609,7 +8609,7 @@
     syncObserver();
   }
   function commitQuery(q) {
-    clearTimeout(inputDebounce);
+    clearTimeout(inputDebounce ?? void 0);
     inputDebounce = null;
     const query5 = (q || "").trim();
     if (!query5) {

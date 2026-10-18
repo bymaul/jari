@@ -16,13 +16,13 @@ export { buildMatcher, hasUpperCase };
 const MAX_MATCHES = 1500;
 
 let active = false;
-let host = null;
-let overlay = null;
-let inputEl = null;
-let statusEl = null;
-let restoreFocus = null;
+let host: HTMLDivElement | null = null;
+let overlay: HTMLDivElement | null = null;
+let inputEl: HTMLInputElement | null = null;
+let statusEl: HTMLSpanElement | null = null;
+let restoreFocus: Element | null = null;
 
-let matches = [];
+let matches: Range[] = [];
 let currentIdx = 0;
 let lastQuery = "";
 let pendingQuery = "";
@@ -32,15 +32,15 @@ let committedHidden = false;
 
 const FIND_HISTORY_KEY = "findHistory";
 const MAX_FIND_HISTORY = 20;
-let findHistory = [];
+let findHistory: string[] = [];
 let historyIdx = -1;
 let historyDraft = "";
 
 let useHighlights = false;
 let highlightsHidden = false;
-let inputDebounce = null;
-let findObserver = null;
-let findObserverTimer = null;
+let inputDebounce: ReturnType<typeof setTimeout> | null = null;
+let findObserver: MutationObserver | null = null;
+let findObserverTimer: ReturnType<typeof setTimeout> | null = null;
 
 function hasHighlights() {
   return matches.length > 0 && !highlightsHidden;
@@ -50,7 +50,7 @@ function isActive() {
   return active;
 }
 
-function matchesChanged(a, b) {
+function matchesChanged(a: Range[], b: Range[]) {
   if (a.length !== b.length) return true;
   return a.some((r, i) => {
     const o = b[i];
@@ -63,7 +63,7 @@ function matchesChanged(a, b) {
   });
 }
 function scheduleFindRebuild() {
-  clearTimeout(findObserverTimer);
+  clearTimeout(findObserverTimer ?? undefined);
   findObserverTimer = setTimeout(() => {
     try {
       if (active && pendingQuery) {
@@ -98,7 +98,7 @@ function startFindObserver() {
   } catch {}
 }
 function stopFindObserver() {
-  clearTimeout(findObserverTimer);
+  clearTimeout(findObserverTimer ?? undefined);
   findObserverTimer = null;
   if (findObserver) {
     try { findObserver.disconnect(); } catch {}
@@ -114,16 +114,16 @@ function syncObserver() {
   }
 }
 
-function buildMatches(query) {
+function buildMatches(query: string): Range[] {
   if (!query) return [];
   const matcher = buildMatcher(query, { caseSensitive: hasUpperCase(query) });
   if (!matcher) return [];
   const nodes = collectTextNodes();
-  const out = [];
+  const out: Range[] = [];
   for (const node of nodes) {
     matcher.lastIndex = 0;
-    let m;
-    while ((m = matcher.exec(node.nodeValue)) !== null) {
+    let m: RegExpExecArray | null;
+    while ((m = matcher.exec(node.nodeValue as string)) !== null) {
       if (m[0].length === 0) {
         matcher.lastIndex++;
         continue;
@@ -163,14 +163,14 @@ function hideHighlights() {
   clearHighlightApi();
 }
 
-function getCurrentLinkElement() {
+function getCurrentLinkElement(): Element | null {
   if (matches.length === 0) return null;
   const r = matches[currentIdx];
   if (!r || !r.startContainer) return null;
   return getLinkAncestor(r.startContainer.parentElement);
 }
 
-function activateCurrentLink() {
+function activateCurrentLink(): boolean {
   const link = getCurrentLinkElement();
   if (!link) return false;
   try {
@@ -224,7 +224,7 @@ function scrollToCurrent() {
       const style = window.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") return;
     } catch {}
-    let rect = null;
+    let rect: DOMRect | null = null;
     try { rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect(); } catch {}
     if (rect && rectIntersectsViewport(rect)) return;
     const fixed = findFixedAncestor(el);
@@ -243,7 +243,7 @@ function scrollToCurrent() {
   } catch {}
 }
 
-function rectIntersectsViewport(rect) {
+function rectIntersectsViewport(rect: DOMRect | null): boolean {
   if (!rect) return false;
   try {
     const vw = window.innerWidth || document.documentElement.clientWidth;
@@ -254,19 +254,21 @@ function rectIntersectsViewport(rect) {
   }
 }
 
-function findFixedAncestor(el) {
+function findFixedAncestor(el: HTMLElement): Element | null {
   try {
-    let node = el;
+    let node: Element | null = el;
     while (node && node.nodeType === 1) {
       if (window.getComputedStyle(node).position === "fixed") return node;
-      const root = node.getRootNode ? node.getRootNode() : null;
+      const root = (
+        node.getRootNode ? node.getRootNode() : null
+      ) as ShadowRoot | null;
       node = (root && root.host) || node.parentElement;
     }
   } catch {}
   return null;
 }
 
-function isScrollableBox(node) {
+function isScrollableBox(node: Element): boolean {
   try {
     if (
       node.scrollHeight <= node.clientHeight + 1 &&
@@ -287,7 +289,10 @@ function isScrollableBox(node) {
   }
 }
 
-function nearestScrollableAncestor(el, stopAfter) {
+function nearestScrollableAncestor(
+  el: HTMLElement | null,
+  stopAfter: Element | null,
+): Element | null {
   try {
     let node = el && el.parentElement ? el.parentElement : null;
     while (node && node.nodeType === 1) {
@@ -299,7 +304,11 @@ function nearestScrollableAncestor(el, stopAfter) {
   return null;
 }
 
-function scrollFixedMatchIntoView(el, fixed, rect) {
+function scrollFixedMatchIntoView(
+  el: HTMLElement,
+  fixed: Element,
+  rect: DOMRect | null,
+): void {
   try {
     if (!rect) {
       try {
@@ -319,11 +328,11 @@ function scrollFixedMatchIntoView(el, fixed, rect) {
   } catch {}
 }
 
-function executeQuery(q) {
+function executeQuery(q: string): void {
   highlightsHidden = false;
   pendingQuery = q;
   const query = (q || "").trim();
-  clearTimeout(inputDebounce);
+  clearTimeout(inputDebounce ?? undefined);
   if (!query) {
     matches = [];
     currentIdx = 0;
@@ -336,7 +345,7 @@ function executeQuery(q) {
   }, 80);
 }
 
-function runQuery(query) {
+function runQuery(query: string): void {
   highlightsHidden = false;
   try {
     matches = buildMatches(query);
@@ -347,7 +356,7 @@ function runQuery(query) {
   } catch {}
 }
 
-async function loadFindHistory() {
+async function loadFindHistory(): Promise<void> {
   try {
     const stored = await chrome.storage.local.get(FIND_HISTORY_KEY);
     const list = stored && stored[FIND_HISTORY_KEY];
@@ -357,7 +366,7 @@ async function loadFindHistory() {
   } catch {}
 }
 
-async function pushFindHistory(q) {
+async function pushFindHistory(q: string): Promise<void> {
   const query = (q || "").trim();
   if (!query) return;
   findHistory = [query, ...findHistory.filter((s) => s !== query)].slice(
@@ -370,7 +379,7 @@ async function pushFindHistory(q) {
   } catch {}
 }
 
-function stepHistory(delta) {
+function stepHistory(delta: number): void {
   if (!inputEl || findHistory.length === 0) return;
   if (historyIdx === -1 && delta < 0) return;
   if (historyIdx === -1 && delta > 0) historyDraft = inputEl.value;
@@ -382,7 +391,7 @@ function stepHistory(delta) {
   executeQuery(inputEl.value);
 }
 
-function updateStatus() {
+function updateStatus(): void {
   if (!statusEl) return;
   if (!pendingQuery && matches.length === 0 && !lastQuery) {
     statusEl.textContent = "";
@@ -403,7 +412,7 @@ function updateStatus() {
   }
 }
 
-function findCss() {
+function findCss(): string {
   return `
     :host { all: initial !important; }
     .jari-overlay {
@@ -486,7 +495,7 @@ function findCss() {
   `;
 }
 
-function renderBar() {
+function renderBar(): void {
   const created = createShadowHost("jari-find-host", findCss());
   host = created.host;
   const shadow = created.shadow;
@@ -516,7 +525,7 @@ function renderBar() {
 
   inputEl.addEventListener("input", () => {
     historyIdx = -1;
-    executeQuery(inputEl.value);
+    executeQuery(inputEl!.value);
   });
 
   inputEl.addEventListener("keydown", (e) => {
@@ -531,7 +540,7 @@ function renderBar() {
   updateStatus();
 }
 
-function open() {
+function open(): void {
   if (active) return;
   touch("find");
   useHighlights = detectHighlightSupport();
@@ -545,9 +554,9 @@ function open() {
   renderBar();
 }
 
-function closeBar() {
+function closeBar(): void {
   if (!active) return;
-  clearTimeout(inputDebounce);
+  clearTimeout(inputDebounce ?? undefined);
   inputDebounce = null;
   const wasInput = inputEl;
   const wasHost = host;
@@ -562,7 +571,7 @@ function closeBar() {
   overlay = null;
   inputEl = null;
   statusEl = null;
-  let focused;
+  let focused: Element | null;
   try {
     focused = deepActiveElement();
   } catch {
@@ -570,13 +579,13 @@ function closeBar() {
   }
   if (restoreFocus && restoreFocus.isConnected && focused !== restoreFocus) {
     try {
-      ui.safeFocus(restoreFocus, { preventScroll: true });
+      ui.safeFocus(restoreFocus as HTMLElement, { preventScroll: true });
     } catch {}
   } else if (wasInput && (focused === wasInput || focused === wasHost)) {
     try {
       wasInput.blur();
     } catch {}
-    let refocused;
+    let refocused: Element | null;
     try {
       refocused = deepActiveElement();
     } catch {
@@ -594,7 +603,7 @@ function closeBar() {
   syncObserver();
 }
 
-function closeAndClear() {
+function closeAndClear(): void {
   clearHighlights();
   closeBar();
   lastQuery = "";
@@ -603,7 +612,7 @@ function closeAndClear() {
   committedHidden = false;
 }
 
-function closeDiscardPending() {
+function closeDiscardPending(): void {
   closeBar();
   const q = (committedQuery || "").trim();
   if (!q) {
@@ -631,8 +640,8 @@ function closeDiscardPending() {
   syncObserver();
 }
 
-function commitQuery(q) {
-  clearTimeout(inputDebounce);
+function commitQuery(q: string): void {
+  clearTimeout(inputDebounce ?? undefined);
   inputDebounce = null;
   const query = (q || "").trim();
   if (!query) {
@@ -661,7 +670,7 @@ function commitQuery(q) {
   syncObserver();
 }
 
-function next(count = 1, reverse = false) {
+function next(count: number = 1, reverse: boolean = false): void {
   const c = Math.max(1, Math.floor(count) || 1);
   if (highlightsHidden && matches.length > 0) {
     highlightsHidden = false;
@@ -733,7 +742,7 @@ function next(count = 1, reverse = false) {
   ui.toast(`${currentIdx + 1}/${len}`);
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): boolean {
   if (!active) return false;
   let focused;
   try {
@@ -752,7 +761,7 @@ function onKeyDown(event) {
     if (event.key === "Enter") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      commitQuery(inputEl.value);
+      commitQuery(inputEl!.value);
       return true;
     }
     return false;
@@ -772,7 +781,7 @@ function onKeyDown(event) {
   return false;
 }
 
-function handleGlobalEsc(event) {
+function handleGlobalEsc(event: KeyboardEvent): boolean {
   if (hasHighlights()) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -783,7 +792,7 @@ function handleGlobalEsc(event) {
   return false;
 }
 
-function handleGlobalEnter(event) {
+function handleGlobalEnter(event: KeyboardEvent): boolean {
   if (!hasHighlights()) return false;
   const link = getCurrentLinkElement();
   if (!link) return false;
@@ -815,7 +824,7 @@ register("find", { close: closeAndClear, onKeyDown, isActive });
 
 try {
   Visual.setFindOpen(() => open());
-  if (typeof Visual.setFindNav === "function") Visual.setFindNav((count, reverse) => next(count, reverse));
+  if (typeof Visual.setFindNav === "function") Visual.setFindNav((count: number, reverse: boolean) => next(count, reverse));
 } catch {}
 
 export const __testHelpers = {
@@ -834,7 +843,23 @@ export const __testHelpers = {
   closeDiscardPending,
 };
 
-export function __setFindTestState({ matches: seed = [], query = "", index = 0, pending = "", committed = null, committedIndex = null, hidden = false } = {}) {
+export function __setFindTestState({
+  matches: seed = [],
+  query = "",
+  index = 0,
+  pending = "",
+  committed = null,
+  committedIndex = null,
+  hidden = false,
+}: {
+  matches?: Range[];
+  query?: string;
+  index?: number;
+  pending?: string;
+  committed?: string | null;
+  committedIndex?: number | null;
+  hidden?: boolean;
+} = {}) {
   matches = seed;
   currentIdx = index;
   lastQuery = query;

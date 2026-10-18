@@ -12,7 +12,7 @@ import { ui } from "./ui.ts";
 import { commands, setModeActions } from "./commands.ts";
 import { Overlays } from "./overlays.ts";
 import { isEditable } from "./hints-elements.ts";
-import { Find, __resetFindState } from "./find.js";
+import { Find, __resetFindState } from "./find.ts";
 import { __resetVisualState } from "./visual.js";
 import { Clue, __resetClueState } from "./clue.ts";
 

@@ -4,7 +4,7 @@ import { COMMAND_CATALOG } from "./catalog.ts";
 import { deepActiveElement, displayCombo } from "./keymap.ts";
 import { register, touch } from "./overlays.ts";
 import { promptCss } from "./prompt/shared.js";
-import { Find } from "./find.js";
+import { Find } from "./find.ts";
 
 const STEP = 50;
 const COLUMNS = 3;

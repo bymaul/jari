@@ -6,7 +6,7 @@ import { Prompt } from "./prompt.js";
 import { TabManager } from "./tab-manager.js";
 import { Help } from "./help.js";
 import { Hints, setCommandRunner } from "./hints.js";
-import { Find } from "./find.js";
+import { Find } from "./find.ts";
 import { Visual } from "./visual.js";
 import { COMMAND_CATALOG } from "./catalog.ts";
 import { goPage } from "./page-nav.ts";
