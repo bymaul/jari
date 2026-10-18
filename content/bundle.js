@@ -10977,7 +10977,7 @@
   };
   register("shot", { close: close7, onKeyDown: onKeyDown8, isActive: isActive8 });
 
-  // content/scrollshot.js
+  // content/scrollshot.ts
   var SETTLE_MS = 120;
   var IMAGE_LOAD_TIMEOUT_MS2 = 5e3;
   var BLOB_TIMEOUT_MS = 5e3;
@@ -11106,7 +11106,9 @@
     } catch {
     }
   }
-  async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
+  async function captureFullPage({
+    settleMs = SETTLE_MS
+  } = {}) {
     if (!isScreenshotable()) {
       ui.toast("Cannot screenshot this page");
       return;

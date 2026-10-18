@@ -19,7 +19,7 @@ const MAX_CAPTURE_PIXELS = 16000000;
 
 let capturing = false;
 
-function computedPosition(el) {
+function computedPosition(el: Element): string {
   try {
     const view =
       (el.ownerDocument && el.ownerDocument.defaultView) || window;
@@ -29,13 +29,13 @@ function computedPosition(el) {
   }
 }
 
-function collectFrameDocs() {
-  const docs = [];
+function collectFrameDocs(): Document[] {
+  const docs: Document[] = [];
   try {
     const frames = document.querySelectorAll("iframe, frame") || [];
     for (const frame of frames) {
       try {
-        const doc = frame.contentDocument;
+        const doc = (frame as HTMLIFrameElement).contentDocument;
         if (doc) docs.push(doc);
       } catch {}
     }
@@ -43,23 +43,23 @@ function collectFrameDocs() {
   return docs;
 }
 
-export function hideFixedElements(seen = new Set()) {
-  const hidden = [];
-  const hideIn = (els) => {
+export function hideFixedElements(seen: Set<Element> = new Set()): () => void {
+  const hidden: [Element, string][] = [];
+  const hideIn = (els: Element[] | NodeListOf<Element>): void => {
     for (const el of els || []) {
       if (seen.has(el)) continue;
-      let pos;
+      let pos: string;
       try {
         pos = computedPosition(el);
       } catch {
         continue;
       }
       if (pos !== "fixed" && pos !== "sticky") continue;
-      if (!el.style) continue;
+      if (!(el as HTMLElement).style) continue;
       seen.add(el);
-      hidden.push([el, el.style.visibility]);
+      hidden.push([el, (el as HTMLElement).style.visibility]);
       try {
-        el.style.visibility = "hidden";
+        (el as HTMLElement).style.visibility = "hidden";
       } catch {}
     }
   };
@@ -77,17 +77,20 @@ export function hideFixedElements(seen = new Set()) {
     for (const [el, prev] of hidden) {
       try {
         if (!el.isConnected) continue;
-        el.style.visibility = prev;
+        (el as HTMLElement).style.visibility = prev;
       } catch {}
     }
   };
 }
 
-function loadImage(src, { timeoutMs = IMAGE_LOAD_TIMEOUT_MS } = {}) {
-  return new Promise((resolve) => {
+function loadImage(
+  src: string,
+  { timeoutMs = IMAGE_LOAD_TIMEOUT_MS }: { timeoutMs?: number } = {},
+): Promise<HTMLImageElement | null> {
+  return new Promise<HTMLImageElement | null>((resolve) => {
     let settled = false;
-    let timer = null;
-    const done = (value) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const done = (value: HTMLImageElement | null): void => {
       if (settled) return;
       settled = true;
       try {
@@ -135,13 +138,15 @@ function loadImage(src, { timeoutMs = IMAGE_LOAD_TIMEOUT_MS } = {}) {
   });
 }
 
-function scrollTo(x, y) {
+function scrollTo(x: number, y: number): void {
   try {
     window.scrollTo(x, y);
   } catch {}
 }
 
-export async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
+export async function captureFullPage({
+  settleMs = SETTLE_MS,
+}: { settleMs?: number } = {}): Promise<void> {
   if (!isScreenshotable()) {
     ui.toast("Cannot screenshot this page");
     return;
@@ -160,7 +165,9 @@ export async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
     }
     const rawDpr =
       typeof window !== "undefined" ? window.devicePixelRatio : undefined;
-    const dpr = Number.isFinite(rawDpr) && rawDpr > 0 ? rawDpr : 1;
+    const dpr = (
+      Number.isFinite(rawDpr) && (rawDpr as number) > 0 ? rawDpr : 1
+    ) as number;
     const scroller = document.scrollingElement || document.documentElement;
     const totalH =
       scroller && Number.isFinite(scroller.scrollHeight)
@@ -180,10 +187,10 @@ export async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
       return;
     }
     const restoreOverlays = ui.hideOverlaysForCapture();
-    const seenFixed = new Set();
+    const seenFixed = new Set<Element>();
     const fixedRestores = [hideFixedElements(seenFixed)];
     const rootEl = document.documentElement;
-    let prevBehavior;
+    let prevBehavior: string | null | undefined;
     try {
       prevBehavior = rootEl && rootEl.style ? rootEl.style.scrollBehavior : undefined;
       if (rootEl && rootEl.style) rootEl.style.scrollBehavior = "auto";
@@ -236,8 +243,8 @@ export async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
         }
         try {
           const destY = Math.round(actualY * dpr);
-          let naturalW;
-          let naturalH;
+          let naturalW: number | undefined;
+          let naturalH: number | undefined;
           try {
             naturalW = img.naturalWidth;
             naturalH = img.naturalHeight;
@@ -248,14 +255,14 @@ export async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
           const expectedH = Math.round(vh * dpr);
           if (
             Number.isFinite(naturalW) &&
-            naturalW > 0 &&
+            (naturalW as number) > 0 &&
             Number.isFinite(naturalH) &&
-            naturalH > 0 &&
+            (naturalH as number) > 0 &&
             (naturalW !== canvasWidth || naturalH !== expectedH)
           ) {
-            const scale = canvasWidth / naturalW;
-            const destH = Math.max(1, Math.round(naturalH * scale));
-            ctx.drawImage(img, 0, 0, naturalW, naturalH, 0, destY, canvasWidth, destH);
+            const scale = canvasWidth / (naturalW as number);
+            const destH = Math.max(1, Math.round((naturalH as number) * scale));
+            ctx.drawImage(img, 0, 0, naturalW as number, naturalH as number, 0, destY, canvasWidth, destH);
           } else {
             ctx.drawImage(img, 0, destY);
           }
@@ -268,10 +275,10 @@ export async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
           } catch {}
         }
       }
-      const blob = await new Promise((resolve) => {
-        let timer = null;
+      const blob = await new Promise<Blob | null>((resolve) => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
         let settled = false;
-        const done = (value) => {
+        const done = (value: Blob | null): void => {
           if (settled) return;
           settled = true;
           try {
@@ -312,7 +319,7 @@ export async function captureFullPage({ settleMs = SETTLE_MS } = {}) {
         ) {
           rootEl.style.removeProperty("scroll-behavior");
         } else {
-          rootEl.style.scrollBehavior = prevBehavior;
+          rootEl.style.scrollBehavior = prevBehavior as string;
         }
       }
     } catch {}

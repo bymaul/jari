@@ -14,7 +14,7 @@ import { goPage } from "./page-nav.ts";
 import type { CommandDef, CommandName } from "./catalog.ts";
 import { Palette } from "./palette.ts";
 import { Shot } from "./shot.ts";
-import { captureFullPage } from "./scrollshot.js";
+import { captureFullPage } from "./scrollshot.ts";
 import { downloadUrl, waitForPaint, isScreenshotable, isScreenshotDataUrl } from "./screenshot.ts";
 
 const PAGE_RATIO = 0.9;
