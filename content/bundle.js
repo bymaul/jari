@@ -10626,7 +10626,7 @@
     });
   }
 
-  // content/shot.js
+  // content/shot.ts
   var STEP2 = 16;
   var SHIFT_STEP = 1;
   var PENDING_G_MS = 1500;

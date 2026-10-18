@@ -13,29 +13,29 @@ const SHIFT_STEP = 1;
 const PENDING_G_MS = 1500;
 
 let active = false;
-let cursor = { x: 0, y: 0 };
-let start = null;
+let cursor: { x: number; y: number } = { x: 0, y: 0 };
+let start: { x: number; y: number } | null = null;
 let pendingCount = "";
 let pendingG = false;
-let pendingGTimer = null;
-let cursorEl = null;
-let markEl = null;
-let rectEl = null;
-let pillEl = null;
+let pendingGTimer: ReturnType<typeof setTimeout> | null = null;
+let cursorEl: HTMLDivElement | null = null;
+let markEl: HTMLDivElement | null = null;
+let rectEl: HTMLDivElement | null = null;
+let pillEl: HTMLDivElement | null = null;
 let finishing = false;
 
-function isActive() {
+function isActive(): boolean {
   return active;
 }
 
-function viewport() {
+function viewport(): { w: number; h: number } {
   return {
     w: window.innerWidth || 0,
     h: window.innerHeight || 0,
   };
 }
 
-function showPill(text) {
+function showPill(text: string): void {
   try {
     if (!pillEl) {
       pillEl = document.createElement("div");
@@ -46,7 +46,7 @@ function showPill(text) {
   } catch {}
 }
 
-function hidePill() {
+function hidePill(): void {
   if (!pillEl) return;
   try {
     pillEl.remove();
@@ -54,17 +54,17 @@ function hidePill() {
   pillEl = null;
 }
 
-function clearPendingGTimer() {
+function clearPendingGTimer(): void {
   if (pendingGTimer !== null) {
     clearTimeout(pendingGTimer);
     pendingGTimer = null;
   }
 }
 
-function styleEl(el, styles) {
+function styleEl(el: HTMLElement, styles: Record<string, string>): void {
   try {
     for (const [prop, value] of Object.entries(styles)) {
-      el.style[prop] = value;
+      (el.style as unknown as Record<string, string>)[prop] = value;
     }
   } catch {}
 }
@@ -75,13 +75,13 @@ const BASE_EL_STYLE = {
   zIndex: "2147483646",
 };
 
-function appendLayer(el) {
+function appendLayer(el: HTMLElement): void {
   try {
     (document.body || document.documentElement).appendChild(el);
   } catch {}
 }
 
-function makeLayer() {
+function makeLayer(): void {
   try {
     cursorEl = document.createElement("div");
     cursorEl.className = "jari-shot-cursor";
@@ -127,7 +127,7 @@ function makeLayer() {
   }
 }
 
-function removeLayer() {
+function removeLayer(): void {
   for (const el of [cursorEl, markEl, rectEl]) {
     if (!el) continue;
     try {
@@ -139,7 +139,7 @@ function removeLayer() {
   rectEl = null;
 }
 
-function paintCursor() {
+function paintCursor(): void {
   if (!cursorEl) return;
   try {
     cursorEl.style.left = `${cursor.x - 6}px`;
@@ -147,7 +147,7 @@ function paintCursor() {
   } catch {}
 }
 
-function paintMark() {
+function paintMark(): void {
   if (!markEl) return;
   try {
     if (!start) {
@@ -160,7 +160,7 @@ function paintMark() {
   } catch {}
 }
 
-function paintRect() {
+function paintRect(): void {
   if (!rectEl) return;
   try {
     if (!start) {
@@ -181,13 +181,13 @@ function paintRect() {
   } catch {}
 }
 
-function paint() {
+function paint(): void {
   paintCursor();
   paintMark();
   paintRect();
 }
 
-function open() {
+function open(): void {
   if (active) return;
   active = true;
   touch("shot");
@@ -202,7 +202,7 @@ function open() {
   paint();
 }
 
-function close() {
+function close(): void {
   if (!active) return;
   active = false;
   start = null;
@@ -213,13 +213,13 @@ function close() {
   hidePill();
 }
 
-function clampCursor() {
+function clampCursor(): void {
   const { w, h } = viewport();
   cursor.x = Math.max(0, Math.min(Math.max(0, w - 1), cursor.x));
   cursor.y = Math.max(0, Math.min(Math.max(0, h - 1), cursor.y));
 }
 
-function move(dx, dy, step) {
+function move(dx: number, dy: number, step: number): void {
   const n = pendingCount ? parseInt(pendingCount, 10) || 1 : 1;
   pendingCount = "";
   cursor.x += dx * step * n;
@@ -228,7 +228,7 @@ function move(dx, dy, step) {
   paint();
 }
 
-function jumpTo(x, y) {
+function jumpTo(x: number | null, y: number | null): void {
   pendingCount = "";
   pendingG = false;
   clearPendingGTimer();
@@ -238,7 +238,7 @@ function jumpTo(x, y) {
   paint();
 }
 
-async function finish() {
+async function finish(): Promise<void> {
   if (finishing) return;
   finishing = true;
   try {
@@ -271,7 +271,7 @@ async function finish() {
   }
 }
 
-function armPendingG() {
+function armPendingG(): void {
   pendingG = true;
   clearPendingGTimer();
   try {
@@ -282,7 +282,7 @@ function armPendingG() {
   } catch {}
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): boolean {
   if (!active) return false;
   const key = event.key;
   if (key === "Escape") {
@@ -347,7 +347,7 @@ function onKeyDown(event) {
     return true;
   }
   const big = key === "H" || key === "J" || key === "K" || key === "L";
-  const dirs = {
+  const dirs: Record<string, [number, number]> = {
     h: [-1, 0],
     j: [0, 1],
     k: [0, -1],

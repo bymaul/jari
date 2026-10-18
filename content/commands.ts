@@ -13,7 +13,7 @@ import { COMMAND_CATALOG } from "./catalog.ts";
 import { goPage } from "./page-nav.ts";
 import type { CommandDef, CommandName } from "./catalog.ts";
 import { Palette } from "./palette.ts";
-import { Shot } from "./shot.js";
+import { Shot } from "./shot.ts";
 import { captureFullPage } from "./scrollshot.js";
 import { downloadUrl, waitForPaint, isScreenshotable, isScreenshotDataUrl } from "./screenshot.ts";
 
