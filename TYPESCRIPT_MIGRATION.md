@@ -109,7 +109,44 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   `boolean | void` because prompt consumes without returning —
   handleKeydown return follows), `content/palette.ts` `3eb0e0c`
   (PaletteItem/CommandTable local types; filterCommands cast over
-  rankMatches output).
+  rankMatches output),
+  `content/help.ts` `94208d1` (HelpCell with the `_jariOrig?: string|null`
+  expando; onKeyDown returns `boolean | void` — later branches return
+  bare), `content/shot.ts` `0f8a52f` (dirs as
+  `Record<string, [number, number]>`; el.style record cast — lib.dom has
+  no string index on CSSStyleDeclaration),
+  `content/scrollshot.ts` `f8d8f56` (hideFixedElements [
+  Element, string] pairs; explicit Promise generics for the image/blob
+  waits; Number.isFinite no-narrow additive casts on rawDpr/naturalW/H;
+  iframe contentDocument HTMLIFrameElement cast),
+  `popup/popup.ts` `968fd91` (StoredThing record duck with updatedAt?;
+  querySelector generics; site.ts exports TabSite; sendMessage tab.id
+  asserted at the isInteger guard),
+  `popup/site.ts` — TabSite now exported for popup.ts (type-only),
+  `content/visual/word.ts` `9e527db` (findNextWordEnd Node-typed; charAt
+  result feeds isWordChar so its param takes string | null | undefined),
+  `content/visual/collect.ts` `a17952a` (textContent reads asserted —
+  targets are text-bearing by construction),
+  `content/visual/caret-geometry.ts` `f19fbd3` (CaretRect loose optional
+  shape exported; isUsableCaretRect is a `rect is CaretRect` predicate —
+  same boolean at runtime — so resolve branches narrow),
+  `content/visual/motion.ts` `87ada7b` (char APIs return
+  string | null | undefined; text-node nodeValue reads asserted;
+  fallback* signatures typed; let-null walker/target locals annotated;
+  lint const on the MoveLine walker first),
+  `options/pagenav.ts` `c3a2743` + `options/engines.ts` `cd72135`
+  (savePatch takes Partial<Settings> imported from content/keymap;
+  statusEl `_timer` expando `ReturnType<typeof setTimeout>` with the
+  ?? undefined no-op; `hidden` writes through HTMLElement casts — not on
+  lib.dom Element; parsePagenavField returns a flattened optional duck;
+  RowData ducks carry the queried inputs).
+- Remaining Phase 2 files (in attack order): `options/options.js` (1276),
+  `content/tab-manager.js` (1528), `content/visual.js` (1635 — imports
+  overlays/ui/hint-layer/hints-elements/collect/caret-geometry/word/motion,
+  registers via `register`+`touch`, exports `Visual` consumed as any by
+  commands.ts/find.ts), then `build.js` -> `build.ts` (order item 6; needs
+  package.json script updates — infra, flag it in that PR). Tests stay `.js`
+  per the established policy (fixture-heavy stubs import `.ts` modules).
 - GATE BUG FIXED in `df238f2`: tsconfig `include` covered only
   `shared/**/*` + `tests/**/*.ts`, so all Phase-2 content/background TS files
   passed `tsc --noEmit` without being in the program (only keymap/rank/
