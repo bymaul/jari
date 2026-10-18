@@ -1622,7 +1622,7 @@
     );
   }
 
-  // options/pagenav.js
+  // options/pagenav.ts
   var pagenavNextEl = document.querySelector("#pagenav-next");
   var pagenavPrevEl = document.querySelector("#pagenav-prev");
   var resetPagenavBtn = document.querySelector("#reset-pagenav");
@@ -1665,7 +1665,7 @@
   function status2(message) {
     if (!statusEl2) return;
     statusEl2.textContent = message;
-    clearTimeout(statusEl2._timer);
+    clearTimeout(statusEl2._timer ?? void 0);
     statusEl2._timer = setTimeout(() => {
       statusEl2.textContent = "";
     }, 2500);

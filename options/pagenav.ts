@@ -5,13 +5,21 @@ import {
   pageNavTextDefaults,
 } from "../shared/page-nav-texts.ts";
 
-const pagenavNextEl = document.querySelector("#pagenav-next");
-const pagenavPrevEl = document.querySelector("#pagenav-prev");
-const resetPagenavBtn = document.querySelector("#reset-pagenav");
-const statusEl = document.querySelector("#status");
-const saveStateEl = document.querySelector("#save-state");
+import type { Settings } from "../content/keymap.ts";
 
-function setSaveState(mode, message) {
+const pagenavNextEl = document.querySelector<HTMLInputElement>("#pagenav-next");
+const pagenavPrevEl = document.querySelector<HTMLInputElement>("#pagenav-prev");
+const resetPagenavBtn =
+  document.querySelector<HTMLButtonElement>("#reset-pagenav");
+const statusEl = document.querySelector<
+  HTMLElement & { _timer?: ReturnType<typeof setTimeout> }
+>("#status");
+const saveStateEl = document.querySelector<HTMLElement>("#save-state");
+
+function setSaveState(
+  mode: "saving" | "failed" | "warn" | "saved",
+  message?: string,
+): void {
   if (!saveStateEl) return;
   saveStateEl.classList.remove("saving", "failed", "warn");
   if (mode === "saving") {
@@ -29,7 +37,7 @@ function setSaveState(mode, message) {
   }
 }
 
-function savedState() {
+function savedState(): void {
   if (settings.isPersistedLocally()) {
     setSaveState("warn", "Saved on this device only — browser sync is full");
   } else {
@@ -37,7 +45,7 @@ function savedState() {
   }
 }
 
-async function savePatch(patch) {
+async function savePatch(patch: Partial<Settings>): Promise<boolean> {
   setSaveState("saving");
   try {
     await settings.update(patch);
@@ -49,36 +57,35 @@ async function savePatch(patch) {
   return true;
 }
 
-function status(message) {
+function status(message: string): void {
   if (!statusEl) return;
   statusEl.textContent = message;
-  clearTimeout(statusEl._timer);
+  clearTimeout(statusEl._timer ?? undefined);
   statusEl._timer = setTimeout(() => {
     statusEl.textContent = "";
   }, 2500);
 }
-
-function showFieldError(id, message) {
+function showFieldError(id: string, message: string): void {
   const el = document.querySelector(`#${id}`);
   if (!el) return;
   el.textContent = message;
-  el.hidden = false;
+  (el as HTMLElement).hidden = false;
 }
 
-function clearFieldError(id) {
+function clearFieldError(id: string): void {
   const el = document.querySelector(`#${id}`);
   if (!el) return;
   el.textContent = "";
-  el.hidden = true;
+  (el as HTMLElement).hidden = true;
 }
 
-function markInvalid(el, invalid) {
+function markInvalid(el: Element | null, invalid: boolean): void {
   if (!el) return;
   if (invalid) el.setAttribute("aria-invalid", "true");
   else el.removeAttribute("aria-invalid");
 }
 
-export function renderPagenav() {
+export function renderPagenav(): void {
   if (pagenavNextEl)
     pagenavNextEl.value = settings.getPageNavTexts().next.join(", ");
   if (pagenavPrevEl)
@@ -86,13 +93,16 @@ export function renderPagenav() {
   clearFieldError("error-pagenav");
 }
 
-function failPagenav(message, badEls) {
+function failPagenav(message: string, badEls?: Element[]): void {
   for (const el of badEls || []) markInvalid(el, true);
   showFieldError("error-pagenav", `${message} (not saved)`);
   status(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
 }
 
-function parsePagenavField(input, label) {
+function parsePagenavField(
+  input: HTMLInputElement,
+  label: string,
+): { error?: string; bad?: Element[]; list?: string[] } {
   markInvalid(input, false);
   const seen = new Set();
   const list = [];
@@ -134,7 +144,7 @@ function commitPagenav() {
     failPagenav(prev.error, prev.bad);
     return;
   }
-  savePatch({ pageNavTexts: { next: next.list, prev: prev.list } }).then(
+  savePatch({ pageNavTexts: { next: next.list!, prev: prev.list! } }).then(
     (ok) => {
       if (!ok) return;
       renderPagenav();
@@ -142,7 +152,7 @@ function commitPagenav() {
   );
 }
 
-function resetPagenav() {
+function resetPagenav(): void {
   savePatch({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
     if (ok) {
       renderPagenav();
@@ -151,7 +161,7 @@ function resetPagenav() {
   });
 }
 
-export function initPagenav() {
+export function initPagenav(): void {
   pagenavNextEl?.addEventListener("change", commitPagenav);
   pagenavPrevEl?.addEventListener("change", commitPagenav);
   resetPagenavBtn?.addEventListener("click", resetPagenav);

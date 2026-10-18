@@ -21,7 +21,7 @@ import { COMMAND_CATALOG } from "../content/catalog.ts";
 import { settings } from "../content/settings.ts";
 import { ui } from "../content/ui.ts";
 import { renderEngines, initEngines } from "./engines.js";
-import { renderPagenav, initPagenav } from "./pagenav.js";
+import { renderPagenav, initPagenav } from "./pagenav.ts";
 
 const tableEl = document.querySelector("#keymap-table");
 const resetBtn = document.querySelector("#reset");
