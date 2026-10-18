@@ -92,6 +92,24 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   lookups — a missing action or drifting handler signature now fails tsc;
   runtime dispatch unchanged). `background/` is fully typed; no loose Handler
   seam remains.
+- Phase 2 continued: `content/find.ts` `2f15bfd` (matches/Range[] state,
+  ShadowRoot cast for fixed-ancestor traversal, `?? undefined` ×5,
+  non-null asserts inside listeners — module-null-narrowing trap),
+  `content/hints.ts` `88ddf30` (HintEntry over hint-layer's HintLink;
+  JariElement/RectLike exported from hints-elements; Node-typed
+  `hasJariClass` with Element casts; resize path makes
+  `scheduleRegenerate(mutations?: ...)` optional — no-arg call preserved),
+  `content/prompt/shared.ts` `dfbe639`, `content/prompt/list.ts` `972744c`
+  (ListRow exported for prompt.ts; TabUrlMap models the mixed
+  suggestion/TabSummary value through an all-optional `source?` prop;
+  mode-arm union narrowing is casts at the two render sites),
+  `content/prompt.ts` `ece7c57` (PromptRow all-optional duck for the
+  heterogeneous filtered mix; rank.ts RankItem/RankMatch exported,
+  RankItem gains `folderPath?`; OverlayApi key handlers honestly widen to
+  `boolean | void` because prompt consumes without returning —
+  handleKeydown return follows), `content/palette.ts` `3eb0e0c`
+  (PaletteItem/CommandTable local types; filterCommands cast over
+  rankMatches output).
 - GATE BUG FIXED in `df238f2`: tsconfig `include` covered only
   `shared/**/*` + `tests/**/*.ts`, so all Phase-2 content/background TS files
   passed `tsc --noEmit` without being in the program (only keymap/rank/
