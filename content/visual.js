@@ -17,7 +17,7 @@ import {
   resolveCaretGeometry,
   readNeighborCharRects,
 } from "./visual/caret-geometry.js";
-import { isWordChar, findNextWordEnd } from "./visual/word.js";
+import { isWordChar, findNextWordEnd } from "./visual/word.ts";
 import {
   fallbackMoveChar,
   fallbackMoveCaret,

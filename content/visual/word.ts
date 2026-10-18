@@ -1,16 +1,18 @@
 /* global NodeFilter */
 
-export function isWordChar(ch) {
+export function isWordChar(ch: string): boolean {
   return !!ch && /[\p{L}\p{N}_]/u.test(ch);
 }
 
-export function findNextWordEnd(count) {
+export function findNextWordEnd(
+  count: number,
+): { node: Node; offset: number } | null {
   const sel = window.getSelection();
   if (!sel || !sel.focusNode) return null;
   const startNode = sel.focusNode;
   const startOffset = sel.focusOffset;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) {
+  const walker = document.createTreeWalker(document.body!, NodeFilter.SHOW_TEXT, {
+    acceptNode(n: Node) {
       const p = n.parentElement;
       if (!p) return NodeFilter.FILTER_REJECT;
       const tag = p.tagName;
@@ -20,13 +22,13 @@ export function findNextWordEnd(count) {
       return NodeFilter.FILTER_ACCEPT;
     },
   });
-  let nodes = [];
+  const nodes: Node[] = [];
   let n = walker.nextNode();
   while (n) {
     nodes.push(n);
     n = walker.nextNode();
   }
-  let startIdx = nodes.indexOf(startNode);
+  const startIdx = nodes.indexOf(startNode);
   if (startIdx === -1) return null;
   let found = 0;
   for (let i = startIdx; i < nodes.length; i++) {

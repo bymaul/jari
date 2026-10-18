@@ -5986,7 +5986,7 @@
     return out;
   }
 
-  // content/visual/word.js
+  // content/visual/word.ts
   function isWordChar(ch) {
     return !!ch && /[\p{L}\p{N}_]/u.test(ch);
   }
@@ -6006,13 +6006,13 @@
         return NodeFilter.FILTER_ACCEPT;
       }
     });
-    let nodes = [];
+    const nodes = [];
     let n = walker.nextNode();
     while (n) {
       nodes.push(n);
       n = walker.nextNode();
     }
-    let startIdx = nodes.indexOf(startNode);
+    const startIdx = nodes.indexOf(startNode);
     if (startIdx === -1) return null;
     let found = 0;
     for (let i = startIdx; i < nodes.length; i++) {

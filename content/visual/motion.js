@@ -1,6 +1,6 @@
 /* global NodeFilter */
 
-import { isWordChar, findNextWordEnd } from "./word.js";
+import { isWordChar, findNextWordEnd } from "./word.ts";
 import { collectVisualTextElements } from "./collect.js";
 import { getRealRect } from "../hints-elements.ts";
 

@@ -1,7 +1,7 @@
 import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
-import { isWordChar, findNextWordEnd } from "../content/visual/word.js";
+import { isWordChar, findNextWordEnd } from "../content/visual/word.ts";
 
 test("visual/word direct import: isWordChar", () => {
   assert.equal(isWordChar("a"), true);
