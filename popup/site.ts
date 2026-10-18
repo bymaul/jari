@@ -5,7 +5,7 @@ import {
 
 export const SHOW_HELP_ACTION = "jari-show-help";
 
-interface TabSite {
+export interface TabSite {
   toggleable: boolean;
   host: string;
   protocol: string;

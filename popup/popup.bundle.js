@@ -199,7 +199,7 @@
     return list;
   }
 
-  // popup/popup.js
+  // popup/popup.ts
   var STORAGE_KEY = "settings";
   var versionEl = document.querySelector("#version");
   var dotEl = document.querySelector("#dot");
@@ -218,7 +218,8 @@
   async function readOne(area) {
     try {
       const stored = await chrome.storage[area].get(STORAGE_KEY);
-      if (stored && stored[STORAGE_KEY]) return stored[STORAGE_KEY];
+      if (stored && stored[STORAGE_KEY])
+        return stored[STORAGE_KEY];
     } catch {
     }
     return null;
@@ -232,7 +233,9 @@
     return local || synced || null;
   }
   function isQuotaError(err) {
-    return /quota/i.test(String(err && err.message || err || ""));
+    return /quota/i.test(
+      String(err && err.message || err || "")
+    );
   }
   async function writeSettings(data) {
     const payload = {
@@ -299,7 +302,9 @@
     helpBtn.addEventListener("click", async () => {
       if (!site.toggleable || !tab || !Number.isInteger(tab.id)) return;
       try {
-        await chrome.tabs.sendMessage(tab.id, { action: SHOW_HELP_ACTION });
+        await chrome.tabs.sendMessage(tab.id, {
+          action: SHOW_HELP_ACTION
+        });
         window.close();
       } catch {
         hostEl.textContent = "Press ? on the page for help.";
