@@ -1504,8 +1504,9 @@
   };
 
   // background/main.ts
+  var typedHandlers = handlers;
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    const handler = handlers[message && message.action];
+    const handler = typedHandlers[message && message.action];
     if (!handler) return;
     const result = handler(sender, message || {});
     if (result && typeof result.then === "function") {
