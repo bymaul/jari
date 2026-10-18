@@ -3,7 +3,7 @@ import { ui, createShadowHost } from "./ui.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 import { deepActiveElement, displayCombo } from "./keymap.ts";
 import { register, touch } from "./overlays.ts";
-import { promptCss } from "./prompt/shared.js";
+import { promptCss } from "./prompt/shared.ts";
 import { Find } from "./find.ts";
 
 const STEP = 50;

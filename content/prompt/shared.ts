@@ -1,4 +1,4 @@
-export function promptCss() {  return `
+export function promptCss(): string {  return `
     :host { all: initial !important; }
     .jari-overlay {
       all: initial;
@@ -128,7 +128,11 @@ export function promptCss() {  return `
   `;
 }
 
-export function renderText(el, text, indices) {
+export function renderText(
+  el: HTMLElement,
+  text: string,
+  indices?: number[] | null,
+): void {
   if (!indices || indices.length === 0) {
     el.textContent = text;
     return;

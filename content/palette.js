@@ -3,7 +3,7 @@ import { deepActiveElement, displayCombo, keysForCommand } from "./keymap.ts";
 import { fuzzyIndices, rankMatches, substringIndices } from "./rank.ts";
 import { settings } from "./settings.ts";
 import { createShadowHost, ui } from "./ui.ts";
-import { promptCss, renderText } from "./prompt/shared.js";
+import { promptCss, renderText } from "./prompt/shared.ts";
 import { register, touch } from "./overlays.ts";
 
 let active = false;

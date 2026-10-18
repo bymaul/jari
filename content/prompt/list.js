@@ -1,6 +1,6 @@
 import { fuzzyIndices, substringIndices } from "../rank.ts";
 import { settings } from "../settings.ts";
-import { renderText } from "./shared.js";
+import { renderText } from "./shared.ts";
 
 function makeSpan(className) {
   const el = document.createElement("span");

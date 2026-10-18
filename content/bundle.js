@@ -3261,7 +3261,7 @@
     });
   }
 
-  // content/prompt/shared.js
+  // content/prompt/shared.ts
   function promptCss() {
     return `
     :host { all: initial !important; }
