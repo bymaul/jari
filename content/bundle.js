@@ -3433,7 +3433,7 @@
     el.appendChild(frag);
   }
 
-  // content/prompt/list.js
+  // content/prompt/list.ts
   function makeSpan(className) {
     const el = document.createElement("span");
     el.className = className;
@@ -3493,19 +3493,36 @@
     li.appendChild(win);
     return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query5);
   }
-  function renderList({ listEl: listEl6, filtered: filtered4, query: query5, mode: mode4, tabUrlMap: tabUrlMap2, selected: selected4 = 0 }) {
+  function renderList({
+    listEl: listEl6,
+    filtered: filtered4,
+    query: query5,
+    mode: mode4,
+    tabUrlMap: tabUrlMap2,
+    selected: selected4 = 0
+  }) {
     const rows = filtered4.slice(0, settings.getMaxResults());
     const frag = document.createDocumentFragment();
     if (mode4 === "open" || mode4 === "edit" || mode4 === "incognito") {
-      for (const row of rows) frag.appendChild(renderSuggestionRow(row, query5, tabUrlMap2));
+      for (const row of rows)
+        frag.appendChild(
+          renderSuggestionRow(row, query5, tabUrlMap2)
+        );
     } else {
       const winLabels = /* @__PURE__ */ new Map();
       let winIndex = 0;
       for (const tab of rows) {
-        if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
+        if (!winLabels.has(tab.windowId))
+          winLabels.set(tab.windowId, ++winIndex);
       }
       for (const tab of rows)
-        frag.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query5));
+        frag.appendChild(
+          renderTabRow(
+            tab,
+            winLabels.get(tab.windowId),
+            query5
+          )
+        );
     }
     listEl6.textContent = "";
     listEl6.appendChild(frag);
@@ -3517,7 +3534,11 @@
       }
     }
   }
-  function highlight({ listEl: listEl6, selected: selected4, scroll = false }) {
+  function highlight({
+    listEl: listEl6,
+    selected: selected4,
+    scroll = false
+  }) {
     const sel = typeof selected4 === "number" ? selected4 : 0;
     Array.from(listEl6.children).forEach(
       (li, i) => li.classList.toggle("selected", i === sel)
@@ -3526,7 +3547,12 @@
     const el = listEl6.children[sel];
     if (el) el.scrollIntoView({ block: "nearest" });
   }
-  function move({ listEl: listEl6, filtered: filtered4, selected: selected4, delta }) {
+  function move({
+    listEl: listEl6,
+    filtered: filtered4,
+    selected: selected4,
+    delta
+  }) {
     if (filtered4.length === 0) return selected4;
     const next2 = (selected4 + delta + filtered4.length) % filtered4.length;
     highlight({ listEl: listEl6, selected: next2, scroll: true });

@@ -1,14 +1,31 @@
 import { fuzzyIndices, substringIndices } from "../rank.ts";
 import { settings } from "../settings.ts";
 import { renderText } from "./shared.ts";
+import type { TabSummary } from "../../shared/protocol.ts";
 
-function makeSpan(className) {
+/** Suggestion list rows shaped like suggest/search results. */
+export interface ListRow {
+  kind: "search" | "url" | "suggestion";
+  title: string;
+  url?: string | null;
+  keyword?: string;
+  folderPath?: string;
+}
+
+type TabUrlMap = Map<string, { source?: "tab" | "history" | "bookmark" }>;
+
+function makeSpan(className: string): HTMLSpanElement {
   const el = document.createElement("span");
   el.className = className;
   return el;
 }
 
-export function renderTitleUrl(li, titleText, urlText, q) {
+export function renderTitleUrl(
+  li: HTMLLIElement,
+  titleText: string,
+  urlText: string,
+  q: string,
+): HTMLLIElement {
   const title = makeSpan("title");
   const url = makeSpan("url");
   if (q) {
@@ -28,7 +45,11 @@ export function renderTitleUrl(li, titleText, urlText, q) {
   return li;
 }
 
-export function renderSuggestionRow(row, query, tabUrlMap) {
+export function renderSuggestionRow(
+  row: ListRow,
+  query: string,
+  tabUrlMap: TabUrlMap,
+): HTMLLIElement {
   const li = document.createElement("li");
   let titleText;
   if (row.kind === "search") {
@@ -41,7 +62,7 @@ export function renderSuggestionRow(row, query, tabUrlMap) {
     const isSwitch =
       row.url &&
       tabUrlMap.has(row.url) &&
-      tabUrlMap.get(row.url).source === "tab";
+      tabUrlMap.get(row.url)!.source === "tab";
     titleText = isSwitch
       ? `Switch to: ${row.title || "(untitled)"}`
       : row.title || "(untitled)";
@@ -62,7 +83,11 @@ export function renderSuggestionRow(row, query, tabUrlMap) {
   );
 }
 
-export function renderTabRow(tab, winLabel, query) {
+export function renderTabRow(
+  tab: TabSummary,
+  winLabel: number | undefined,
+  query: string,
+): HTMLLIElement {
   const li = document.createElement("li");
   const win = makeSpan("jari-win-tag");
   win.textContent = "#" + winLabel;
@@ -70,19 +95,43 @@ export function renderTabRow(tab, winLabel, query) {
   return renderTitleUrl(li, tab.title || "(untitled)", tab.url || "", query);
 }
 
-export function renderList({ listEl, filtered, query, mode, tabUrlMap, selected = 0 }) {
+export function renderList({
+  listEl,
+  filtered,
+  query,
+  mode,
+  tabUrlMap,
+  selected = 0,
+}: {
+  listEl: HTMLElement;
+  filtered: (ListRow | TabSummary)[];
+  query: string;
+  mode: string;
+  tabUrlMap: TabUrlMap;
+  selected?: number;
+}): void {
   const rows = filtered.slice(0, settings.getMaxResults());
   const frag = document.createDocumentFragment();
   if (mode === "open" || mode === "edit" || mode === "incognito") {
-    for (const row of rows) frag.appendChild(renderSuggestionRow(row, query, tabUrlMap));
+    for (const row of rows)
+      frag.appendChild(
+        renderSuggestionRow(row as ListRow, query, tabUrlMap),
+      );
   } else {
-    const winLabels = new Map();
+    const winLabels = new Map<number | undefined, number>();
     let winIndex = 0;
     for (const tab of rows) {
-      if (!winLabels.has(tab.windowId)) winLabels.set(tab.windowId, ++winIndex);
+      if (!winLabels.has((tab as TabSummary).windowId))
+        winLabels.set((tab as TabSummary).windowId, ++winIndex);
     }
     for (const tab of rows)
-      frag.appendChild(renderTabRow(tab, winLabels.get(tab.windowId), query));
+      frag.appendChild(
+        renderTabRow(
+          tab as TabSummary,
+          winLabels.get((tab as TabSummary).windowId),
+          query,
+        ),
+      );
   }
   listEl.textContent = "";
   listEl.appendChild(frag);
@@ -94,7 +143,15 @@ export function renderList({ listEl, filtered, query, mode, tabUrlMap, selected 
   }
 }
 
-export function highlight({ listEl, selected, scroll = false }) {
+export function highlight({
+  listEl,
+  selected,
+  scroll = false,
+}: {
+  listEl: HTMLElement;
+  selected?: number | null;
+  scroll?: boolean;
+}): void {
   const sel = typeof selected === "number" ? selected : 0;
   Array.from(listEl.children).forEach((li, i) =>
     li.classList.toggle("selected", i === sel),
@@ -104,7 +161,17 @@ export function highlight({ listEl, selected, scroll = false }) {
   if (el) el.scrollIntoView({ block: "nearest" });
 }
 
-export function move({ listEl, filtered, selected, delta }) {
+export function move({
+  listEl,
+  filtered,
+  selected,
+  delta,
+}: {
+  listEl: HTMLElement;
+  filtered: unknown[];
+  selected: number;
+  delta: number;
+}): number {
   if (filtered.length === 0) return selected;
   const next = (selected + delta + filtered.length) % filtered.length;
   highlight({ listEl, selected: next, scroll: true });
