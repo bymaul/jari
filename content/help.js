@@ -2,7 +2,7 @@ import { settings } from "./settings.ts";
 import { ui, createShadowHost } from "./ui.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 import { deepActiveElement, displayCombo } from "./keymap.ts";
-import { register, touch } from "./overlays.js";
+import { register, touch } from "./overlays.ts";
 import { promptCss } from "./prompt/shared.js";
 import { Find } from "./find.js";
 

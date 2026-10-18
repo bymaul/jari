@@ -7,7 +7,7 @@ import { promptCss, renderText } from "./prompt/shared.js";
 import { renderList as renderPromptList, move as movePrompt } from "./prompt/list.js";
 export { promptCss, renderText };
 import { deepActiveElement } from "./keymap.ts";
-import { register, touch } from "./overlays.js";
+import { register, touch } from "./overlays.ts";
 
 function parseKeyword(query) {
   return parseEngineKeyword(query, cachedEngines || settings.getSearchEngines());

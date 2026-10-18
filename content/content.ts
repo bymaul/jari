@@ -10,7 +10,7 @@ import { settings } from "./settings.ts";
 import { SHOW_HELP_ACTION } from "../popup/site.ts";
 import { ui } from "./ui.ts";
 import { commands, setModeActions } from "./commands.js";
-import { Overlays } from "./overlays.js";
+import { Overlays } from "./overlays.ts";
 import { isEditable } from "./hints-elements.ts";
 import { Find, __resetFindState } from "./find.js";
 import { __resetVisualState } from "./visual.js";

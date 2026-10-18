@@ -3533,11 +3533,15 @@
     return next2;
   }
 
-  // content/overlays.js
+  // content/overlays.ts
   var overlays = [];
   var openOrder = [];
-  function register(name, api, opts = {}) {
-    overlays.push({ name, modal: opts.modal !== false, ...api });
+  function register(name, api, { modal = true } = {}) {
+    overlays.push({
+      name,
+      modal,
+      ...api
+    });
   }
   function touch(name) {
     const idx = openOrder.indexOf(name);

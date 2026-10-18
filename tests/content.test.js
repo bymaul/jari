@@ -6,7 +6,7 @@ const { settings } = await import("../content/settings.ts");
 const { commands } = await import("../content/commands.js");
 const { keymapDefaults } = await import("../content/keymap.ts");
 const { handleKeydown, shieldOverlayKey, __resetState } = await import("../content/content.ts");
-const { Overlays, register, touch } = await import("../content/overlays.js");
+const { Overlays, register, touch } = await import("../content/overlays.ts");
 
 let shieldActive = false;
 const shieldKeys = [];

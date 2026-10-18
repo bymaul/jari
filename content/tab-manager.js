@@ -4,7 +4,7 @@ import { normalizeUrl, Url } from "../shared/url.ts";
 import { settings } from "./settings.ts";
 import { createShadowHost, sendMessageWithTimeout, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";
-import { register, touch } from "./overlays.js";
+import { register, touch } from "./overlays.ts";
 
 const HOST_CLASS = "jari-tab-manager-host";
 const GROUPED_NONE = -1;

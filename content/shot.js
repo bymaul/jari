@@ -1,5 +1,5 @@
 import { sendMessageWithTimeout, ui } from "./ui.ts";
-import { register, touch } from "./overlays.js";
+import { register, touch } from "./overlays.ts";
 import {
   normalizeRect,
   cropDataUrl,

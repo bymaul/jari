@@ -4,7 +4,7 @@ import { fuzzyIndices, rankMatches, substringIndices } from "./rank.ts";
 import { settings } from "./settings.ts";
 import { createShadowHost, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.js";
-import { register, touch } from "./overlays.js";
+import { register, touch } from "./overlays.ts";
 
 let active = false;
 let host = null;
