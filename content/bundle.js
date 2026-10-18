@@ -9299,7 +9299,7 @@
   var Help = { open: open3, close: close4, onKeyDown: onKeyDown5, isActive: isActive5 };
   register("help", { close: close4, onKeyDown: onKeyDown5, isActive: isActive5 });
 
-  // content/hints.js
+  // content/hints.ts
   var MAX_HINTS = 800;
   var REGENERATE_DELAY = 150;
   var active6 = false;
@@ -9326,7 +9326,12 @@
     "cycleScrollFrame",
     "resetScrollTarget"
   ]);
-  function classifyHintKey(key, { labels = [], prefix: prefix2 = "", keymap = null, charset = "" } = {}) {
+  function classifyHintKey(key, {
+    labels = [],
+    prefix: prefix2 = "",
+    keymap = null,
+    charset = ""
+  } = {}) {
     if (key.length !== 1) return { type: "ignore" };
     const command = keymap && keymap[key] || (key === "g" ? "scrollToTop" : null);
     const entry = command && COMMAND_CATALOG[command] || null;
@@ -9367,7 +9372,9 @@
         }
       }
       if (node.closest) {
-        return !!node.closest("[class^='jari-'], [class*=' jari-']");
+        return !!node.closest(
+          "[class^='jari-'], [class*=' jari-']"
+        );
       }
     } catch {
     }
@@ -9480,12 +9487,13 @@
     }
     ui.safeFocus(el, { preventScroll: true });
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+      const input = el;
       try {
-        const len = el.value ? el.value.length : 0;
-        if (typeof el.select === "function" && el.type !== "checkbox" && el.type !== "radio") {
-          el.select();
-        } else if (typeof el.setSelectionRange === "function") {
-          el.setSelectionRange(len, len);
+        const len = input.value ? input.value.length : 0;
+        if (typeof input.select === "function" && input.type !== "checkbox" && input.type !== "radio") {
+          input.select();
+        } else if (typeof input.setSelectionRange === "function") {
+          input.setSelectionRange(len, len);
         }
       } catch {
       }
@@ -9755,7 +9763,7 @@
       scrollHandler = null;
     }
     try {
-      clearTimeout(scrollStopTimer);
+      clearTimeout(scrollStopTimer ?? void 0);
     } catch {
     }
     scrollStopTimer = null;
@@ -9813,7 +9821,7 @@
       if (!active6) return;
       scheduleReposition();
       try {
-        clearTimeout(scrollStopTimer);
+        clearTimeout(scrollStopTimer ?? void 0);
       } catch {
       }
       scrollStopTimer = setTimeout(() => {

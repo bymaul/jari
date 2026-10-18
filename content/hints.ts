@@ -36,29 +36,42 @@ import {
   prioritizeForViewport,
   viewportScore,
 } from "./hints-elements.ts";
+import type { JariElement, RectLike } from "./hints-elements.ts";
+import type { HintLink } from "./hint-layer.ts";
+import type { CommandName } from "./catalog.ts";
+
+type HintEntry = {
+  el: Element;
+  label: string;
+  hintEl: HintLink;
+  hiddenByViewport: boolean;
+};
 
 const MAX_HINTS = 800;
 const REGENERATE_DELAY = 150;
 
 let active = false;
-let hintsHost = null;
-let holder = null;
-let elements = [];
-let hints = [];
+let hintsHost: HTMLDivElement | null = null;
+let holder: HTMLElement | null = null;
+let elements: JariElement[] = [];
+let hints: HintEntry[] = [];
 let prefix = "";
 let mode = "click";
 let multipleHits = false;
-let resizeHandler = null;
-let mutationObserver = null;
-let regenerateTimer = null;
-let pendingRoots = [];
+let resizeHandler: (() => void) | null = null;
+let mutationObserver: MutationObserver | null = null;
+let regenerateTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingRoots: Node[] = [];
 let forceFullRegen = false;
-let scrollStopTimer = null;
-let hintPill = null;
+let scrollStopTimer: ReturnType<typeof setTimeout> | null = null;
+let hintPill: HTMLDivElement | null = null;
 let spaceHeld = false;
 
-let commandRunner = null;
-export function setCommandRunner(fn) {
+let commandRunner: ((command: string, event: KeyboardEvent) => void) | null =
+  null;
+export function setCommandRunner(
+  fn: (command: string, event: KeyboardEvent) => void,
+): void {
   commandRunner = fn;
 }
 
@@ -67,16 +80,33 @@ const NON_HINT_SCROLL_COMMANDS = new Set([
   "resetScrollTarget",
 ]);
 
-export function classifyHintKey(key, { labels = [], prefix = "", keymap = null, charset = "" } = {}) {
+export function classifyHintKey(
+  key: string,
+  {
+    labels = [],
+    prefix = "",
+    keymap = null,
+    charset = "",
+  }: {
+    labels?: string[];
+    prefix?: string;
+    keymap?: Record<string, string> | null;
+    charset?: string;
+  } = {},
+): 
+  | { type: "ignore" }
+  | { type: "scroll"; command: string }
+  | { type: "activate"; prefix: string; label: string }
+  | { type: "filter"; prefix: string } {
   if (key.length !== 1) return { type: "ignore" };
   const command = (keymap && keymap[key]) || (key === "g" ? "scrollToTop" : null);
-  const entry = (command && COMMAND_CATALOG[command]) || null;
+  const entry = (command && COMMAND_CATALOG[command as CommandName]) || null;
   if (
     entry &&
     entry.category === "scrolling" &&
-    !NON_HINT_SCROLL_COMMANDS.has(command)
+    !NON_HINT_SCROLL_COMMANDS.has(command!)
   ) {
-    return { type: "scroll", command };
+    return { type: "scroll", command: command! };
   }
   const lower = key.toLowerCase();
   if (!charset.includes(lower)) return { type: "ignore" };
@@ -105,30 +135,32 @@ function hideHintPill() {
   hintPill = null;
 }
 
-function hasJariClass(node) {
+function hasJariClass(node: Node | null): boolean {
   try {
     if (!node || node.nodeType !== 1) return false;
-    const classes = node.classList;
+    const classes = (node as Element).classList;
     if (classes) {
       for (const c of classes) {
         if (typeof c === "string" && c.startsWith("jari-")) return true;
       }
     }
-    if (node.closest) {
-      return !!node.closest("[class^='jari-'], [class*=' jari-']");
+    if ((node as Element).closest) {
+      return !!((node as Element).closest(
+        "[class^='jari-'], [class*=' jari-']",
+      ) as Element);
     }
   } catch {}
   return false;
 }
 
-function isOwnMutation(mutation) {
+function isOwnMutation(mutation: MutationRecord): boolean {
   try {
     const nodes = [
       ...(mutation.addedNodes || []),
       ...(mutation.removedNodes || []),
     ];
-    const allOwn = (list) =>
-      list.every((n) => n.nodeType !== 1 || hasJariClass(n));
+    const allOwn = (list: Node[]) =>
+      list.every((n: Node) => n.nodeType !== 1 || hasJariClass(n));
     if (mutation.target && mutation.target.nodeType === 1 && hasJariClass(mutation.target)) {
       return allOwn(nodes);
     }
@@ -137,10 +169,10 @@ function isOwnMutation(mutation) {
   return false;
 }
 
-function mergeNewcomers(roots) {
-  let newcomers;
+function mergeNewcomers(roots: Node[]): void {
+  let newcomers: Element[];
   try {
-    const known = new Set(elements);
+    const known = new Set<Element>(elements);
     newcomers = filterOverlapElements(collectNewcomers(roots, mode, known));
     for (const el of collectIframeElements(mode)) {
       if (!known.has(el) && !newcomers.includes(el)) newcomers.push(el);
@@ -148,7 +180,7 @@ function mergeNewcomers(roots) {
   } catch {
     newcomers = [];
   }
-  let alive;
+  let alive: JariElement[];
   try {
     alive = elements.filter((el) => {
       try {
@@ -169,7 +201,7 @@ function mergeNewcomers(roots) {
   replaceElements(merged);
 }
 
-function replaceElements(next) {
+function replaceElements(next: Element[]): void {
   if (next.length === 0) {
     close();
     ui.toast("No hints");
@@ -188,7 +220,10 @@ function replaceElements(next) {
   refresh();
 }
 
-function scheduleRegenerate(mutations, force) {
+function scheduleRegenerate(
+  mutations?: MutationRecord[] | null,
+  force?: boolean,
+): void {
   if (mutations && mutations.length > 0) {
     for (const m of mutations) collectMutationRoots(m, pendingRoots);
   }
@@ -218,33 +253,34 @@ function scheduleRegenerate(mutations, force) {
   }, REGENERATE_DELAY);
 }
 
-function isActive() {
+function isActive(): boolean {
   return active;
 }
 
-function focusFrame(el) {
-  ui.focusFrameElement(el);
+function focusFrame(el: Element): void {
+  ui.focusFrameElement(el as HTMLIFrameElement);
   try {
     ui.toast("Focused frame");
   } catch {}
 }
 
-function focusInput(el) {
+function focusInput(el: HTMLElement): void {
   try {
     el.scrollIntoView({ block: "center", inline: "center" });
   } catch {}
   ui.safeFocus(el, { preventScroll: true });
   if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+    const input = el as HTMLInputElement;
     try {
-      const len = el.value ? el.value.length : 0;
+      const len = input.value ? input.value.length : 0;
       if (
-        typeof el.select === "function" &&
-        el.type !== "checkbox" &&
-        el.type !== "radio"
+        typeof input.select === "function" &&
+        input.type !== "checkbox" &&
+        input.type !== "radio"
       ) {
-        el.select();
-      } else if (typeof el.setSelectionRange === "function") {
-        el.setSelectionRange(len, len);
+        input.select();
+      } else if (typeof input.setSelectionRange === "function") {
+        input.setSelectionRange(len, len);
       }
     } catch {}
   } else if (el.isContentEditable) {
@@ -261,7 +297,7 @@ function focusInput(el) {
   }
 }
 
-function refresh() {
+function refresh(): void {
   if (!active) return;
   for (const h of hints) {
     if (h.hiddenByViewport) {
@@ -285,14 +321,14 @@ function refresh() {
   }
 }
 
-function currentHintRect(el) {
-  let frame;
+function currentHintRect(el: Element): RectLike | null {
+  let frame: Element | null;
   try {
-    frame = el._jariFrame || null;
+    frame = (el as JariElement)._jariFrame || null;
   } catch {
     frame = null;
   }
-  let base;
+  let base: DOMRect | null;
   try {
     base = getRealRect(el);
   } catch {
@@ -314,9 +350,9 @@ function currentHintRect(el) {
   );
 }
 
-function repositionHints() {
+function repositionHints(): void {
   if (!active || !holder) return;
-  let bof;
+  let bof: { top: number; left: number };
   try {
     bof = coordinate(holder);
   } catch {
@@ -344,7 +380,7 @@ function repositionHints() {
   }
 }
 
-function scheduleReposition() {
+function scheduleReposition(): void {
   if (repositionRaf !== null) return;
   try {
     repositionRaf = requestAnimationFrame(() => {
@@ -358,7 +394,7 @@ function scheduleReposition() {
   }
 }
 
-function flip() {
+function flip(): void {
   if (hints.length === 0) return;
   const first = hints[0].hintEl;
   const isFlipped = first.style.zIndex !== String(first.zIndex);
@@ -371,11 +407,14 @@ function flip() {
   });
 }
 
-function assignLabels(nextElements, charset) {
+function assignLabels(
+  nextElements: JariElement[],
+  charset: string,
+): string[] {
   const oldByEl = new Map(hints.map((h) => [h.el, h.label]));
-  const assigned = new Map();
-  const taken = [];
-  const newcomers = [];
+  const assigned = new Map<JariElement, string>();
+  const taken: string[] = [];
+  const newcomers: JariElement[] = [];
   for (const el of nextElements) {
     const old = oldByEl.get(el);
     if (old) {
@@ -401,10 +440,10 @@ function assignLabels(nextElements, charset) {
       return genLabels(nextElements.length, charset);
     }
   }
-  return nextElements.map((el) => assigned.get(el));
+  return nextElements.map((el) => assigned.get(el)!);
 }
 
-function render() {
+function render(): void {
   if (hintsHost) {
     try {
       hintsHost.remove();
@@ -440,7 +479,7 @@ function render() {
   refresh();
 }
 
-function flashElement(el) {
+function flashElement(el: Element): void {
   try {
     const r = getHintRect(el);
     if (!r || r.width <= 0 || r.height <= 0) return;
@@ -459,18 +498,18 @@ function flashElement(el) {
   } catch {}
 }
 
-let scrollLockPrevent = null;
-let keyUpHandler = null;
-let scrollHandler = null;
-let repositionRaf = null;
+let scrollLockPrevent: ((e: Event) => void) | null = null;
+let keyUpHandler: ((e: KeyboardEvent) => void) | null = null;
+let scrollHandler: (() => void) | null = null;
+let repositionRaf: number | null = null;
 
 const SCROLL_STOP_DELAY = 200;
 
-function disableScrollLock() {
+function disableScrollLock(): void {
   if (scrollLockPrevent) return;
   scrollLockPrevent = (e) => {
     if (!active) return;
-    const t = e.target;
+    const t = e.target as Element | null;
     if (t?.closest?.(".jari-hint")) return;
     e.preventDefault();
     e.stopPropagation();
@@ -485,7 +524,7 @@ function disableScrollLock() {
   }
 }
 
-function enableScrollLock() {
+function enableScrollLock(): void {
   if (!scrollLockPrevent) return;
   for (const type of ["wheel", "touchmove"]) {
     try {
@@ -495,7 +534,7 @@ function enableScrollLock() {
   scrollLockPrevent = null;
 }
 
-function stopTracking() {
+function stopTracking(): void {
   if (resizeHandler) {
     try {
       window.removeEventListener("resize", resizeHandler);
@@ -526,7 +565,7 @@ function stopTracking() {
     scrollHandler = null;
   }
   try {
-    clearTimeout(scrollStopTimer);
+    clearTimeout(scrollStopTimer ?? undefined);
   } catch {}
   scrollStopTimer = null;
   forceFullRegen = false;
@@ -542,7 +581,7 @@ function stopTracking() {
   hideHintPill();
 }
 
-function startTracking() {
+function startTracking(): void {
   stopTracking();
   disableScrollLock();
   showHintPill();
@@ -579,7 +618,7 @@ function startTracking() {
     if (!active) return;
     scheduleReposition();
     try {
-      clearTimeout(scrollStopTimer);
+      clearTimeout(scrollStopTimer ?? undefined);
     } catch {}
     scrollStopTimer = setTimeout(() => {
       scrollStopTimer = null;
@@ -595,7 +634,7 @@ function startTracking() {
   } catch {}
 }
 
-function close() {
+function close(): void {
   if (!active) return;
   active = false;
   prefix = "";
@@ -619,7 +658,7 @@ function close() {
   stopTracking();
 }
 
-const VALID_HINT_MODES = new Set([
+const VALID_HINT_MODES: Set<string> = new Set([
   "click",
   "open",
   "openBackground",
@@ -629,7 +668,7 @@ const VALID_HINT_MODES = new Set([
   "yankText",
 ]);
 
-function open(requestedMode) {
+function open(requestedMode: string): void {
   if (active) close();
   mode = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
   multipleHits = mode === "openBackground";
@@ -637,7 +676,7 @@ function open(requestedMode) {
   let candidates = collectElements(mode);
 
   if (mode === "input" && candidates.length === 1) {
-    focusInput(candidates[0]);
+    focusInput(candidates[0] as HTMLElement);
     return;
   }
 
@@ -666,7 +705,7 @@ function open(requestedMode) {
   startTracking();
 }
 
-function handleActivationEnd() {
+function handleActivationEnd(): void {
   if (!multipleHits) close();
   else {
     prefix = "";
@@ -674,11 +713,11 @@ function handleActivationEnd() {
   }
 }
 
-function activate(el) {
+function activate(el: Element): void {
   flashElement(el);
   if (mode === "click") {
     if (isFrameElement(el)) focusFrame(el);
-    else if (isEditable(el)) focusInput(el);
+    else if (isEditable(el)) focusInput(el as HTMLElement);
     else ui.dispatchClick(el);
     handleActivationEnd();
   } else if (mode === "open") {
@@ -705,7 +744,7 @@ function activate(el) {
       close();
     }
   } else if (mode === "input") {
-    focusInput(el);
+    focusInput(el as HTMLElement);
     close();
   } else if (mode === "yank") {
     const url = getHref(el);
@@ -718,7 +757,7 @@ function activate(el) {
     }
     close();
   } else if (mode === "yankText") {
-    const text = ((el.innerText || el.textContent) || "").trim();
+    const text = (((el as HTMLElement).innerText || el.textContent) || "").trim();
     if (text) {
       ui.copyText(text).then((ok) =>
         ui.toast(ok ? "Yanked text" : "Copy failed"),
@@ -730,7 +769,7 @@ function activate(el) {
   }
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): boolean {
   if (!active) return false;
   const key = event.key;
 
@@ -797,7 +836,7 @@ function onKeyDown(event) {
   return true;
 }
 
-function onKeyUp(event) {
+function onKeyUp(event: KeyboardEvent): boolean {
   if (!active) return false;
   if (event.key === " " || event.code === "Space") {
     ui.consume(event);

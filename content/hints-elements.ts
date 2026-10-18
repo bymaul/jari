@@ -7,7 +7,8 @@ import { settings } from "./settings.ts";
 const SHOW_ELEMENT = 1;
 
 /** Rect-shaped plain object; DOMRect is structurally compatible. */
-type RectLike = {
+/** Rect measurements compatible with DOMRect minus offsets. */
+export type RectLike = {
   left: number;
   top: number;
   right: number;
@@ -17,7 +18,7 @@ type RectLike = {
 };
 
 /** Jari expandos stored on hint targets (see collectIframeElements). */
-interface JariElement extends Element {
+export interface JariElement extends Element {
   _jariBase?: string;
   _jariViewportRect?: RectLike;
   _jariFrame?: Element;
