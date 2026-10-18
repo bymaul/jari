@@ -10025,7 +10025,7 @@
   var Hints = { open: open4, close: close5, isActive: isActive6, onKeyDown: onKeyDown6, onKeyUp, genLabels };
   register("hints", { close: close5, onKeyDown: onKeyDown6, onKeyUp, isActive: isActive6 });
 
-  // content/page-nav.js
+  // content/page-nav.ts
   function normText(value) {
     return String(value || "").trim().toLowerCase();
   }

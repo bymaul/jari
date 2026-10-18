@@ -2,11 +2,11 @@ import { getClickableElements } from "./hints-elements.ts";
 import { settings } from "./settings.ts";
 import { ui } from "./ui.ts";
 
-function normText(value) {
+function normText(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
 
-function relTokens(el) {
+function relTokens(el: Element): string[] {
   try {
     const rel = el.getAttribute ? el.getAttribute("rel") : "";
     return String(rel || "").toLowerCase().split(/\s+/).filter(Boolean);
@@ -15,7 +15,7 @@ function relTokens(el) {
   }
 }
 
-function elementLabel(el) {
+function elementLabel(el: Element): { text: string; aria: string } {
   let text = "";
   try {
     text = el.textContent || "";
@@ -27,7 +27,11 @@ function elementLabel(el) {
   return { text: normText(text), aria: normText(aria) };
 }
 
-export function findPageNavLink(direction, texts, elements) {
+export function findPageNavLink(
+  direction: string,
+  texts?: string[] | null,
+  elements?: Element[],
+): Element | null {
   const rel = direction === "prev" ? "prev" : "next";
   const els = elements || getClickableElements();
   for (const el of els) {
@@ -42,7 +46,7 @@ export function findPageNavLink(direction, texts, elements) {
   return null;
 }
 
-export function goPage(direction) {
+export function goPage(direction: string): void {
   const dir = direction === "prev" ? "prev" : "next";
   const texts = settings.getPageNavTexts()[dir] || [];
   const el = findPageNavLink(dir, texts);
