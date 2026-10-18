@@ -162,7 +162,7 @@ export function shieldOverlayKey(event: KeyboardEvent): void {
   ui.consume(event);
 }
 
-function handleKeydown(event: KeyboardEvent): boolean | undefined {
+function handleKeydown(event: KeyboardEvent): boolean | void {
   if (!event.isTrusted) return;
 
   if (

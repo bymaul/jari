@@ -3601,7 +3601,7 @@
     }
   };
 
-  // content/prompt.js
+  // content/prompt.ts
   function parseKeyword(query5) {
     return parseEngineKeyword(query5, cachedEngines || settings.getSearchEngines());
   }
@@ -3666,11 +3666,13 @@
     render("Move tab to", "Choose a window...");
   }
   function requestSuggestions(suggestQuery, onResults) {
-    clearTimeout(suggestTimer);
+    clearTimeout(suggestTimer ?? void 0);
     const seq = ++suggestSeq;
     suggestTimer = setTimeout(async () => {
       if (!active || seq !== suggestSeq) return;
-      const res = await sendMessage("suggest", { query: suggestQuery }) || [];
+      const res = await sendMessage("suggest", {
+        query: suggestQuery
+      }) || [];
       if (!active || seq !== suggestSeq) return;
       const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
       tabUrlMap.clear();
@@ -3752,7 +3754,7 @@
     });
   }
   function handleTabListAll() {
-    clearTimeout(suggestTimer);
+    clearTimeout(suggestTimer ?? void 0);
     suggestSeq++;
     const seq = suggestSeq;
     query = "";
@@ -3809,10 +3811,22 @@
     ui.safeFocus(inputEl, { preventScroll: true });
   }
   function renderList2() {
-    return renderList({ listEl, filtered, query, mode, tabUrlMap, selected });
+    return renderList({
+      listEl,
+      filtered,
+      query,
+      mode,
+      tabUrlMap,
+      selected
+    });
   }
   function move2(delta) {
-    const next2 = move({ listEl, filtered, selected, delta });
+    const next2 = move({
+      listEl,
+      filtered,
+      selected,
+      delta
+    });
     selected = next2;
     return next2;
   }
@@ -3910,7 +3924,7 @@
     close();
   }
   function close() {
-    clearTimeout(suggestTimer);
+    clearTimeout(suggestTimer ?? void 0);
     suggestSeq++;
     if (host) {
       try {

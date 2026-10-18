@@ -104,7 +104,7 @@ export function renderList({
   selected = 0,
 }: {
   listEl: HTMLElement;
-  filtered: (ListRow | TabSummary)[];
+  filtered: unknown[];
   query: string;
   mode: string;
   tabUrlMap: TabUrlMap;

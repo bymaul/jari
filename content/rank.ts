@@ -5,7 +5,7 @@ const SCORE_CAMEL = 14;
 const SCORE_GAP = -3;
 const SCORE_LEADING = -1;
 
-interface RankItem {
+export interface RankItem {
   title?: string;
   url?: string;
   source?: string;
@@ -16,9 +16,10 @@ interface RankItem {
   visitCount?: number;
   typedCount?: number;
   typedVisits?: number;
+  folderPath?: string;
 }
 
-interface RankMatch {
+export interface RankMatch {
   item: RankItem;
   match: { score: number; indices: number[]; baseScore: number };
   span: number;

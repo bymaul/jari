@@ -5,8 +5,8 @@ export interface OverlayApi {
   modal: boolean;
   isActive(): boolean;
   close(): void;
-  onKeyDown?(event: KeyboardEvent): boolean;
-  onKeyUp?(event: KeyboardEvent): boolean;
+  onKeyDown?(event: KeyboardEvent): boolean | void;
+  onKeyUp?(event: KeyboardEvent): boolean | void;
 }
 
 const overlays: OverlayApi[] = [];

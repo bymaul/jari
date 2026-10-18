@@ -8,41 +8,73 @@ import { renderList as renderPromptList, move as movePrompt } from "./prompt/lis
 export { promptCss, renderText };
 import { deepActiveElement } from "./keymap.ts";
 import { register, touch } from "./overlays.ts";
+import type {
+  Suggestion,
+  TabSummary,
+  WindowSummary,
+} from "../shared/protocol.ts";
+import type { SearchEngine } from "../shared/search-engines.ts";
+import type { RankItem, RankMatch } from "./rank.ts";
 
-function parseKeyword(query) {
+// List entries are heterogeneous: omnibar rows carry kind/search fields,
+// tab/window rows are raw TabSummary/WindowSummary entries. All-optional
+// duck matches both.
+type PromptRow = {
+  kind?: "search" | "url" | "suggestion";
+  title?: string;
+  url?: string | null;
+  keyword?: string;
+  folderPath?: string;
+  id?: number;
+  windowId?: number;
+  match?: { score: number; indices: number[]; baseScore: number } | null;
+  source?: string;
+  lastVisit?: number;
+  lastAccessed?: number;
+  lastVisitTime?: number;
+  dateAdded?: number;
+  visitCount?: number;
+  typedCount?: number;
+  typedVisits?: number;
+};
+
+function parseKeyword(query: string) {
   return parseEngineKeyword(query, cachedEngines || settings.getSearchEngines());
 }
 
 let active = false;
-let host = null;
-let overlay = null;
-let inputEl = null;
-let listEl = null;
-let tabs = [];
-let filtered = [];
+let host: HTMLDivElement | null = null;
+let overlay: HTMLDivElement | null = null;
+let inputEl: HTMLInputElement | null = null;
+let listEl: HTMLUListElement | null = null;
+let tabs: RankItem[] = [];
+let filtered: PromptRow[] = [];
 let selected = 0;
 let query = "";
 let mode = "tabs";
 let suggestSeq = 0;
-let suggestTimer = null;
-let restoreFocus = null;
-let tabUrlMap = new Map();
-let cachedEngines = null;
+let suggestTimer: ReturnType<typeof setTimeout> | null = null;
+let restoreFocus: Element | null = null;
+const tabUrlMap = new Map<
+  string,
+  { source?: "tab" | "history" | "bookmark"; id?: number }
+>();
+let cachedEngines: SearchEngine[] | null = null;
 
-function isActive() {
+function isActive(): boolean {
   return active;
 }
 
-export function parseTabPrefix(text) {
+export function parseTabPrefix(text: string): string | null {
   const m = String(text || "").match(/^t\s+(.*\S)\s*$/i);
   return m ? m[1] : null;
 }
 
-export function isTabListAll(text) {
+export function isTabListAll(text: string): boolean {
   return /^\s*t\s+$/i.test(String(text || ""));
 }
 
-function openOmnibar() {
+function openOmnibar(): void {
   if (active) return;
   tabs = [];
   mode = "open";
@@ -50,7 +82,7 @@ function openOmnibar() {
   render("Open", "Search, URL, or t for tabs");
 }
 
-function openIncognito() {
+function openIncognito(): void {
   if (active) return;
   tabs = [];
   mode = "incognito";
@@ -58,21 +90,23 @@ function openIncognito() {
   render("Incognito", "Search or type URL");
 }
 
-function openEditUrl() {
+function openEditUrl(): void {
   if (active) return;
   tabs = [];
   mode = "edit";
   active = true;
   render("Edit URL", "Search or type URL");
-  inputEl.value = location.href;
-  ui.safeFocus(inputEl, { preventScroll: true });
+  inputEl!.value = location.href;
+  ui.safeFocus(inputEl!, { preventScroll: true });
   try {
-    inputEl.select();
+    inputEl!.select();
   } catch {}
-  handleOpenInput(inputEl.value);
+  handleOpenInput(inputEl!.value);
 }
 
-function chooseWindow(data) {
+function chooseWindow(
+  data: { tabs?: WindowSummary[] } | null | undefined,
+): void {
   if (active) return;
   tabs = (data && data.tabs) || [];
   mode = "moveWindow";
@@ -80,12 +114,18 @@ function chooseWindow(data) {
   render("Move tab to", "Choose a window...");
 }
 
-function requestSuggestions(suggestQuery, onResults) {
-  clearTimeout(suggestTimer);
+function requestSuggestions(
+  suggestQuery: string,
+  onResults: (items: Suggestion[]) => void,
+): void {
+  clearTimeout(suggestTimer ?? undefined);
   const seq = ++suggestSeq;
   suggestTimer = setTimeout(async () => {
     if (!active || seq !== suggestSeq) return;
-    const res = (await sendMessage("suggest", { query: suggestQuery })) || [];
+    const res =
+      ((await sendMessage("suggest", {
+        query: suggestQuery,
+      })) as Suggestion[] | null) || [];
     if (!active || seq !== suggestSeq) return;
     const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
     tabUrlMap.clear();
@@ -94,7 +134,10 @@ function requestSuggestions(suggestQuery, onResults) {
   }, 130);
 }
 
-function toSuggestionRow(item, match) {
+function toSuggestionRow(
+  item: RankItem,
+  match: RankMatch["match"] | null,
+): PromptRow {
   return {
     kind: "suggestion",
     title: item.title,
@@ -105,12 +148,12 @@ function toSuggestionRow(item, match) {
   };
 }
 
-function isOmnibarMode() {
+function isOmnibarMode(): boolean {
   return mode === "open" || mode === "edit" || mode === "incognito";
 }
 
-function handleInput() {
-  const raw = inputEl.value;
+function handleInput(): void {
+  const raw = inputEl!.value;
   query = raw.trim();
   if (isOmnibarMode()) {
     handleOpenInput(raw);
@@ -121,7 +164,7 @@ function handleInput() {
   }
 }
 
-function handleOpenInput(queryText) {
+function handleOpenInput(queryText: string): void {
   if (mode !== "incognito" && isTabListAll(queryText)) {
     handleTabListAll();
     return;
@@ -146,7 +189,7 @@ function handleOpenInput(queryText) {
     });
     return;
   }
-  let row;
+  let row: PromptRow;
   if (kw) {
     row = {
       kind: "search",
@@ -176,8 +219,8 @@ function handleOpenInput(queryText) {
   });
 }
 
-function handleTabListAll() {
-  clearTimeout(suggestTimer);
+function handleTabListAll(): void {
+  clearTimeout(suggestTimer ?? undefined);
   suggestSeq++;
   const seq = suggestSeq;
   query = "";
@@ -187,9 +230,9 @@ function handleTabListAll() {
   sendMessage("listTabs").then((res) => {
     if (!active || seq !== suggestSeq || !inputEl || !isTabListAll(inputEl.value)) return;
     tabUrlMap.clear();
-    filtered = (res || [])
+    filtered = ((res || []) as TabSummary[])
       .map((item) => {
-        const tab = { ...item, source: "tab" };
+        const tab = { ...item, source: "tab" as const };
         if (tab.url) tabUrlMap.set(tab.url, tab);
         return toSuggestionRow(tab, null);
       })
@@ -199,15 +242,15 @@ function handleTabListAll() {
   });
 }
 
-function rank(list, query) {
+function rank(list: RankItem[], query: string): RankMatch[] {
   return rankMatches(query, list, settings.isFuzzyMatching());
 }
 
-function rankTabs(q, list) {
+function rankTabs(q: string, list: RankItem[]): RankItem[] {
   return rank(list, q).map((x) => x.item);
 }
 
-function render(title, placeholder) {
+function render(title: string, placeholder: string): void {
   touch("prompt");
   cachedEngines = settings.getSearchEngines();
   const created = createShadowHost("jari-prompt-host", promptCss());
@@ -246,18 +289,30 @@ function render(title, placeholder) {
   ui.safeFocus(inputEl, { preventScroll: true });
 }
 
-function renderList() {
-  return renderPromptList({ listEl, filtered, query, mode, tabUrlMap, selected });
+function renderList(): void {
+  return renderPromptList({
+    listEl: listEl!,
+    filtered,
+    query,
+    mode,
+    tabUrlMap,
+    selected,
+  });
 }
 
-function move(delta) {
-  const next = movePrompt({ listEl, filtered, selected, delta });
+function move(delta: number): number {
+  const next = movePrompt({
+    listEl: listEl!,
+    filtered,
+    selected,
+    delta,
+  });
   selected = next;
   return next;
 }
 
-function onKeyDown(event) {
-  let focused;
+function onKeyDown(event: KeyboardEvent): void {
+  let focused: Element | null;
   try {
     focused = deepActiveElement();
   } catch {
@@ -306,7 +361,7 @@ function onKeyDown(event) {
   }
 }
 
-function openUrl(url, forceNewTab = false) {
+function openUrl(url: string, forceNewTab: boolean = false): void {
   sendMessage(
     mode === "incognito"
       ? "openIncognitoTab"
@@ -317,7 +372,7 @@ function openUrl(url, forceNewTab = false) {
   );
 }
 
-function searchQuery(text, forceNewTab = false) {
+function searchQuery(text: string, forceNewTab: boolean = false): void {
   sendMessage("search", {
     query: text,
     newTab: forceNewTab || mode !== "edit",
@@ -325,7 +380,7 @@ function searchQuery(text, forceNewTab = false) {
   });
 }
 
-function activate(forceNewTab = false) {
+function activate(forceNewTab: boolean = false): void {
   const item = filtered[selected];
   const rawValue = inputEl ? inputEl.value : "";
   const rawInput = rawValue.trim();
@@ -369,8 +424,8 @@ function activate(forceNewTab = false) {
   close();
 }
 
-function close() {
-  clearTimeout(suggestTimer);
+function close(): void {
+  clearTimeout(suggestTimer ?? undefined);
   suggestSeq++;
   if (host) {
     try {
@@ -395,7 +450,7 @@ function close() {
     restoreFocus.isConnected &&
     document.activeElement !== restoreFocus
   ) {
-    ui.safeFocus(restoreFocus, { preventScroll: true });
+    ui.safeFocus(restoreFocus as HTMLElement, { preventScroll: true });
   }
   restoreFocus = null;
 }

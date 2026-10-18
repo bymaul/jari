@@ -1,8 +1,9 @@
 import { Url } from "../shared/url.ts";
+import type { WindowSummary } from "../shared/protocol.ts";
 import { settings } from "./settings.ts";
 import { sendMessage, sendMessageWithTimeout, ui } from "./ui.ts";
 import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, frameScrollBox, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.ts";
-import { Prompt } from "./prompt.js";
+import { Prompt } from "./prompt.ts";
 import { TabManager } from "./tab-manager.js";
 import { Help } from "./help.js";
 import { Hints, setCommandRunner } from "./hints.ts";
@@ -325,6 +326,7 @@ export const commands: Record<string, CommandImpl> = {
         movedToWindow?: boolean;
         movedToNewWindow?: boolean;
         needWindowChoice?: boolean;
+        tabs?: WindowSummary[];
       } | null = await sendMessage("moveTabToWindow");
       if (!res || !res.ok) {
         ui.toast("No window available");
