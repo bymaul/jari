@@ -11686,7 +11686,7 @@ ${location.href}`;
     hide();
   }
 
-  // content/content.js
+  // content/content.ts
   var pendingCount3 = "";
   var pendingKeys = "";
   var timer = null;
@@ -11852,8 +11852,8 @@ ${location.href}`;
       return;
     }
     const key = canonicalKey(event);
-    let buffer = pendingKeys;
-    let bufferWasPending = buffer !== "";
+    const buffer = pendingKeys;
+    const bufferWasPending = buffer !== "";
     let commandName = null;
     if (bufferWasPending) {
       commandName = settings.getKeymap()[buffer + key] || null;
@@ -11863,7 +11863,7 @@ ${location.href}`;
       }
     }
     const activeEl = deepActiveElement();
-    if (isEditable(activeEl)) {
+    if (activeEl !== null && isEditable(activeEl)) {
       if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
       else if (event.key === "Escape") {
         ui.consume(event);

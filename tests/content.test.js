@@ -5,7 +5,7 @@ import assert from "node:assert";
 const { settings } = await import("../content/settings.ts");
 const { commands } = await import("../content/commands.js");
 const { keymapDefaults } = await import("../content/keymap.ts");
-const { handleKeydown, shieldOverlayKey, __resetState } = await import("../content/content.js");
+const { handleKeydown, shieldOverlayKey, __resetState } = await import("../content/content.ts");
 const { Overlays, register, touch } = await import("../content/overlays.js");
 
 let shieldActive = false;

@@ -18,25 +18,25 @@ import { Clue, __resetClueState } from "./clue.ts";
 
 let pendingCount = "";
 let pendingKeys = "";
-let timer = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
 let ignoreMode = false;
 let passthroughMode = false;
-let passthroughTimer = null;
-const pills = {};
+let passthroughTimer: ReturnType<typeof setTimeout> | null = null;
+const pills: Record<string, HTMLDivElement> = {};
 
 const PILL_IGNORE_TEXT = "ignore";
-function pillPassthroughText() {
+function pillPassthroughText(): string {
   return "passthrough (" + settings.getPassthroughMs() + "ms)";
 }
 
-function clearPending() {
+function clearPending(): void {
   pendingCount = "";
   pendingKeys = "";
   ui.showcmd(null);
   Clue.hide();
 }
 
-function restartTimer() {
+function restartTimer(): void {
   clearTimeout(timer);
   timer = null;
   const timeoutMs = settings.getTimeoutMs();
@@ -44,7 +44,7 @@ function restartTimer() {
   timer = setTimeout(clearPending, timeoutMs);
 }
 
-function run(commandName, count, event) {
+function run(commandName: string, count: number, event: KeyboardEvent): void {
   const cmd = commands[commandName];
   if (!cmd) return;
   ui.consume(event);
@@ -52,7 +52,7 @@ function run(commandName, count, event) {
   cmd.run({ count: cmd.repeatable ? count : 1, event });
 }
 
-function setIgnore(on) {
+function setIgnore(on: boolean): void {
   ignoreMode = on;
   clearPending();
   if (on) {
@@ -63,13 +63,13 @@ function setIgnore(on) {
   }
 }
 
-function toggleIgnore() {
+function toggleIgnore(): boolean {
   exitPassthrough();
   setIgnore(!ignoreMode);
   return ignoreMode;
 }
 
-function restartPassthroughTimer() {
+function restartPassthroughTimer(): void {
   clearTimeout(passthroughTimer);
   passthroughTimer = null;
   const passthroughMs = settings.getPassthroughMs();
@@ -78,7 +78,7 @@ function restartPassthroughTimer() {
   }
 }
 
-function enterPassthrough() {
+function enterPassthrough(): void {
   setIgnore(false);
   clearPending();
 
@@ -88,7 +88,7 @@ function enterPassthrough() {
   restartPassthroughTimer();
 }
 
-function exitPassthrough() {
+function exitPassthrough(): void {
   if (!passthroughMode) return;
   clearTimeout(passthroughTimer);
   passthroughTimer = null;
@@ -96,11 +96,11 @@ function exitPassthrough() {
   hidePill("passthrough");
 }
 
-function isFullscreen() {
+function isFullscreen(): boolean {
   return !!document.fullscreenElement;
 }
 
-function showPill(name, text) {
+function showPill(name: string, text: string): void {
   if (pills[name] || isFullscreen()) return;
   const el = document.createElement("div");
   el.className = "jari-pill";
@@ -109,7 +109,7 @@ function showPill(name, text) {
   pills[name] = el;
 }
 
-function hidePill(name) {
+function hidePill(name: string): void {
   const el = pills[name];
   if (el) {
     el.remove();
@@ -117,7 +117,7 @@ function hidePill(name) {
   }
 }
 
-function handleFullscreenChange() {
+function handleFullscreenChange(): void {
   Clue.hide();
   if (!ignoreMode && !passthroughMode) return;
   if (isFullscreen()) {
@@ -129,22 +129,23 @@ function handleFullscreenChange() {
   }
 }
 
-function isJariUiTarget(event) {
-  let path = null;
+function isJariUiTarget(event: Event): boolean {
+  let path: EventTarget[] | null = null;
   try {
     if (typeof event.composedPath === "function") path = event.composedPath();
   } catch {}
-  const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
+  const nodes =
+    Array.isArray(path) && path.length > 0 ? path : [event.target];
   for (const node of nodes) {
     try {
-      const cls = node && node.className;
+      const cls = node && (node as { className?: unknown }).className;
       if (typeof cls === "string" && cls.includes("jari-")) return true;
     } catch {}
   }
   return false;
 }
 
-export function shieldOverlayKey(event) {
+export function shieldOverlayKey(event: KeyboardEvent): void {
   const overlay = Overlays.active();
   if (!overlay) return;
   if (
@@ -161,10 +162,12 @@ export function shieldOverlayKey(event) {
   ui.consume(event);
 }
 
-function handleKeydown(event) {
+function handleKeydown(event: KeyboardEvent): boolean | undefined {
   if (!event.isTrusted) return;
 
-  if (window.__jariOptionsRecording) {
+  if (
+    (window as { __jariOptionsRecording?: unknown }).__jariOptionsRecording
+  ) {
     clearPending();
     return;
   }
@@ -211,8 +214,8 @@ function handleKeydown(event) {
 
   const key = canonicalKey(event);
 
-  let buffer = pendingKeys;
-  let bufferWasPending = buffer !== "";
+  const buffer = pendingKeys;
+  const bufferWasPending = buffer !== "";
   let commandName = null;
   if (bufferWasPending) {
     commandName = settings.getKeymap()[buffer + key] || null;
@@ -223,11 +226,11 @@ function handleKeydown(event) {
   }
 
   const activeEl = deepActiveElement();
-  if (isEditable(activeEl)) {
+  if (activeEl !== null && isEditable(activeEl)) {
     if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
     else if (event.key === "Escape") {
       ui.consume(event);
-      activeEl.blur();
+      (activeEl as HTMLElement).blur();
       clearPending();
     } else if (pendingKeys || pendingCount) clearPending();
     return;
@@ -303,7 +306,7 @@ function handleKeydown(event) {
   run(commandName, count, event);
 }
 
-async function boot() {
+async function boot(): Promise<void> {
   await settings.load();
 
   Events.on("settingsChanged", () => {
@@ -333,7 +336,7 @@ boot();
 
 export { handleKeydown };
 
-export function __resetState() {
+export function __resetState(): void {
   clearTimeout(timer);
   clearTimeout(passthroughTimer);
   timer = null;
