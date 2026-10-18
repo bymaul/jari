@@ -1,5 +1,5 @@
 import { clampCount } from "./utils.ts";
-import * as tabs from "./tabs.js";
+import * as tabs from "./tabs.ts";
 import { bookmarkManagerTabs, unbookmarkManagerTabs } from "./bookmarks.ts";
 import { suggest, search } from "./suggest.ts";
 

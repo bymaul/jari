@@ -520,7 +520,8 @@
     }
   }
 
-  // background/tabs.js
+  // background/tabs.ts
+  var asTabIds = (ids) => ids;
   function resolveTarget(url) {
     if (url === void 0) return { ok: true, target: void 0 };
     const target = normalizeUrl(url);
@@ -600,7 +601,11 @@
     const others = windows.filter((win) => win.id !== tab.windowId).map(summarizeWindow);
     if (others.length === 0) return { ok: true, needWindowChoice: false };
     if (others.length === 1) {
-      await moveTabIntoWindowAndFocus(tab.id, others[0].windowId, "moveTabToWindow auto-merge");
+      await moveTabIntoWindowAndFocus(
+        tab.id,
+        others[0].windowId,
+        "moveTabToWindow auto-merge"
+      );
       return { ok: true, movedToWindow: true };
     }
     return {
@@ -623,7 +628,8 @@
     const perGroup = /* @__PURE__ */ new Map();
     for (const id of ids) {
       const tab = byId.get(id);
-      if (!tab || !Number.isInteger(tab.groupId) || tab.groupId < 0) continue;
+      if (!tab || !Number.isInteger(tab.groupId) || tab.groupId < 0)
+        continue;
       if (!perGroup.has(tab.groupId)) perGroup.set(tab.groupId, []);
       perGroup.get(tab.groupId).push(id);
     }
@@ -652,7 +658,9 @@
     for (const { tabIds, title, color } of groupings) {
       let newId;
       try {
-        newId = await chrome.tabs.group({ tabIds });
+        newId = await chrome.tabs.group({
+          tabIds: asTabIds(tabIds)
+        });
       } catch {
         continue;
       }
@@ -726,7 +734,7 @@
       const groupings = await groupingsForIds(all, live);
       try {
         await moveTabIntoWindowAndFocus(
-          live,
+          asTabIds(live),
           others[0].windowId,
           "moveManagerTabsToWindow auto-merge"
         );
@@ -740,7 +748,8 @@
   }
   async function moveManagerTabsIntoWindow(_, { ids, targetWindowId } = {}) {
     const targets = sanitizeIds(ids);
-    if (targets.length === 0 || !Number.isInteger(targetWindowId)) return { ok: false };
+    if (targets.length === 0 || !Number.isInteger(targetWindowId))
+      return { ok: false };
     let target;
     try {
       target = await chrome.windows.get(targetWindowId);
@@ -766,7 +775,7 @@
     const groupings = await groupingsForIds(all || [], live);
     try {
       await moveTabIntoWindowAndFocus(
-        live,
+        asTabIds(live),
         targetWindowId,
         "moveManagerTabsIntoWindow"
       );
@@ -841,7 +850,9 @@
     try {
       let owner = chrome;
       for (const name of path) {
-        if (!owner || typeof owner[name] === "undefined") return false;
+        if (!owner || typeof owner[name] === "undefined") {
+          return false;
+        }
         owner = owner[name];
       }
       return typeof owner === "function";
@@ -995,7 +1006,7 @@
     if (moved > 0 && groupsSupported()) {
       for (const [groupId, ids2] of regroup) {
         try {
-          await chrome.tabs.group({ tabIds: ids2, groupId });
+          await chrome.tabs.group({ tabIds: asTabIds(ids2), groupId });
         } catch {
         }
       }
@@ -1031,7 +1042,11 @@
       } catch {
       }
     }
-    return created.length > 0 ? { ok: true, duplicated: created.length, ids: created.map((tab) => tab.id) } : { ok: false };
+    return created.length > 0 ? {
+      ok: true,
+      duplicated: created.length,
+      ids: created.map((tab) => tab.id)
+    } : { ok: false };
   }
   async function editManagerTab(_, { id, url } = {}) {
     if (!Number.isInteger(id)) return { ok: false };
@@ -1049,7 +1064,7 @@
     if (targets.length === 0) return { ok: false };
     if (!groupsSupported()) return { ok: false, reason: "unsupported" };
     try {
-      const options = Number.isInteger(groupId) && groupId >= 0 ? { tabIds: targets, groupId } : { tabIds: targets };
+      const options = Number.isInteger(groupId) && groupId >= 0 ? { tabIds: asTabIds(targets), groupId } : { tabIds: asTabIds(targets) };
       const createdId = await chrome.tabs.group(options);
       return { ok: true, groupId: createdId };
     } catch (err) {
@@ -1061,7 +1076,7 @@
     if (targets.length === 0) return { ok: false };
     if (!groupsSupported()) return { ok: false, reason: "unsupported" };
     try {
-      await chrome.tabs.ungroup(targets);
+      await chrome.tabs.ungroup(asTabIds(targets));
       return { ok: true, ungrouped: targets.length };
     } catch (err) {
       return { ok: false, error: String(err) };
@@ -1083,10 +1098,11 @@
   }
   async function goHistory(tab, delta) {
     if (!tab || !tab.id) return { ok: false };
+    const legacy = chrome.tabs;
     const method = delta < 0 ? "goBack" : "goForward";
-    if (typeof chrome.tabs[method] === "function") {
+    if (typeof legacy[method] === "function") {
       try {
-        await chrome.tabs[method](tab.id);
+        await legacy[method](tab.id);
       } catch {
         return { ok: false };
       }

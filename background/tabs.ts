@@ -2,15 +2,34 @@ import { normalizeUrl } from "../shared/url.ts";
 import { clampCount } from "./utils.ts";
 import { bookmarkedUrlKeys, bookmarkUrlKey } from "./bookmarks.ts";
 import { focusWindow, moveTabIntoWindowAndFocus, openInIncognito } from "./windows.ts";
+import type {
+  GroupSummary,
+  ManagerTab,
+  MessagePayload,
+  MessageResponse,
+  TabSummary,
+  WindowSummary,
+} from "../shared/protocol.ts";
 
-function resolveTarget(url) {
+type Sender = chrome.runtime.MessageSender;
+/** @types/chrome models multi-id tab APIs as non-empty tuples; the real
+ *  browser accepts plain arrays, so id lists pass through this cast. */
+const asTabIds = (ids: number[]): [number, ...number[]] =>
+  ids as unknown as [number, ...number[]];
+
+function resolveTarget(
+  url: unknown,
+): { ok: true; target: string | undefined } | { ok: false } {
   if (url === undefined) return { ok: true, target: undefined };
   const target = normalizeUrl(url);
   if (!target) return { ok: false };
   return { ok: true, target };
 }
 
-export async function createTab(_, { url } = {}) {
+export async function createTab(
+  _: Sender,
+  { url }: MessagePayload<"createTab"> = {},
+): Promise<MessageResponse<"createTab">> {
   const resolved = resolveTarget(url);
   if (!resolved.ok) return resolved;
   const tab = await chrome.tabs.create(
@@ -19,31 +38,43 @@ export async function createTab(_, { url } = {}) {
   return tab ? { ok: true, id: tab.id } : { ok: false };
 }
 
-export async function openIncognitoTab(_, { url } = {}) {
+export async function openIncognitoTab(
+  _: Sender,
+  { url }: MessagePayload<"openIncognitoTab"> = {},
+): Promise<MessageResponse<"openIncognitoTab">> {
   const resolved = resolveTarget(url);
   if (!resolved.ok) return resolved;
   return openInIncognito(resolved.target);
 }
 
-export async function navigate(sender, { url } = {}) {
+export async function navigate(
+  sender: Sender,
+  { url }: MessagePayload<"navigate"> = {},
+): Promise<MessageResponse<"navigate">> {
   const target = normalizeUrl(url);
   if (!target || !sender.tab || !sender.tab.id) return { ok: false };
   await chrome.tabs.update(sender.tab.id, { url: target });
   return { ok: true };
 }
 
-export async function closeTab(sender, { count = 1 } = {}) {
+export async function closeTab(
+  sender: Sender,
+  { count = 1 }: MessagePayload<"closeTab"> = {},
+): Promise<MessageResponse<"closeTab">> {
   const tab = sender.tab;
   if (!tab || !tab.id) return { ok: false };
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const index = tabs.findIndex((t) => t.id === tab.id);
   if (index === -1) return { ok: false };
-  const ids = tabs.slice(index, index + clampCount(count)).map((t) => t.id);
+  const ids = tabs.slice(index, index + clampCount(count)).map((t) => t.id!);
   await chrome.tabs.remove(ids);
   return { ok: true, closed: ids.length };
 }
 
-export async function restoreTab(_, { count = 1 } = {}) {
+export async function restoreTab(
+  _: Sender,
+  { count = 1 }: MessagePayload<"restoreTab"> = {},
+): Promise<MessageResponse<"restoreTab">> {
   let sessions;
   try {
     sessions = await chrome.sessions.getRecentlyClosed();
@@ -54,7 +85,7 @@ export async function restoreTab(_, { count = 1 } = {}) {
   const tabs = (sessions || []).filter((s) => s.tab && s.tab.sessionId);
   for (let i = 0; i < Math.min(clampCount(count), tabs.length); i++) {
     try {
-      await chrome.sessions.restore(tabs[i].tab.sessionId);
+      await chrome.sessions.restore(tabs[i].tab!.sessionId);
     } catch {
       break;
     }
@@ -62,15 +93,21 @@ export async function restoreTab(_, { count = 1 } = {}) {
   return { ok: true };
 }
 
-export async function previousTab(sender, { count = 1 } = {}) {
+export async function previousTab(
+  sender: Sender,
+  { count = 1 }: MessagePayload<"previousTab"> = {},
+): Promise<MessageResponse<"previousTab">> {
   return switchTab(sender.tab, -clampCount(count));
 }
 
-export async function nextTab(sender, { count = 1 } = {}) {
+export async function nextTab(
+  sender: Sender,
+  { count = 1 }: MessagePayload<"nextTab"> = {},
+): Promise<MessageResponse<"nextTab">> {
   return switchTab(sender.tab, clampCount(count));
 }
 
-function summarizeWindow(win) {
+function summarizeWindow(win: chrome.windows.Window): WindowSummary {
   const wtab =
     win.tabs && win.tabs.length
       ? win.tabs.find((t) => t.active) || win.tabs[0]
@@ -82,7 +119,9 @@ function summarizeWindow(win) {
   };
 }
 
-export async function moveTabToWindow(sender) {
+export async function moveTabToWindow(
+  sender: Sender,
+): Promise<MessageResponse<"moveTabToWindow">> {
   const tab = sender.tab;
   if (!tab || !tab.id) return { ok: false };
   const myTabs = await chrome.tabs.query({ windowId: tab.windowId });
@@ -96,7 +135,11 @@ export async function moveTabToWindow(sender) {
     .map(summarizeWindow);
   if (others.length === 0) return { ok: true, needWindowChoice: false };
   if (others.length === 1) {
-    await moveTabIntoWindowAndFocus(tab.id, others[0].windowId, "moveTabToWindow auto-merge");
+    await moveTabIntoWindowAndFocus(
+      tab.id as number,
+      others[0].windowId as number,
+      "moveTabToWindow auto-merge",
+    );
     return { ok: true, movedToWindow: true };
   }
   return {
@@ -108,25 +151,32 @@ export async function moveTabToWindow(sender) {
   };
 }
 
-export async function moveTabIntoWindow(sender, { targetWindowId } = {}) {
+export async function moveTabIntoWindow(
+  sender: Sender,
+  { targetWindowId }: MessagePayload<"moveTabIntoWindow"> = {},
+): Promise<MessageResponse<"moveTabIntoWindow">> {
   const tab = sender.tab;
   if (!tab || !tab.id || !targetWindowId) return { ok: false };
   await moveTabIntoWindowAndFocus(tab.id, targetWindowId, "moveTabIntoWindow");
   return { ok: true };
 }
 
-async function groupingsForIds(allTabs, ids) {
+async function groupingsForIds(
+  allTabs: chrome.tabs.Tab[] | null | undefined,
+  ids: number[],
+): Promise<{ tabIds: number[]; title: string; color: string }[]> {
   if (!groupsSupported()) return [];
   const byId = new Map((allTabs || []).map((tab) => [tab.id, tab]));
-  const perGroup = new Map();
+  const perGroup = new Map<number, number[]>();
   for (const id of ids) {
     const tab = byId.get(id);
-    if (!tab || !Number.isInteger(tab.groupId) || tab.groupId < 0) continue;
-    if (!perGroup.has(tab.groupId)) perGroup.set(tab.groupId, []);
-    perGroup.get(tab.groupId).push(id);
+    if (!tab || !Number.isInteger(tab.groupId) || (tab.groupId as number) < 0)
+      continue;
+    if (!perGroup.has(tab.groupId!)) perGroup.set(tab.groupId!, []);
+    perGroup.get(tab.groupId!)!.push(id);
   }
   if (perGroup.size === 0) return [];
-  let meta = new Map();
+  let meta = new Map<number, { title: string; color: string }>();
   try {
     if (chrome.tabGroups && typeof chrome.tabGroups.query === "function") {
       const found = (await chrome.tabGroups.query({})) || [];
@@ -144,20 +194,24 @@ async function groupingsForIds(allTabs, ids) {
   }));
 }
 
-async function restoreGroupings(groupings) {
+async function restoreGroupings(
+  groupings: { tabIds: number[]; title: string; color: string }[],
+): Promise<void> {
   if (!groupsSupported() || groupings.length === 0) return;
   const canRename = hasApi(["tabGroups", "update"]);
   for (const { tabIds, title, color } of groupings) {
-    let newId;
+    let newId: number;
     try {
-      newId = await chrome.tabs.group({ tabIds });
+      newId = (await chrome.tabs.group({
+        tabIds: asTabIds(tabIds),
+      })) as unknown as number;
     } catch {
       continue;
     }
     if (!canRename || !Number.isInteger(newId)) continue;
-    const patch = {};
+    const patch: chrome.tabGroups.UpdateProperties = {};
     if (title) patch.title = title;
-    if (color) patch.color = color;
+    if (color) patch.color = color as chrome.tabGroups.Color;
     if (Object.keys(patch).length === 0) continue;
     try {
       await chrome.tabGroups.update(newId, patch);
@@ -165,7 +219,10 @@ async function restoreGroupings(groupings) {
   }
 }
 
-export async function moveManagerTabsToWindow(_, { ids } = {}) {
+export async function moveManagerTabsToWindow(
+  _: Sender,
+  { ids }: MessagePayload<"moveManagerTabsToWindow"> = {},
+): Promise<MessageResponse<"moveManagerTabsToWindow">> {
   const targets = sanitizeIds(ids);
   if (targets.length === 0) return { ok: false };
   let all;
@@ -177,7 +234,7 @@ export async function moveManagerTabsToWindow(_, { ids } = {}) {
   const byId = new Map(all.map((tab) => [tab.id, tab]));
   const live = targets.filter((id) => byId.has(id));
   if (live.length === 0) return { ok: false };
-  const kinds = new Set(live.map((id) => !!byId.get(id).incognito));
+  const kinds = new Set(live.map((id) => !!byId.get(id)!.incognito));
   if (kinds.size > 1) return { ok: false, reason: "incognito" };
   const totalByWindow = new Map();
   const selectedByWindow = new Map();
@@ -186,7 +243,7 @@ export async function moveManagerTabsToWindow(_, { ids } = {}) {
   }
   for (const id of live) {
     const tab = byId.get(id);
-    selectedByWindow.set(tab.windowId, (selectedByWindow.get(tab.windowId) || 0) + 1);
+    selectedByWindow.set(tab!.windowId, (selectedByWindow.get(tab!.windowId) || 0) + 1);
   }
   const emptied = new Set();
   for (const [windowId, count] of selectedByWindow) {
@@ -224,8 +281,8 @@ export async function moveManagerTabsToWindow(_, { ids } = {}) {
     const groupings = await groupingsForIds(all, live);
     try {
       await moveTabIntoWindowAndFocus(
-        live,
-        others[0].windowId,
+        asTabIds(live),
+        others[0].windowId as number,
         "moveManagerTabsToWindow auto-merge",
       );
       await restoreGroupings(groupings);
@@ -237,12 +294,16 @@ export async function moveManagerTabsToWindow(_, { ids } = {}) {
   return { ok: true, needWindowChoice: true, ownIds: live, tabs: others };
 }
 
-export async function moveManagerTabsIntoWindow(_, { ids, targetWindowId } = {}) {
+export async function moveManagerTabsIntoWindow(
+  _: Sender,
+  { ids, targetWindowId }: MessagePayload<"moveManagerTabsIntoWindow"> = {},
+): Promise<MessageResponse<"moveManagerTabsIntoWindow">> {
   const targets = sanitizeIds(ids);
-  if (targets.length === 0 || !Number.isInteger(targetWindowId)) return { ok: false };
+  if (targets.length === 0 || !Number.isInteger(targetWindowId))
+    return { ok: false };
   let target;
   try {
-    target = await chrome.windows.get(targetWindowId);
+    target = await chrome.windows.get(targetWindowId as number);
   } catch {
     target = null;
   }
@@ -257,16 +318,16 @@ export async function moveManagerTabsIntoWindow(_, { ids, targetWindowId } = {})
   const live = byId ? targets.filter((id) => byId.has(id)) : targets;
   if (live.length === 0) return { ok: false };
   if (byId) {
-    const kinds = new Set(live.map((id) => !!byId.get(id).incognito));
-    if (kinds.size > 1 || kinds.has(!target.incognito)) {
+    const kinds = new Set(live.map((id) => !!byId.get(id)!.incognito));
+    if (kinds.size > 1 || kinds.has(!target!.incognito)) {
       return { ok: false, reason: "incognito" };
     }
   }
   const groupings = await groupingsForIds(all || [], live);
   try {
     await moveTabIntoWindowAndFocus(
-      live,
-      targetWindowId,
+      asTabIds(live),
+      targetWindowId as number,
       "moveManagerTabsIntoWindow",
     );
     await restoreGroupings(groupings);
@@ -276,23 +337,26 @@ export async function moveManagerTabsIntoWindow(_, { ids, targetWindowId } = {})
   return { ok: true, moved: live.length };
 }
 
-export async function moveTabLeft(sender) {
+export async function moveTabLeft(sender: Sender): Promise<MessageResponse<"moveTabLeft">> {
   return moveTab(sender, -1);
 }
 
-export async function moveTabRight(sender) {
+export async function moveTabRight(sender: Sender): Promise<MessageResponse<"moveTabRight">> {
   return moveTab(sender, 1);
 }
 
-export async function goToFirstTab() {
+export async function goToFirstTab(): Promise<MessageResponse<"goToFirstTab">> {
   return activateTabByIndex(0);
 }
 
-export async function goToLastTab() {
+export async function goToLastTab(): Promise<MessageResponse<"goToLastTab">> {
   return activateTabByIndex(-1);
 }
 
-export async function reloadTab(sender, { bypassCache = false } = {}) {
+export async function reloadTab(
+  sender: Sender,
+  { bypassCache = false }: MessagePayload<"reloadTab"> = {},
+): Promise<MessageResponse<"reloadTab">> {
   if (sender.tab && sender.tab.id) {
     await chrome.tabs.reload(sender.tab.id, { bypassCache });
     return { ok: true };
@@ -300,15 +364,15 @@ export async function reloadTab(sender, { bypassCache = false } = {}) {
   return { ok: false };
 }
 
-export async function goBack(sender) {
+export async function goBack(sender: Sender): Promise<MessageResponse<"goBack">> {
   return goHistory(sender.tab, -1);
 }
 
-export async function goForward(sender) {
+export async function goForward(sender: Sender): Promise<MessageResponse<"goForward">> {
   return goHistory(sender.tab, 1);
 }
 
-export async function listTabs() {
+export async function listTabs(): Promise<TabSummary[] | { ok: false }> {
   const tabs = await chrome.tabs.query({});
   return tabs.map((tab) => ({
     id: tab.id,
@@ -321,7 +385,7 @@ export async function listTabs() {
   }));
 }
 
-function sanitizeIds(ids, max = 100) {
+function sanitizeIds(ids: unknown, max = 100): number[] {
   if (!Array.isArray(ids)) return [];
   const out = [];
   const seen = new Set();
@@ -334,7 +398,7 @@ function sanitizeIds(ids, max = 100) {
   return out;
 }
 
-async function liveIds(ids) {
+async function liveIds(ids: unknown): Promise<number[]> {
   const targets = sanitizeIds(ids);
   if (targets.length === 0) return [];
   let all;
@@ -347,12 +411,17 @@ async function liveIds(ids) {
   return targets.filter((id) => alive.has(id));
 }
 
-function hasApi(path) {
+function hasApi(path: string[]): boolean {
   try {
-    let owner = chrome;
+    let owner: unknown = chrome;
     for (const name of path) {
-      if (!owner || typeof owner[name] === "undefined") return false;
-      owner = owner[name];
+      if (
+        !owner ||
+        typeof (owner as Record<string, unknown>)[name] === "undefined"
+      ) {
+        return false;
+      }
+      owner = (owner as Record<string, unknown>)[name];
     }
     return typeof owner === "function";
   } catch {
@@ -364,18 +433,20 @@ function groupsSupported() {
   return hasApi(["tabs", "group"]) && hasApi(["tabs", "ungroup"]);
 }
 
-export async function managerList(sender) {
+export async function managerList(
+  sender: Sender,
+): Promise<MessageResponse<"managerList">> {
   let raw;
   try {
     raw = (await chrome.tabs.query({})) || [];
   } catch {
     return { ok: false };
   }
-  let bookmarkedUrls = new Set();
+  let bookmarkedUrls = new Set<string>();
   if (chrome.bookmarks && typeof chrome.bookmarks.getTree === "function") {
     bookmarkedUrls = await bookmarkedUrlKeys();
   }
-  const tabs = raw.map((tab) => ({
+  const tabs: ManagerTab[] = raw.map((tab) => ({
     id: tab.id,
     windowId: tab.windowId,
     index: typeof tab.index === "number" ? tab.index : 0,
@@ -389,7 +460,7 @@ export async function managerList(sender) {
     groupId: typeof tab.groupId === "number" ? tab.groupId : -1,
     lastAccessed: tab.lastAccessed || 0,
   }));
-  let groups = [];
+  let groups: GroupSummary[] = [];
   try {
     if (chrome.tabGroups && typeof chrome.tabGroups.query === "function") {
       const found = (await chrome.tabGroups.query({})) || [];
@@ -404,20 +475,25 @@ export async function managerList(sender) {
   return { ok: true, tabs, groups, currentWindowId: await currentWindowId(sender) };
 }
 
-async function currentWindowId(sender) {
+async function currentWindowId(
+  sender: Sender,
+): Promise<number | null> {
   if (sender && sender.tab && Number.isInteger(sender.tab.windowId)) {
-    return sender.tab.windowId;
+    return sender.tab.windowId as number;
   }
   try {
     if (chrome.windows && typeof chrome.windows.getLastFocused === "function") {
       const win = await chrome.windows.getLastFocused();
-      if (win && Number.isInteger(win.id)) return win.id;
+      if (win && Number.isInteger(win.id)) return win.id as number;
     }
   } catch {}
   return null;
 }
 
-export async function closeManagerTabs(_, { ids } = {}) {
+export async function closeManagerTabs(
+  _: Sender,
+  { ids }: MessagePayload<"closeManagerTabs"> = {},
+): Promise<MessageResponse<"closeManagerTabs">> {
   const targets = await liveIds(ids);
   if (targets.length === 0) return { ok: false };
   try {
@@ -428,7 +504,13 @@ export async function closeManagerTabs(_, { ids } = {}) {
   return { ok: true, closed: targets.length };
 }
 
-async function updateTabFlag(ids, prop, value) {
+async function updateTabFlag<K extends "pinned" | "muted">(
+  ids: unknown,
+  prop: K,
+  value: unknown,
+): Promise<
+  ({ ok: true; updated: number } & { [key in K]: boolean }) | { ok: false }
+> {
   const targets = sanitizeIds(ids);
   if (targets.length === 0) return { ok: false };
   const next = !!value;
@@ -439,15 +521,24 @@ async function updateTabFlag(ids, prop, value) {
   return updated > 0 ? { ok: true, updated, [prop]: next } : { ok: false };
 }
 
-export async function setTabsPinned(_, { ids, pinned } = {}) {
+export async function setTabsPinned(
+  _: Sender,
+  { ids, pinned }: MessagePayload<"setTabsPinned"> = {},
+): Promise<MessageResponse<"setTabsPinned">> {
   return updateTabFlag(ids, "pinned", pinned);
 }
 
-export async function setTabsMuted(_, { ids, muted } = {}) {
+export async function setTabsMuted(
+  _: Sender,
+  { ids, muted }: MessagePayload<"setTabsMuted"> = {},
+): Promise<MessageResponse<"setTabsMuted">> {
   return updateTabFlag(ids, "muted", muted);
 }
 
-export async function moveManagerTabs(_, { ids, delta = 0 } = {}) {
+export async function moveManagerTabs(
+  _: Sender,
+  { ids, delta = 0 }: MessagePayload<"moveManagerTabs"> = {},
+): Promise<MessageResponse<"moveManagerTabs">> {
   const targets = sanitizeIds(ids);
   const step = Number.isFinite(Number(delta)) ? Math.trunc(Number(delta)) : 0;
   if (targets.length === 0 || step === 0) return { ok: false };
@@ -458,8 +549,11 @@ export async function moveManagerTabs(_, { ids, delta = 0 } = {}) {
     return { ok: false };
   }
   const byId = new Map(all.map((tab) => [tab.id, tab]));
-  const perWindow = new Map();
-  const regroup = new Map();
+  const perWindow = new Map<
+    string,
+    { windowId: number | undefined; pinned: boolean; ids: number[] }
+  >();
+  const regroup = new Map<number, number[]>();
   for (const id of targets) {
     const tab = byId.get(id);
     if (!tab) continue;
@@ -468,15 +562,15 @@ export async function moveManagerTabs(_, { ids, delta = 0 } = {}) {
     if (!perWindow.has(key)) {
       perWindow.set(key, { windowId: tab.windowId, pinned, ids: [] });
     }
-    perWindow.get(key).ids.push(id);
-    if (Number.isInteger(tab.groupId) && tab.groupId >= 0) {
-      if (!regroup.has(tab.groupId)) regroup.set(tab.groupId, []);
-      regroup.get(tab.groupId).push(id);
+    perWindow.get(key)!.ids.push(id);
+    if (Number.isInteger(tab.groupId) && (tab.groupId as number) >= 0) {
+      if (!regroup.has(tab.groupId!)) regroup.set(tab.groupId!, []);
+      regroup.get(tab.groupId!)!.push(id);
     }
   }
   if (perWindow.size === 0) return { ok: false };
   const dir = step > 0 ? 1 : -1;
-  const pinnedCount = new Map();
+  const pinnedCount = new Map<number | undefined, number>();
   for (const tab of all) {
     if (!tab.pinned) continue;
     pinnedCount.set(tab.windowId, (pinnedCount.get(tab.windowId) || 0) + 1);
@@ -496,7 +590,9 @@ export async function moveManagerTabs(_, { ids, delta = 0 } = {}) {
       const sequenced = group
         .filter((id) => pos.has(id))
         .sort((a, b) =>
-          dir > 0 ? pos.get(b) - pos.get(a) : pos.get(a) - pos.get(b),
+          dir > 0
+            ? pos.get(b)! - pos.get(a)!
+            : pos.get(a)! - pos.get(b)!,
         );
       for (const id of sequenced) {
         const from = order.indexOf(id);
@@ -515,23 +611,26 @@ export async function moveManagerTabs(_, { ids, delta = 0 } = {}) {
   if (moved > 0 && groupsSupported()) {
     for (const [groupId, ids] of regroup) {
       try {
-        await chrome.tabs.group({ tabIds: ids, groupId });
+        await chrome.tabs.group({ tabIds: asTabIds(ids), groupId });
       } catch {}
     }
   }
   return viable ? { ok: true, moved } : { ok: false };
 }
 
-export async function duplicateManagerTabs(_, { ids } = {}) {
+export async function duplicateManagerTabs(
+  _: Sender,
+  { ids }: MessagePayload<"duplicateManagerTabs"> = {},
+): Promise<MessageResponse<"duplicateManagerTabs">> {
   const targets = sanitizeIds(ids);
   if (targets.length === 0) return { ok: false };
-  const activeBefore = new Map();
+  const activeBefore = new Map<number | undefined, number | undefined>();
   try {
     for (const tab of (await chrome.tabs.query({ active: true })) || []) {
       if (tab && Number.isInteger(tab.windowId)) activeBefore.set(tab.windowId, tab.id);
     }
   } catch {}
-  const created = [];
+  const created: chrome.tabs.Tab[] = [];
   for (const id of [...targets].reverse()) {
     try {
       const tab = await chrome.tabs.duplicate(id);
@@ -549,57 +648,73 @@ export async function duplicateManagerTabs(_, { ids } = {}) {
     } catch {}
   }
   return created.length > 0
-    ? { ok: true, duplicated: created.length, ids: created.map((tab) => tab.id) }
+    ? {
+        ok: true,
+        duplicated: created.length,
+        ids: created.map((tab) => tab.id as number),
+      }
     : { ok: false };
 }
 
-export async function editManagerTab(_, { id, url } = {}) {
+export async function editManagerTab(
+  _: Sender,
+  { id, url }: MessagePayload<"editManagerTab"> = {},
+): Promise<MessageResponse<"editManagerTab">> {
   if (!Number.isInteger(id)) return { ok: false };
   const target = normalizeUrl(url);
   if (!target) return { ok: false };
   try {
-    await chrome.tabs.update(id, { url: target });
+    await chrome.tabs.update(id as number, { url: target });
     return { ok: true, url: target };
   } catch (err) {
     return { ok: false, error: String(err) };
   }
 }
 
-export async function groupManagerTabs(_, { ids, groupId } = {}) {
+export async function groupManagerTabs(
+  _: Sender,
+  { ids, groupId }: MessagePayload<"groupManagerTabs"> = {},
+): Promise<MessageResponse<"groupManagerTabs">> {
   const targets = await liveIds(ids);
   if (targets.length === 0) return { ok: false };
   if (!groupsSupported()) return { ok: false, reason: "unsupported" };
   try {
     const options =
-      Number.isInteger(groupId) && groupId >= 0
-        ? { tabIds: targets, groupId }
-        : { tabIds: targets };
-    const createdId = await chrome.tabs.group(options);
+      Number.isInteger(groupId) && (groupId as number) >= 0
+        ? { tabIds: asTabIds(targets), groupId: groupId as number }
+        : { tabIds: asTabIds(targets) };
+    const createdId = (await chrome.tabs.group(options)) as unknown as number;
     return { ok: true, groupId: createdId };
   } catch (err) {
     return { ok: false, error: String(err) };
   }
 }
 
-export async function ungroupManagerTabs(_, { ids } = {}) {
+export async function ungroupManagerTabs(
+  _: Sender,
+  { ids }: MessagePayload<"ungroupManagerTabs"> = {},
+): Promise<MessageResponse<"ungroupManagerTabs">> {
   const targets = await liveIds(ids);
   if (targets.length === 0) return { ok: false };
   if (!groupsSupported()) return { ok: false, reason: "unsupported" };
   try {
-    await chrome.tabs.ungroup(targets);
+    await chrome.tabs.ungroup(asTabIds(targets));
     return { ok: true, ungrouped: targets.length };
   } catch (err) {
     return { ok: false, error: String(err) };
   }
 }
 
-export async function renameGroup(_, { groupId, title } = {}) {
+export async function renameGroup(
+  _: Sender,
+  { groupId, title }: MessagePayload<"renameGroup"> = {},
+): Promise<MessageResponse<"renameGroup">> {
   if (!Number.isInteger(groupId)) return { ok: false };
   if (!hasApi(["tabGroups", "update"])) {
     return { ok: false, reason: "unsupported" };
   }
   try {
-    await chrome.tabGroups.update(groupId, {
+    await chrome.tabGroups.update(groupId as number, {
       title: String(title ?? "").slice(0, 100),
     });
     return { ok: true };
@@ -608,12 +723,19 @@ export async function renameGroup(_, { groupId, title } = {}) {
   }
 }
 
-async function goHistory(tab, delta) {
+async function goHistory(
+  tab: chrome.tabs.Tab | undefined,
+  delta: number,
+): Promise<{ ok: true } | { ok: false }> {
   if (!tab || !tab.id) return { ok: false };
+  const legacy = chrome.tabs as unknown as Record<
+    "goBack" | "goForward",
+    ((tabId: number) => Promise<void>) | undefined
+  >;
   const method = delta < 0 ? "goBack" : "goForward";
-  if (typeof chrome.tabs[method] === "function") {
+  if (typeof legacy[method] === "function") {
     try {
-      await chrome.tabs[method](tab.id);
+      await legacy[method](tab.id);
     } catch {
       return { ok: false };
     }
@@ -621,7 +743,10 @@ async function goHistory(tab, delta) {
   return { ok: true };
 }
 
-async function switchTab(current, delta) {
+async function switchTab(
+  current: chrome.tabs.Tab | undefined,
+  delta: number,
+): Promise<{ ok: true } | { ok: false }> {
   if (!current || !current.id) return { ok: false };
   const tabs = await chrome.tabs.query({ currentWindow: true });
   if (tabs.length < 2) return { ok: false };
@@ -629,11 +754,14 @@ async function switchTab(current, delta) {
   if (index === -1) return { ok: false };
   const nextIndex =
     (((index + delta) % tabs.length) + tabs.length) % tabs.length;
-  await chrome.tabs.update(tabs[nextIndex].id, { active: true });
+  await chrome.tabs.update(tabs[nextIndex].id!, { active: true });
   return { ok: true };
 }
 
-async function moveTab(sender, delta) {
+async function moveTab(
+  sender: Sender,
+  delta: number,
+): Promise<{ ok: true } | { ok: false }> {
   const tab = sender.tab;
   if (tab && tab.id) {
     await chrome.tabs.move(tab.id, { index: Math.max(0, tab.index + delta) });
@@ -642,17 +770,22 @@ async function moveTab(sender, delta) {
   return { ok: false };
 }
 
-async function activateTabByIndex(index) {
+async function activateTabByIndex(
+  index: number,
+): Promise<{ ok: true } | { ok: false }> {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const tab = tabs[index < 0 ? tabs.length + index : index];
   if (!tab) return { ok: false };
-  await chrome.tabs.update(tab.id, { active: true });
+  await chrome.tabs.update(tab.id!, { active: true });
   return { ok: true };
 }
 
-export async function activateTab(_, { id } = {}) {
+export async function activateTab(
+  _: Sender,
+  { id }: MessagePayload<"activateTab"> = {},
+): Promise<MessageResponse<"activateTab">> {
   if (!id) return { ok: false };
-  let windowId = null;
+  let windowId: number | null | undefined = null;
   try {
     const tab = await chrome.tabs.get(id);
     windowId = tab && tab.windowId;
@@ -668,7 +801,10 @@ export async function activateTab(_, { id } = {}) {
   return { ok: true };
 }
 
-export async function zoomBy(sender, { delta = 0 } = {}) {
+export async function zoomBy(
+  sender: Sender,
+  { delta = 0 }: MessagePayload<"zoomBy"> = {},
+): Promise<MessageResponse<"zoomBy">> {
   const tab = sender.tab;
   if (
     !tab ||
@@ -684,26 +820,37 @@ export async function zoomBy(sender, { delta = 0 } = {}) {
   return { ok: true, zoom: next };
 }
 
-export async function openTab(url, active) {
+export async function openTab(
+  url: unknown,
+  active: boolean,
+): Promise<{ ok: true } | { ok: false }> {
   const target = normalizeUrl(url);
   if (!target) return { ok: false };
   await chrome.tabs.create({ url: target, active });
   return { ok: true };
 }
 
-export async function openInBackgroundTab(_, { url } = {}) {
+export async function openInBackgroundTab(
+  _: Sender,
+  { url }: MessagePayload<"openInBackgroundTab"> = {},
+): Promise<MessageResponse<"openInBackgroundTab">> {
   return openTab(url, false);
 }
 
-export async function openInForegroundTab(_, { url } = {}) {
+export async function openInForegroundTab(
+  _: Sender,
+  { url }: MessagePayload<"openInForegroundTab"> = {},
+): Promise<MessageResponse<"openInForegroundTab">> {
   return openTab(url, true);
 }
 
-export async function captureScreenshot(sender) {
+export async function captureScreenshot(
+  sender: Sender,
+): Promise<MessageResponse<"captureScreenshot">> {
   const windowId = sender && sender.tab && sender.tab.windowId;
   if (!Number.isInteger(windowId)) return { ok: false };
   try {
-    const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+    const dataUrl = await chrome.tabs.captureVisibleTab(windowId as number, {
       format: "png",
     });
     if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
@@ -715,12 +862,12 @@ export async function captureScreenshot(sender) {
   }
 }
 
-export async function openSettings() {
+export async function openSettings(): Promise<MessageResponse<"openSettings">> {
   await chrome.runtime.openOptionsPage();
   return { ok: true };
 }
 
-function extensionsPageUrl() {
+function extensionsPageUrl(): string | null {
   let ua;
   try {
     ua = navigator.userAgent || "";
@@ -732,7 +879,7 @@ function extensionsPageUrl() {
   return "chrome://extensions";
 }
 
-export async function openExtensions() {
+export async function openExtensions(): Promise<MessageResponse<"openExtensions">> {
   const url = extensionsPageUrl();
   if (!url) return { ok: false, reason: "blocked" };
   try {
