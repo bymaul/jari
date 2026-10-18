@@ -10,7 +10,7 @@ import {
 import type { PageNavTexts } from "../shared/page-nav-texts.ts";
 import type { SearchEngine } from "../shared/search-engines.ts";
 import { matchesSitePattern, pageSiteKey } from "../shared/url.ts";
-import { toggleSiteInList } from "../popup/site.js";
+import { toggleSiteInList } from "../popup/site.ts";
 
 const STORAGE_KEY = "settings";
 

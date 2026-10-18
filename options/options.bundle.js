@@ -823,7 +823,7 @@
     return columns;
   }
 
-  // popup/site.js
+  // popup/site.ts
   function toggleSiteInList(disabledSites, key) {
     const list = Array.isArray(disabledSites) ? disabledSites.slice() : [];
     const idx = list.indexOf(key);

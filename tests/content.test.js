@@ -268,7 +268,7 @@ test("shieldOverlayKey shields keyup for overlays without onKeyUp", () => {
 });
 
 test("popup help message opens the cheatsheet in the top frame", async () => {
-  const { SHOW_HELP_ACTION } = await import("../popup/site.js");
+  const { SHOW_HELP_ACTION } = await import("../popup/site.ts");
   spyOn("showHelp");
   globalThis.window.top = globalThis.window;
   try {
@@ -282,7 +282,7 @@ test("popup help message opens the cheatsheet in the top frame", async () => {
 });
 
 test("popup help message is ignored in subframes and for other actions", async () => {
-  const { SHOW_HELP_ACTION } = await import("../popup/site.js");
+  const { SHOW_HELP_ACTION } = await import("../popup/site.ts");
   spyOn("showHelp");
   const listeners = globalThis.chrome.runtime.onMessage._listeners;
   globalThis.window.top = {};

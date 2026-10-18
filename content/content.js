@@ -7,7 +7,7 @@ import {
   parseRepeatCount,
 } from "./keymap.ts";
 import { settings } from "./settings.ts";
-import { SHOW_HELP_ACTION } from "../popup/site.js";
+import { SHOW_HELP_ACTION } from "../popup/site.ts";
 import { ui } from "./ui.ts";
 import { commands, setModeActions } from "./commands.js";
 import { Overlays } from "./overlays.js";

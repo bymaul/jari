@@ -5,7 +5,7 @@ import {
   isSiteDisabled,
   parseTabSite,
   toggleSiteInList,
-} from "../popup/site.js";
+} from "../popup/site.ts";
 
 test("parseTabSite extracts a toggleable host", () => {
   assert.deepEqual(parseTabSite("https://example.com/page?q=1"), {

@@ -1131,7 +1131,7 @@
     return columns;
   }
 
-  // popup/site.js
+  // popup/site.ts
   var SHOW_HELP_ACTION = "jari-show-help";
   function toggleSiteInList(disabledSites, key) {
     const list = Array.isArray(disabledSites) ? disabledSites.slice() : [];

@@ -5,11 +5,19 @@ import {
 
 export const SHOW_HELP_ACTION = "jari-show-help";
 
-function notToggleable(protocol) {
+interface TabSite {
+  toggleable: boolean;
+  host: string;
+  protocol: string;
+  label: string;
+  key: string;
+}
+
+function notToggleable(protocol: string): TabSite {
   return { toggleable: false, host: "", protocol, label: "", key: "" };
 }
 
-export function parseTabSite(rawUrl) {
+export function parseTabSite(rawUrl: unknown): TabSite {
   if (typeof rawUrl !== "string" || !rawUrl) {
     return notToggleable("");
   }
@@ -45,15 +53,17 @@ export function parseTabSite(rawUrl) {
   };
 }
 
-export function isSiteDisabled(disabledSites, host, protocol) {
-  const list = Array.isArray(disabledSites) ? disabledSites : [];
-  return list.some((pattern) =>
-    matchesSitePattern(host, pattern, protocol),
-  );
+export function isSiteDisabled(
+  disabledSites: unknown,
+  host: unknown,
+  protocol: unknown,
+): boolean {
+  const list: unknown[] = Array.isArray(disabledSites) ? disabledSites : [];
+  return list.some((pattern) => matchesSitePattern(host, pattern, protocol));
 }
 
-export function toggleSiteInList(disabledSites, key) {
-  const list = Array.isArray(disabledSites) ? disabledSites.slice() : [];
+export function toggleSiteInList(disabledSites: unknown, key: string): string[] {
+  const list: string[] = Array.isArray(disabledSites) ? disabledSites.slice() : [];
   const idx = list.indexOf(key);
   if (idx >= 0) list.splice(idx, 1);
   else list.push(key);

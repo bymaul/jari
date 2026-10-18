@@ -145,7 +145,7 @@
     return host;
   }
 
-  // popup/site.js
+  // popup/site.ts
   var SHOW_HELP_ACTION = "jari-show-help";
   function notToggleable(protocol) {
     return { toggleable: false, host: "", protocol, label: "", key: "" };
@@ -187,9 +187,7 @@
   }
   function isSiteDisabled(disabledSites, host, protocol) {
     const list = Array.isArray(disabledSites) ? disabledSites : [];
-    return list.some(
-      (pattern) => matchesSitePattern(host, pattern, protocol)
-    );
+    return list.some((pattern) => matchesSitePattern(host, pattern, protocol));
   }
   function toggleSiteInList(disabledSites, key) {
     const list = Array.isArray(disabledSites) ? disabledSites.slice() : [];
