@@ -7,7 +7,7 @@ const { Scroll, frameScrollBox, __smoothFrameMove } = await import("../content/s
 const VW = 800;
 const VH = 600;
 
-globalThis.Node = { ELEMENT_NODE: 1 };
+globalThis.Node = { ELEMENT_NODE: 1 } as unknown as typeof Node;
 
 const windowCalls = { focus: 0, blur: 0 };
 globalThis.window.innerWidth = VW;
@@ -20,15 +20,47 @@ globalThis.window.focus = () => {
 globalThis.window.blur = () => {
   windowCalls.blur++;
 };
-globalThis.window.getComputedStyle = () => ({
+globalThis.window.getComputedStyle = (() => ({
   display: "block",
   visibility: "visible",
   opacity: "1",
   overflowY: "auto",
   overflowX: "auto",
-});
+})) as unknown as typeof window.getComputedStyle;
 
-function makeArea() {
+interface FakeArea {
+  tagName: string;
+  nodeType: number;
+  isConnected: boolean;
+  parentElement: null;
+  clientHeight: number;
+  clientWidth: number;
+  scrollHeight: number;
+  scrollWidth: number;
+  focusCalls: number;
+  blurCalls: number;
+  closest: () => null;
+  contains: (node: unknown) => boolean;
+  getAttribute: () => null;
+  hasAttribute: () => boolean;
+  getRootNode: () => { host: null };
+  getBoundingClientRect: () => {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    width: number;
+    height: number;
+  };
+  scrollIntoView: () => void;
+  focus(): void;
+  blur(): void;
+  matches: (sel: string) => boolean;
+  contentWindow?: { focusCalls: number; focus(): void };
+  contentDocument?: unknown;
+}
+
+function makeArea(): FakeArea {
   return {
     tagName: "DIV",
     nodeType: 1,
@@ -64,7 +96,7 @@ function makeArea() {
   };
 }
 
-function makeFrame() {
+function makeFrame(): FakeArea {
   const el = makeArea();
   el.tagName = "IFRAME";
   el.matches = () => true;
@@ -80,32 +112,34 @@ function makeFrame() {
 // One shared fixture set, reset explicitly between cases.
 const area = makeArea();
 const frame = makeFrame();
-globalThis.document.querySelectorAll = () => [area, frame];
-globalThis.document.scrollingElement = { scrollHeight: 1200, clientHeight: 600 };
-globalThis.document.createElement = () => ({
+const doc = globalThis.document as unknown as Record<string, unknown>;
+const win = globalThis.window as unknown as Record<string, unknown>;
+doc.querySelectorAll = () => [area, frame];
+doc.scrollingElement = { scrollHeight: 1200, clientHeight: 600 };
+doc.createElement = () => ({
   style: {},
   appendChild: () => {},
   remove: () => {},
 });
-globalThis.document.body = { appendChild: () => {} };
+doc.body = { appendChild: () => {} };
 
 function resetCalls() {
   area.focusCalls = 0;
   area.blurCalls = 0;
   frame.focusCalls = 0;
   frame.blurCalls = 0;
-  frame.contentWindow.focusCalls = 0;
+  frame.contentWindow!.focusCalls = 0;
   windowCalls.focus = 0;
   windowCalls.blur = 0;
 }
 
 beforeEach(() => {
-  globalThis.window.top = globalThis.window;
-  globalThis.document.activeElement = null;
+  win.top = globalThis.window;
+  doc.activeElement = null;
   resetCalls();
 });
 
-function rotateTo(target) {
+function rotateTo(target: unknown) {
   for (let i = 0; i < 4; i++) {
     if (Scroll.getTarget() === target) return;
     Scroll.cycle();
@@ -147,10 +181,10 @@ test("cycle walks the DOM once per press", () => {
   rotateTo(globalThis.window);
   const prevQsa = globalThis.document.querySelectorAll;
   let queries = 0;
-  globalThis.document.querySelectorAll = (...args) => {
+  globalThis.document.querySelectorAll = ((...args: [string]) => {
     queries++;
     return prevQsa(...args);
-  };
+  }) as unknown as typeof globalThis.document.querySelectorAll;
   try {
     queries = 0;
     Scroll.cycle();
@@ -207,9 +241,9 @@ test("a frame with a scrollable inner panel is a stop", () => {
 
 test("frameScrollBox resolves the inner panel, null for the rest", () => {
   const { frame, inner } = makeChatFrame();
-  assert.equal(frameScrollBox(frame), inner);
-  assert.equal(frameScrollBox(makeDeadFrame()), null);
-  assert.equal(frameScrollBox(area), null);
+  assert.equal(frameScrollBox(frame as unknown as HTMLIFrameElement), inner);
+  assert.equal(frameScrollBox(makeDeadFrame() as unknown as HTMLIFrameElement), null);
+  assert.equal(frameScrollBox(area as unknown as HTMLIFrameElement), null);
 });
 
 test("a frame with no scrollable content is not a stop", () => {
@@ -234,7 +268,7 @@ test("reset returns to the page after cycling onto an area", () => {
 test("reset releases frame focus and returns to the page", () => {
   rotateTo(frame);
   assert.equal(Scroll.getTarget(), frame);
-  globalThis.document.activeElement = frame;
+  doc.activeElement = frame;
   resetCalls();
 
   Scroll.reset();
@@ -244,7 +278,23 @@ test("reset releases frame focus and returns to the page", () => {
   assert.ok(windowCalls.focus > 0, "expected focus to return to the page");
 });
 
-function makeAreaAt({ top = 0, left = 0, w = 200, h = 200, overflow = 400, tag = "DIV" } = {}) {
+function makeAreaAt(
+  {
+    top = 0,
+    left = 0,
+    w = 200,
+    h = 200,
+    overflow = 400,
+    tag = "DIV",
+  }: {
+    top?: number;
+    left?: number;
+    w?: number;
+    h?: number;
+    overflow?: number;
+    tag?: string;
+  } = {},
+) {
   const el = makeArea();
   el.tagName = tag;
   el.clientHeight = h;
@@ -264,15 +314,15 @@ function makeAreaAt({ top = 0, left = 0, w = 200, h = 200, overflow = 400, tag =
 
 const defaultFixtures = globalThis.document.querySelectorAll;
 
-function useFixtures(list) {
-  globalThis.document.querySelectorAll = () => list;
+function useFixtures(list: unknown[]) {
+  doc.querySelectorAll = () => list;
   Scroll.reset();
 }
 
 function restoreFixtures() {
-  globalThis.document.querySelectorAll = defaultFixtures;
-  globalThis.document.scrollingElement = { scrollHeight: 1200, clientHeight: 600 };
-  globalThis.document.activeElement = null;
+  doc.querySelectorAll = defaultFixtures;
+  doc.scrollingElement = { scrollHeight: 1200, clientHeight: 600 };
+  doc.activeElement = null;
   Scroll.reset();
 }
 
@@ -309,9 +359,9 @@ test("getTarget stays on the page until an explicit cycle", () => {
   const small = makeAreaAt({ left: 300, overflow: 50 });
   const inner = { nodeType: 1 };
   small.contains = (node) => node === inner;
-  globalThis.document.querySelectorAll = () => [big, small];
+  doc.querySelectorAll = () => [big, small];
   Scroll.reset();
-  globalThis.document.activeElement = inner;
+  doc.activeElement = inner;
   try {
     assert.equal(Scroll.getTarget(), globalThis.window);
     Scroll.cycle();
@@ -384,14 +434,14 @@ test("getTarget performs no DOM scan", () => {
   const prevStyle = globalThis.window.getComputedStyle;
   let queries = 0;
   let styles = 0;
-  globalThis.document.querySelectorAll = () => {
+  globalThis.document.querySelectorAll = (() => {
     queries++;
     return [big];
-  };
-  globalThis.window.getComputedStyle = (...args) => {
+  }) as unknown as typeof globalThis.document.querySelectorAll;
+  globalThis.window.getComputedStyle = ((...args: [Element]) => {
     styles++;
     return prevStyle(...args);
-  };
+  }) as unknown as typeof window.getComputedStyle;
   try {
     Scroll.reset();
     queries = 0;
