@@ -1,11 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { build } from "esbuild";
+import { build, context, type BuildContext, type BuildOptions } from "esbuild";
 import {
   copyFileSync,
   mkdirSync,
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
+  watchFile,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,8 +15,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const target: string | undefined = process.argv[2];
-if (target !== "chrome" && target !== "firefox" && target !== "dist") {
-  console.error("Usage: node build.ts <chrome|firefox|dist>");
+if (
+  target !== "chrome" &&
+  target !== "firefox" &&
+  target !== "dist" &&
+  target !== "dev"
+) {
+  console.error("Usage: node build.ts <chrome|firefox|dist|dev>");
   process.exit(1);
 }
 
@@ -47,28 +54,40 @@ if (distFiles.some((file) => /(^|[/\\])(docs|demo)([/\\]|$)/i.test(file))) {
   throw new Error("docs/ must not be packaged");
 }
 
-await buildOne("content", "content.js", "bundle.js", buildBanner);
-await buildOne("options", "options.js", "options.bundle.js", buildBanner);
-await buildOne("popup", "popup.js", "popup.bundle.js", buildBanner);
-await buildOne("background", "main.ts", "background.js", buildBanner);
+// One entry per bundle; [dir, entry, outfile]. The content entry name is kept
+// as "content.js" so esbuild resolves it to content/content.ts.
+const entries: Array<[string, string, string]> = [
+  ["content", "content.js", "bundle.js"],
+  ["options", "options.js", "options.bundle.js"],
+  ["popup", "popup.js", "popup.bundle.js"],
+  ["background", "main.ts", "background.js"],
+];
 
-console.log("Wrote content/bundle.js");
-console.log("Wrote options/options.bundle.js");
-console.log("Wrote popup/popup.bundle.js");
-console.log("Wrote background.js");
+// Dev watches hold the esbuild daemons; esbuild tears down a watch when its
+// context object becomes garbage, so keep every context alive for the whole
+// dev-mode process lifetime (see watchOne).
+const devContexts: BuildContext[] = [];
 
-if (target === "dist") {
-  buildDist("chrome");
-  buildDist("firefox");
+if (target === "dev") {
+  await dev();
 } else {
-  writeFileSync(
-    join(root, "manifest.json"),
-    JSON.stringify(manifestFor(target), null, 2) + "\n",
-  );
-  console.log(`Wrote manifest.json (${target})`);
-  console.log(
-    `Load this folder in ${target === "chrome" ? "Chrome" : "Firefox"}.`,
-  );
+  for (const [dir, entry, outfile] of entries) {
+    await buildOne(dir, entry, outfile, buildBanner);
+  }
+  console.log("Wrote content/bundle.js");
+  console.log("Wrote options/options.bundle.js");
+  console.log("Wrote popup/popup.bundle.js");
+  console.log("Wrote background.js");
+
+  if (target === "dist") {
+    buildDist("chrome");
+    buildDist("firefox");
+  } else {
+    writeManifest(target);
+    console.log(
+      `Load this folder in ${target === "chrome" ? "Chrome" : "Firefox"}.`,
+    );
+  }
 }
 
 // Only the fields build.ts reads or mutates are declared; the rest of the
@@ -99,6 +118,14 @@ function manifestFor(target: "chrome" | "firefox"): Manifest {
     manifest.permissions.push("clipboardWrite");
   }
   return manifest;
+}
+
+function writeManifest(target: "chrome" | "firefox"): void {
+  writeFileSync(
+    join(root, "manifest.json"),
+    JSON.stringify(manifestFor(target), null, 2) + "\n",
+  );
+  console.log(`Wrote manifest.json (${target})`);
 }
 
 function buildDist(target: "chrome" | "firefox"): void {
@@ -191,17 +218,65 @@ async function buildOne(
   banner: string,
 ): Promise<void> {
   const outPath = join(root, dir === "background" ? "." : dir, outfile);
-  await build({
+  await build(bundleOptions(dir, entry, outPath, banner));
+
+  const firstLine = readFileSync(outPath, "utf8").split("\n", 1)[0];
+  if (firstLine !== buildBanner.trim()) {
+    throw new Error(`Banner missing from ${outPath}`);
+  }
+}
+
+function bundleOptions(
+  dir: string,
+  entry: string,
+  outPath: string,
+  banner: string,
+): BuildOptions {
+  return {
     entryPoints: [join(root, dir, entry)],
     bundle: true,
     format: "iife",
     outfile: outPath,
     banner: { js: banner },
     logLevel: "warning",
+  };
+}
+
+// Dev watch mode: `npm run dev`. Same options as release builds plus
+// sourcemaps (release output stays map-free and byte-stable), rebuilt on
+// every source edit. manifest.base.json is not an esbuild input, so the
+// contexts never see edits to it — poll-stat it and regenerate the manifest
+// when it changes.
+async function dev(): Promise<void> {
+  for (const [dir, entry, outfile] of entries) {
+    devContexts.push(await watchOne(dir, entry, outfile, buildBanner));
+  }
+  writeManifest("chrome");
+
+  const baseManifest = join(root, "manifest.base.json");
+  let mtimeMs = statSync(baseManifest).mtimeMs;
+  watchFile(baseManifest, { interval: 500 }, (now) => {
+    if (now.mtimeMs === mtimeMs) return;
+    mtimeMs = now.mtimeMs;
+    writeManifest("chrome");
   });
 
-  const firstLine = readFileSync(outPath, "utf8").split("\n", 1)[0];
-  if (firstLine !== buildBanner.trim()) {
-    throw new Error(`Banner missing from ${outPath}`);
-  }
+  console.log("Load this folder in Chrome. Watching for changes…");
+  await new Promise(() => {});
+}
+
+async function watchOne(
+  dir: string,
+  entry: string,
+  outfile: string,
+  banner: string,
+): Promise<BuildContext> {
+  const outPath = join(root, dir === "background" ? "." : dir, outfile);
+  const ctx = await context({
+    ...bundleOptions(dir, entry, outPath, banner),
+    sourcemap: true,
+  });
+  await ctx.watch();
+  console.log(`Watching ${outPath}`);
+  return ctx;
 }
