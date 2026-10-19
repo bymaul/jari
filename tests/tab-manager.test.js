@@ -2,7 +2,7 @@ import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
 
-const { isSameSnapshot } = await import("../content/tab-manager.js");
+const { isSameSnapshot } = await import("../content/tab-manager.ts");
 
 function tab(over = {}) {
   return {

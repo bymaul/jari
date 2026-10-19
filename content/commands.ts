@@ -4,7 +4,7 @@ import { settings } from "./settings.ts";
 import { sendMessage, sendMessageWithTimeout, ui } from "./ui.ts";
 import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, frameScrollBox, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.ts";
 import { Prompt } from "./prompt.ts";
-import { TabManager } from "./tab-manager.js";
+import { TabManager } from "./tab-manager.ts";
 import { Help } from "./help.ts";
 import { Hints, setCommandRunner } from "./hints.ts";
 import { Find } from "./find.ts";

@@ -3960,7 +3960,7 @@
   };
   register("prompt", { close, onKeyDown, isActive });
 
-  // content/tab-manager.js
+  // content/tab-manager.ts
   var HOST_CLASS = "jari-tab-manager-host";
   var GROUPED_NONE = -1;
   var POLL_MS = 2e3;
@@ -4320,7 +4320,8 @@
     if (query2) appendSpan(headerEl, "jari-mgr-badge", `/${query2}`);
     if (visualAnchor !== null)
       appendSpan(headerEl, "jari-mgr-badge", "(visual)");
-    if (field) appendSpan(headerEl, "jari-mgr-badge", `(${FIELDS[field.kind].badge})`);
+    if (field)
+      appendSpan(headerEl, "jari-mgr-badge", `(${FIELDS[field.kind].badge})`);
     if (windowChoice)
       appendSpan(
         headerEl,
@@ -4328,7 +4329,11 @@
         `(moving ${windowChoice.ids.length} tab${windowChoice.ids.length === 1 ? "" : "s"})`
       );
     const total = windowChoice ? windowChoice.windows.length : filtered2.length;
-    appendSpan(headerEl, "jari-mgr-pos", total === 0 ? "0/0" : `${selected2 + 1}/${total}`);
+    appendSpan(
+      headerEl,
+      "jari-mgr-pos",
+      total === 0 ? "0/0" : `${selected2 + 1}/${total}`
+    );
   }
   function renderFooter() {
     if (field) {
@@ -4422,7 +4427,11 @@
   }
   function applyFilter() {
     const focused = focusedId();
-    filtered2 = filterManagerTabs(tabs2, query2, settings.isFuzzyMatching());
+    filtered2 = filterManagerTabs(
+      tabs2,
+      query2,
+      settings.isFuzzyMatching()
+    );
     const kept = focused === null ? -1 : indexOfTab(focused);
     selected2 = kept >= 0 ? kept : Math.min(selected2, filtered2.length - 1);
   }
@@ -4430,10 +4439,12 @@
     tabs2 = sortManagerTabs(res.tabs);
     windowId = Number.isInteger(res.currentWindowId) ? res.currentWindowId : null;
     groupsById = new Map(
-      (Array.isArray(res.groups) ? res.groups : []).map((group) => [
-        group.id,
-        { title: group.title || "", color: group.color || "" }
-      ])
+      (Array.isArray(res.groups) ? res.groups : []).map(
+        (group) => [
+          group.id,
+          { title: group.title || "", color: group.color || "" }
+        ]
+      )
     );
   }
   var SNAPSHOT_FIELDS = [
@@ -4900,9 +4911,11 @@
       renderAll();
       return;
     }
-    openField("group", (groupsById.get(focused.groupId) || {}).title || "", {
-      groupId: focused.groupId
-    });
+    openField(
+      "group",
+      (groupsById.get(focused.groupId) || {}).title || "",
+      { groupId: focused.groupId }
+    );
   }
   function startEditUrl() {
     const focused = focusedTab();
@@ -5093,13 +5106,17 @@
       return;
     }
     if (res.movedToNewWindow) {
-      ui.toast(res.moved > 1 ? `Split ${res.moved} tabs to new window` : "Split to new window");
+      ui.toast(
+        res.moved > 1 ? `Split ${res.moved} tabs to new window` : "Split to new window"
+      );
       consumeMarks();
       await refresh();
       return;
     }
     if (res.movedToWindow) {
-      ui.toast(res.moved > 1 ? `Merged ${res.moved} tabs` : "Merged to window");
+      ui.toast(
+        res.moved > 1 ? `Merged ${res.moved} tabs` : "Merged to window"
+      );
       consumeMarks();
       await refresh();
       return;

@@ -5,6 +5,14 @@ import { settings } from "./settings.ts";
 import { createShadowHost, sendMessageWithTimeout, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.ts";
 import { register, touch } from "./overlays.ts";
+import type {
+  Action,
+  GroupSummary,
+  ManagerTab,
+  MessagePayload,
+  MessageResponse,
+  WindowSummary,
+} from "../shared/protocol.ts";
 
 const HOST_CLASS = "jari-tab-manager-host";
 const GROUPED_NONE = -1;
@@ -45,67 +53,119 @@ const FIELDS = {
 };
 
 let active = false;
-let host = null;
-let overlay = null;
-let headerEl = null;
-let listEl = null;
-let footerEl = null;
-let restoreFocus = null;
+let host: HTMLElement | null = null;
+let overlay: HTMLDivElement | null = null;
+let headerEl: HTMLDivElement | null = null;
+let listEl: HTMLUListElement | null = null;
+let footerEl: HTMLDivElement | null = null;
+let restoreFocus: Element | null = null;
 
-let tabs = [];
-let windowId = null;
-let groupsById = new Map();
-let filtered = [];
+let tabs: ManagerTab[] = [];
+let windowId: number | null = null;
+let groupsById = new Map<number, { title: string; color: string }>();
+let filtered: ManagerTab[] = [];
 let selected = 0;
-let marked = new Set();
+let marked = new Set<number>();
 let query = "";
 let showHints = false;
-let visualAnchor = null;
-let visualPainted = new Set();
-let visualBaseline = new Set();
-let field = null;
-let fieldEl = null;
-let fieldFocusBefore = null;
-let confirm = null;
-let windowChoice = null;
+let visualAnchor: number | null = null;
+let visualPainted = new Set<number>();
+let visualBaseline = new Set<number>();
+let field: Field | null = null;
+let fieldEl: HTMLInputElement | null = null;
+let fieldFocusBefore: Element | null = null;
+let confirm: {
+  kind: string;
+  key: string;
+  ids: number[];
+  message: string;
+} | null = null;
+let windowChoice: { ids: number[]; windows: WindowSummary[] } | null = null;
 let refreshQueued = false;
-let pollTimer = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 let refreshing = false;
 
-export function sortManagerTabs(list) {
+type FieldKind = keyof typeof FIELDS;
+type Field = { kind: FieldKind; groupId?: number; tabId?: number };
+/* Snapshot of a successful managerList answer: the shape the two
+   `!res.ok`-narrowed call sites hand over. */
+type ManagerRes = {
+  ok?: boolean;
+  tabs: ManagerTab[];
+  groups?: GroupSummary[];
+  currentWindowId: number | null;
+};
+type TargetOutcome<A extends TargetAction> = {
+  failed: string;
+  done?:
+    | ((
+        res: Extract<MessageResponse<A>, { ok: true }>,
+        targets: ManagerTab[],
+      ) => void)
+    | null;
+};
+/* The manager row actions: every one of them answers an `{ok, ...}` shape
+   (unlike arbitrary Actions), so runOnTargets can read/narrow `res.ok`. */
+type TargetAction =
+  | "closeManagerTabs"
+  | "setTabsPinned"
+  | "setTabsMuted"
+  | "groupManagerTabs"
+  | "ungroupManagerTabs"
+  | "duplicateManagerTabs"
+  | "bookmarkManagerTabs"
+  | "unbookmarkManagerTabs"
+  | "moveManagerTabs";
+
+export function sortManagerTabs(list: ManagerTab[]): ManagerTab[] {
   return [...(Array.isArray(list) ? list : [])].sort((a, b) => {
-    if (a.windowId !== b.windowId) return a.windowId - b.windowId;
+    if (a.windowId !== b.windowId) return a.windowId! - b.windowId!;
     return (a.index || 0) - (b.index || 0);
   });
 }
 
-export function filterManagerTabs(list, text, fuzzy = true) {
+export function filterManagerTabs(
+  list: ManagerTab[],
+  text: string,
+  fuzzy = true,
+): ManagerTab[] {
   const q = String(text || "").trim();
   if (!q) return [...list];
   const ranked = rankMatches(q, list, fuzzy);
-  return fuzzy ? ranked.map((entry) => entry.item) : ranked;
+  /* rankMatches speaks RankItem; at runtime its items are the ManagerTabs
+     themselves (and the non-fuzzy overload returns list members verbatim). */
+  return fuzzy
+    ? (ranked.map((entry) => entry.item) as unknown as ManagerTab[])
+    : (ranked as unknown as ManagerTab[]);
 }
 
-export function targetsForAction(list, markedIds, focusedId) {
+export function targetsForAction(
+  list: ManagerTab[],
+  markedIds?: Iterable<number>,
+  focusedId?: number | undefined | null,
+): ManagerTab[] {
   const rows = Array.isArray(list) ? list : [];
   const ids = [...(markedIds || [])];
   if (ids.length > 0) {
     const wanted = new Set(ids);
-    return rows.filter((tab) => wanted.has(tab.id));
+    return rows.filter((tab) => wanted.has(tab.id!));
   }
   const focused = rows.find((tab) => tab.id === focusedId);
   return focused ? [focused] : [];
 }
 
-export function needsCloseConfirm(targets) {
+export function needsCloseConfirm(targets: ManagerTab[]): boolean {
   return Array.isArray(targets) && targets.length > 1;
 }
 
-export function decideSetState(targets, key) {
+export function decideSetState(
+  targets: ManagerTab[],
+  key: "pinned" | "muted" | "bookmarked",
+): boolean {
   return (targets || []).some((tab) => !tab[key]);
 }
 
-const GROUP_COLORS = {
+const GROUP_COLORS: Record<string, string> = {
   grey: "#878787",
   blue: "#6e94b2",
   red: "#d8647e",
@@ -117,12 +177,12 @@ const GROUP_COLORS = {
   orange: "#e0a363",
 };
 
-export function groupColorHex(name) {
+export function groupColorHex(name: string): string {
   return GROUP_COLORS[String(name || "").toLowerCase()] || "#888888";
 }
 
-export function stateTags(tab) {
-  const out = [];
+export function stateTags(tab: ManagerTab): string[] {
+  const out: string[] = [];
   if (!tab) return out;
   if (tab.pinned) out.push("pin");
   if (tab.muted) out.push("muted");
@@ -131,15 +191,20 @@ export function stateTags(tab) {
   return out;
 }
 
-export function confirmKey(ids) {
-  return [...(ids || [])].sort((a, b) => a - b).join(",");
+export function confirmKey(ids?: Iterable<number>): string {
+  return [...(ids || [])]
+    .sort((a, b) => a - b)
+    .join(",");
 }
 
-function isActive() {
+function isActive(): boolean {
   return active;
 }
 
-async function ask(action, payload) {
+async function ask<A extends Action>(
+  action: A,
+  payload?: MessagePayload<A>,
+): Promise<MessageResponse<A> | null> {
   try {
     return await sendMessageWithTimeout(action, payload);
   } catch {
@@ -147,16 +212,16 @@ async function ask(action, payload) {
   }
 }
 
-function focusedTab() {
+function focusedTab(): ManagerTab | null {
   return filtered[selected] || null;
 }
 
-function focusedId() {
+function focusedId(): number | undefined | null {
   const focused = focusedTab();
   return focused ? focused.id : null;
 }
 
-function currentTargets() {
+function currentTargets(): ManagerTab[] {
   return targetsForAction(tabs, marked, focusedId());
 }
 
@@ -285,16 +350,20 @@ function managerCss() {
   );
 }
 
-function windowLabels(rows) {
-  const labels = new Map();
+function windowLabels(rows: ManagerTab[]): Map<number, number> {
+  const labels = new Map<number, number>();
   let n = 0;
   for (const tab of rows) {
-    if (!labels.has(tab.windowId)) labels.set(tab.windowId, ++n);
+    if (!labels.has(tab.windowId!)) labels.set(tab.windowId!, ++n);
   }
   return labels;
 }
 
-function appendSpan(li, className, text) {
+function appendSpan(
+  li: HTMLElement,
+  className: string,
+  text: string,
+): HTMLSpanElement {
   const span = document.createElement("span");
   span.className = className;
   span.textContent = text;
@@ -302,7 +371,12 @@ function appendSpan(li, className, text) {
   return span;
 }
 
-function highlightSpan(span, text, q, tab) {
+function highlightSpan(
+  span: HTMLSpanElement,
+  text: string,
+  q: string,
+  tab: ManagerTab,
+): void {
   if (!q) {
     span.textContent = text;
     return;
@@ -310,9 +384,12 @@ function highlightSpan(span, text, q, tab) {
   renderText(span, text, titleMatch(tab, text));
 }
 
-let matchCache = new Map();
+let matchCache = new Map<
+  number | undefined,
+  { q: string; fuzzy: boolean; text: string; indices: number[] }
+>();
 
-function titleMatch(tab, text) {
+function titleMatch(tab: ManagerTab, text: string): number[] {
   const fuzzy = settings.isFuzzyMatching();
   const hit = matchCache.get(tab.id);
   if (hit && hit.q === query && hit.fuzzy === fuzzy && hit.text === text) {
@@ -325,17 +402,21 @@ function titleMatch(tab, text) {
   return indices;
 }
 
-function renderRow(tab, labels, currentWin) {
+function renderRow(
+  tab: ManagerTab,
+  labels: Map<number, number>,
+  currentWin: number | null,
+): HTMLLIElement {
   const li = document.createElement("li");
   li.className = "jari-mgr-row";
-  li.classList.toggle("marked", marked.has(tab.id));
-  appendSpan(li, "jari-mgr-mark", marked.has(tab.id) ? "●" : "○");
+  li.classList.toggle("marked", marked.has(tab.id!));
+  appendSpan(li, "jari-mgr-mark", marked.has(tab.id!) ? "●" : "○");
   const info = groupsById.get(tab.groupId) || null;
   const loc = document.createElement("span");
   loc.className = "jari-mgr-loc";
   const win = document.createElement("span");
   win.className = "jari-mgr-win";
-  win.textContent = `W${labels.get(tab.windowId) || "?"}`;
+  win.textContent = `W${labels.get(tab.windowId!) || "?"}`;
   win.classList.toggle("jari-mgr-cur", tab.windowId === currentWin);
   loc.appendChild(win);
   if (info) {
@@ -365,11 +446,14 @@ function renderRow(tab, labels, currentWin) {
   return li;
 }
 
-function renderChoiceRow(win, labels) {
+function renderChoiceRow(
+  win: WindowSummary,
+  labels: Map<number, number>,
+): HTMLLIElement {
   const li = document.createElement("li");
   li.className = "jari-mgr-row";
   appendSpan(li, "jari-mgr-mark", "→");
-  appendSpan(li, "jari-mgr-loc", `W${labels.get(win.windowId) || "?"}`);
+  appendSpan(li, "jari-mgr-loc", `W${labels.get(win.windowId!) || "?"}`);
   const title = document.createElement("span");
   title.className = "title";
   title.textContent = win.title || "Window";
@@ -379,12 +463,12 @@ function renderChoiceRow(win, labels) {
   return li;
 }
 
-function renderHeader() {
+function renderHeader(): void {
   const wins = new Set(tabs.map((tab) => tab.windowId)).size;
-  headerEl.textContent = "";
-  headerEl.classList.add("jari-mgr-header");
+  headerEl!.textContent = "";
+  headerEl!.classList.add("jari-mgr-header");
 
-  appendSpan(headerEl, "jari-mgr-title", "Tab manager");
+  appendSpan(headerEl!, "jari-mgr-title", "Tab manager");
 
   const stats = document.createElement("span");
   stats.className = "jari-mgr-stats";
@@ -397,24 +481,29 @@ function renderHeader() {
   marks.className = "jari-mgr-marked";
   marks.textContent = `${marked.size} marked`;
   stats.appendChild(marks);
-  headerEl.appendChild(stats);
+  headerEl!.appendChild(stats);
 
-  if (query) appendSpan(headerEl, "jari-mgr-badge", `/${query}`);
+  if (query) appendSpan(headerEl!, "jari-mgr-badge", `/${query}`);
   if (visualAnchor !== null)
-    appendSpan(headerEl, "jari-mgr-badge", "(visual)");
-  if (field) appendSpan(headerEl, "jari-mgr-badge", `(${FIELDS[field.kind].badge})`);
+    appendSpan(headerEl!, "jari-mgr-badge", "(visual)");
+  if (field)
+    appendSpan(headerEl!, "jari-mgr-badge", `(${FIELDS[field.kind].badge})`);
   if (windowChoice)
     appendSpan(
-      headerEl,
+      headerEl!,
       "jari-mgr-badge",
       `(moving ${windowChoice.ids.length} tab${windowChoice.ids.length === 1 ? "" : "s"})`,
     );
 
   const total = windowChoice ? windowChoice.windows.length : filtered.length;
-  appendSpan(headerEl, "jari-mgr-pos", total === 0 ? "0/0" : `${selected + 1}/${total}`);
+  appendSpan(
+    headerEl!,
+    "jari-mgr-pos",
+    total === 0 ? "0/0" : `${selected + 1}/${total}`,
+  );
 }
 
-function renderFooter() {
+function renderFooter(): void {
   if (field) {
     setFooterLines([FIELDS[field.kind].hint], false);
     return;
@@ -430,47 +519,47 @@ function renderFooter() {
   }
 }
 
-function setFooterLines(lines, warn) {
-  footerEl.classList.toggle("jari-manager-warn", !!warn);
-  footerEl.textContent = "";
+function setFooterLines(lines: string[], warn: boolean): void {
+  footerEl!.classList.toggle("jari-manager-warn", !!warn);
+  footerEl!.textContent = "";
   for (const line of lines) {
     const div = document.createElement("div");
     div.textContent = line;
-    footerEl.appendChild(div);
+    footerEl!.appendChild(div);
   }
 }
 
-function renderList() {
+function renderList(): void {
   const labels = windowLabels(tabs);
-  listEl.textContent = "";
+  listEl!.textContent = "";
   if (windowChoice) {
     for (const win of windowChoice.windows)
-      listEl.appendChild(renderChoiceRow(win, labels));
+      listEl!.appendChild(renderChoiceRow(win, labels));
   } else {
     if (filtered.length === 0) {
       const li = document.createElement("li");
       li.textContent = query ? "No matching tabs" : "No tabs";
-      listEl.appendChild(li);
+      listEl!.appendChild(li);
       return;
     }
     for (const tab of filtered)
-      listEl.appendChild(renderRow(tab, labels, windowId));
+      listEl!.appendChild(renderRow(tab, labels, windowId));
   }
-  Array.from(listEl.children).forEach((li, i) =>
+  Array.from(listEl!.children).forEach((li, i) =>
     li.classList.toggle("selected", i === selected),
   );
-  const el = listEl.children[selected];
+  const el = listEl!.children[selected];
   if (el) el.scrollIntoView({ block: "nearest" });
 }
 
-function renderAll() {
+function renderAll(): void {
   if (!active) return;
   renderHeader();
   renderList();
   renderFooter();
 }
 
-function paintSelection(prev) {
+function paintSelection(prev: number): void {
   if (!listEl || windowChoice) return;
   const rows = listEl.children;
   const old = rows[prev];
@@ -484,7 +573,7 @@ function paintSelection(prev) {
   }
 }
 
-function repaintRows(indices) {
+function repaintRows(indices: number[]): void {
   if (!listEl || windowChoice) return;
   const labels = windowLabels(tabs);
   for (const i of indices) {
@@ -504,29 +593,35 @@ function repaintRows(indices) {
   }
 }
 
-function indexOfTab(id) {
+function indexOfTab(id?: number | null): number {
   return filtered.findIndex((tab) => tab.id === id);
 }
 
-function applyFilter() {
+function applyFilter(): void {
   const focused = focusedId();
-  filtered = filterManagerTabs(tabs, query, settings.isFuzzyMatching());
+  filtered = filterManagerTabs(
+    tabs,
+    query,
+    settings.isFuzzyMatching(),
+  ) as ManagerTab[];
   const kept = focused === null ? -1 : indexOfTab(focused);
   selected = kept >= 0 ? kept : Math.min(selected, filtered.length - 1);
 }
 
-function adoptSnapshot(res) {
+function adoptSnapshot(res: ManagerRes): void {
   tabs = sortManagerTabs(res.tabs);
   windowId = Number.isInteger(res.currentWindowId) ? res.currentWindowId : null;
   groupsById = new Map(
-    (Array.isArray(res.groups) ? res.groups : []).map((group) => [
-      group.id,
-      { title: group.title || "", color: group.color || "" },
-    ]),
+    (Array.isArray(res.groups) ? res.groups : []).map(
+      (group): [number, { title: string; color: string }] => [
+        group.id,
+        { title: group.title || "", color: group.color || "" },
+      ],
+    ),
   );
 }
 
-const SNAPSHOT_FIELDS = [
+const SNAPSHOT_FIELDS: (keyof ManagerTab)[] = [
   "id",
   "windowId",
   "index",
@@ -540,7 +635,12 @@ const SNAPSHOT_FIELDS = [
   "groupId",
 ];
 
-export function isSameSnapshot(prevTabs, prevGroups, prevWindowId, res) {
+export function isSameSnapshot(
+  prevTabs: ManagerTab[],
+  prevGroups: Map<number, { title: string; color: string }>,
+  prevWindowId: number | null,
+  res: ManagerRes,
+): boolean {
   if (!res || !Array.isArray(res.tabs)) return false;
   const nextWindowId = Number.isInteger(res.currentWindowId)
     ? res.currentWindowId
@@ -586,14 +686,14 @@ function pruneMarksAndConfirm() {
   };
 }
 
-async function refresh() {
+async function refresh(): Promise<void> {
   if (windowChoice) return;
   if (refreshing) {
     refreshQueued = true;
     return;
   }
   refreshing = true;
-  let res;
+  let res: MessageResponse<"managerList"> | null;
   try {
     res = await sendMessageWithTimeout("managerList");
   } catch {
@@ -623,7 +723,7 @@ async function refresh() {
   renderAll();
 }
 
-function startPolling() {
+function startPolling(): void {
   stopPolling();
   pollTimer = setInterval(() => {
     if (!active || refreshing || document.hidden) return;
@@ -632,18 +732,22 @@ function startPolling() {
   }, POLL_MS);
 }
 
-function stopPolling() {
+function stopPolling(): void {
   if (pollTimer !== null) {
     clearInterval(pollTimer);
     pollTimer = null;
   }
 }
 
-export function pollState() {
+export function pollState(): {
+  active: boolean;
+  polling: boolean;
+  refreshing: boolean;
+} {
   return { active, polling: pollTimer !== null, refreshing };
 }
 
-async function open() {
+async function open(): Promise<void> {
   if (active) return;
   const res = await ask("managerList");
   if (!res || !res.ok || !Array.isArray(res.tabs)) {
@@ -705,11 +809,11 @@ async function open() {
   startPolling();
 }
 
-function onVisibility() {
+function onVisibility(): void {
   if (!document.hidden && active) refresh();
 }
 
-function close() {
+function close(): void {
   stopPolling();
   refreshing = false;
   document.removeEventListener("visibilitychange", onVisibility);
@@ -747,22 +851,22 @@ function close() {
     document.activeElement !== restoreFocus
   ) {
     try {
-      ui.safeFocus(restoreFocus, { preventScroll: true });
+      ui.safeFocus(restoreFocus as HTMLElement, { preventScroll: true });
     } catch {}
   }
   restoreFocus = null;
 }
 
-function paintRange() {
+function paintRange(): void {
   if (visualAnchor === null) return;
   const from = Math.min(visualAnchor, selected);
   const to = Math.max(visualAnchor, selected);
-  const painted = new Set();
+  const painted = new Set<number>();
   for (let i = from; i <= to; i++) {
     const tab = filtered[i];
     if (!tab) continue;
-    painted.add(tab.id);
-    marked.add(tab.id);
+    painted.add(tab.id!);
+    marked.add(tab.id!);
   }
   for (const id of visualPainted) {
     if (painted.has(id) || visualBaseline.has(id)) continue;
@@ -771,7 +875,7 @@ function paintRange() {
   visualPainted = painted;
 }
 
-function move(delta) {
+function move(delta: number): void {
   if (filtered.length === 0) return;
   const hadConfirm = takeConfirm();
   endVisual();
@@ -785,7 +889,7 @@ function move(delta) {
   paintSelection(prev);
 }
 
-function moveVisual(delta) {
+function moveVisual(delta: number): void {
   if (filtered.length === 0) return;
   const hadConfirm = takeConfirm();
   const anchor = visualAnchor ?? selected;
@@ -797,7 +901,7 @@ function moveVisual(delta) {
     renderAll();
     return;
   }
-  const rows = [];
+  const rows: number[] = [];
   for (let i = Math.min(lo, selected); i <= Math.max(hi, selected); i++) {
     rows.push(i);
   }
@@ -805,12 +909,12 @@ function moveVisual(delta) {
   repaintRows(rows);
 }
 
-function toggleMark() {
+function toggleMark(): void {
   const tab = focusedTab();
   if (!tab) return;
   const hadConfirm = takeConfirm();
-  if (marked.has(tab.id)) marked.delete(tab.id);
-  else marked.add(tab.id);
+  if (marked.has(tab.id!)) marked.delete(tab.id!);
+  else marked.add(tab.id!);
   if (hadConfirm) {
     renderAll();
     return;
@@ -819,19 +923,19 @@ function toggleMark() {
   repaintRows([selected]);
 }
 
-function takeConfirm() {
+function takeConfirm(): boolean {
   const hadConfirm = confirm !== null;
   confirm = null;
   return hadConfirm;
 }
 
-function endVisual() {
+function endVisual(): void {
   visualAnchor = null;
   visualPainted = new Set();
   visualBaseline = new Set();
 }
 
-function startVisual() {
+function startVisual(): void {
   if (filtered.length === 0) return;
   confirm = null;
   visualAnchor = selected;
@@ -840,19 +944,19 @@ function startVisual() {
   paintRange();
 }
 
-function markAllVisible() {
+function markAllVisible(): void {
   confirm = null;
   endVisual();
-  for (const tab of filtered) marked.add(tab.id);
+  for (const tab of filtered) marked.add(tab.id!);
   renderAll();
 }
 
-function consumeMarks() {
+function consumeMarks(): void {
   marked = new Set();
   endVisual();
 }
 
-async function activateFocused() {
+async function activateFocused(): Promise<void> {
   const tab = focusedTab();
   if (!tab) return;
   const res = await ask("activateTab", { id: tab.id });
@@ -865,12 +969,12 @@ async function activateFocused() {
   await refresh();
 }
 
-function armConfirm(kind, ids, message) {
+function armConfirm(kind: string, ids: number[], message: string): void {
   confirm = { kind, key: confirmKey(ids), ids: [...ids], message };
   renderAll();
 }
 
-function isConfirmed(kind, ids) {
+function isConfirmed(kind: string, ids: number[]): boolean {
   return (
     !!confirm &&
     confirm.kind === kind &&
@@ -879,7 +983,10 @@ function isConfirmed(kind, ids) {
   );
 }
 
-function failureMessage(res, outcome) {
+function failureMessage(
+  res: { ok?: boolean; reason?: string } | null,
+  outcome: { failed: string },
+): string {
   if (res && res.reason === "unsupported") {
     return "Tab groups not supported here";
   }
@@ -892,7 +999,12 @@ function failureMessage(res, outcome) {
   return outcome.failed;
 }
 
-async function runOnTargets(action, payload, outcome, opts = {}) {
+async function runOnTargets<A extends TargetAction>(
+  action: A,
+  payload: (targets: ManagerTab[]) => MessagePayload<A>,
+  outcome: TargetOutcome<A>,
+  opts: { keepMarks?: boolean } = {},
+): Promise<void> {
   const targets = currentTargets();
   if (targets.length === 0) return;
   confirm = null;
@@ -903,15 +1015,15 @@ async function runOnTargets(action, payload, outcome, opts = {}) {
     renderAll();
     return;
   }
-  if (outcome.done) outcome.done(res, targets);
+  if (outcome.done) outcome.done(res as Extract<MessageResponse<A>, { ok: true }>, targets);
   if (!opts.keepMarks) consumeMarks();
   await refresh();
 }
 
-async function closeTargets() {
+async function closeTargets(): Promise<void> {
   const targets = currentTargets();
   if (targets.length === 0) return;
-  const ids = targets.map((tab) => tab.id);
+  const ids = targets.map((tab) => tab.id!);
   if (needsCloseConfirm(targets) && !isConfirmed("close", ids)) {
     const pinned = targets.filter((tab) => tab.pinned).length;
     armConfirm(
@@ -945,16 +1057,17 @@ const FLAGS = {
     on: "Muted",
     off: "Unmuted",
   },
-};
+} as const;
 
-function toggleFlag(kind) {
+function toggleFlag(kind: "pin" | "mute"): Promise<void> {
   const flag = FLAGS[kind];
   return runOnTargets(
     flag.action,
-    (targets) => ({
-      ids: targets.map((tab) => tab.id),
-      [flag.field]: decideSetState(targets, flag.key),
-    }),
+    (targets) =>
+      ({
+        ids: targets.map((tab) => tab.id!),
+        [flag.field]: decideSetState(targets, flag.key),
+      }) as MessagePayload<typeof flag.action>,
     {
       failed: `${flag.label} failed`,
       done: (res, targets) => {
@@ -965,10 +1078,10 @@ function toggleFlag(kind) {
   );
 }
 
-function groupTargets() {
+function groupTargets(): Promise<void> {
   return runOnTargets(
     "groupManagerTabs",
-    (targets) => ({ ids: targets.map((tab) => tab.id) }),
+    (targets) => ({ ids: targets.map((tab) => tab.id!) }),
     {
       failed: "Group failed",
       done: (res, targets) => ui.toast(`Grouped ${targets.length} tabs`),
@@ -1006,7 +1119,7 @@ async function addToFocusedGroup() {
     return;
   }
   const res = await ask("groupManagerTabs", {
-    ids: outside.map((tab) => tab.id),
+    ids: outside.map((tab) => tab.id!),
     groupId,
   });
   if (!active) return;
@@ -1020,7 +1133,7 @@ async function addToFocusedGroup() {
   await refresh();
 }
 
-async function ungroupTargets() {
+async function ungroupTargets(): Promise<void> {
   const grouped = currentTargets().filter(
     (tab) => tab.groupId !== GROUPED_NONE,
   );
@@ -1031,7 +1144,7 @@ async function ungroupTargets() {
   }
   await runOnTargets(
     "ungroupManagerTabs",
-    () => ({ ids: grouped.map((tab) => tab.id) }),
+    () => ({ ids: grouped.map((tab) => tab.id!) }),
     {
       failed: "Ungroup failed",
       done: () => ui.toast(`Ungrouped ${grouped.length} tabs`),
@@ -1039,7 +1152,7 @@ async function ungroupTargets() {
   );
 }
 
-function startRename() {
+function startRename(): void {
   const focused = focusedTab();
   if (!focused) return;
   if (focused.groupId === GROUPED_NONE) {
@@ -1047,18 +1160,21 @@ function startRename() {
     renderAll();
     return;
   }
-  openField("group", (groupsById.get(focused.groupId) || {}).title || "", {
-    groupId: focused.groupId,
-  });
+  openField(
+    "group",
+    (groupsById.get(focused.groupId) || ({} as { title?: string })).title ||
+      "",
+    { groupId: focused.groupId },
+  );
 }
 
-function startEditUrl() {
+function startEditUrl(): void {
   const focused = focusedTab();
   if (!focused) return;
   openField("url", focused.url || "", { tabId: focused.id });
 }
 
-async function commitRename() {
+async function commitRename(): Promise<void> {
   if (!field || field.kind !== "group") return;
   const { groupId } = field;
   const title = fieldValue().trim();
@@ -1074,7 +1190,7 @@ async function commitRename() {
   await refresh();
 }
 
-async function commitEditUrl() {
+async function commitEditUrl(): Promise<void> {
   if (!field || field.kind !== "url") return;
   const { tabId } = field;
   const value = fieldValue().trim();
@@ -1091,10 +1207,10 @@ async function commitEditUrl() {
   await refresh();
 }
 
-function duplicateTargets() {
+function duplicateTargets(): Promise<void> {
   return runOnTargets(
     "duplicateManagerTabs",
-    (targets) => ({ ids: targets.map((tab) => tab.id) }),
+    (targets) => ({ ids: targets.map((tab) => tab.id!) }),
     {
       failed: "Duplicate failed",
       done: (res) => ui.toast(`Duplicated ${res.duplicated}`),
@@ -1102,11 +1218,11 @@ function duplicateTargets() {
   );
 }
 
-function bookmarkPayload(targets) {
+function bookmarkPayload(targets: ManagerTab[]) {
   return { tabs: targets.map((tab) => ({ url: tab.url, title: tab.title })) };
 }
 
-function saveBookmarks() {
+function saveBookmarks(): Promise<void> {
   return runOnTargets(
     "bookmarkManagerTabs",
     bookmarkPayload,
@@ -1122,7 +1238,7 @@ function saveBookmarks() {
   );
 }
 
-function removeBookmarks() {
+function removeBookmarks(): Promise<void> {
   return runOnTargets(
     "unbookmarkManagerTabs",
     bookmarkPayload,
@@ -1136,18 +1252,18 @@ function removeBookmarks() {
   );
 }
 
-function bookmarkTargets() {
+function bookmarkTargets(): Promise<void> {
   return decideSetState(currentTargets(), "bookmarked")
     ? saveBookmarks()
     : removeBookmarks();
 }
 
-function focusOverlay() {
+function focusOverlay(): void {
   if (!overlay) return;
   ui.safeFocus(overlay, { preventScroll: true });
 }
 
-function isOwnChrome(el) {
+function isOwnChrome(el: Element | null): boolean {
   try {
     if (!el) return false;
     if (el === host || el === overlay) return true;
@@ -1158,7 +1274,11 @@ function isOwnChrome(el) {
   }
 }
 
-function openField(kind, text, meta = {}) {
+function openField(
+  kind: FieldKind,
+  text: string,
+  meta: { groupId?: number; tabId?: number } = {},
+): void {
   if (field) return;
   confirm = null;
   const cfg = FIELDS[kind];
@@ -1173,13 +1293,13 @@ function openField(kind, text, meta = {}) {
   input.addEventListener("keydown", (event) => event.stopPropagation());
   input.addEventListener("input", () => {
     if (!field || field.kind !== "filter") return;
-    query = fieldEl.value;
+    query = fieldEl!.value;
     applyFilter();
     renderAll();
   });
   fieldEl = input;
   field = { kind, ...meta };
-  overlay.insertBefore(input, footerEl);
+  overlay!.insertBefore(input, footerEl);
   renderAll();
   const prev = document.activeElement;
   fieldFocusBefore = isOwnChrome(prev) ? null : prev;
@@ -1189,7 +1309,7 @@ function openField(kind, text, meta = {}) {
   } catch {}
 }
 
-function closeField() {
+function closeField(): void {
   if (!fieldEl) return;
   try {
     fieldEl.remove();
@@ -1202,7 +1322,7 @@ function closeField() {
   if (prev && prev.isConnected) {
     if (document.activeElement !== prev) {
       try {
-        ui.safeFocus(prev, { preventScroll: true });
+        ui.safeFocus(prev as HTMLElement, { preventScroll: true });
       } catch {
         focusOverlay();
       }
@@ -1212,11 +1332,11 @@ function closeField() {
   focusOverlay();
 }
 
-function fieldValue() {
+function fieldValue(): string {
   return fieldEl ? fieldEl.value : "";
 }
 
-async function submitOpen() {
+async function submitOpen(): Promise<void> {
   const raw = fieldValue().trim();
   closeField();
   if (!raw) return;
@@ -1241,21 +1361,33 @@ async function submitOpen() {
   await refresh();
 }
 
-function moveTargets(delta) {
+function moveTargets(delta: number): Promise<void> {
   return runOnTargets(
     "moveManagerTabs",
-    (targets) => ({ ids: targets.map((tab) => tab.id), delta }),
+    (targets) => ({ ids: targets.map((tab) => tab.id!), delta }),
     { failed: "Move failed", done: null },
     { keepMarks: true },
   );
 }
 
-async function moveWindowTargets() {
+async function moveWindowTargets(): Promise<void> {
   const targets = currentTargets();
   if (targets.length === 0) return;
-  const ids = targets.map((tab) => tab.id);
+  const ids = targets.map((tab) => tab.id!);
   confirm = null;
-  const res = await ask("moveManagerTabsToWindow", { ids });
+  /* The moveToWindow answer is a 5-way union; every site below reads fields
+     that only exist on some branches, so the reads go through this flat
+     view of the runtime answer instead of per-property casts. */
+  const res = (await ask("moveManagerTabsToWindow", { ids })) as null | {
+    ok: boolean;
+    reason?: string;
+    moved?: number;
+    movedToNewWindow?: boolean;
+    movedToWindow?: boolean;
+    needWindowChoice?: boolean;
+    ownIds?: number[];
+    tabs?: WindowSummary[];
+  };
   if (!active) return;
   if (!res || !res.ok) {
     ui.toast(failureMessage(res, { failed: "Move failed" }));
@@ -1263,13 +1395,19 @@ async function moveWindowTargets() {
     return;
   }
   if (res.movedToNewWindow) {
-    ui.toast(res.moved > 1 ? `Split ${res.moved} tabs to new window` : "Split to new window");
+    ui.toast(
+      res.moved! > 1
+        ? `Split ${res.moved!} tabs to new window`
+        : "Split to new window",
+    );
     consumeMarks();
     await refresh();
     return;
   }
   if (res.movedToWindow) {
-    ui.toast(res.moved > 1 ? `Merged ${res.moved} tabs` : "Merged to window");
+    ui.toast(
+      res.moved! > 1 ? `Merged ${res.moved!} tabs` : "Merged to window",
+    );
     consumeMarks();
     await refresh();
     return;
@@ -1277,7 +1415,7 @@ async function moveWindowTargets() {
   if (res.needWindowChoice) {
     const ownIds =
       Array.isArray(res.ownIds) && res.ownIds.length > 0 ? res.ownIds : ids;
-    windowChoice = { ids: ownIds, windows: res.tabs };
+    windowChoice = { ids: ownIds, windows: res.tabs! };
     selected = 0;
     renderAll();
     return;
@@ -1286,7 +1424,7 @@ async function moveWindowTargets() {
   renderAll();
 }
 
-async function confirmWindowChoice() {
+async function confirmWindowChoice(): Promise<void> {
   if (!windowChoice) return;
   const { ids, windows } = windowChoice;
   const target = windows[selected];
@@ -1307,13 +1445,13 @@ async function confirmWindowChoice() {
   await refresh();
 }
 
-function stepChoice(delta) {
-  const total = windowChoice.windows.length;
+function stepChoice(delta: number): void {
+  const total = windowChoice!.windows.length;
   selected = (selected + delta + total) % total;
   renderAll();
 }
 
-function onChoiceKey(event) {
+function onChoiceKey(event: KeyboardEvent): boolean {
   if (!windowChoice || windowChoice.windows.length === 0) return false;
   switch (event.key) {
     case "Escape":
@@ -1340,7 +1478,7 @@ function onChoiceKey(event) {
   }
 }
 
-function isModifier(event) {
+function isModifier(event: KeyboardEvent): boolean {
   return (
     event.key === "Control" ||
     event.key === "Alt" ||
@@ -1349,11 +1487,11 @@ function isModifier(event) {
   );
 }
 
-function onFieldKey(event) {
+function onFieldKey(event: KeyboardEvent): boolean {
   if (event.isComposing || event.keyCode === 229) return false;
   if (event.key === "Escape") {
     ui.consume(event);
-    if (field.kind === "filter") {
+    if (field!.kind === "filter") {
       query = "";
       applyFilter();
     }
@@ -1362,16 +1500,16 @@ function onFieldKey(event) {
   }
   if (event.key === "Enter") {
     ui.consume(event);
-    if (field.kind === "open") submitOpen();
-    else if (field.kind === "group") commitRename();
-    else if (field.kind === "url") commitEditUrl();
+    if (field!.kind === "open") submitOpen();
+    else if (field!.kind === "group") commitRename();
+    else if (field!.kind === "url") commitEditUrl();
     else closeField();
     return true;
   }
   return false;
 }
 
-function onNormalKey(event) {
+function onNormalKey(event: KeyboardEvent): boolean {
   if (isModifier(event)) return false;
   const hasMod = event.ctrlKey || event.altKey || event.metaKey;
   if (hasMod) return false;
@@ -1508,13 +1646,13 @@ function onNormalKey(event) {
   }
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): boolean {
   if (!active) return false;
   if (field) return onFieldKey(event);
   return onNormalKey(event);
 }
 
-export function fieldState() {
+export function fieldState(): { kind: FieldKind; text: string } | null {
   return field ? { kind: field.kind, text: fieldValue() } : null;
 }
 
