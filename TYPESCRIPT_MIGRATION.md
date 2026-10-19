@@ -1,6 +1,6 @@
 # TypeScript Migration Plan
 
-Status: proposed (2026-10). Incremental JS -> TS rewrite with a DX layer.
+Status: complete (2026-10). Incremental JS -> TS rewrite with a DX layer.
 
 ## Codebase facts that shape the plan
 
@@ -298,11 +298,15 @@ bundles committed every time. Recommended order:
   auto-discovers `.test.ts`; if not, point the script at
   `node --test "tests/*.test.ts"` explicitly.
 
-### Phase 4 — cleanup
+### Phase 4 — cleanup (done)
 
-- Remove JS leftovers; drop the browser-globals eslint block.
-- Update `AGENTS.md` (commands, layout, "tests import .ts" convention,
-  erasable-syntax rule) and the README build/dev section if needed.
+- No JS source leftovers: every module under `content/`, `background/`,
+  `shared/`, `options/`, `popup/`, `benchmarks/`, plus `build.ts`, is `.ts`.
+  The remaining `.js` is intentional and stays: the 6 fixture-heavy stub
+  suites (per the test-file policy above), the `docs/` demo, and committed
+  build output — so the browser-globals eslint block stays to cover them.
+- `AGENTS.md` refreshed (`476d8a2`: `.ts` paths, `setup.ts`, erasable-syntax
+  rule, protocol/settings type homes) and README gained `npm run check`.
 
 ## Gotchas
 
