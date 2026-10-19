@@ -71,10 +71,21 @@ if (target === "dist") {
   );
 }
 
-function manifestFor(target: "chrome" | "firefox") {
+// Only the fields build.ts reads or mutates are declared; the rest of the
+// manifest shape stays governed by manifest.base.json (the committed source
+// of truth).
+type Manifest = {
+  version: string;
+  background: { service_worker?: string; scripts?: string[] };
+  browser_specific_settings?: Record<string, unknown>;
+  permissions: string[];
+  [key: string]: unknown;
+};
+
+function manifestFor(target: "chrome" | "firefox"): Manifest {
   const manifest = JSON.parse(
     readFileSync(join(root, "manifest.base.json"), "utf8"),
-  );
+  ) as Manifest;
   if (target === "chrome") {
     manifest.background = { service_worker: "background.js" };
     delete manifest.browser_specific_settings;
