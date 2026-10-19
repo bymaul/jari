@@ -35,7 +35,7 @@ function stubWordWalker(nodes: FakeTextNode[]) {
   };
   return (focusNode: FakeTextNode, focusOffset: number) => {
     (globalThis.window as unknown as { getSelection: unknown }).getSelection =
-      { focusNode, focusOffset };
+      () => ({ focusNode, focusOffset });
   };
 }
 
