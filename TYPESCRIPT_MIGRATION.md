@@ -298,6 +298,10 @@ bundles committed every time. Recommended order:
   stay byte-stable, unminified, map-free). Kills the edit-rebuild-reload loop,
   today's worst gap.
 - Optional: `npm run dev:firefox` via web-ext (already a devDep) for auto-reload.
+  (Done: `dev` takes an optional `[chrome|firefox]` target; the firefox
+  flavor writes the firefox manifest and spawns `web-ext run` with
+  node_modules/dist/.git ignored — edit/rebuild/reload loop verified
+  headless; `dev`/`dev:chrome` stay watch-only with a manual load.)
 - Move the CI distFiles guard (docs/ demo not packaged) into `build.ts` as a real
   check — the CI step greps `build.js` source text and breaks on rename.
 - Type the manifest object in build (JSON stays the committed source of truth;

@@ -18,6 +18,8 @@
     "build:chrome": "node build.ts chrome",
     "build:firefox": "node build.ts firefox",
     "dev": "node build.ts dev",
+    "dev:chrome": "node build.ts dev chrome",
+    "dev:firefox": "node build.ts dev firefox",
     "dist": "node build.ts dist",
     "sign:firefox": "web-ext sign --source-dir=dist/jari-firefox --artifacts-dir=dist/signed --channel=unlisted"
   },

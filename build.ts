@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { build, context, type BuildContext, type BuildOptions } from "esbuild";
 import {
   copyFileSync,
@@ -14,14 +14,21 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const target: string | undefined = process.argv[2];
+const command: string | undefined = process.argv[2];
+const devTargetArg: string | undefined = process.argv[3];
+const devTarget: "chrome" | "firefox" =
+  devTargetArg === "firefox" ? "firefox" : "chrome";
 if (
-  target !== "chrome" &&
-  target !== "firefox" &&
-  target !== "dist" &&
-  target !== "dev"
+  (command !== "chrome" &&
+    command !== "firefox" &&
+    command !== "dist" &&
+    command !== "dev") ||
+  (command === "dev" &&
+    devTargetArg !== undefined &&
+    devTargetArg !== "chrome" &&
+    devTargetArg !== "firefox")
 ) {
-  console.error("Usage: node build.ts <chrome|firefox|dist|dev>");
+  console.error("Usage: node build.ts <chrome|firefox|dist|dev [chrome|firefox]>");
   process.exit(1);
 }
 
@@ -68,8 +75,19 @@ const entries: Array<[string, string, string]> = [
 // dev-mode process lifetime (see watchOne).
 const devContexts: BuildContext[] = [];
 
-if (target === "dev") {
-  await dev();
+if (command === "dev") {
+  await dev(devTarget);
+} else if (command === "dist") {
+  for (const [dir, entry, outfile] of entries) {
+    await buildOne(dir, entry, outfile, buildBanner);
+  }
+  console.log("Wrote content/bundle.js");
+  console.log("Wrote options/options.bundle.js");
+  console.log("Wrote popup/popup.bundle.js");
+  console.log("Wrote background.js");
+
+  buildDist("chrome");
+  buildDist("firefox");
 } else {
   for (const [dir, entry, outfile] of entries) {
     await buildOne(dir, entry, outfile, buildBanner);
@@ -79,15 +97,10 @@ if (target === "dev") {
   console.log("Wrote popup/popup.bundle.js");
   console.log("Wrote background.js");
 
-  if (target === "dist") {
-    buildDist("chrome");
-    buildDist("firefox");
-  } else {
-    writeManifest(target);
-    console.log(
-      `Load this folder in ${target === "chrome" ? "Chrome" : "Firefox"}.`,
-    );
-  }
+  writeManifest(command);
+  console.log(
+    `Load this folder in ${command === "chrome" ? "Chrome" : "Firefox"}.`,
+  );
 }
 
 // Only the fields build.ts reads or mutates are declared; the rest of the
@@ -242,27 +255,73 @@ function bundleOptions(
   };
 }
 
-// Dev watch mode: `npm run dev`. Same options as release builds plus
-// sourcemaps (release output stays map-free and byte-stable), rebuilt on
-// every source edit. manifest.base.json is not an esbuild input, so the
-// contexts never see edits to it — poll-stat it and regenerate the manifest
-// when it changes.
-async function dev(): Promise<void> {
+// Dev watch mode: `npm run dev[:chrome|:firefox]`. Same options as release
+// builds plus sourcemaps (release output stays map-free and byte-stable),
+// rebuilt on every source edit. manifest.base.json is not an esbuild input,
+// so the contexts never see edits to it — poll-stat it and regenerate the
+// manifest when it changes. The firefox flavor additionally launches
+// `web-ext run` so the extension auto-reloads in Firefox on every rebuild.
+async function dev(devTarget: "chrome" | "firefox"): Promise<void> {
   for (const [dir, entry, outfile] of entries) {
     devContexts.push(await watchOne(dir, entry, outfile, buildBanner));
   }
-  writeManifest("chrome");
+  writeManifest(devTarget);
 
   const baseManifest = join(root, "manifest.base.json");
   let mtimeMs = statSync(baseManifest).mtimeMs;
   watchFile(baseManifest, { interval: 500 }, (now) => {
     if (now.mtimeMs === mtimeMs) return;
     mtimeMs = now.mtimeMs;
-    writeManifest("chrome");
+    writeManifest(devTarget);
   });
 
-  console.log("Load this folder in Chrome. Watching for changes…");
+  if (devTarget === "firefox") {
+    launchWebExtRun();
+  } else {
+    console.log("Load this folder in Chrome. Watching for changes…");
+  }
   await new Promise(() => {});
+}
+
+// Firefox flavor of dev watch: run the repo root under `web-ext run` so
+// the extension installs into a throwaway profile and reloads on every
+// esbuild rebuild. Heavy local-only trees stay out of the packaged reload
+// via --ignore-files/--watch-ignored. A web-ext failure (no Firefox,
+// no display) only costs auto-reload — the esbuild watch keeps running.
+function launchWebExtRun(): void {
+  const webExt = join(root, "node_modules", "web-ext", "bin", "web-ext.js");
+  const child = spawn(
+    process.execPath,
+    [
+      webExt,
+      "run",
+      "--source-dir",
+      root,
+      "--artifacts-dir",
+      join(tmpdir(), "jari-web-ext-run"),
+      "--ignore-files",
+      "node_modules",
+      "dist",
+      ".git",
+      "web-ext-artifacts",
+      "--watch-ignored",
+      "node_modules/**",
+      "dist/**",
+      ".git/**",
+      "--no-config-discovery",
+    ],
+    { stdio: "inherit" },
+  );
+  child.on("error", (err) => {
+    console.error(
+      `web-ext run failed to start (${err.message}); watching without auto-reload.`,
+    );
+  });
+  child.on("exit", (code) => {
+    console.log(
+      `web-ext run exited (${code}); esbuild watch is still running.`,
+    );
+  });
 }
 
 async function watchOne(
