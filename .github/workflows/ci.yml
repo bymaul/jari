@@ -14,7 +14,5 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build:chrome
-      - name: docs demo stays out of packaged builds
-        run: node -e "const m=require('fs').readFileSync('build.ts','utf8').match(/const distFiles = \[(.*?)\];/s);if(!m)throw new Error('distFiles not found');if(/demo|docs/i.test(m[1]))throw new Error('docs/ must not be packaged')"
       - name: generated bundles are in sync
         run: git diff --exit-code -- content/bundle.js background.js options/options.bundle.js manifest.json

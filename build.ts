@@ -40,6 +40,13 @@ const distFiles = [
   "icons/icon-128.png",
 ];
 
+// The docs/ demo site stays out of the packaged artifacts (CI relied on a
+// source-text grep for this before the check moved here; now every build
+// invocation enforces it for real).
+if (distFiles.some((file) => /(^|[/\\])(docs|demo)([/\\]|$)/i.test(file))) {
+  throw new Error("docs/ must not be packaged");
+}
+
 await buildOne("content", "content.js", "bundle.js", buildBanner);
 await buildOne("options", "options.js", "options.bundle.js", buildBanner);
 await buildOne("popup", "popup.js", "popup.bundle.js", buildBanner);
