@@ -30,8 +30,8 @@ export default tseslint.config(
     },
   },
   {
-    // build.js is a plain Node script, not a browser content script.
-    files: ["build.js"],
+    // build.ts is a plain Node script, not a browser content script.
+    files: ["build.ts"],
     languageOptions: {
       ecmaVersion: 2022,
       globals: {

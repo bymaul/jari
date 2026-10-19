@@ -15,9 +15,9 @@
     "lint": "eslint .",
     "test": "node --test",
     "bench": "node benchmarks/rank.js",
-    "build:chrome": "node build.js chrome",
-    "build:firefox": "node build.js firefox",
-    "dist": "node build.js dist",
+    "build:chrome": "node build.ts chrome",
+    "build:firefox": "node build.ts firefox",
+    "dist": "node build.ts dist",
     "sign:firefox": "web-ext sign --source-dir=dist/jari-firefox --artifacts-dir=dist/signed --channel=unlisted"
   },
   "devDependencies": {
