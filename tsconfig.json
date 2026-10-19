@@ -4,6 +4,7 @@
     "lib": ["ES2022", "DOM"],
     "module": "preserve",
     "moduleResolution": "bundler",
+    "moduleDetection": "force",
     "esModuleInterop": true,
     "strict": true,
     "noEmit": true,
@@ -22,6 +23,7 @@
     "background/**/*.ts",
     "popup/**/*.ts",
     "options/**/*.ts",
+    "benchmarks/**/*",
     "tests/**/*.ts"
   ]
 }

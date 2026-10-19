@@ -1,7 +1,7 @@
 // Rank benchmark: per-keystroke cost of rankMatches over a synthetic
 // suggest-sized pool. Not a test (no assertions, always exits 0).
 // Run: npm run bench -- [poolSize]
-import { rankMatches } from "../content/rank.js";
+import { rankMatches, type RankItem } from "../content/rank.ts";
 
 const N = Number(process.argv[2]) || 600;
 const titles = [
@@ -16,7 +16,7 @@ const titles = [
   "TypeScript Handbook",
   "NixOS Search",
 ];
-const pool = [];
+const pool: RankItem[] = [];
 for (let i = 0; i < N; i++) {
   const t = titles[i % titles.length];
   pool.push({

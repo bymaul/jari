@@ -226,6 +226,11 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   Suites that stay `.js` per the fixture-heavy policy: background, content,
   find-collect, hints, scroll, suggest. `node --test` discovers `.test.ts`
   with no script change; suite count unchanged at 134.
+- Benchmarks: `benchmarks/{rank,scroll}.js` -> `.ts` (`pool: RankItem[]`
+  annotation, Node/window/document/location/chrome stub casts,
+  location/chrome stub casts, `moduleDetection: force` + `benchmarks/**/*`
+  in tsconfig, `bench` script points at `rank.ts`, eslint benchmark block
+  folded into the plain-JS override; source bundles byte-identical).
 
 ## Phases
 

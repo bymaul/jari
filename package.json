@@ -14,7 +14,7 @@
     "check": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --test",
-    "bench": "node benchmarks/rank.js",
+    "bench": "node benchmarks/rank.ts",
     "build:chrome": "node build.ts chrome",
     "build:firefox": "node build.ts firefox",
     "dev": "node build.ts dev",
