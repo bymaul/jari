@@ -201,6 +201,21 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   that include build:firefox, head back to a clean root manifest via
   `npm run build:chrome` before staging — the chrome build is what the CI
   sync check expects on disk.
+- Phase 3 build DX, commits `30b4cbd` (docs/ dist guard moved from the CI
+  source-text grep into build.ts as a real module-scope check; CI step
+  removed), `325efd5` (Manifest type: only the fields manifestFor reads or
+  mutates + unknown index signature; base JSON stays the source of truth),
+  `71dce71` (`npm run dev`: esbuild context()+watch() over the four bundles
+  with sourcemaps, writeManifest("chrome") + 500ms mtime poll on
+  manifest.base.json; contexts collected module-level because esbuild tears
+  down a watch when its context object is GC'd).
+- Dev-mode debugging lesson: verify rebuilds with a change that actually
+  alters bundle bytes — comment probes get stripped by esbuild and unreferenced
+  string consts get tree-shaken, so identical-output edits never appear in the
+  bundle. First signal that a watch fired: the .map file mtime/sourcesContent.
+  dev5 stalled once after its first rebuild (likely interference from stray
+  daemons still alive during probing); a clean restart rebuilt consecutively,
+  so the design stands on ctx.watch() after all.
 
 ## Phases
 
