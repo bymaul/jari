@@ -139,9 +139,21 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   statusEl `_timer` expando `ReturnType<typeof setTimeout>` with the
   ?? undefined no-op; `hidden` writes through HTMLElement casts — not on
   lib.dom Element; parsePagenavField returns a flattened optional duck;
-  RowData ducks carry the queried inputs).
-- Remaining Phase 2 files (in attack order): `options/options.js` (1276),
-  `content/tab-manager.js` (1528), `content/visual.js` (1635 — imports
+  RowData ducks carry the queried inputs),
+  `options/options.ts` `6ac3672` (static-html elements asserted non-null at
+  declaration so unguarded accesses keep their original throw-on-missing
+  behavior — `?.`-guarded ones stay nullable; activeRecording gets a
+  button/name/waitingKeys shape with asserts inside onAddKeydown; numeric
+  settings go into input.value raw via `as unknown as string` (DOM setter
+  coerce preserved); commitNumber's options object unions
+  fallback/settingKey so `settings[fallback]()` and the computed-key patch
+  fly; `ui.safeFocus(el, opts?)` widens to optional — the one-arg call in
+  the confirm dialog is the original runtime and the body forwards to
+  `el.focus(opts)`, erased from content/bundle.js).
+- Remaining Phase 2 files (in attack order): `content/tab-manager.js`
+  (1528 — 83 functions, uses rank/search-engines/url/settings/ui/prompt
+  shared/overlays; exports TabManager consumed by commands.ts),
+  `content/visual.js` (1635 — imports
   overlays/ui/hint-layer/hints-elements/collect/caret-geometry/word/motion,
   registers via `register`+`touch`, exports `Visual` consumed as any by
   commands.ts/find.ts), then `build.js` -> `build.ts` (order item 6; needs
