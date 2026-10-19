@@ -1,6 +1,7 @@
 import "./setup.ts";
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
+import type { CommandContext } from "../content/commands.ts";
 
 const { settings } = await import("../content/settings.ts");
 const { commands } = await import("../content/commands.ts");
@@ -9,7 +10,7 @@ const { handleKeydown, shieldOverlayKey, __resetState } = await import("../conte
 const { Overlays, register, touch } = await import("../content/overlays.ts");
 
 let shieldActive = false;
-const shieldKeys = [];
+const shieldKeys: string[] = [];
 register("test-shield", {
   isActive: () => shieldActive,
   onKeyDown: (event) => {
@@ -22,7 +23,7 @@ register("test-shield", {
 
 let keyupActive = false;
 let keyupHandled = true;
-const keyupSeen = [];
+const keyupSeen: string[] = [];
 register("test-keyup", {
   isActive: () => keyupActive,
   onKeyDown: () => false,
@@ -35,7 +36,24 @@ register("test-keyup", {
   },
 });
 
-function key(partial = {}) {
+interface FakeKey {
+  isTrusted: boolean;
+  key: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  type?: string;
+  target?: unknown;
+  composedPath?: () => unknown[];
+  claimed?: boolean;
+  shielded?: boolean;
+  preventDefault(): void;
+  stopImmediatePropagation(): void;
+  stopPropagation(): void;
+}
+
+function key(partial: Partial<FakeKey> = {}): FakeKey {
   return {
     isTrusted: true,
     key: "j",
@@ -56,19 +74,27 @@ function key(partial = {}) {
   };
 }
 
-function assertClaimed(ev) {
+function press(ev: FakeKey): void {
+  handleKeydown(ev as unknown as KeyboardEvent);
+}
+
+function shield(ev: FakeKey): void {
+  shieldOverlayKey(ev as unknown as KeyboardEvent);
+}
+
+function assertClaimed(ev: FakeKey) {
   assert.ok(ev.claimed, "expected the key to be claimed");
 }
-function assertUnclaimed(ev) {
+function assertUnclaimed(ev: FakeKey) {
   assert.ok(!ev.claimed, "expected the key to reach the page");
 }
 
-const originals = {};
-const spiedCalls = {};
-function spyOn(commandName) {
+const originals: Record<string, (typeof commands)[string]> = {};
+const spiedCalls: Record<string, CommandContext[]> = {};
+function spyOn(commandName: string) {
   if (!(commandName in originals)) originals[commandName] = commands[commandName];
   spiedCalls[commandName] = [];
-  const original = originals[commandName] || {};
+  const original = originals[commandName];
   commands[commandName] = {
     ...original,
     run: (c) => spiedCalls[commandName].push(c),
@@ -90,7 +116,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetState();
-  document.activeElement = null;
+  (globalThis.document as unknown as Record<string, unknown>).activeElement = null;
   shieldActive = false;
   shieldKeys.length = 0;
   Overlays.closeAll();
@@ -100,7 +126,7 @@ afterEach(() => {
 test("synthetic events are ignored", () => {
   spyOn("scrollDown");
   const ev = key({ isTrusted: false });
-  handleKeydown(ev);
+  press(ev);
   assert.equal(spiedCalls.scrollDown.length, 0);
   assertUnclaimed(ev);
 });
@@ -108,7 +134,7 @@ test("synthetic events are ignored", () => {
 test("a single-key command runs once and claims the key", () => {
   spyOn("scrollDown");
   const ev = key({ key: "j" });
-  handleKeydown(ev);
+  press(ev);
   assert.equal(spiedCalls.scrollDown.length, 1);
   assert.equal(spiedCalls.scrollDown[0].count, 1);
   assert.equal(spiedCalls.scrollDown[0].event, ev);
@@ -117,16 +143,16 @@ test("a single-key command runs once and claims the key", () => {
 
 test("a count prefix repeats a command", () => {
   spyOn("scrollDown");
-  handleKeydown(key({ key: "2" }));
-  handleKeydown(key({ key: "j" }));
+  press(key({ key: "2" }));
+  press(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown.length, 1);
   assert.equal(spiedCalls.scrollDown[0].count, 2);
 });
 
 test("a two-key prefix composes a binding", () => {
   spyOn("goToParent");
-  handleKeydown(key({ key: "g" }));
-  handleKeydown(key({ key: "u" }));
+  press(key({ key: "g" }));
+  press(key({ key: "u" }));
   assert.equal(spiedCalls.goToParent.length, 1);
   assert.equal(spiedCalls.goToParent[0].count, 1);
 });
@@ -134,48 +160,48 @@ test("a two-key prefix composes a binding", () => {
 test("Escape with a pending count cancels the composition", () => {
   spyOn("scrollDown");
   const esc = key({ key: "Escape" });
-  handleKeydown(key({ key: "5" }));
-  handleKeydown(esc);
+  press(key({ key: "5" }));
+  press(esc);
   assertClaimed(esc);
-  handleKeydown(key({ key: "j" }));
+  press(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown[0].count, 1);
 });
 
 test("ignore mode passes every key through except its toggle and Escape", () => {
   spyOn("scrollDown");
   const on = key({ key: "I" });
-  handleKeydown(on);
+  press(on);
   assertClaimed(on);
 
   const pass = key({ key: "j" });
-  handleKeydown(pass);
+  press(pass);
   assert.equal(spiedCalls.scrollDown.length, 0);
   assertUnclaimed(pass);
 
   const off = key({ key: "I" });
-  handleKeydown(off);
+  press(off);
   assertClaimed(off);
 
-  handleKeydown(key({ key: "j" }));
+  press(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown.length, 1);
 });
 
 test("passthrough lets every key through until Escape", () => {
   spyOn("scrollDown");
   const on = key({ key: "p" });
-  handleKeydown(on);
+  press(on);
   assertClaimed(on);
 
   const pass = key({ key: "j" });
-  handleKeydown(pass);
+  press(pass);
   assert.equal(spiedCalls.scrollDown.length, 0);
   assertUnclaimed(pass);
 
   const esc = key({ key: "Escape" });
-  handleKeydown(esc);
+  press(esc);
   assertClaimed(esc);
 
-  handleKeydown(key({ key: "j" }));
+  press(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown.length, 1);
 });
 
@@ -185,20 +211,20 @@ test("disabled sites pass every key through except the toggle", () => {
   spyOn("toggleSiteEnabled");
 
   const pass = key({ key: "j" });
-  handleKeydown(pass);
+  press(pass);
   assert.equal(spiedCalls.scrollDown.length, 0);
   assertUnclaimed(pass);
 
   const toggle = key({ key: "v", ctrlKey: true, altKey: true });
-  handleKeydown(toggle);
+  press(toggle);
   assert.equal(spiedCalls.toggleSiteEnabled.length, 1);
   assertClaimed(toggle);
 });
 
 test("keys typed into a form field reach the page, Escape blurs", () => {
   spyOn("scrollDown");
-  const calls = [];
-  document.activeElement = {
+  const calls: string[] = [];
+  (globalThis.document as unknown as Record<string, unknown>).activeElement = {
     tagName: "INPUT",
     isContentEditable: false,
     getAttribute: () => null,
@@ -206,12 +232,12 @@ test("keys typed into a form field reach the page, Escape blurs", () => {
   };
 
   const pass = key({ key: "j" });
-  handleKeydown(pass);
+  press(pass);
   assert.equal(spiedCalls.scrollDown.length, 0);
   assertUnclaimed(pass);
 
   const esc = key({ key: "Escape" });
-  handleKeydown(esc);
+  press(esc);
   assertClaimed(esc);
   assert.deepEqual(calls, ["blur"]);
 });
@@ -224,7 +250,7 @@ test("keys typed into overlay UI are shielded from the page", () => {
     target: { className: "page-node" },
     composedPath: () => [{ className: "jari-prompt-host" }],
   });
-  handleKeydown(ev);
+  press(ev);
   assert.deepEqual(shieldKeys, ["/"]);
   assert.ok(ev.shielded, "expected stopPropagation for Jari UI targets");
 });
@@ -236,7 +262,7 @@ test("shieldOverlayKey offers keyup to the overlay before shielding", () => {
   touch("test-keyup");
   try {
     const ev = key({ key: " ", type: "keyup" });
-    shieldOverlayKey(ev);
+    shield(ev);
     assert.deepEqual(keyupSeen, [" "]);
     assertUnclaimed(ev);
   } finally {
@@ -251,7 +277,7 @@ test("shieldOverlayKey shields keyup the overlay ignores", () => {
   touch("test-keyup");
   try {
     const ev = key({ key: " ", type: "keyup" });
-    shieldOverlayKey(ev);
+    shield(ev);
     assert.deepEqual(keyupSeen, [" "]);
     assertClaimed(ev);
   } finally {
@@ -263,35 +289,41 @@ test("shieldOverlayKey shields keyup for overlays without onKeyUp", () => {
   shieldActive = true;
   touch("test-shield");
   const ev = key({ key: " ", type: "keyup" });
-  shieldOverlayKey(ev);
+  shield(ev);
   assertClaimed(ev);
 });
 
 test("popup help message opens the cheatsheet in the top frame", async () => {
   const { SHOW_HELP_ACTION } = await import("../popup/site.ts");
   spyOn("showHelp");
-  globalThis.window.top = globalThis.window;
+  const win = globalThis.window as unknown as Record<string, unknown>;
+  win.top = globalThis.window;
   try {
-    const listeners = globalThis.chrome.runtime.onMessage._listeners;
-    assert.ok(listeners.length > 0);
-    for (const fn of listeners) fn({ action: SHOW_HELP_ACTION });
+    const listeners = globalThis.chrome.runtime.onMessage as unknown as {
+      _listeners: ((msg: unknown) => void)[];
+    };
+    assert.ok(listeners._listeners.length > 0);
+    for (const fn of listeners._listeners) fn({ action: SHOW_HELP_ACTION });
     assert.equal(spiedCalls.showHelp.length, 1);
   } finally {
-    delete globalThis.window.top;
+    delete win.top;
   }
 });
 
 test("popup help message is ignored in subframes and for other actions", async () => {
   const { SHOW_HELP_ACTION } = await import("../popup/site.ts");
   spyOn("showHelp");
-  const listeners = globalThis.chrome.runtime.onMessage._listeners;
-  globalThis.window.top = {};
+  const listeners = globalThis.chrome.runtime.onMessage as unknown as {
+    _listeners: ((msg: unknown) => void)[];
+  };
+  const win = globalThis.window as unknown as Record<string, unknown>;
+  win.top = {};
   try {
-    for (const fn of listeners) fn({ action: SHOW_HELP_ACTION });
+    for (const fn of listeners._listeners) fn({ action: SHOW_HELP_ACTION });
   } finally {
-    delete globalThis.window.top;
+    delete win.top;
   }
-  for (const fn of listeners) fn({ action: "something-else" });
-  for (const fn of listeners) fn(null);
+  for (const fn of listeners._listeners) fn({ action: "something-else" });
+  for (const fn of listeners._listeners) fn(null);
   assert.equal(spiedCalls.showHelp.length, 0);
 });
