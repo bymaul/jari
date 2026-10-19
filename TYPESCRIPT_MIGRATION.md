@@ -20,7 +20,7 @@ Status: proposed (2026-10). Incremental JS -> TS rewrite with a DX layer.
   fallbacks in `content/ui.js`. Namespaces: tabs (heaviest), windows, tabGroups
   (feature-detected, Chrome-only), bookmarks, history, sessions, storage,
   runtime. No ports anywhere.
-- Node 24.22; tests are `node --test` with a shared stub in `tests/setup.mjs`
+- Node 24.22; tests are `node --test` with a shared stub in `tests/setup.ts`
   (tests monkeypatch the global `chrome` object per suite, swapping/deleting whole
   namespaces).
 
@@ -216,6 +216,16 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   dev5 stalled once after its first rebuild (likely interference from stray
   daemons still alive during probing); a clean restart rebuilt consecutively,
   so the design stands on ctx.watch() after all.
+- Test conversion: `1d687ef` popup (renamed only), `7d0f93e` background-utils
+  (storage-get swaps type-fit as-is), `34df66b` hint-layer (as-is),
+  `2951282` tab-manager (ManagerTab/GroupSummary annotations; group
+  literals gain `collapsed` to match GroupSummary; the two missing-list cases
+  keep covering isSameSnapshot's looser runtime branch via casts), `4553340`
+  + `42278e5` visual-word (FakeDocWithWalker casts; one transcription slip:
+  the getSelection stub must be the arrow function, not the plain object).
+  Suites that stay `.js` per the fixture-heavy policy: background, content,
+  find-collect, hints, scroll, suggest. `node --test` discovers `.test.ts`
+  with no script change; suite count unchanged at 134.
 
 ## Phases
 

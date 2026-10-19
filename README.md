@@ -90,6 +90,7 @@ Details in [PRIVACY.md](PRIVACY.md).
 
 ```sh
 npm install
+npm run dev           # rebuild on save (chrome manifest, sourcemaps)
 npm run lint          # eslint, must be clean
 npm test              # node --test
 npm run build:chrome  # or: npm run build:firefox
