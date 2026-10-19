@@ -149,11 +149,22 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   fallback/settingKey so `settings[fallback]()` and the computed-key patch
   fly; `ui.safeFocus(el, opts?)` widens to optional — the one-arg call in
   the confirm dialog is the original runtime and the body forwards to
-  `el.focus(opts)`, erased from content/bundle.js).
-- Remaining Phase 2 files (in attack order): `content/tab-manager.js`
-  (1528 — 83 functions, uses rank/search-engines/url/settings/ui/prompt
-  shared/overlays; exports TabManager consumed by commands.ts),
-  `content/visual.js` (1635 — imports
+  `el.focus(opts)`, erased from content/bundle.js),
+  `content/tab-manager.ts` `8047327` (state carries its runtime shapes —
+  ManagerTab[] tabs/filtered, groupsById Map<number, {title, color}>,
+  field {kind, groupId?, tabId?}, windowChoice {ids, windows: WindowSummary[]};
+  runOnTargets generic over TargetAction, the nine actions answering
+  `ok`-shapes, with TargetOutcome.done fed `Extract<.., {ok: true}>`; the
+  body's non-narrowing generic indexed access needed the additive Extract
+  cast; known-good `id!`/`windowId!` asserts at Set/Map ops and id
+  payload arrays; additive casts: filterManagerTabs through the RankItem
+  seam (non-fuzzy branch returns list members verbatim), the 5-branch
+  moveToWindow answer read through a flat duck binding, toggleFlag's
+  computed-key payload via `as MessagePayload<typeof flag.action>`;
+  element module-lets stay nullable with asserts at their guarded use
+  sites — bundle diff is comment rename + rewraps only).
+- Remaining Phase 2 files (in attack order): `content/visual.js` (1635 —
+  imports
   overlays/ui/hint-layer/hints-elements/collect/caret-geometry/word/motion,
   registers via `register`+`touch`, exports `Visual` consumed as any by
   commands.ts/find.ts), then `build.js` -> `build.ts` (order item 6; needs
