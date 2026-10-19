@@ -162,14 +162,21 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   moveToWindow answer read through a flat duck binding, toggleFlag's
   computed-key payload via `as MessagePayload<typeof flag.action>`;
   element module-lets stay nullable with asserts at their guarded use
-  sites — bundle diff is comment rename + rewraps only).
-- Remaining Phase 2 files (in attack order): `content/visual.js` (1635 —
-  imports
-  overlays/ui/hint-layer/hints-elements/collect/caret-geometry/word/motion,
-  registers via `register`+`touch`, exports `Visual` consumed as any by
-  commands.ts/find.ts), then `build.js` -> `build.ts` (order item 6; needs
-  package.json script updates — infra, flag it in that PR). Tests stay `.js`
-  per the established policy (fixture-heavy stubs import `.ts` modules).
+  sites — bundle diff is comment rename + rewraps only),
+  `content/visual.ts` `e3d6359` (mode/pending state as unions — VisualMode
+  and PendingFindChar/LastFindChar; extendSelection/moveCaret take local
+  SelectionModifyDirection/Granularity unions since lib.dom does not ship
+  them; hintMap is Map<string, {el, hintEl: HintLink}>; the three
+  resolveCaretGeometry rects are CaretRect ducks; known-good nodeValue
+  asserts on walker-filtered text nodes; additive casts for
+  setStart/setEnd focus/lineEnd nodes read after selection mutation, the
+  parentNode Element cast, the hasModify falsy-union cast; issuer-cleared
+  timers ride the documented ?? undefined no-op; lint-driven let/const on
+  ok/nodes/startIdx disclosed — bundle diff rename + rewrap only).
+- Remaining Phase 2 files (in attack order): `build.js` -> `build.ts`
+  (163 lines; order item 6; needs package.json script updates — infra,
+  flag it in that PR). Tests stay `.js` per the established policy
+  (fixture-heavy stubs import `.ts` modules).
 - GATE BUG FIXED in `df238f2`: tsconfig `include` covered only
   `shared/**/*` + `tests/**/*.ts`, so all Phase-2 content/background TS files
   passed `tsc --noEmit` without being in the program (only keymap/rank/
