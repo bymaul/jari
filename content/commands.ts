@@ -8,7 +8,7 @@ import { TabManager } from "./tab-manager.ts";
 import { Help } from "./help.ts";
 import { Hints, setCommandRunner } from "./hints.ts";
 import { Find } from "./find.ts";
-import { Visual } from "./visual.js";
+import { Visual } from "./visual.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 import { goPage } from "./page-nav.ts";
 import type { CommandDef, CommandName } from "./catalog.ts";

@@ -6540,7 +6540,7 @@
     return false;
   }
 
-  // content/visual.js
+  // content/visual.ts
   var active3 = false;
   var mode2 = "visual";
   var pillEl = null;
@@ -6839,7 +6839,8 @@
     try {
       if (typeof event.composedPath === "function") {
         const path = event.composedPath();
-        if (Array.isArray(path) && path.length > 0 && path[0]) return path[0];
+        if (Array.isArray(path) && path.length > 0 && path[0])
+          return path[0];
       }
     } catch {
     }
@@ -7147,7 +7148,7 @@
   function doMoveWordEnd() {
     if (isCaret()) {
       if (!fallbackMoveWordEnd(1, true)) {
-        let ok = moveCaret("forward", "word");
+        const ok = moveCaret("forward", "word");
         if (ok) {
           if (!moveCaret("backward", "character")) fallbackMoveCaret(-1);
         } else {
@@ -7159,7 +7160,7 @@
       return;
     }
     if (!fallbackExtendWordEnd(1, false)) {
-      let ok = extendSelection("forward", "word");
+      const ok = extendSelection("forward", "word");
       if (ok) {
         if (!extendSelection("backward", "character")) fallbackMoveChar(-1);
       } else {
@@ -7188,13 +7189,13 @@
   function doDocBoundary(dir) {
     const gran = "documentboundary";
     if (isCaret()) {
-      let ok2 = moveCaret(dir < 0 ? "backward" : "forward", gran);
+      const ok2 = moveCaret(dir < 0 ? "backward" : "forward", gran);
       if (!ok2) fallbackDocBoundary(dir, true);
       ensureVisible();
       updateBlockCaret();
       return;
     }
-    let ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
+    const ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
     if (!ok) fallbackDocBoundary(dir, false);
     ensureVisible();
     updateBlockCaret();
@@ -7406,7 +7407,7 @@
   function getCaretLinkElement() {
     const sel = getSelection2();
     if (!sel || !sel.focusNode) return null;
-    const el = sel.focusNode.parentElement || sel.focusNode.parentNode || null;
+    const el = sel.focusNode.parentElement || (sel.focusNode.parentNode || null);
     return getLinkAncestor(el);
   }
   function activateCaretLink() {
@@ -7447,13 +7448,13 @@
         }
       }
     );
-    let nodes = [];
+    const nodes = [];
     let n = walker.nextNode();
     while (n) {
       nodes.push(n);
       n = walker.nextNode();
     }
-    let startIdx = nodes.indexOf(focusNode);
+    const startIdx = nodes.indexOf(focusNode);
     if (startIdx === -1) {
       ui.toast(`Not found: ${ch}`);
       pendingF = null;
@@ -7776,7 +7777,7 @@
         ui.consume(event);
         pendingG = true;
         if (pillEl) pillEl.textContent = pillText(mode2) + " g";
-        clearTimeout(pendingGTimer);
+        clearTimeout(pendingGTimer ?? void 0);
         pendingGTimer = setTimeout(() => {
           pendingGTimer = null;
           pendingG = false;
@@ -7812,7 +7813,7 @@
         ui.consume(event);
         pendingY = true;
         if (pillEl) pillEl.textContent = pillText(mode2) + " y";
-        clearTimeout(pendingYTimer);
+        clearTimeout(pendingYTimer ?? void 0);
         pendingYTimer = setTimeout(() => {
           pendingYTimer = null;
           if (pendingY) {

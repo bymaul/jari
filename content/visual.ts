@@ -30,20 +30,38 @@ import {
   fallbackExtendWordEnd,
   fallbackMoveLine,
 } from "./visual/motion.ts";
+import type { CaretRect } from "./visual/caret-geometry.ts";
+import type { HintLink } from "./hint-layer.ts";
+
+type VisualMode = "visual" | "line" | "caret";
+type PendingFindChar = {
+  dir: "forward" | "backward";
+  till: boolean;
+  count: number;
+};
+type LastFindChar = PendingFindChar & { ch: string };
+/** DOM selection.modify() direction/granularity spellings. */
+type SelectionModifyDirection = "forward" | "backward" | "left" | "right";
+type SelectionModifyGranularity =
+  | "character"
+  | "word"
+  | "line"
+  | "lineboundary"
+  | "documentboundary";
 
 let active = false;
-let mode = "visual"; // "visual" | "line" | "caret"
-let pillEl = null;
+let mode: VisualMode = "visual"; // "visual" | "line" | "caret"
+let pillEl: HTMLDivElement | null = null;
 let pendingCount = "";
 let pendingG = false;
-let pendingF = null;
-let lastF = null;
+let pendingF: PendingFindChar | null = null;
+let lastF: LastFindChar | null = null;
 let pendingY = false;
-let pendingGTimer = null;
-let pendingYTimer = null;
-let caretRaf = null;
+let pendingGTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingYTimer: ReturnType<typeof setTimeout> | null = null;
+let caretRaf: number | null = null;
 
-function clearPendingKeyTimers() {
+function clearPendingKeyTimers(): void {
   if (pendingGTimer !== null) {
     clearTimeout(pendingGTimer);
     pendingGTimer = null;
@@ -54,35 +72,35 @@ function clearPendingKeyTimers() {
   }
 }
 
-let caretEl = null;
-let caretHost = null;
+let caretEl: HTMLDivElement | null = null;
+let caretHost: HTMLDivElement | null = null;
 
 let hintActive = false;
-let hintElements = [];
+let hintElements: Element[] = [];
 let hintPrefix = "";
-let hintHost = null;
-let hintHolder = null;
-let hintMap = new Map();
-let pendingVisualMode = "visual";
+let hintHost: HTMLDivElement | null = null;
+let hintHolder: HTMLElement | null = null;
+const hintMap = new Map<string, { el: Element; hintEl: HintLink }>();
+let pendingVisualMode: VisualMode = "visual";
 
-let findOpenHandler = null;
-let findNavHandler = null;
+let findOpenHandler: (() => void) | null = null;
+let findNavHandler: ((repeat: number, reverse: boolean) => void) | null = null;
 
-function isActive() {
+function isActive(): boolean {
   return active || hintActive;
 }
-function setFindOpen(handler) {
+function setFindOpen(handler: () => void): void {
   findOpenHandler = handler;
 }
-function setFindNav(handler) {
+function setFindNav(handler: (repeat: number, reverse: boolean) => void): void {
   findNavHandler = handler;
 }
-function pillText(m) {
+function pillText(m: string): string {
   if (m === "caret") return "caret";
   if (m === "line") return "visual line";
   return "visual";
 }
-function showPill() {
+function showPill(): void {
   if (pillEl) return;
   try {
     pillEl = document.createElement("div");
@@ -92,7 +110,7 @@ function showPill() {
   } catch {}
 }
 
-function hidePill() {
+function hidePill(): void {
   if (!pillEl) return;
   try {
     pillEl.remove();
@@ -100,16 +118,16 @@ function hidePill() {
   pillEl = null;
 }
 
-function getSelection() {
+function getSelection(): Selection | null {
   return window.getSelection();
 }
 
-function hasModify() {
+function hasModify(): boolean {
   const sel = getSelection();
-  return sel && typeof sel.modify === "function";
+  return (sel && typeof sel.modify === "function") as boolean;
 }
 
-function caretCss() {
+function caretCss(): string {
   return `
       .jari-visual-caret {
         position: absolute;
@@ -130,7 +148,7 @@ function caretCss() {
     `;
 }
 
-function showBlockCaret() {
+function showBlockCaret(): void {
   if (caretEl) return;
   try {
     const created = ui.createShadowHost(
@@ -145,7 +163,7 @@ function showBlockCaret() {
   } catch {}
 }
 
-function hideBlockCaret() {
+function hideBlockCaret(): void {
   if (caretHost) {
     try {
       caretHost.remove();
@@ -160,7 +178,7 @@ function hideBlockCaret() {
   }
 }
 
-function updateBlockCaretImmediate() {
+function updateBlockCaretImmediate(): void {
   if (!active || !caretEl || !caretHost) return;
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
@@ -168,8 +186,8 @@ function updateBlockCaretImmediate() {
     const range = sel.getRangeAt(0);
     const focusNode = sel.focusNode;
     const focusOffset = sel.focusOffset;
-    let collapsed = null;
-    let clientRects = null;
+    let collapsed: CaretRect | null = null;
+    let clientRects: DOMRectList | null = null;
     try {
       if (focusNode) {
         const r = document.createRange();
@@ -193,15 +211,15 @@ function updateBlockCaretImmediate() {
         collapsed = null;
       }
     }
-    let before = null;
-    let after = null;
+    let before: CaretRect | null = null;
+    let after: CaretRect | null = null;
     if (!isUsableCaretRect(collapsed) && !firstUsableRect(clientRects)) {
       const neighbors = readNeighborCharRects(focusNode, focusOffset);
       before = neighbors.before;
       after = neighbors.after;
     }
-    let parentRect = null;
-    let parentEl = null;
+    let parentRect: CaretRect | null = null;
+    let parentEl: HTMLElement | null = null;
     if (
       !isUsableCaretRect(collapsed) &&
       !firstUsableRect(clientRects) &&
@@ -229,18 +247,19 @@ function updateBlockCaretImmediate() {
       fallbackHeight: parentEl ? lineHeightForElement(parentEl) : 16,
     });
     if (!geo) return;
-    caretEl.style.transform = `translate3d(${geo.left}px, ${geo.top}px, 0)`;
-    caretEl.style.height = `${Math.max(12, geo.height)}px`;
+    caretEl!.style.transform = `translate3d(${geo.left}px, ${geo.top}px, 0)`;
+    caretEl!.style.height = `${Math.max(12, geo.height!)}px`;
     if (mode === "line") {
-      caretEl.style.width = `${Math.max(20, geo.width || 0)}px`;
-      caretEl.style.opacity = "0.35";
+      caretEl!.style.width = `${Math.max(20, geo.width || 0)}px`;
+      caretEl!.style.opacity = "0.35";
     } else {
-      caretEl.style.width = `7px`;
-      caretEl.style.opacity = "0.85";
+      caretEl!.style.width = `7px`;
+      caretEl!.style.opacity = "0.85";
     }
   } catch {}
 }
-function updateBlockCaret() {
+
+function updateBlockCaret(): void {
   if (caretRaf) return;
   caretRaf = requestAnimationFrame(() => {
     caretRaf = null;
@@ -248,7 +267,7 @@ function updateBlockCaret() {
   });
 }
 
-function ensureVisible() {
+function ensureVisible(): void {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
   try {
@@ -284,7 +303,7 @@ function ensureVisible() {
   updateBlockCaret();
 }
 
-function attachCaretListeners() {
+function attachCaretListeners(): void {
   try {
     window.addEventListener("scroll", updateBlockCaret, {
       passive: true,
@@ -305,7 +324,7 @@ function attachCaretListeners() {
   enableSelectOverride();
   attachMouseListeners();
 }
-function detachCaretListeners() {
+function detachCaretListeners(): void {
   try {
     window.removeEventListener("scroll", updateBlockCaret, { capture: true });
     window.removeEventListener("resize", updateBlockCaret);
@@ -326,8 +345,8 @@ function detachCaretListeners() {
   if (!active && !hintActive) disableSelectOverride();
   if (!active && !hintActive) detachMouseListeners();
 }
-let selectOverrideEl = null;
-function enableSelectOverride() {
+let selectOverrideEl: HTMLStyleElement | null = null;
+function enableSelectOverride(): void {
   if (selectOverrideEl) return;
   try {
     selectOverrideEl = document.createElement("style");
@@ -336,7 +355,7 @@ function enableSelectOverride() {
     (document.head || document.documentElement).appendChild(selectOverrideEl);
   } catch {}
 }
-function disableSelectOverride() {
+function disableSelectOverride(): void {
   if (!selectOverrideEl) return;
   try {
     selectOverrideEl.remove();
@@ -344,32 +363,33 @@ function disableSelectOverride() {
   selectOverrideEl = null;
 }
 
-function mouseTarget(event) {
+function mouseTarget(event: MouseEvent): Element | null {
   try {
     if (typeof event.composedPath === "function") {
       const path = event.composedPath();
-      if (Array.isArray(path) && path.length > 0 && path[0]) return path[0];
+      if (Array.isArray(path) && path.length > 0 && path[0])
+        return path[0] as Element;
     }
   } catch {}
-  return event.target || null;
+  return (event.target as Element | null) || null;
 }
 
-function isJariUiEvent(event) {
-  let path = null;
+function isJariUiEvent(event: MouseEvent): boolean {
+  let path: EventTarget[] | null = null;
   try {
     if (typeof event.composedPath === "function") path = event.composedPath();
   } catch {}
   const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
   for (const node of nodes) {
     try {
-      const cls = node && node.className;
+      const cls = node && (node as Element).className;
       if (typeof cls === "string" && cls.includes("jari-")) return true;
     } catch {}
   }
   return false;
 }
 
-function onMouseDown(event) {
+function onMouseDown(event: MouseEvent): void {
   if (!active && !hintActive) return;
   if (isJariUiEvent(event)) return;
   if (hintActive) closeHints();
@@ -377,7 +397,7 @@ function onMouseDown(event) {
   if (isEditable(mouseTarget(event))) close(true);
 }
 
-function onSelectionChange() {
+function onSelectionChange(): void {
   if (!active || hintActive) return;
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
@@ -388,7 +408,7 @@ function onSelectionChange() {
   updateBlockCaret();
 }
 
-function attachMouseListeners() {
+function attachMouseListeners(): void {
   try {
     window.addEventListener("mousedown", onMouseDown, true);
     document.addEventListener("selectionchange", onSelectionChange);
@@ -399,7 +419,7 @@ function attachMouseListeners() {
   }
 }
 
-function detachMouseListeners() {
+function detachMouseListeners(): void {
   try {
     window.removeEventListener("mousedown", onMouseDown, true);
     document.removeEventListener("selectionchange", onSelectionChange);
@@ -410,7 +430,7 @@ function detachMouseListeners() {
   }
 }
 
-function renderHints() {
+function renderHints(): void {
   if (hintHost) {
     try {
       hintHost.remove();
@@ -433,7 +453,7 @@ function renderHints() {
   refreshHints();
 }
 
-function refreshHints() {
+function refreshHints(): void {
   if (!hintActive) return;
   for (const [label, obj] of hintMap.entries()) {
     const hintEl = obj.hintEl;
@@ -453,7 +473,7 @@ function refreshHints() {
   }
 }
 
-function showVisualHints(requestedMode) {
+function showVisualHints(requestedMode?: VisualMode): void {
   pendingVisualMode = requestedMode || "visual";
   const elements = collectVisualTextElements();
   if (elements.length === 0) {
@@ -479,7 +499,7 @@ function showVisualHints(requestedMode) {
   ui.toast(`Hints: ${hintElements.length} text targets`);
 }
 
-function closeHints() {
+function closeHints(): void {
   if (!hintActive) return;
   hintActive = false;
   hintPrefix = "";
@@ -504,7 +524,7 @@ function closeHints() {
   }
 }
 
-function activateHintByLabel(label) {
+function activateHintByLabel(label: string): boolean {
   const entry = hintMap.get(label);
   if (!entry) return false;
   const el = entry.el;
@@ -513,7 +533,7 @@ function activateHintByLabel(label) {
   return true;
 }
 
-function enterAtElement(el, newMode) {
+function enterAtElement(el: Element, newMode?: VisualMode): void {
   if (active) close(false);
   mode = newMode || "visual";
   let range;
@@ -586,7 +606,10 @@ function enterAtElement(el, newMode) {
   updateBlockCaret();
 }
 
-function extendSelection(direction, granularity) {
+function extendSelection(
+  direction: SelectionModifyDirection,
+  granularity: SelectionModifyGranularity,
+): boolean {
   const sel = getSelection();
   if (!sel) return false;
   if (hasModify()) {
@@ -598,7 +621,10 @@ function extendSelection(direction, granularity) {
   return false;
 }
 
-function moveCaret(direction, granularity) {
+function moveCaret(
+  direction: SelectionModifyDirection,
+  granularity: SelectionModifyGranularity,
+): boolean {
   const sel = getSelection();
   if (!sel) return false;
   if (hasModify()) {
@@ -610,11 +636,11 @@ function moveCaret(direction, granularity) {
   return false;
 }
 
-function isCaret() {
+function isCaret(): boolean {
   return mode === "caret";
 }
 
-function doMoveChar(dir) {
+function doMoveChar(dir: number): void {
   if (isCaret()) {
     const ok = moveCaret(dir < 0 ? "left" : "right", "character");
     if (!ok) fallbackMoveCaret(dir);
@@ -633,7 +659,7 @@ function doMoveChar(dir) {
 
 
 
-function doMoveLine(dir) {
+function doMoveLine(dir: number): void {
   if (isCaret()) {
     let ok = moveCaret(dir < 0 ? "backward" : "forward", "line");
     if (!ok) ok = fallbackMoveLine(dir, true);
@@ -649,7 +675,7 @@ function doMoveLine(dir) {
   updateBlockCaret();
 }
 
-function doMoveWord(dir) {
+function doMoveWord(dir: number): void {
   if (isCaret()) {
     let ok = moveCaret(dir < 0 ? "backward" : "forward", "word");
     if (!ok) ok = fallbackMoveWord(dir);
@@ -665,10 +691,10 @@ function doMoveWord(dir) {
   updateBlockCaret();
 }
 
-function doMoveWordEnd() {
+function doMoveWordEnd(): void {
   if (isCaret()) {
     if (!fallbackMoveWordEnd(1, true)) {
-      let ok = moveCaret("forward", "word");
+      const ok = moveCaret("forward", "word");
       if (ok) {
         if (!moveCaret("backward", "character")) fallbackMoveCaret(-1);
       } else {
@@ -680,7 +706,7 @@ function doMoveWordEnd() {
     return;
   }
   if (!fallbackExtendWordEnd(1, false)) {
-    let ok = extendSelection("forward", "word");
+    const ok = extendSelection("forward", "word");
     if (ok) {
       if (!extendSelection("backward", "character")) fallbackMoveChar(-1);
     } else {
@@ -691,7 +717,7 @@ function doMoveWordEnd() {
   updateBlockCaret();
 }
 
-function doLineBoundary(dir) {
+function doLineBoundary(dir: number): void {
   const gran = "lineboundary";
   if (isCaret()) {
     let ok = moveCaret(dir < 0 ? "backward" : "forward", gran);
@@ -708,21 +734,21 @@ function doLineBoundary(dir) {
   updateBlockCaret();
 }
 
-function doDocBoundary(dir) {
+function doDocBoundary(dir: number): void {
   const gran = "documentboundary";
   if (isCaret()) {
-    let ok = moveCaret(dir < 0 ? "backward" : "forward", gran);
+    const ok = moveCaret(dir < 0 ? "backward" : "forward", gran);
     if (!ok) fallbackDocBoundary(dir, true);
     ensureVisible();
     updateBlockCaret();
     return;
   }
-  let ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
+  const ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
   if (!ok) fallbackDocBoundary(dir, false);
   ensureVisible();
   updateBlockCaret();
 }
-function doGoToLine(n) {
+function doGoToLine(n: number): void {
   const line = Math.max(1, Math.floor(n) || 1);
   const walker = document.createTreeWalker(
     document.body,
@@ -743,7 +769,7 @@ function doGoToLine(n) {
     },
   );
   let idx = 0;
-  let target = null;
+  let target: Node | null = null;
   let node = walker.nextNode();
   while (node) {
     idx++;
@@ -762,7 +788,7 @@ function doGoToLine(n) {
   updateBlockCaret();
 }
 
-function doFirstNonBlank() {
+function doFirstNonBlank(): void {
   const forCaret = isCaret();
   if (!fallbackFirstNonBlank(forCaret)) {
     doLineBoundary(-1);
@@ -770,7 +796,7 @@ function doFirstNonBlank() {
     if (sel && sel.focusNode && sel.focusNode.nodeType === Node.TEXT_NODE) {
       const node = sel.focusNode;
       const off = sel.focusOffset;
-      const txt = node.nodeValue;
+      const txt = node.nodeValue!;
       let newOff = off;
       while (newOff < txt.length && /\s/.test(txt[newOff])) newOff++;
       if (newOff !== off) moveToPosition(node, newOff);
@@ -781,7 +807,7 @@ function doFirstNonBlank() {
   }
 }
 
-function swapAnchorFocus() {
+function swapAnchorFocus(): void {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const anchorNode = sel.anchorNode;
@@ -809,7 +835,7 @@ function swapAnchorFocus() {
   } catch {}
 }
 
-function yankSelection() {
+function yankSelection(): void {
   const sel = getSelection();
   if (!sel) return;
   const text = sel.toString();
@@ -822,11 +848,11 @@ function yankSelection() {
   );
 }
 
-function stripTrailingNewlines(text) {
+function stripTrailingNewlines(text: string): string {
   return text.replace(/[\r\n]+$/, "");
 }
 
-function yankLinesFromCaret(count) {
+function yankLinesFromCaret(count: number): void {
   const sel = getSelection();
   if (!sel || !sel.focusNode) {
     ui.toast("No line");
@@ -879,7 +905,7 @@ function yankLinesFromCaret(count) {
   );
 }
 
-function yankLineFromCaret() {
+function yankLineFromCaret(): void {
   const sel = getSelection();
   if (!sel || !sel.focusNode) {
     ui.toast("No line");
@@ -937,14 +963,16 @@ function yankLineFromCaret() {
   );
 }
 
-function getCaretLinkElement() {
+function getCaretLinkElement(): Element | null {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return null;
-  const el = sel.focusNode.parentElement || sel.focusNode.parentNode || null;
+  const el =
+    sel.focusNode.parentElement ||
+    ((sel.focusNode.parentNode as Element | null) || null);
   return getLinkAncestor(el);
 }
 
-function activateCaretLink() {
+function activateCaretLink(): boolean {
   const link = getCaretLinkElement();
   if (!link) {
     ui.toast("No link at caret");
@@ -956,7 +984,7 @@ function activateCaretLink() {
   return true;
 }
 
-function handleFChar(ch) {
+function handleFChar(ch: string): void {
   const sel = getSelection();
   if (!sel) return;
   const focusNode = sel.focusNode;
@@ -982,25 +1010,25 @@ function handleFChar(ch) {
       },
     },
   );
-  let nodes = [];
+  const nodes: Node[] = [];
   let n = walker.nextNode();
   while (n) {
     nodes.push(n);
     n = walker.nextNode();
   }
-  let startIdx = nodes.indexOf(focusNode);
+  const startIdx = nodes.indexOf(focusNode);
   if (startIdx === -1) {
     ui.toast(`Not found: ${ch}`);
     pendingF = null;
     return;
   }
   let found = 0;
-  let targetNode = null;
+  let targetNode: Node | null = null;
   let targetOffset = -1;
   if (dir === "forward") {
     for (let i = startIdx; i < nodes.length; i++) {
       const node = nodes[i];
-      const text = node.nodeValue;
+      const text = node.nodeValue!;
       let from = 0;
       if (i === startIdx) from = focusOffset + 1;
       let idx = text.indexOf(ch, from);
@@ -1018,8 +1046,8 @@ function handleFChar(ch) {
   } else {
     for (let i = startIdx; i >= 0; i--) {
       const node = nodes[i];
-      const text = node.nodeValue;
-      let idx;
+      const text = node.nodeValue!;
+      let idx: number;
       if (i === startIdx) idx = text.lastIndexOf(ch, focusOffset - 1);
       else idx = text.lastIndexOf(ch);
       while (idx !== -1) {
@@ -1044,7 +1072,7 @@ function handleFChar(ch) {
   pendingF = null;
 }
 
-function moveToPosition(node, offset) {
+function moveToPosition(node: Node, offset: number): void {
   const sel = getSelection();
   if (!sel) return;
   offset = Math.max(
@@ -1088,7 +1116,7 @@ function moveToPosition(node, offset) {
   updateBlockCaret();
 }
 
-function expandSelectionToFullLines() {
+function expandSelectionToFullLines(): boolean {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !hasModify()) {
     return false;
@@ -1108,8 +1136,8 @@ function expandSelectionToFullLines() {
     sel.addRange(tail);
     sel.modify("extend", "backward", "lineboundary");
     const full = document.createRange();
-    full.setStart(sel.focusNode, sel.focusOffset);
-    full.setEnd(lineEndNode, lineEndOffset);
+    full.setStart(sel.focusNode as Node, sel.focusOffset);
+    full.setEnd(lineEndNode as Node, lineEndOffset);
     sel.removeAllRanges();
     sel.addRange(full);
     return true;
@@ -1118,14 +1146,14 @@ function expandSelectionToFullLines() {
   }
 }
 
-function getRepeatCount() {
+function getRepeatCount(): number {
   const n = parseInt(pendingCount || "1", 10);
   const c = Number.isNaN(n) ? 1 : Math.max(1, n);
   pendingCount = "";
   return c;
 }
 
-function collapseToFocus() {
+function collapseToFocus(): void {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
   try {
@@ -1141,7 +1169,7 @@ function collapseToFocus() {
   } catch {}
 }
 
-function enterCaretAtFocus() {
+function enterCaretAtFocus(): void {
   if (!active) return;
   collapseToFocus();
   mode = "caret";
@@ -1156,7 +1184,7 @@ function enterCaretAtFocus() {
   updateBlockCaret();
 }
 
-function enter(newMode) {
+function enter(newMode?: VisualMode): void {
   if (hintActive) closeHints();
   if (active) close(false);
   touch("visual");
@@ -1164,7 +1192,7 @@ function enter(newMode) {
   showVisualHints(pendingVisualMode);
 }
 
-function close(keepSelection = false) {
+function close(keepSelection: boolean = false): void {
   if (hintActive) closeHints();
   if (!active) return;
   active = false;
@@ -1186,7 +1214,7 @@ function close(keepSelection = false) {
   }
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): boolean {
   if (hintActive) {
     const key = event.key;
     if (key === "Escape") {
@@ -1211,7 +1239,7 @@ function onKeyDown(event) {
     }
     if (key === "Enter") {
       ui.consume(event);
-      const visible = [];
+      const visible: string[] = [];
       for (const label of hintMap.keys()) {
         if (label.startsWith(hintPrefix)) visible.push(label);
       }
@@ -1323,7 +1351,7 @@ function onKeyDown(event) {
       ui.consume(event);
       pendingG = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " g";
-      clearTimeout(pendingGTimer);
+      clearTimeout(pendingGTimer ?? undefined);
       pendingGTimer = setTimeout(() => {
         pendingGTimer = null;
         pendingG = false;
@@ -1361,7 +1389,7 @@ function onKeyDown(event) {
       ui.consume(event);
       pendingY = true;
       if (pillEl) pillEl.textContent = pillText(mode) + " y";
-      clearTimeout(pendingYTimer);
+      clearTimeout(pendingYTimer ?? undefined);
       pendingYTimer = setTimeout(() => {
         pendingYTimer = null;
         if (pendingY) {
