@@ -10,7 +10,7 @@ const { HINT_CHARSET_DEFAULT, keymapDefaults } = await import("../content/keymap
 const { isExplicitlyRequested, isElementClickable, collectIframeElements } =
   __testHelpers;
 
-function assertPrefixFree(labels) {
+function assertPrefixFree(labels: string[]) {
   assert.equal(new Set(labels).size, labels.length, "labels must be unique");
   for (let i = 0; i < labels.length; i++) {
     for (let j = 0; j < labels.length; j++) {
@@ -54,21 +54,36 @@ test("normalizeCharset falls back to the shared default", () => {
 });
 
 test("isElementClickable honors selector matches without measuring", () => {
-  assert.equal(isElementClickable({ matches: () => true }), true);
+  assert.equal(
+    isElementClickable({ matches: () => true } as unknown as Element),
+    true,
+  );
 });
 
 test("isElementClickable reuses a passed style for the cursor check", () => {
-  const el = { matches: () => false, closest: () => null };
-  assert.equal(isElementClickable(el, { cursor: "pointer" }), true);
-  assert.equal(isElementClickable(el, { cursor: "url(foo.png)" }), true);
-  assert.equal(isElementClickable(el, { cursor: "default" }), false);
+  const el = {
+    matches: () => false,
+    closest: () => null,
+  } as unknown as Element;
+  assert.equal(
+    isElementClickable(el, { cursor: "pointer" } as unknown as CSSStyleDeclaration),
+    true,
+  );
+  assert.equal(
+    isElementClickable(el, { cursor: "url(foo.png)" } as unknown as CSSStyleDeclaration),
+    true,
+  );
+  assert.equal(
+    isElementClickable(el, { cursor: "default" } as unknown as CSSStyleDeclaration),
+    false,
+  );
 });
 
 test("iframe inners are hinted only for the focused frame", () => {
   const innerLink = {
     tagName: "A",
-    matches: (s) => s === "[href]",
-    getAttribute: (n) => (n === "href" ? "https://example.com/" : null),
+    matches: (s: string) => s === "[href]",
+    getAttribute: (n: string) => (n === "href" ? "https://example.com/" : null),
     href: "https://example.com/",
     disabled: false,
     readOnly: false,
@@ -82,6 +97,7 @@ test("iframe inners are hinted only for the focused frame", () => {
       width: 90,
       height: 20,
     }),
+    ownerDocument: null as unknown,
   };
   const innerDoc = {
     body: { querySelectorAll: () => [innerLink] },
@@ -105,26 +121,28 @@ test("iframe inners are hinted only for the focused frame", () => {
     }),
   };
   const prevQsa = globalThis.document.querySelectorAll;
-  const prevActive = globalThis.document.activeElement;
+  const doc = globalThis.document as unknown as Record<string, unknown>;
+  const prevActive = doc.activeElement;
   const prevStyle = globalThis.window.getComputedStyle;
   const prevW = globalThis.window.innerWidth;
   const prevH = globalThis.window.innerHeight;
-  globalThis.document.querySelectorAll = () => [frame];
+  globalThis.document.querySelectorAll = (() =>
+    [frame]) as unknown as typeof globalThis.document.querySelectorAll;
   globalThis.window.innerWidth = 800;
   globalThis.window.innerHeight = 600;
-  globalThis.window.getComputedStyle = () => ({
+  globalThis.window.getComputedStyle = (() => ({
     opacity: "1",
     visibility: "visible",
     display: "block",
-  });
+  })) as unknown as typeof window.getComputedStyle;
   try {
-    globalThis.document.activeElement = frame;
+    doc.activeElement = frame as unknown as Element;
     assert.equal(collectIframeElements("open").length, 1);
-    globalThis.document.activeElement = null;
+    doc.activeElement = null;
     assert.equal(collectIframeElements("open").length, 0);
   } finally {
     globalThis.document.querySelectorAll = prevQsa;
-    globalThis.document.activeElement = prevActive;
+    doc.activeElement = prevActive;
     globalThis.window.getComputedStyle = prevStyle;
     globalThis.window.innerWidth = prevW;
     globalThis.window.innerHeight = prevH;
@@ -186,16 +204,19 @@ test("collectMutationRoots gathers added subtrees and changed targets", () => {
   const added = { nodeType: 1 };
   const target = { nodeType: 1 };
   const textParent = { nodeType: 1 };
-  const out = [];
+  const out: Node[] = [];
   collectMutationRoots(
-    { addedNodes: [added, { nodeType: 3 }], target },
+    { addedNodes: [added, { nodeType: 3 }], target } as unknown as MutationRecord,
     out,
   );
   collectMutationRoots(
-    { addedNodes: [], target: { nodeType: 3, parentElement: textParent } },
+    {
+      addedNodes: [],
+      target: { nodeType: 3, parentElement: textParent },
+    } as unknown as MutationRecord,
     out,
   );
-  collectMutationRoots(null, out);
+  collectMutationRoots(null as unknown as MutationRecord, out);
   assert.deepEqual(out, [added, target, textParent]);
 });
 
@@ -205,38 +226,39 @@ test("collectNewcomers accepts visible clickables and skips the rest", () => {
   const prevStyle = globalThis.window.getComputedStyle;
   globalThis.window.innerWidth = 800;
   globalThis.window.innerHeight = 600;
-  globalThis.window.getComputedStyle = () => ({
+  globalThis.window.getComputedStyle = (() => ({
     opacity: "1",
     visibility: "visible",
     display: "block",
     cursor: "default",
     overflowY: "visible",
     overflowX: "visible",
-  });
-  const stubEl = (over = {}) => ({
-    nodeType: 1,
-    tagName: "DIV",
-    matches: () => true,
-    closest: () => null,
-    getAttribute: () => null,
-    disabled: false,
-    readOnly: false,
-    isContentEditable: false,
-    getRootNode: () => ({ host: null }),
-    parentElement: null,
-    contains: () => false,
-    shadowRoot: null,
-    getBoundingClientRect: () => ({
-      left: 10,
-      top: 10,
-      right: 100,
-      bottom: 30,
-      width: 90,
-      height: 20,
-    }),
-    querySelectorAll: () => [],
-    ...over,
-  });
+  })) as unknown as typeof window.getComputedStyle;
+  const stubEl = (over: Record<string, unknown> = {}) =>
+    ({
+      nodeType: 1,
+      tagName: "DIV",
+      matches: () => true,
+      closest: () => null,
+      getAttribute: () => null,
+      disabled: false,
+      readOnly: false,
+      isContentEditable: false,
+      getRootNode: () => ({ host: null }),
+      parentElement: null,
+      contains: () => false,
+      shadowRoot: null,
+      getBoundingClientRect: () => ({
+        left: 10,
+        top: 10,
+        right: 100,
+        bottom: 30,
+        width: 90,
+        height: 20,
+      }),
+      querySelectorAll: () => [],
+      ...over,
+    }) as unknown as Element;
   try {
     const good = stubEl();
     const hidden = stubEl({
@@ -265,17 +287,28 @@ test("collectNewcomers accepts visible clickables and skips the rest", () => {
 });
 
 test("isExplicitlyRequested honors the custom clickable selector", () => {
-  assert.equal(isExplicitlyRequested({ matches: () => true }), false);
+  assert.equal(
+    isExplicitlyRequested({ matches: () => true } as unknown as Element),
+    false,
+  );
   settings.set({ clickableSelector: "div.card" });
-  assert.equal(isExplicitlyRequested({ matches: (s) => s === "div.card" }), true);
-  assert.equal(isExplicitlyRequested({ matches: () => false }), false);
+  assert.equal(
+    isExplicitlyRequested({
+      matches: (s: string) => s === "div.card",
+    } as unknown as Element),
+    true,
+  );
+  assert.equal(
+    isExplicitlyRequested({ matches: () => false } as unknown as Element),
+    false,
+  );
   settings.set({ clickableSelector: "[" });
   assert.equal(
     isExplicitlyRequested({
       matches: () => {
         throw new Error("invalid selector");
       },
-    }),
+    } as unknown as Element),
     false,
   );
   settings.set({ clickableSelector: "" });
