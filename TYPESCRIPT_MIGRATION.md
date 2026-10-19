@@ -223,13 +223,17 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   keep covering isSameSnapshot's looser runtime branch via casts), `4553340`
   + `42278e5` visual-word (FakeDocWithWalker casts; one transcription slip:
   the getSelection stub must be the arrow function, not the plain object).
-  Suites that stay `.js` per the fixture-heavy policy: background, content,
-  find-collect, hints, scroll. `node --test` discovers `.test.ts`
-  with no script change; suite count unchanged at 134.
-- Trial reversal: `suggest.test.js` -> `.ts` `8f17b1b` (70 lines; the stub
-  assignments each need an `as unknown as typeof chrome.*` cast and the
-  listener bag a `Record<string, () => void>` — readable at this size,
-  verdict on the five larger suites pending).
+  `node --test` discovers `.test.ts` with no script change; suite count
+  unchanged at 134.
+- Policy reversal: the remaining stub-heavy suites migrate after all —
+  `suggest` `a7c0db8`, `find-collect` + `hints`, `content`, `scroll`,
+  `background` (one commit each). Recurring patterns: whole-namespace
+  chrome writes go through a `Record<string, unknown>` alias (deletes need
+  it — lib.dom props are required/readonly), stub-typed reads stay on the
+  typed namespace; handler-arity fixes (goBack/moveTabLeft take sender only,
+  goToFirstTab/openExtensions take none — the dropped `{}` args were
+  runtime no-ops); `&&`-chains become `if`s for the TS lint rule; the
+  window-choice response union needs one `as unknown as` loosen cast.
 - Benchmarks: `benchmarks/{rank,scroll}.js` -> `.ts` (`pool: RankItem[]`
   annotation, Node/window/document/location/chrome stub casts,
   location/chrome stub casts, `moduleDetection: force` + `benchmarks/**/*`
@@ -305,10 +309,10 @@ bundles committed every time. Recommended order:
 ### Phase 4 — cleanup (done)
 
 - No JS source leftovers: every module under `content/`, `background/`,
-  `shared/`, `options/`, `popup/`, `benchmarks/`, plus `build.ts`, is `.ts`.
-  The remaining `.js` is intentional and stays: the 6 fixture-heavy stub
-  suites (per the test-file policy above), the `docs/` demo, and committed
-  build output — so the browser-globals eslint block stays to cover them.
+  `shared/`, `options/`, `popup/`, `benchmarks/`, `tests/`, plus `build.ts`,
+  is `.ts`. The remaining `.js` is intentional and stays: the `docs/` demo
+  and committed build output — the browser-globals eslint block covers only
+  those now (the `tests/**/*.js` override is gone).
 - `AGENTS.md` refreshed (`476d8a2`: `.ts` paths, `setup.ts`, erasable-syntax
   rule, protocol/settings type homes) and README gained `npm run check`.
 

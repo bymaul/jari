@@ -43,22 +43,8 @@ export default tseslint.config(
     },
   },
   {
-    // The node:test suites run under Node, not in a browser.
-    files: ["tests/**/*.js"],
-    languageOptions: {
-      ecmaVersion: 2022,
-      globals: {
-        process: "readonly",
-        console: "readonly",
-        fetch: "readonly",
-        WebSocket: "readonly",
-      },
-    },
-  },
-  {
-    // Plain-JS files that live outside the TS migration: the node:test stub
-    // suites (kept per TYPESCRIPT_MIGRATION.md's fixture-heavy policy) and
-    // the docs/ demo script. They reference browser globals directly.
+    // Plain-JS files that live outside the TS migration: the docs/ demo
+    // script. It references browser globals directly.
     files: ["**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,

@@ -80,9 +80,11 @@ source (repo convention).
   core user-facing flows (happy-path + 1-2 edge cases each). Do not add
   copy/text/ordering snapshot tests or combinatorial permutations.
 - Tests import `./setup.ts` for window/document/location/chrome stubs;
-  per-test DOM fixtures use save/restore (`background.test.js`
+  per-test DOM fixtures use save/restore (`background.test.ts`
   pattern). Pure-logic suites (`rank`, `keymap`, `url`) need no stubs.
-  Fixture-heavy suites stay `.js`; pure-logic suites are `.test.ts`.
+  All suites are `.test.ts`; stub-heavy fixtures write through
+  `Record<string, unknown>` casts and `as unknown as typeof chrome.*`
+  at namespace swaps/deletes.
 - TypeScript is erasable-syntax-only (Node strips types natively): no enums,
   namespaces, or parameter properties; type-only imports use `import type`;
   cross-module imports carry explicit `.ts` specifiers.
