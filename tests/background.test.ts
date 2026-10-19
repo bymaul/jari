@@ -14,37 +14,55 @@ test("clampCount bounds and normalizes the count", () => {
   assert.equal(clampCount(Infinity), 1);
 });
 
-const savedWindows = globalThis.chrome.windows;
-const savedTabsCreate = globalThis.chrome.tabs.create;
+// Whole-namespace swaps and deletes simulate unsupported browsers, so the
+// chrome stub is written through a loose record while reads that need
+// callability stay on the typed namespace.
+const chromeStubs = globalThis.chrome as unknown as Record<string, unknown>;
+function tabsStubs(): Record<string, unknown> {
+  return chromeStubs.tabs as Record<string, unknown>;
+}
+
+const savedWindows = chromeStubs.windows;
+const savedTabsCreate = tabsStubs().create;
 
 afterEach(() => {
-  if (savedWindows === undefined) delete globalThis.chrome.windows;
-  else globalThis.chrome.windows = savedWindows;
-  if (savedTabsCreate === undefined) delete globalThis.chrome.tabs.create;
-  else globalThis.chrome.tabs.create = savedTabsCreate;
+  if (savedWindows === undefined) delete chromeStubs.windows;
+  else chromeStubs.windows = savedWindows;
+  if (savedTabsCreate === undefined) delete tabsStubs().create;
+  else tabsStubs().create = savedTabsCreate;
 });
 
-function stubChrome({ windows, onCreateTab, onCreateWindow, onUpdateWindow }) {
-  globalThis.chrome.windows = {
+function stubChrome({
+  windows,
+  onCreateTab,
+  onCreateWindow,
+  onUpdateWindow,
+}: {
+  windows: unknown[];
+  onCreateTab?: (opts: unknown) => void;
+  onCreateWindow?: (opts: unknown) => void;
+  onUpdateWindow?: (args: unknown) => void;
+}): void {
+  chromeStubs.windows = {
     getAll: async () => windows,
     get: async () => ({ state: "normal" }),
-    create: async (opts) => {
-      onCreateWindow && onCreateWindow(opts);
+    create: async (opts: unknown) => {
+      if (onCreateWindow) onCreateWindow(opts);
       return { id: 30 };
     },
-    update: async (...args) => {
-      onUpdateWindow && onUpdateWindow(args);
+    update: async (...args: unknown[]) => {
+      if (onUpdateWindow) onUpdateWindow(args);
     },
   };
-  globalThis.chrome.tabs.create = async (opts) => {
-    onCreateTab && onCreateTab(opts);
+  tabsStubs().create = async (opts: unknown) => {
+    if (onCreateTab) onCreateTab(opts);
     return { id: 9 };
   };
 }
 
 test("openIncognitoTab reuses an existing incognito window", async () => {
-  const created = [];
-  const updated = [];
+  const created: unknown[] = [];
+  const updated: unknown[] = [];
   stubChrome({
     windows: [
       { id: 1, incognito: false },
@@ -63,8 +81,8 @@ test("openIncognitoTab reuses an existing incognito window", async () => {
 });
 
 test("openIncognitoTab creates an incognito window when none exists", async () => {
-  const createdTabs = [];
-  const createdWindows = [];
+  const createdTabs: unknown[] = [];
+  const createdWindows: unknown[] = [];
   stubChrome({
     windows: [{ id: 1, incognito: false }],
     onCreateTab: (opts) => createdTabs.push(opts),
@@ -77,9 +95,11 @@ test("openIncognitoTab creates an incognito window when none exists", async () =
 });
 
 test("search uses the configured default engine", async () => {
-  const createdWindows = [];
-  const savedGet = globalThis.chrome.storage.sync.get;
-  globalThis.chrome.storage.sync.get = async () => ({
+  const createdWindows: unknown[] = [];
+  const syncStubs = (chromeStubs.storage as Record<string, unknown>)
+    .sync as Record<string, unknown>;
+  const savedGet = syncStubs.get;
+  syncStubs.get = async () => ({
     settings: {
       searchEngines: [
         { keyword: "ddg", url: "https://duckduckgo.com/?q=%s" },
@@ -106,68 +126,84 @@ test("search uses the configured default engine", async () => {
       },
     ]);
   } finally {
-    globalThis.chrome.storage.sync.get = savedGet;
+    syncStubs.get = savedGet;
   }
 });
 
 test("tab actions report failure without a sender tab", async () => {
   assert.deepEqual(await handlers.reloadTab({}, {}), { ok: false });
-  assert.deepEqual(await handlers.goBack({}, {}), { ok: false });
-  assert.deepEqual(await handlers.moveTabLeft({}, {}), { ok: false });
+  assert.deepEqual(await handlers.goBack({}), { ok: false });
+  assert.deepEqual(await handlers.moveTabLeft({}), { ok: false });
 });
 
 test("tab actions succeed with a sender tab", async () => {
-  const calls = [];
-  const savedTabs = globalThis.chrome.tabs;
-  globalThis.chrome.tabs = {
-    ...savedTabs,
-    reload: async (id, opts) => {
+  const calls: unknown[] = [];
+  const savedTabs = chromeStubs.tabs;
+  chromeStubs.tabs = {
+    ...(savedTabs as Record<string, unknown>),
+    reload: async (id: unknown, opts: unknown) => {
       calls.push(["reload", id, opts]);
     },
-    move: async (id, props) => {
+    move: async (id: unknown, props: unknown) => {
       calls.push(["move", id, props]);
     },
     query: async () => [{ id: 4, index: 1 }],
-    goBack: async (id) => {
+    goBack: async (id: unknown) => {
       calls.push(["goBack", id]);
     },
   };
   try {
-    assert.deepEqual(await handlers.reloadTab({ tab: { id: 7 } }, {}), { ok: true });
-    assert.deepEqual(await handlers.goBack({ tab: { id: 7 } }, {}), { ok: true });
     assert.deepEqual(
-      await handlers.moveTabLeft({ tab: { id: 7, index: 2 } }, {}),
+      await handlers.reloadTab(
+        { tab: { id: 7 } } as unknown as chrome.runtime.MessageSender,
+        {},
+      ),
+      { ok: true },
+    );
+    assert.deepEqual(
+      await handlers.goBack(
+        { tab: { id: 7 } } as unknown as chrome.runtime.MessageSender,
+      ),
+      { ok: true },
+    );
+    assert.deepEqual(
+      await handlers.moveTabLeft(
+        { tab: { id: 7, index: 2 } } as unknown as chrome.runtime.MessageSender,
+      ),
       { ok: true },
     );
     assert.deepEqual(calls[0], ["reload", 7, { bypassCache: false }]);
   } finally {
-    globalThis.chrome.tabs = savedTabs;
+    chromeStubs.tabs = savedTabs;
   }
 });
 
 test("goToFirstTab reports failure with no tabs", async () => {
-  const savedTabs = globalThis.chrome.tabs;
-  globalThis.chrome.tabs = { ...savedTabs, query: async () => [] };
+  const savedTabs = chromeStubs.tabs;
+  chromeStubs.tabs = {
+    ...(savedTabs as Record<string, unknown>),
+    query: async () => [],
+  };
   try {
-    assert.deepEqual(await handlers.goToFirstTab({}, {}), { ok: false });
+    assert.deepEqual(await handlers.goToFirstTab(), { ok: false });
   } finally {
-    globalThis.chrome.tabs = savedTabs;
+    chromeStubs.tabs = savedTabs;
   }
 });
 
 test("openExtensions opens the first creatable URL", async () => {
-  const created = [];
-  const savedCreate = globalThis.chrome.tabs.create;
-  globalThis.chrome.tabs.create = async (opts) => {
+  const created: unknown[] = [];
+  const savedCreate = tabsStubs().create;
+  tabsStubs().create = async (opts: unknown) => {
     created.push(opts);
     return { id: 9 };
   };
   try {
-    assert.deepEqual(await handlers.openExtensions({}, {}), { ok: true });
+    assert.deepEqual(await handlers.openExtensions(), { ok: true });
     assert.deepEqual(created, [{ url: "chrome://extensions" }]);
   } finally {
-    if (savedCreate === undefined) delete globalThis.chrome.tabs.create;
-    else globalThis.chrome.tabs.create = savedCreate;
+    if (savedCreate === undefined) delete tabsStubs().create;
+    else tabsStubs().create = savedCreate;
   }
 });
 
@@ -181,54 +217,64 @@ function stubWindowMove({
   groupList,
   onGroupUpdate,
   onRemove,
-}) {
-  const savedTabs = globalThis.chrome.tabs;
-  const savedWindows = globalThis.chrome.windows;
-  const savedTabGroups = globalThis.chrome.tabGroups;
-  globalThis.chrome.tabs = {
-    ...savedTabs,
+}: {
+  allTabs: unknown[];
+  windows: unknown[];
+  onMove?: (ids: unknown, props: unknown) => void;
+  onCreateWindow?: (opts: unknown) => void;
+  onFocus?: (args: unknown) => void;
+  onGroup?: (opts: unknown) => void;
+  groupList?: unknown[];
+  onGroupUpdate?: (args: unknown) => void;
+  onRemove?: (ids: unknown) => void;
+}): () => void {
+  const savedTabs = chromeStubs.tabs;
+  const savedWindows = chromeStubs.windows;
+  const savedTabGroups = chromeStubs.tabGroups;
+  chromeStubs.tabs = {
+    ...(savedTabs as Record<string, unknown>),
     query: async () => allTabs,
-    move: async (ids, props) => {
-      onMove && onMove(ids, props);
+    move: async (ids: unknown, props: unknown) => {
+      if (onMove) onMove(ids, props);
     },
     update: async () => {},
-    remove: async (ids) => {
-      onRemove && onRemove(ids);
+    remove: async (ids: unknown) => {
+      if (onRemove) onRemove(ids);
     },
-    group: async (opts) => {
-      onGroup && onGroup(opts);
+    group: async (opts: unknown) => {
+      if (onGroup) onGroup(opts);
       return 99;
     },
     ungroup: async () => {},
   };
-  globalThis.chrome.windows = {
+  chromeStubs.windows = {
     getAll: async () => windows,
     get: async () => ({ state: "normal" }),
-    create: async (opts) => {
-      onCreateWindow && onCreateWindow(opts);
+    create: async (opts: unknown) => {
+      if (onCreateWindow) onCreateWindow(opts);
       return { id: 30 };
     },
-    update: async (...args) => {
-      onFocus && onFocus(args);
+    update: async (...args: unknown[]) => {
+      if (onFocus) onFocus(args);
     },
   };
-  globalThis.chrome.tabGroups = {
+  chromeStubs.tabGroups = {
     query: async () => groupList || [],
-    update: async (...args) => {
-      onGroupUpdate && onGroupUpdate(args);
+    update: async (...args: unknown[]) => {
+      if (onGroupUpdate) onGroupUpdate(args);
     },
   };
   return () => {
-    globalThis.chrome.tabs = savedTabs;
-    globalThis.chrome.windows = savedWindows;
-    if (savedTabGroups === undefined) delete globalThis.chrome.tabGroups;
-    else globalThis.chrome.tabGroups = savedTabGroups;
+    chromeStubs.tabs = savedTabs;
+    chromeStubs.windows = savedWindows;
+    if (savedTabGroups === undefined) delete chromeStubs.tabGroups;
+    else chromeStubs.tabGroups = savedTabGroups;
   };
 }
 
 test("moveManagerTabsToWindow splits when sources keep tabs", async () => {
-  const created = [];
-  const moved = [];
+  const created: unknown[] = [];
+  const moved: unknown[] = [];
   const restore = stubWindowMove({
     allTabs: [
       { id: 1, windowId: 10 },
@@ -251,8 +297,8 @@ test("moveManagerTabsToWindow splits when sources keep tabs", async () => {
 });
 
 test("moveManagerTabsToWindow merges into the lone survivor", async () => {
-  const moved = [];
-  const focused = [];
+  const moved: unknown[] = [];
+  const focused: unknown[] = [];
   const restore = stubWindowMove({
     allTabs: [
       { id: 1, windowId: 10 },
@@ -266,7 +312,7 @@ test("moveManagerTabsToWindow merges into the lone survivor", async () => {
     onMove: (ids, props) => moved.push([ids, props]),
     onFocus: (args) => focused.push(args),
   });
-  globalThis.chrome.tabs.query = async (opts) => {
+  tabsStubs().query = async (opts?: { windowId?: number }) => {
     if (opts && opts.windowId === 20) return [{ id: 1 }, { id: 2 }, { id: 3 }];
     if (opts && opts.windowId !== undefined) return [];
     return [
@@ -301,11 +347,16 @@ test("moveManagerTabsToWindow offers a choice with several survivors", async () 
     ],
   });
   try {
-    const res = await handlers.moveManagerTabsToWindow({}, { ids: [1] });
+    const res = (await handlers.moveManagerTabsToWindow({}, { ids: [1] })) as unknown as {
+      ok: boolean;
+      needWindowChoice?: boolean;
+      ownIds?: number[];
+      tabs?: { length: number };
+    };
     assert.equal(res.ok, true);
     assert.equal(res.needWindowChoice, true);
     assert.deepEqual(res.ownIds, [1]);
-    assert.equal(res.tabs.length, 2);
+    assert.equal(res.tabs!.length, 2);
   } finally {
     restore();
   }
@@ -336,13 +387,13 @@ test("moveManagerTabsToWindow reports no other window", async () => {
 });
 
 test("moveManagerTabsIntoWindow moves into the chosen window", async () => {
-  const moved = [];
+  const moved: unknown[] = [];
   const restore = stubWindowMove({
     allTabs: [],
     windows: [],
     onMove: (ids, props) => moved.push([ids, props]),
   });
-  globalThis.chrome.tabs.query = async (opts) => {
+  tabsStubs().query = async (opts?: { windowId?: number }) => {
     if (opts && opts.windowId !== undefined) return [{ id: 5 }];
     return [
       { id: 1, windowId: 10 },
@@ -368,8 +419,8 @@ test("moveManagerTabsIntoWindow moves into the chosen window", async () => {
 });
 
 test("split regroups moved tabs with title and color", async () => {
-  const grouped = [];
-  const renamed = [];
+  const grouped: unknown[] = [];
+  const renamed: unknown[] = [];
   const restore = stubWindowMove({
     allTabs: [
       { id: 1, windowId: 10, groupId: 7 },
@@ -392,7 +443,7 @@ test("split regroups moved tabs with title and color", async () => {
 });
 
 test("merge regroups moved tabs in the target window", async () => {
-  const grouped = [];
+  const grouped: unknown[] = [];
   const restore = stubWindowMove({
     allTabs: [
       { id: 1, windowId: 10, groupId: 7 },
@@ -405,7 +456,7 @@ test("merge regroups moved tabs in the target window", async () => {
     groupList: [{ id: 7, title: "", color: "" }],
     onGroup: (opts) => grouped.push(opts),
   });
-  globalThis.chrome.tabs.query = async (opts) => {
+  tabsStubs().query = async (opts?: { windowId?: number }) => {
     if (opts && opts.windowId === 20) return [{ id: 2 }, { id: 1 }];
     if (opts && opts.windowId !== undefined) return [];
     return [
@@ -430,9 +481,9 @@ test("split still succeeds without group support", async () => {
     ],
     windows: [],
   });
-  delete globalThis.chrome.tabs.group;
-  delete globalThis.chrome.tabs.ungroup;
-  delete globalThis.chrome.tabGroups;
+  delete tabsStubs().group;
+  delete tabsStubs().ungroup;
+  delete chromeStubs.tabGroups;
   try {
     assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [1] }), {
       ok: true,
@@ -445,7 +496,7 @@ test("split still succeeds without group support", async () => {
 });
 
 test("closeManagerTabs tolerates dead ids", async () => {
-  const removed = [];
+  const removed: unknown[] = [];
   const restore = stubWindowMove({
     allTabs: [{ id: 1, windowId: 10 }],
     windows: [],
@@ -487,7 +538,7 @@ test("group and ungroup tolerate dead ids", async () => {
 
 test("moveManagerTabsIntoWindow reports a closed target", async () => {
   const restore = stubWindowMove({ allTabs: [], windows: [] });
-  globalThis.chrome.windows.get = async () => {
+  (chromeStubs.windows as Record<string, unknown>).get = async () => {
     throw new Error("gone");
   };
   try {
