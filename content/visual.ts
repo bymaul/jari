@@ -1,0 +1,1663 @@
+/* global NodeFilter */
+import { register, touch } from "./overlays.ts";
+import { ui } from "./ui.ts";
+import {
+  normalizeCharset,
+  genLabels,
+  updateHintText,
+  createHintsHost,
+  layoutHints,
+} from "./hint-layer.ts";
+import { getLinkAncestor, isEditable } from "./hints-elements.ts";
+import { collectVisualTextElements } from "./visual/collect.ts";
+import {
+  isUsableCaretRect,
+  firstUsableRect,
+  lineHeightForElement,
+  resolveCaretGeometry,
+  readNeighborCharRects,
+} from "./visual/caret-geometry.ts";
+import { isWordChar, findNextWordEnd } from "./visual/word.ts";
+import {
+  fallbackMoveChar,
+  fallbackMoveCaret,
+  fallbackMoveWord,
+  fallbackExtendWord,
+  fallbackLineBoundary,
+  fallbackFirstNonBlank,
+  fallbackDocBoundary,
+  fallbackMoveWordEnd,
+  fallbackExtendWordEnd,
+  fallbackMoveLine,
+} from "./visual/motion.ts";
+import type { CaretRect } from "./visual/caret-geometry.ts";
+import type { HintLink } from "./hint-layer.ts";
+
+type VisualMode = "visual" | "line" | "caret";
+type PendingFindChar = {
+  dir: "forward" | "backward";
+  till: boolean;
+  count: number;
+};
+type LastFindChar = PendingFindChar & { ch: string };
+/** DOM selection.modify() direction/granularity spellings. */
+type SelectionModifyDirection = "forward" | "backward" | "left" | "right";
+type SelectionModifyGranularity =
+  | "character"
+  | "word"
+  | "line"
+  | "lineboundary"
+  | "documentboundary";
+
+let active = false;
+let mode: VisualMode = "visual"; // "visual" | "line" | "caret"
+let pillEl: HTMLDivElement | null = null;
+let pendingCount = "";
+let pendingG = false;
+let pendingF: PendingFindChar | null = null;
+let lastF: LastFindChar | null = null;
+let pendingY = false;
+let pendingGTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingYTimer: ReturnType<typeof setTimeout> | null = null;
+let caretRaf: number | null = null;
+
+function clearPendingKeyTimers(): void {
+  if (pendingGTimer !== null) {
+    clearTimeout(pendingGTimer);
+    pendingGTimer = null;
+  }
+  if (pendingYTimer !== null) {
+    clearTimeout(pendingYTimer);
+    pendingYTimer = null;
+  }
+}
+
+let caretEl: HTMLDivElement | null = null;
+let caretHost: HTMLDivElement | null = null;
+
+let hintActive = false;
+let hintElements: Element[] = [];
+let hintPrefix = "";
+let hintHost: HTMLDivElement | null = null;
+let hintHolder: HTMLElement | null = null;
+const hintMap = new Map<string, { el: Element; hintEl: HintLink }>();
+let pendingVisualMode: VisualMode = "visual";
+
+let findOpenHandler: (() => void) | null = null;
+let findNavHandler: ((repeat: number, reverse: boolean) => void) | null = null;
+
+function isActive(): boolean {
+  return active || hintActive;
+}
+function setFindOpen(handler: () => void): void {
+  findOpenHandler = handler;
+}
+function setFindNav(handler: (repeat: number, reverse: boolean) => void): void {
+  findNavHandler = handler;
+}
+function pillText(m: string): string {
+  if (m === "caret") return "caret";
+  if (m === "line") return "visual line";
+  return "visual";
+}
+function showPill(): void {
+  if (pillEl) return;
+  try {
+    pillEl = document.createElement("div");
+    pillEl.className = "jari-pill";
+    pillEl.textContent = pillText(mode);
+    ui.statusContainer().appendChild(pillEl);
+  } catch {}
+}
+
+function hidePill(): void {
+  if (!pillEl) return;
+  try {
+    pillEl.remove();
+  } catch {}
+  pillEl = null;
+}
+
+function getSelection(): Selection | null {
+  return window.getSelection();
+}
+
+function hasModify(): boolean {
+  const sel = getSelection();
+  return (sel && typeof sel.modify === "function") as boolean;
+}
+
+function caretCss(): string {
+  return `
+      .jari-visual-caret {
+        position: absolute;
+        width: 8px;
+        height: 1.2em;
+        background: var(--jari-accent, #e0a363);
+        opacity: 0.85;
+        border: 1px solid var(--jari-accent-border, #c38a22);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        pointer-events: none;
+        will-change: transform;
+        backface-visibility: hidden;
+        transform: translate3d(0,0,0);
+      }
+      @media (forced-colors: active) {
+        .jari-visual-caret { background: CanvasText !important; border-color: Canvas !important; forced-color-adjust: none; }
+      }
+    `;
+}
+
+function showBlockCaret(): void {
+  if (caretEl) return;
+  try {
+    const created = ui.createShadowHost(
+      "jari-visual-caret-host",
+      caretCss(),
+    );
+    caretHost = created.host;
+    const shadow = created.shadow;
+    caretEl = document.createElement("div");
+    caretEl.className = "jari-visual-caret";
+    shadow.appendChild(caretEl);
+  } catch {}
+}
+
+function hideBlockCaret(): void {
+  if (caretHost) {
+    try {
+      caretHost.remove();
+    } catch {}
+    caretHost = null;
+    caretEl = null;
+  } else if (caretEl) {
+    try {
+      caretEl.remove();
+    } catch {}
+    caretEl = null;
+  }
+}
+
+function updateBlockCaretImmediate(): void {
+  if (!active || !caretEl || !caretHost) return;
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  try {
+    const range = sel.getRangeAt(0);
+    const focusNode = sel.focusNode;
+    const focusOffset = sel.focusOffset;
+    let collapsed: CaretRect | null = null;
+    let clientRects: DOMRectList | null = null;
+    try {
+      if (focusNode) {
+        const r = document.createRange();
+        r.setStart(focusNode, focusOffset);
+        r.collapse(true);
+        collapsed = r.getBoundingClientRect();
+        if (!isUsableCaretRect(collapsed)) {
+          try {
+            clientRects = range.getClientRects();
+          } catch {
+            clientRects = null;
+          }
+        }
+      } else {
+        collapsed = range.getBoundingClientRect();
+      }
+    } catch {
+      try {
+        collapsed = range.getBoundingClientRect();
+      } catch {
+        collapsed = null;
+      }
+    }
+    let before: CaretRect | null = null;
+    let after: CaretRect | null = null;
+    if (!isUsableCaretRect(collapsed) && !firstUsableRect(clientRects)) {
+      const neighbors = readNeighborCharRects(focusNode, focusOffset);
+      before = neighbors.before;
+      after = neighbors.after;
+    }
+    let parentRect: CaretRect | null = null;
+    let parentEl: HTMLElement | null = null;
+    if (
+      !isUsableCaretRect(collapsed) &&
+      !firstUsableRect(clientRects) &&
+      !isUsableCaretRect(before) &&
+      !isUsableCaretRect(after)
+    ) {
+      try {
+        parentEl =
+          focusNode && focusNode.parentElement ? focusNode.parentElement : null;
+        if (parentEl) {
+          const cr = parentEl.getClientRects();
+          parentRect =
+            (cr && cr.length ? cr[0] : null) || parentEl.getBoundingClientRect();
+        }
+      } catch {
+        parentRect = null;
+      }
+    }
+    const geo = resolveCaretGeometry({
+      collapsed,
+      clientRects,
+      before,
+      after,
+      parentRect,
+      fallbackHeight: parentEl ? lineHeightForElement(parentEl) : 16,
+    });
+    if (!geo) return;
+    caretEl!.style.transform = `translate3d(${geo.left}px, ${geo.top}px, 0)`;
+    caretEl!.style.height = `${Math.max(12, geo.height!)}px`;
+    if (mode === "line") {
+      caretEl!.style.width = `${Math.max(20, geo.width || 0)}px`;
+      caretEl!.style.opacity = "0.35";
+    } else {
+      caretEl!.style.width = `7px`;
+      caretEl!.style.opacity = "0.85";
+    }
+  } catch {}
+}
+
+function updateBlockCaret(): void {
+  if (caretRaf) return;
+  caretRaf = requestAnimationFrame(() => {
+    caretRaf = null;
+    updateBlockCaretImmediate();
+  });
+}
+
+function ensureVisible(): void {
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  try {
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    if (
+      !rect ||
+      (rect.top === 0 &&
+        rect.left === 0 &&
+        rect.width === 0 &&
+        rect.height === 0)
+    ) {
+      const node = sel.focusNode;
+      if (node && node.parentElement) {
+        node.parentElement.scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+        });
+      }
+      return;
+    }
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    if (rect.top < 0 || rect.bottom > vh || rect.left < 0 || rect.right > vw) {
+      const el =
+        sel.focusNode && sel.focusNode.parentElement
+          ? sel.focusNode.parentElement
+          : null;
+      if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+      else window.scrollBy(0, rect.top - vh / 2);
+    }
+  } catch {}
+  updateBlockCaret();
+}
+
+function attachCaretListeners(): void {
+  try {
+    window.addEventListener("scroll", updateBlockCaret, {
+      passive: true,
+      capture: true,
+    });
+    window.addEventListener("resize", updateBlockCaret, { passive: true });
+    document.addEventListener("scroll", updateBlockCaret, {
+      passive: true,
+      capture: true,
+    });
+  } catch {
+    try {
+      window.addEventListener("scroll", updateBlockCaret, true);
+      window.addEventListener("resize", updateBlockCaret);
+      document.addEventListener("scroll", updateBlockCaret, true);
+    } catch {}
+  }
+  enableSelectOverride();
+  attachMouseListeners();
+}
+function detachCaretListeners(): void {
+  try {
+    window.removeEventListener("scroll", updateBlockCaret, { capture: true });
+    window.removeEventListener("resize", updateBlockCaret);
+    document.removeEventListener("scroll", updateBlockCaret, { capture: true });
+  } catch {
+    try {
+      window.removeEventListener("scroll", updateBlockCaret, true);
+      window.removeEventListener("resize", updateBlockCaret);
+      document.removeEventListener("scroll", updateBlockCaret, true);
+    } catch {}
+  }
+  if (caretRaf) {
+    try {
+      cancelAnimationFrame(caretRaf);
+    } catch {}
+    caretRaf = null;
+  }
+  if (!active && !hintActive) disableSelectOverride();
+  if (!active && !hintActive) detachMouseListeners();
+}
+let selectOverrideEl: HTMLStyleElement | null = null;
+function enableSelectOverride(): void {
+  if (selectOverrideEl) return;
+  try {
+    selectOverrideEl = document.createElement("style");
+    selectOverrideEl.id = "jari-select-override";
+    selectOverrideEl.textContent = `*{-webkit-user-select:text !important;user-select:text !important;} [class*="select-none"]{-webkit-user-select:text !important;user-select:text !important;} .jari-visual-caret-host,*{ -webkit-user-drag: none !important; } :root ::selection{background:var(--jari-accent, #e0a363) !important;color:#1a1a1a !important;} :root ::-moz-selection{background:var(--jari-accent, #e0a363) !important;color:#1a1a1a !important;}`;
+    (document.head || document.documentElement).appendChild(selectOverrideEl);
+  } catch {}
+}
+function disableSelectOverride(): void {
+  if (!selectOverrideEl) return;
+  try {
+    selectOverrideEl.remove();
+  } catch {}
+  selectOverrideEl = null;
+}
+
+function mouseTarget(event: MouseEvent): Element | null {
+  try {
+    if (typeof event.composedPath === "function") {
+      const path = event.composedPath();
+      if (Array.isArray(path) && path.length > 0 && path[0])
+        return path[0] as Element;
+    }
+  } catch {}
+  return (event.target as Element | null) || null;
+}
+
+function isJariUiEvent(event: MouseEvent): boolean {
+  let path: EventTarget[] | null = null;
+  try {
+    if (typeof event.composedPath === "function") path = event.composedPath();
+  } catch {}
+  const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
+  for (const node of nodes) {
+    try {
+      const cls = node && (node as Element).className;
+      if (typeof cls === "string" && cls.includes("jari-")) return true;
+    } catch {}
+  }
+  return false;
+}
+
+function onMouseDown(event: MouseEvent): void {
+  if (!active && !hintActive) return;
+  if (isJariUiEvent(event)) return;
+  if (hintActive) closeHints();
+  if (!active) return;
+  if (isEditable(mouseTarget(event))) close(true);
+}
+
+function onSelectionChange(): void {
+  if (!active || hintActive) return;
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  if (sel.isCollapsed && (mode === "visual" || mode === "line")) {
+    mode = "caret";
+    if (pillEl) pillEl.textContent = pillText(mode);
+  }
+  updateBlockCaret();
+}
+
+function attachMouseListeners(): void {
+  try {
+    window.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("selectionchange", onSelectionChange);
+  } catch {
+    try {
+      window.addEventListener("mousedown", onMouseDown, true);
+    } catch {}
+  }
+}
+
+function detachMouseListeners(): void {
+  try {
+    window.removeEventListener("mousedown", onMouseDown, true);
+    document.removeEventListener("selectionchange", onSelectionChange);
+  } catch {
+    try {
+      window.removeEventListener("mousedown", onMouseDown, true);
+    } catch {}
+  }
+}
+
+function renderHints(): void {
+  if (hintHost) {
+    try {
+      hintHost.remove();
+    } catch {}
+    hintHost = null;
+    hintHolder = null;
+  }
+  const created = createHintsHost("cyan");
+  hintHost = created.host;
+  hintHolder = created.holder;
+
+  const charset = normalizeCharset();
+  const labels = genLabels(hintElements.length, charset);
+  hintMap.clear();
+
+  const hintEls = layoutHints(hintHolder, hintElements, labels);
+  for (const link of hintEls) {
+    hintMap.set(link.label, { el: link.link, hintEl: link });
+  }
+  refreshHints();
+}
+
+function refreshHints(): void {
+  if (!hintActive) return;
+  for (const [label, obj] of hintMap.entries()) {
+    const hintEl = obj.hintEl;
+    if (!hintPrefix) {
+      hintEl.style.opacity = "1";
+      hintEl.style.display = "";
+      hintEl.classList.remove("jari-hint-hidden");
+      updateHintText(hintEl, label, "");
+    } else if (label.startsWith(hintPrefix)) {
+      hintEl.style.opacity = "1";
+      hintEl.style.display = "";
+      updateHintText(hintEl, label, hintPrefix);
+    } else {
+      hintEl.style.opacity = "0";
+      hintEl.style.display = "none";
+    }
+  }
+}
+
+function showVisualHints(requestedMode?: VisualMode): void {
+  pendingVisualMode = requestedMode || "visual";
+  const elements = collectVisualTextElements();
+  if (elements.length === 0) {
+    ui.toast("No text to select");
+    return;
+  }
+  hintElements = elements.length > 300 ? elements.slice(0, 300) : elements;
+  hintPrefix = "";
+  hintActive = true;
+  enableSelectOverride();
+  attachMouseListeners();
+  renderHints();
+  if (!pillEl) {
+    try {
+      pillEl = document.createElement("div");
+      pillEl.className = "jari-pill";
+      pillEl.textContent = "visual hint";
+      ui.statusContainer().appendChild(pillEl);
+    } catch {}
+  } else {
+    pillEl.textContent = "visual hint";
+  }
+  ui.toast(`Hints: ${hintElements.length} text targets`);
+}
+
+function closeHints(): void {
+  if (!hintActive) return;
+  hintActive = false;
+  hintPrefix = "";
+  hintElements = [];
+  hintMap.clear();
+  if (hintHost) {
+    try {
+      hintHost.remove();
+    } catch {}
+    hintHost = null;
+    hintHolder = null;
+  }
+  if (!active && !hintActive) disableSelectOverride();
+  if (!active && !hintActive) detachMouseListeners();
+  if (!active && pillEl) {
+    try {
+      pillEl.remove();
+    } catch {}
+    pillEl = null;
+  } else if (active && pillEl) {
+    pillEl.textContent = pillText(mode);
+  }
+}
+
+function activateHintByLabel(label: string): boolean {
+  const entry = hintMap.get(label);
+  if (!entry) return false;
+  const el = entry.el;
+  closeHints();
+  enterAtElement(el, pendingVisualMode);
+  return true;
+}
+
+function enterAtElement(el: Element, newMode?: VisualMode): void {
+  if (active) close(false);
+  mode = newMode || "visual";
+  let range;
+  try {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue || !node.nodeValue.trim())
+          return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const first = walker.nextNode();
+    if (first) {
+      range = document.createRange();
+      range.setStart(first, 0);
+      range.collapse(true);
+    } else {
+      range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(true);
+    }
+  } catch {
+    range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(true);
+  }
+  const sel = window.getSelection();
+  if (!sel) return;
+  try {
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } catch {}
+  if (mode !== "line" && sel.isCollapsed) {
+    if (hasModify()) {
+      try {
+        sel.modify("extend", "forward", "character");
+      } catch {}
+    }
+  }
+  if (mode !== "line" && sel.isCollapsed) {
+    ui.toast("No text to select");
+  }
+  if (mode === "line") {
+    try {
+      if (hasModify()) {
+        sel.modify("extend", "forward", "lineboundary");
+      } else {
+        const r2 = document.createRange();
+        r2.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(r2);
+      }
+    } catch {
+      const r2 = document.createRange();
+      r2.selectNodeContents(el);
+      sel.removeAllRanges();
+      sel.addRange(r2);
+    }
+  }
+  active = true;
+  showPill();
+  showBlockCaret();
+  attachCaretListeners();
+  pendingCount = "";
+  pendingG = false;
+  pendingF = null;
+  pendingY = false;
+  clearPendingKeyTimers();
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function extendSelection(
+  direction: SelectionModifyDirection,
+  granularity: SelectionModifyGranularity,
+): boolean {
+  const sel = getSelection();
+  if (!sel) return false;
+  if (hasModify()) {
+    try {
+      sel.modify("extend", direction, granularity);
+      return true;
+    } catch {}
+  }
+  return false;
+}
+
+function moveCaret(
+  direction: SelectionModifyDirection,
+  granularity: SelectionModifyGranularity,
+): boolean {
+  const sel = getSelection();
+  if (!sel) return false;
+  if (hasModify()) {
+    try {
+      sel.modify("move", direction, granularity);
+      return true;
+    } catch {}
+  }
+  return false;
+}
+
+function isCaret(): boolean {
+  return mode === "caret";
+}
+
+function doMoveChar(dir: number): void {
+  if (isCaret()) {
+    const ok = moveCaret(dir < 0 ? "left" : "right", "character");
+    if (!ok) fallbackMoveCaret(dir);
+    ensureVisible();
+    updateBlockCaret();
+    return;
+  }
+  const ok = extendSelection(dir < 0 ? "left" : "right", "character");
+  if (!ok) fallbackMoveChar(dir);
+  ensureVisible();
+  updateBlockCaret();
+}
+
+
+
+
+
+
+function doMoveLine(dir: number): void {
+  if (isCaret()) {
+    let ok = moveCaret(dir < 0 ? "backward" : "forward", "line");
+    if (!ok) ok = fallbackMoveLine(dir, true);
+    if (!ok) ui.toast("No line move");
+    ensureVisible();
+    updateBlockCaret();
+    return;
+  }
+  let ok = extendSelection(dir < 0 ? "backward" : "forward", "line");
+  if (!ok) ok = fallbackMoveLine(dir, false);
+  if (!ok) ui.toast("No line move");
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function doMoveWord(dir: number): void {
+  if (isCaret()) {
+    let ok = moveCaret(dir < 0 ? "backward" : "forward", "word");
+    if (!ok) ok = fallbackMoveWord(dir);
+    if (!ok) ui.toast("No word move");
+    ensureVisible();
+    updateBlockCaret();
+    return;
+  }
+  let ok = extendSelection(dir < 0 ? "backward" : "forward", "word");
+  if (!ok) ok = fallbackExtendWord(dir);
+  if (!ok) ui.toast("No word move");
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function doMoveWordEnd(): void {
+  if (isCaret()) {
+    if (!fallbackMoveWordEnd(1, true)) {
+      const ok = moveCaret("forward", "word");
+      if (ok) {
+        if (!moveCaret("backward", "character")) fallbackMoveCaret(-1);
+      } else {
+        ui.toast("No word move");
+      }
+    }
+    ensureVisible();
+    updateBlockCaret();
+    return;
+  }
+  if (!fallbackExtendWordEnd(1, false)) {
+    const ok = extendSelection("forward", "word");
+    if (ok) {
+      if (!extendSelection("backward", "character")) fallbackMoveChar(-1);
+    } else {
+      ui.toast("No word move");
+    }
+  }
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function doLineBoundary(dir: number): void {
+  const gran = "lineboundary";
+  if (isCaret()) {
+    let ok = moveCaret(dir < 0 ? "backward" : "forward", gran);
+    if (!ok) ok = fallbackLineBoundary(dir, true);
+    if (!ok) ui.toast("No line boundary");
+    ensureVisible();
+    updateBlockCaret();
+    return;
+  }
+  let ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
+  if (!ok) ok = fallbackLineBoundary(dir, false);
+  if (!ok) ui.toast("No line boundary");
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function doDocBoundary(dir: number): void {
+  const gran = "documentboundary";
+  if (isCaret()) {
+    const ok = moveCaret(dir < 0 ? "backward" : "forward", gran);
+    if (!ok) fallbackDocBoundary(dir, true);
+    ensureVisible();
+    updateBlockCaret();
+    return;
+  }
+  const ok = extendSelection(dir < 0 ? "backward" : "forward", gran);
+  if (!ok) fallbackDocBoundary(dir, false);
+  ensureVisible();
+  updateBlockCaret();
+}
+function doGoToLine(n: number): void {
+  const line = Math.max(1, Math.floor(n) || 1);
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue || !node.nodeValue.trim())
+          return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === "none" || style.visibility === "hidden")
+            return NodeFilter.FILTER_REJECT;
+        } catch {}
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    },
+  );
+  let idx = 0;
+  let target: Node | null = null;
+  let node = walker.nextNode();
+  while (node) {
+    idx++;
+    if (idx === line) {
+      target = node;
+      break;
+    }
+    node = walker.nextNode();
+  }
+  if (!target) {
+    doDocBoundary(line === 1 ? -1 : 1);
+    return;
+  }
+  moveToPosition(target, 0);
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function doFirstNonBlank(): void {
+  const forCaret = isCaret();
+  if (!fallbackFirstNonBlank(forCaret)) {
+    doLineBoundary(-1);
+    const sel = getSelection();
+    if (sel && sel.focusNode && sel.focusNode.nodeType === Node.TEXT_NODE) {
+      const node = sel.focusNode;
+      const off = sel.focusOffset;
+      const txt = node.nodeValue!;
+      let newOff = off;
+      while (newOff < txt.length && /\s/.test(txt[newOff])) newOff++;
+      if (newOff !== off) moveToPosition(node, newOff);
+    }
+  } else {
+    ensureVisible();
+    updateBlockCaret();
+  }
+}
+
+function swapAnchorFocus(): void {
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const anchorNode = sel.anchorNode;
+  const anchorOffset = sel.anchorOffset;
+  const focusNode = sel.focusNode;
+  const focusOffset = sel.focusOffset;
+  if (!anchorNode || !focusNode) return;
+  try {
+    const r = document.createRange();
+    r.setStart(focusNode, focusOffset);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    if (typeof sel.extend === "function") {
+      sel.extend(anchorNode, anchorOffset);
+    } else {
+      const r2 = document.createRange();
+      r2.setStart(anchorNode, anchorOffset);
+      r2.setEnd(focusNode, focusOffset);
+      sel.removeAllRanges();
+      sel.addRange(r2);
+    }
+    ensureVisible();
+    updateBlockCaret();
+  } catch {}
+}
+
+function yankSelection(): void {
+  const sel = getSelection();
+  if (!sel) return;
+  const text = sel.toString();
+  if (!text) {
+    ui.toast("No selection");
+    return;
+  }
+  ui.copyText(text).then((ok) =>
+    ui.toast(ok ? `Yanked ${text.length} chars` : "Copy failed"),
+  );
+}
+
+function stripTrailingNewlines(text: string): string {
+  return text.replace(/[\r\n]+$/, "");
+}
+
+function yankLinesFromCaret(count: number): void {
+  const sel = getSelection();
+  if (!sel || !sel.focusNode) {
+    ui.toast("No line");
+    return;
+  }
+  if (!hasModify()) {
+    yankLineFromCaret();
+    return;
+  }
+  const savedNode = sel.focusNode;
+  const savedOffset = sel.focusOffset;
+  const wanted = Math.max(1, count);
+  let lineText = "";
+  try {
+    moveCaret("backward", "lineboundary");
+    let extended = false;
+    for (let i = 0; i < wanted; i++) {
+      if (!extendSelection("forward", "lineboundary")) break;
+      extended = true;
+    }
+    if (extended) lineText = sel.toString();
+  } catch {}
+  try {
+    const r = document.createRange();
+    r.setStart(savedNode, savedOffset);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    updateBlockCaret();
+    ensureVisible();
+  } catch {}
+  if (!lineText) {
+    ui.toast("No line");
+    return;
+  }
+  lineText = stripTrailingNewlines(lineText);
+  if (!lineText) {
+    ui.toast("No line");
+    return;
+  }
+  const yanked = lineText.split(/\r?\n/).length;
+  ui.copyText(lineText).then((ok) =>
+    ui.toast(
+      ok
+        ? yanked > 1
+          ? `Yanked ${yanked} lines`
+          : `Yanked line ${lineText.length} chars`
+        : "Copy failed",
+    ),
+  );
+}
+
+function yankLineFromCaret(): void {
+  const sel = getSelection();
+  if (!sel || !sel.focusNode) {
+    ui.toast("No line");
+    return;
+  }
+  const savedNode = sel.focusNode;
+  const savedOffset = sel.focusOffset;
+  let lineText = "";
+  try {
+    const moved = moveCaret("backward", "lineboundary");
+    if (!moved) {
+      fallbackMoveCaret(-1);
+    }
+    const atStartNode = sel.focusNode;
+    const wasCollapsed = sel.isCollapsed;
+    if (wasCollapsed) {
+      const ok = extendSelection("forward", "lineboundary");
+      if (!ok) {
+        const cur =
+          sel.focusNode && sel.focusNode.parentElement
+            ? sel.focusNode.parentElement
+            : null;
+        if (cur) lineText = cur.textContent || "";
+        else lineText = sel.toString();
+      } else {
+        lineText = sel.toString();
+        if (!lineText) {
+          const cur =
+            atStartNode && atStartNode.parentElement
+              ? atStartNode.parentElement
+              : null;
+          lineText = cur ? cur.textContent || "" : "";
+        }
+      }
+    } else {
+      lineText = sel.toString();
+    }
+    if (lineText) lineText = stripTrailingNewlines(lineText);
+  } catch {}
+  try {
+    const r = document.createRange();
+    r.setStart(savedNode, savedOffset);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    updateBlockCaret();
+    ensureVisible();
+  } catch {}
+  if (!lineText) {
+    ui.toast("No line");
+    return;
+  }
+  ui.copyText(lineText).then((ok) =>
+    ui.toast(ok ? `Yanked line ${lineText.length} chars` : "Copy failed"),
+  );
+}
+
+function getCaretLinkElement(): Element | null {
+  const sel = getSelection();
+  if (!sel || !sel.focusNode) return null;
+  const el =
+    sel.focusNode.parentElement ||
+    ((sel.focusNode.parentNode as Element | null) || null);
+  return getLinkAncestor(el);
+}
+
+function activateCaretLink(): boolean {
+  const link = getCaretLinkElement();
+  if (!link) {
+    ui.toast("No link at caret");
+    return false;
+  }
+  try {
+    ui.dispatchClick(link);
+  } catch {}
+  return true;
+}
+
+function handleFChar(ch: string): void {
+  const sel = getSelection();
+  if (!sel) return;
+  const focusNode = sel.focusNode;
+  const focusOffset = sel.focusOffset;
+  if (!focusNode || !pendingF) return;
+  const dir = pendingF.dir;
+  const till = pendingF.till;
+  const count = pendingF.count || 1;
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+        const p = node.parentElement;
+        if (p) {
+          const tag = p.tagName;
+          if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
+            return NodeFilter.FILTER_REJECT;
+          }
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    },
+  );
+  const nodes: Node[] = [];
+  let n = walker.nextNode();
+  while (n) {
+    nodes.push(n);
+    n = walker.nextNode();
+  }
+  const startIdx = nodes.indexOf(focusNode);
+  if (startIdx === -1) {
+    ui.toast(`Not found: ${ch}`);
+    pendingF = null;
+    return;
+  }
+  let found = 0;
+  let targetNode: Node | null = null;
+  let targetOffset = -1;
+  if (dir === "forward") {
+    for (let i = startIdx; i < nodes.length; i++) {
+      const node = nodes[i];
+      const text = node.nodeValue!;
+      let from = 0;
+      if (i === startIdx) from = focusOffset + 1;
+      let idx = text.indexOf(ch, from);
+      while (idx !== -1) {
+        found++;
+        if (found === count) {
+          targetNode = node;
+          targetOffset = till ? idx : idx + 1;
+          break;
+        }
+        idx = text.indexOf(ch, idx + 1);
+      }
+      if (targetNode) break;
+    }
+  } else {
+    for (let i = startIdx; i >= 0; i--) {
+      const node = nodes[i];
+      const text = node.nodeValue!;
+      let idx: number;
+      if (i === startIdx) idx = text.lastIndexOf(ch, focusOffset - 1);
+      else idx = text.lastIndexOf(ch);
+      while (idx !== -1) {
+        found++;
+        if (found === count) {
+          targetNode = node;
+          targetOffset = till ? idx + 1 : idx;
+          break;
+        }
+        idx = text.lastIndexOf(ch, idx - 1);
+      }
+      if (targetNode) break;
+    }
+  }
+  if (targetNode) {
+    moveToPosition(targetNode, targetOffset);
+    lastF = { ch, dir, till, count };
+    ui.toast(`${till ? "t" : "f"}${ch}`);
+  } else {
+    ui.toast(`Not found: ${ch}`);
+  }
+  pendingF = null;
+}
+
+function moveToPosition(node: Node, offset: number): void {
+  const sel = getSelection();
+  if (!sel) return;
+  offset = Math.max(
+    0,
+    Math.min(offset, node.nodeValue ? node.nodeValue.length : 0),
+  );
+  if (isCaret()) {
+    try {
+      const r = document.createRange();
+      r.setStart(node, offset);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } catch {}
+    ensureVisible();
+    updateBlockCaret();
+    return;
+  }
+  const anchorNode = sel.anchorNode;
+  const anchorOffset = sel.anchorOffset;
+  if (!anchorNode) return;
+  if (typeof sel.extend === "function") {
+    try {
+      sel.extend(node, offset);
+      ensureVisible();
+      updateBlockCaret();
+      return;
+    } catch {}
+  }
+  const r = document.createRange();
+  try {
+    r.setStart(anchorNode, anchorOffset);
+    r.setEnd(node, offset);
+  } catch {
+    r.setStart(node, offset);
+    r.setEnd(anchorNode, anchorOffset);
+  }
+  sel.removeAllRanges();
+  sel.addRange(r);
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function expandSelectionToFullLines(): boolean {
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !hasModify()) {
+    return false;
+  }
+  try {
+    const r0 = sel.getRangeAt(0);
+    const head = r0.cloneRange();
+    head.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(head);
+    sel.modify("extend", "forward", "lineboundary");
+    const lineEndNode = sel.focusNode;
+    const lineEndOffset = sel.focusOffset;
+    const tail = r0.cloneRange();
+    tail.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(tail);
+    sel.modify("extend", "backward", "lineboundary");
+    const full = document.createRange();
+    full.setStart(sel.focusNode as Node, sel.focusOffset);
+    full.setEnd(lineEndNode as Node, lineEndOffset);
+    sel.removeAllRanges();
+    sel.addRange(full);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getRepeatCount(): number {
+  const n = parseInt(pendingCount || "1", 10);
+  const c = Number.isNaN(n) ? 1 : Math.max(1, n);
+  pendingCount = "";
+  return c;
+}
+
+function collapseToFocus(): void {
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  try {
+    const focusNode = sel.focusNode;
+    const focusOffset = sel.focusOffset;
+    if (focusNode) {
+      const r = document.createRange();
+      r.setStart(focusNode, focusOffset);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+  } catch {}
+}
+
+function enterCaretAtFocus(): void {
+  if (!active) return;
+  collapseToFocus();
+  mode = "caret";
+  if (pillEl) pillEl.textContent = pillText(mode);
+  pendingCount = "";
+  pendingG = false;
+  pendingF = null;
+  pendingY = false;
+  showBlockCaret();
+  attachCaretListeners();
+  ensureVisible();
+  updateBlockCaret();
+}
+
+function enter(newMode?: VisualMode): void {
+  if (hintActive) closeHints();
+  if (active) close(false);
+  touch("visual");
+  pendingVisualMode = newMode || "visual";
+  showVisualHints(pendingVisualMode);
+}
+
+function close(keepSelection: boolean = false): void {
+  if (hintActive) closeHints();
+  if (!active) return;
+  active = false;
+  hidePill();
+  hideBlockCaret();
+  detachCaretListeners();
+  pendingCount = "";
+  pendingG = false;
+  pendingF = null;
+  pendingY = false;
+  clearPendingKeyTimers();
+  if (!keepSelection) {
+    const sel = getSelection();
+    if (sel) {
+      try {
+        sel.removeAllRanges();
+      } catch {}
+    }
+  }
+}
+
+function onKeyDown(event: KeyboardEvent): boolean {
+  if (hintActive) {
+    const key = event.key;
+    if (key === "Escape") {
+      ui.consume(event);
+      if (hintPrefix) {
+        hintPrefix = "";
+        refreshHints();
+      } else {
+        closeHints();
+      }
+      return true;
+    }
+    if (key === "Backspace") {
+      ui.consume(event);
+      if (hintPrefix) {
+        hintPrefix = hintPrefix.slice(0, -1);
+        refreshHints();
+      } else {
+        closeHints();
+      }
+      return true;
+    }
+    if (key === "Enter") {
+      ui.consume(event);
+      const visible: string[] = [];
+      for (const label of hintMap.keys()) {
+        if (label.startsWith(hintPrefix)) visible.push(label);
+      }
+      if (visible.length === 1) activateHintByLabel(visible[0]);
+      return true;
+    }
+    if (key.length === 1) {
+      const charset = normalizeCharset();
+      const lower = key.toLowerCase();
+      if (charset.includes(lower)) {
+        ui.consume(event);
+        const next = hintPrefix + lower.toUpperCase();
+        const exact = hintMap.get(next);
+        hintPrefix = next;
+        refreshHints();
+        if (exact) {
+          activateHintByLabel(next);
+        }
+        return true;
+      }
+    }
+    ui.consume(event);
+    return true;
+  }
+
+  if (!active) return false;
+
+  if (pendingF) {
+    const ch = event.key;
+    if (ch.length === 1) {
+      ui.consume(event);
+      handleFChar(ch);
+      return true;
+    }
+    if (ch === "Escape") {
+      ui.consume(event);
+      pendingF = null;
+      ui.toast("Cancelled");
+      return true;
+    }
+    ui.consume(event);
+    return true;
+  }
+
+  const key = event.key;
+
+  if (key === "Escape") {
+    ui.consume(event);
+    if (isCaret()) {
+      close(false);
+    } else {
+      enterCaretAtFocus();
+      if (!active) {
+        close(false);
+      }
+    }
+    return true;
+  }
+
+  if (/^[0-9]$/.test(key)) {
+    // A bare "0" is line-start, not a count, so it falls through to the switch.
+    if (key !== "0" || pendingCount !== "") {
+      ui.consume(event);
+      if (pendingCount.length < 9) pendingCount += key;
+      if (pillEl) pillEl.textContent = pillText(mode) + " " + pendingCount;
+      return true;
+    }
+  }
+
+  if (key === "f" || key === "F" || key === "t" || key === "T") {
+    const isUpper = key === "F" || key === "T";
+    const till = key === "t" || key === "T";
+    const dir = isUpper ? "backward" : "forward";
+    const count = pendingCount ? parseInt(pendingCount, 10) || 1 : 1;
+    pendingCount = "";
+    if (pillEl) pillEl.textContent = pillText(mode);
+    pendingF = { dir, till, count };
+    ui.consume(event);
+    ui.toast(`/${till ? "t" : "f"}-char…`);
+    return true;
+  }
+  if (key === ";" || key === ",") {
+    ui.consume(event);
+    if (!lastF) {
+      ui.toast("No f/t yet");
+      return true;
+    }
+    const isReverse = key === ",";
+    let dir = lastF.dir;
+    if (isReverse) dir = dir === "forward" ? "backward" : "forward";
+    const count = pendingCount ? parseInt(pendingCount, 10) || 1 : 1;
+    pendingCount = "";
+    if (pillEl) pillEl.textContent = pillText(mode);
+    pendingF = { dir, till: lastF.till, count };
+    handleFChar(lastF.ch);
+    return true;
+  }
+
+  if (key === "g") {
+    if (pendingG) {
+      ui.consume(event);
+      const n = getRepeatCount();
+      if (n > 1) doGoToLine(n);
+      else doDocBoundary(-1);
+      pendingG = false;
+      if (pillEl) pillEl.textContent = pillText(mode);
+      return true;
+    } else {
+      ui.consume(event);
+      pendingG = true;
+      if (pillEl) pillEl.textContent = pillText(mode) + " g";
+      clearTimeout(pendingGTimer ?? undefined);
+      pendingGTimer = setTimeout(() => {
+        pendingGTimer = null;
+        pendingG = false;
+        if (pillEl && pillEl.textContent.endsWith(" g"))
+          pillEl.textContent = pillText(mode);
+      }, 1500);
+      return true;
+    }
+  }
+  if (pendingG) {
+    clearPendingKeyTimers();
+    pendingG = false;
+    if (pillEl) pillEl.textContent = pillText(mode);
+  }
+
+  let repeat = 1;
+  if (pendingCount) {
+    repeat = getRepeatCount();
+  }
+
+  if (isCaret()) {
+    if (pendingY) {
+      clearPendingKeyTimers();
+      pendingY = false;
+      if (pillEl && pillEl.textContent.endsWith(" y"))
+        pillEl.textContent = pillText(mode);
+      if (key === "y") {
+        ui.consume(event);
+        yankLinesFromCaret(repeat);
+        pendingCount = "";
+        return true;
+      }
+    }
+    if (key === "y") {
+      ui.consume(event);
+      pendingY = true;
+      if (pillEl) pillEl.textContent = pillText(mode) + " y";
+      clearTimeout(pendingYTimer ?? undefined);
+      pendingYTimer = setTimeout(() => {
+        pendingYTimer = null;
+        if (pendingY) {
+          pendingY = false;
+          if (pillEl && pillEl.textContent.endsWith(" y"))
+            pillEl.textContent = pillText(mode);
+        }
+      }, 1500);
+      return true;
+    }
+    if (key === "Y") {
+      ui.consume(event);
+      clearPendingKeyTimers();
+      pendingY = false;
+      yankLinesFromCaret(repeat);
+      pendingCount = "";
+      return true;
+    }
+    if (key === "/") {
+      ui.consume(event);
+      close(false);
+      if (findOpenHandler) findOpenHandler();
+      pendingCount = "";
+      return true;
+    }
+    if (key === "v" || key === "V") {
+      ui.consume(event);
+      const sel = getSelection();
+      if (key === "v") {
+        mode = "visual";
+        if (pillEl) pillEl.textContent = pillText(mode);
+        if (sel && sel.isCollapsed && hasModify()) {
+          try {
+            sel.modify("extend", "forward", "character");
+          } catch {}
+        }
+        ensureVisible();
+        updateBlockCaret();
+      } else {
+        mode = "line";
+        if (pillEl) pillEl.textContent = pillText(mode);
+        if (sel && sel.isCollapsed) {
+          try {
+            sel.modify("extend", "forward", "lineboundary");
+            sel.modify("extend", "backward", "lineboundary");
+          } catch {}
+          if (sel && sel.isCollapsed) {
+            try {
+              sel.modify("extend", "forward", "line");
+            } catch {}
+          }
+        }
+        ensureVisible();
+        updateBlockCaret();
+      }
+      pendingCount = "";
+      return true;
+    }
+    if (key === "Enter") {
+      ui.consume(event);
+      if (!activateCaretLink()) {
+        ui.toast("No link at caret");
+      } else {
+        close(false);
+      }
+      pendingCount = "";
+      return true;
+    }
+  }
+
+  switch (key) {
+    case "h":
+    case "ArrowLeft":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doMoveChar(-1);
+      break;
+    case "l":
+    case "ArrowRight":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doMoveChar(1);
+      break;
+    case "j":
+    case "ArrowDown":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doMoveLine(1);
+      break;
+    case "k":
+    case "ArrowUp":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doMoveLine(-1);
+      break;
+    case "w":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doMoveWord(1);
+      break;
+    case "b":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doMoveWord(-1);
+      break;
+    case "e":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doMoveWordEnd();
+      break;
+    case "0":
+      ui.consume(event);
+      doLineBoundary(-1);
+      break;
+    case "^":
+      ui.consume(event);
+      doFirstNonBlank();
+      break;
+    case "$":
+      ui.consume(event);
+      for (let i = 0; i < repeat; i++) doLineBoundary(1);
+      break;
+    case "G":
+      ui.consume(event);
+      if (repeat > 1) doGoToLine(repeat);
+      else doDocBoundary(1);
+      break;
+    case "o":
+      ui.consume(event);
+      swapAnchorFocus();
+      break;
+    case "y":
+      ui.consume(event);
+      yankSelection();
+      try {
+        collapseToFocus();
+      } catch {}
+      mode = "caret";
+      if (pillEl) pillEl.textContent = pillText(mode);
+      pendingCount = "";
+      pendingG = false;
+      pendingF = null;
+      pendingY = false;
+      showBlockCaret();
+      attachCaretListeners();
+      ensureVisible();
+      updateBlockCaret();
+      break;
+    case "v":
+      ui.consume(event);
+      if (mode === "visual") {
+        enterCaretAtFocus();
+      } else if (mode === "line") {
+        enterCaretAtFocus();
+      } else {
+        close(false);
+        enter("visual");
+      }
+      break;
+    case "V":
+      ui.consume(event);
+      if (mode === "line" || mode === "visual") {
+        enterCaretAtFocus();
+      } else {
+        close(false);
+        enter("line");
+      }
+      break;
+    case "Y":
+      ui.consume(event);
+      expandSelectionToFullLines();
+      if (repeat > 1 && hasModify()) {
+        try {
+          for (let i = 1; i < repeat; i++) {
+            extendSelection("forward", "lineboundary");
+          }
+        } catch {}
+      }
+      yankSelection();
+      try {
+        collapseToFocus();
+      } catch {}
+      mode = "caret";
+      if (pillEl) pillEl.textContent = pillText(mode);
+      pendingCount = "";
+      pendingG = false;
+      pendingF = null;
+      pendingY = false;
+      showBlockCaret();
+      attachCaretListeners();
+      ensureVisible();
+      updateBlockCaret();
+      break;
+    case "n":
+    case "N":
+      if (isCaret()) {
+        ui.consume(event);
+        if (findNavHandler) {
+          const reverse = key === "N";
+          findNavHandler(repeat, reverse);
+        } else {
+          ui.toast("No search");
+        }
+        break;
+      }
+      // fall through for visual mode: show disabled
+      if (
+        key.length === 1 &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
+        ui.consume(event);
+        ui.toast(`${isCaret() ? "No caret" : "No visual"}: ${key}`);
+      } else {
+        ui.consume(event);
+      }
+      break;
+    default:
+      if (isCaret()) {
+        ui.consume(event);
+      } else if (
+        key.length === 1 &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
+        ui.consume(event);
+        ui.toast(`No visual: ${key}`);
+      } else {
+        ui.consume(event);
+      }
+      break;
+  }
+  pendingCount = "";
+  return true;
+}
+
+export const Visual = {
+  enter,
+  close,
+  isActive,
+  setFindOpen,
+  setFindNav,
+  enterCaretAtFocus,
+  onKeyDown,
+  showBlockCaret,
+  hideBlockCaret,
+  updateBlockCaret,
+};
+
+export const __visualCaret = {
+  isUsableCaretRect,
+  firstUsableRect,
+  lineHeightForElement,
+  resolveCaretGeometry,
+  isWordChar,
+  findNextWordEnd,
+};
+
+register("visual", {
+  close: () => {
+    closeHints();
+    close(false);
+  },
+  onKeyDown,
+  isActive,
+});
+
+export function __resetVisualState() {
+  closeHints();
+  close(false);
+  pendingCount = "";
+  pendingG = false;
+  pendingF = null;
+  pendingY = false;
+  clearPendingKeyTimers();
+}

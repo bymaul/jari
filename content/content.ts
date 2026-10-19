@@ -1,0 +1,359 @@
+import {
+  Events,
+  canonicalKey,
+  deepActiveElement,
+  isPrefixKey,
+  modifierKeys,
+  parseRepeatCount,
+} from "./keymap.ts";
+import { settings } from "./settings.ts";
+import { SHOW_HELP_ACTION } from "../popup/site.ts";
+import { ui } from "./ui.ts";
+import { commands, setModeActions } from "./commands.ts";
+import { Overlays } from "./overlays.ts";
+import { isEditable } from "./hints-elements.ts";
+import { Find, __resetFindState } from "./find.ts";
+import { __resetVisualState } from "./visual.ts";
+import { Clue, __resetClueState } from "./clue.ts";
+
+let pendingCount = "";
+let pendingKeys = "";
+let timer: ReturnType<typeof setTimeout> | null = null;
+let ignoreMode = false;
+let passthroughMode = false;
+let passthroughTimer: ReturnType<typeof setTimeout> | null = null;
+const pills: Record<string, HTMLDivElement> = {};
+
+const PILL_IGNORE_TEXT = "ignore";
+function pillPassthroughText(): string {
+  return "passthrough (" + settings.getPassthroughMs() + "ms)";
+}
+
+function clearPending(): void {
+  pendingCount = "";
+  pendingKeys = "";
+  ui.showcmd(null);
+  Clue.hide();
+}
+
+function restartTimer(): void {
+  clearTimeout(timer ?? undefined);
+  timer = null;
+  const timeoutMs = settings.getTimeoutMs();
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return;
+  timer = setTimeout(clearPending, timeoutMs);
+}
+
+function run(commandName: string, count: number, event: KeyboardEvent): void {
+  const cmd = commands[commandName];
+  if (!cmd) return;
+  ui.consume(event);
+  Clue.hide();
+  cmd.run({ count: cmd.repeatable ? count : 1, event });
+}
+
+function setIgnore(on: boolean): void {
+  ignoreMode = on;
+  clearPending();
+  if (on) {
+    Overlays.closeAll();
+    showPill("ignore", PILL_IGNORE_TEXT);
+  } else {
+    hidePill("ignore");
+  }
+}
+
+function toggleIgnore(): boolean {
+  exitPassthrough();
+  setIgnore(!ignoreMode);
+  return ignoreMode;
+}
+
+function restartPassthroughTimer(): void {
+  clearTimeout(passthroughTimer ?? undefined);
+  passthroughTimer = null;
+  const passthroughMs = settings.getPassthroughMs();
+  if (Number.isFinite(passthroughMs) && passthroughMs > 0) {
+    passthroughTimer = setTimeout(exitPassthrough, passthroughMs);
+  }
+}
+
+function enterPassthrough(): void {
+  setIgnore(false);
+  clearPending();
+
+  Overlays.closeAll();
+  passthroughMode = true;
+  showPill("passthrough", pillPassthroughText());
+  restartPassthroughTimer();
+}
+
+function exitPassthrough(): void {
+  if (!passthroughMode) return;
+  clearTimeout(passthroughTimer ?? undefined);
+  passthroughTimer = null;
+  passthroughMode = false;
+  hidePill("passthrough");
+}
+
+function isFullscreen(): boolean {
+  return !!document.fullscreenElement;
+}
+
+function showPill(name: string, text: string): void {
+  if (pills[name] || isFullscreen()) return;
+  const el = document.createElement("div");
+  el.className = "jari-pill";
+  el.textContent = text;
+  ui.statusContainer().appendChild(el);
+  pills[name] = el;
+}
+
+function hidePill(name: string): void {
+  const el = pills[name];
+  if (el) {
+    el.remove();
+    delete pills[name];
+  }
+}
+
+function handleFullscreenChange(): void {
+  Clue.hide();
+  if (!ignoreMode && !passthroughMode) return;
+  if (isFullscreen()) {
+    hidePill("ignore");
+    hidePill("passthrough");
+  } else {
+    if (ignoreMode) showPill("ignore", PILL_IGNORE_TEXT);
+    if (passthroughMode) showPill("passthrough", pillPassthroughText());
+  }
+}
+
+function isJariUiTarget(event: Event): boolean {
+  let path: EventTarget[] | null = null;
+  try {
+    if (typeof event.composedPath === "function") path = event.composedPath();
+  } catch {}
+  const nodes =
+    Array.isArray(path) && path.length > 0 ? path : [event.target];
+  for (const node of nodes) {
+    try {
+      const cls = node && (node as { className?: unknown }).className;
+      if (typeof cls === "string" && cls.includes("jari-")) return true;
+    } catch {}
+  }
+  return false;
+}
+
+export function shieldOverlayKey(event: KeyboardEvent): void {
+  const overlay = Overlays.active();
+  if (!overlay) return;
+  if (
+    event.type === "keyup" &&
+    typeof overlay.onKeyUp === "function" &&
+    overlay.onKeyUp(event)
+  ) {
+    return;
+  }
+  if (isJariUiTarget(event)) {
+    event.stopPropagation();
+    return;
+  }
+  ui.consume(event);
+}
+
+function handleKeydown(event: KeyboardEvent): boolean | void {
+  if (!event.isTrusted) return;
+
+  if (
+    (window as { __jariOptionsRecording?: unknown }).__jariOptionsRecording
+  ) {
+    clearPending();
+    return;
+  }
+
+  const overlay = Overlays.active();
+  if (overlay) {
+    Clue.hide();
+    const handled = overlay.onKeyDown!(event);
+    if (isJariUiTarget(event)) event.stopPropagation();
+    return handled;
+  }
+
+  if (modifierKeys.has(event.key)) return;
+
+  if (passthroughMode) {
+    if (event.key === "Escape") {
+      ui.consume(event);
+      exitPassthrough();
+    } else {
+      restartPassthroughTimer();
+    }
+    return;
+  }
+
+  if (ignoreMode) {
+    const key = canonicalKey(event);
+    if (
+      settings.getKeymap()[key] === "toggleIgnore" ||
+      event.key === "Escape"
+    ) {
+      ui.consume(event);
+      toggleIgnore();
+    }
+    return;
+  }
+
+  if (settings.isDisabled()) {
+    const key = canonicalKey(event);
+    if (settings.getKeymap()[key] === "toggleSiteEnabled")
+      run("toggleSiteEnabled", 1, event);
+    else if (pendingKeys || pendingCount) clearPending();
+    return;
+  }
+
+  const key = canonicalKey(event);
+
+  const buffer = pendingKeys;
+  const bufferWasPending = buffer !== "";
+  let commandName = null;
+  if (bufferWasPending) {
+    commandName = settings.getKeymap()[buffer + key] || null;
+    if (commandName) {
+      pendingKeys = "";
+      ui.showcmd(null);
+    }
+  }
+
+  const activeEl = deepActiveElement();
+  if (activeEl !== null && isEditable(activeEl)) {
+    if (commandName === "toggleSiteEnabled") run(commandName, 1, event);
+    else if (event.key === "Escape") {
+      ui.consume(event);
+      (activeEl as HTMLElement).blur();
+      clearPending();
+    } else if (pendingKeys || pendingCount) clearPending();
+    return;
+  }
+
+  if (bufferWasPending && !commandName) {
+    ui.consume(event);
+    if (
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      isPrefixKey(settings.getKeymap(), buffer + key)
+    ) {
+      pendingKeys = buffer + key;
+      ui.showcmd(pendingCount + pendingKeys);
+      Clue.refresh(pendingKeys, pendingCount);
+      restartTimer();
+      return;
+    }
+    clearPending();
+    return;
+  }
+
+  if (event.key === "Escape") {
+    if (pendingCount) {
+      ui.consume(event);
+      clearPending();
+      return;
+    }
+    if (Find.hasHighlights()) {
+      ui.consume(event);
+      Find.handleGlobalEsc(event);
+      return;
+    }
+    return;
+  }
+
+  if (event.key === "Enter" && Find.hasHighlights()) {
+    if (Find.handleGlobalEnter(event)) return;
+  }
+
+  if (!commandName && /^[0-9]$/.test(key)) {
+    if (pendingCount.length < 9) pendingCount += key;
+    ui.showcmd(pendingCount);
+    ui.consume(event);
+    restartTimer();
+    return;
+  }
+
+  if (!commandName && isPrefixKey(settings.getKeymap(), key)) {
+    pendingKeys = key;
+    ui.showcmd(pendingCount + key);
+    Clue.schedule(key, pendingCount);
+    ui.consume(event);
+    restartTimer();
+    return;
+  }
+
+  if (!commandName) commandName = settings.getKeymap()[key];
+  if (!commandName) {
+    clearPending();
+    return;
+  }
+
+  const countStr = pendingCount;
+  const count = parseRepeatCount(pendingCount);
+  const hadCount = countStr !== "";
+  pendingCount = "";
+
+  if (hadCount || bufferWasPending) ui.flash(countStr + buffer + key);
+  restartTimer();
+
+  run(commandName, count, event);
+}
+
+async function boot(): Promise<void> {
+  await settings.load();
+
+  Events.on("settingsChanged", () => {
+    Clue.hide();
+    if (settings.isDisabled()) {
+      setIgnore(false);
+      exitPassthrough();
+      Overlays.closeAll();
+    }
+  });
+
+  window.addEventListener("keydown", handleKeydown, true);
+  window.addEventListener("keypress", shieldOverlayKey, true);
+  window.addEventListener("keyup", shieldOverlayKey, true);
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+  chrome.runtime.onMessage.addListener((message) => {
+    if (!message || message.action !== SHOW_HELP_ACTION) return;
+    if (window.top !== window) return;
+    const cmd = commands.showHelp;
+    if (cmd) cmd.run({ count: 1 });
+  });
+}
+
+setModeActions({ ignore: toggleIgnore, passthrough: enterPassthrough });
+
+boot();
+
+export { handleKeydown };
+
+export function __resetState(): void {
+  clearTimeout(timer ?? undefined);
+  clearTimeout(passthroughTimer ?? undefined);
+  timer = null;
+  passthroughTimer = null;
+  pendingCount = "";
+  pendingKeys = "";
+  ignoreMode = false;
+  passthroughMode = false;
+  if (pills.ignore) hidePill("ignore");
+  if (pills.passthrough) hidePill("passthrough");
+  try {
+    __resetClueState();
+  } catch {}
+  try {
+    __resetFindState();
+  } catch {}
+  try {
+    __resetVisualState();
+  } catch {}
+}

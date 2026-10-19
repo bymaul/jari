@@ -90,6 +90,9 @@ Details in [PRIVACY.md](PRIVACY.md).
 
 ```sh
 npm install
+npm run dev:chrome    # rebuild on save (chrome manifest, sourcemaps)
+npm run dev:firefox   # rebuild on save + auto-reload in Firefox via web-ext
+npm run check         # tsc --noEmit, must be clean
 npm run lint          # eslint, must be clean
 npm test              # node --test
 npm run build:chrome  # or: npm run build:firefox

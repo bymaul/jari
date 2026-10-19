@@ -1,0 +1,49 @@
+import { clampCount } from "./utils.ts";
+import * as tabs from "./tabs.ts";
+import { bookmarkManagerTabs, unbookmarkManagerTabs } from "./bookmarks.ts";
+import { suggest, search } from "./suggest.ts";
+
+export { clampCount };
+
+export const handlers = {
+  createTab: tabs.createTab,
+  openIncognitoTab: tabs.openIncognitoTab,
+  navigate: tabs.navigate,
+  closeTab: tabs.closeTab,
+  restoreTab: tabs.restoreTab,
+  previousTab: tabs.previousTab,
+  nextTab: tabs.nextTab,
+  moveTabToWindow: tabs.moveTabToWindow,
+  moveTabIntoWindow: tabs.moveTabIntoWindow,
+  moveManagerTabsToWindow: tabs.moveManagerTabsToWindow,
+  moveManagerTabsIntoWindow: tabs.moveManagerTabsIntoWindow,
+  moveTabLeft: tabs.moveTabLeft,
+  goToFirstTab: tabs.goToFirstTab,
+  goToLastTab: tabs.goToLastTab,
+  moveTabRight: tabs.moveTabRight,
+  reloadTab: tabs.reloadTab,
+  goBack: tabs.goBack,
+  goForward: tabs.goForward,
+  listTabs: tabs.listTabs,
+  managerList: tabs.managerList,
+  closeManagerTabs: tabs.closeManagerTabs,
+  setTabsPinned: tabs.setTabsPinned,
+  setTabsMuted: tabs.setTabsMuted,
+  moveManagerTabs: tabs.moveManagerTabs,
+  duplicateManagerTabs: tabs.duplicateManagerTabs,
+  editManagerTab: tabs.editManagerTab,
+  groupManagerTabs: tabs.groupManagerTabs,
+  ungroupManagerTabs: tabs.ungroupManagerTabs,
+  renameGroup: tabs.renameGroup,
+  bookmarkManagerTabs,
+  unbookmarkManagerTabs,
+  suggest,
+  search,
+  activateTab: tabs.activateTab,
+  zoomBy: tabs.zoomBy,
+  openInBackgroundTab: tabs.openInBackgroundTab,
+  openInForegroundTab: tabs.openInForegroundTab,
+  captureScreenshot: tabs.captureScreenshot,
+  openSettings: tabs.openSettings,
+  openExtensions: tabs.openExtensions,
+};

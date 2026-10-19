@@ -1,2 +1,4 @@
 node_modules/
 dist/
+# esbuild dev-watch sourcemaps (release builds are map-free).
+*.map

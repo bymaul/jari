@@ -1,11 +1,12 @@
 // ESLint flat config for Jari.
 // package.json sets "type": "module", so content scripts, options page,
-// build script, tests and benchmarks are all ESM by default. The background
-// service worker (background.js) is still a classic script and `chrome` is
-// the only extension-specific global.
+// build script, benchmarks, tests and the docs demo are all ESM by default.
+// The background service worker (background.js) is still a classic script and
+// `chrome` is the only extension-specific global.
 import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
   {
     ignores: [
       "**/node_modules/**",
@@ -19,8 +20,19 @@ export default [
   },
   js.configs.recommended,
   {
-    // build.js is a plain Node script, not a browser content script.
-    files: ["build.js"],
+    // TypeScript modules (the JS->TS migration is done for source files;
+    // the remaining .js are the stub-heavy test suites and the docs demo —
+    // see the plain-JS override below).
+    files: ["**/*.ts"],
+    extends: [tseslint.configs.recommended],
+    rules: {
+      // Clipboard/capture/screenshot fallbacks intentionally swallow errors.
+      "no-empty": ["error", { allowEmptyCatch: true }],
+    },
+  },
+  {
+    // build.ts is a plain Node script, not a browser content script.
+    files: ["build.ts"],
     languageOptions: {
       ecmaVersion: 2022,
       globals: {
@@ -31,30 +43,8 @@ export default [
     },
   },
   {
-    // The node:test suites run under Node, not in a browser.
-    files: ["tests/**/*.js"],
-    languageOptions: {
-      ecmaVersion: 2022,
-      globals: {
-        process: "readonly",
-        console: "readonly",
-        fetch: "readonly",
-        WebSocket: "readonly",
-      },
-    },
-  },
-  {
-    // The benchmark scripts run under Node.
-    files: ["benchmarks/**/*.js"],
-    languageOptions: {
-      ecmaVersion: 2022,
-      globals: {
-        process: "readonly",
-        console: "readonly",
-      },
-    },
-  },
-  {
+    // Plain-JS files that live outside the TS migration: the docs/ demo
+    // script. It references browser globals directly.
     files: ["**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
@@ -85,4 +75,4 @@ export default [
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
-];
+);

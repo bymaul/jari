@@ -3,7 +3,7 @@
   "version": "0.7.0",
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "license": "MIT",
-  "author": "Maulana Ahmad Aji Triadi",
+  "author": "maulana",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bymaul/jari.git"
@@ -11,19 +11,26 @@
   "homepage": "https://github.com/bymaul/jari",
   "type": "module",
   "scripts": {
+    "check": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --test",
-    "bench": "node benchmarks/rank.js",
-    "build:chrome": "node build.js chrome",
-    "build:firefox": "node build.js firefox",
-    "dist": "node build.js dist",
+    "bench": "node benchmarks/rank.ts",
+    "build:chrome": "node build.ts chrome",
+    "build:firefox": "node build.ts firefox",
+    "dev:chrome": "node build.ts dev chrome",
+    "dev:firefox": "node build.ts dev firefox",
+    "dist": "node build.ts dist",
     "sign:firefox": "web-ext sign --source-dir=dist/jari-firefox --artifacts-dir=dist/signed --channel=unlisted"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/chrome": "^0.3.5",
+    "@types/node": "^26.6.5",
     "crx3": "^2.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.8.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2",
     "web-ext": "^10.7.0"
   },
   "allowScripts": {

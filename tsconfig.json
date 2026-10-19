@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "esModuleInterop": true,
+    "strict": true,
+    "noEmit": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true,
+    "types": ["node", "chrome"]
+  },
+  "include": [
+    "build.ts",
+    "shared/**/*",
+    "content/**/*.ts",
+    "background/**/*.ts",
+    "popup/**/*.ts",
+    "options/**/*.ts",
+    "benchmarks/**/*",
+    "tests/**/*.ts"
+  ]
+}
