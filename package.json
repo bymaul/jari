@@ -3,7 +3,7 @@
   "version": "0.7.0",
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "license": "MIT",
-  "author": "Maulana Ahmad Aji Triadi",
+  "author": "maulana",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bymaul/jari.git"
@@ -17,7 +17,6 @@
     "bench": "node benchmarks/rank.ts",
     "build:chrome": "node build.ts chrome",
     "build:firefox": "node build.ts firefox",
-    "dev": "node build.ts dev",
     "dev:chrome": "node build.ts dev chrome",
     "dev:firefox": "node build.ts dev firefox",
     "dist": "node build.ts dist",

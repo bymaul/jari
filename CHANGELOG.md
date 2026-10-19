@@ -9,8 +9,8 @@ versioned for the extension manifest (`manifest.base.json`).
 ### Changed
 
 - Internal: the codebase is now fully TypeScript (erasable syntax, no
-  runtime change). `npm run check` type-checks; `npm run dev` rebuilds
-  on save with sourcemaps.
+  runtime change). `npm run check` type-checks; `npm run dev:chrome`
+  rebuilds on save with sourcemaps.
 
 ## [0.7.0] - 2026-10-15
 

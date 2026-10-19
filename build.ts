@@ -255,7 +255,7 @@ function bundleOptions(
   };
 }
 
-// Dev watch mode: `npm run dev[:chrome|:firefox]`. Same options as release
+// Dev watch mode: `npm run dev:chrome|:firefox`. Same options as release
 // builds plus sourcemaps (release output stays map-free and byte-stable),
 // rebuilt on every source edit. manifest.base.json is not an esbuild input,
 // so the contexts never see edits to it — poll-stat it and regenerate the

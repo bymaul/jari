@@ -3,7 +3,7 @@
   "name": "Jari",
   "version": "0.7.0",
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
-  "author": "Maulana Ahmad Aji Triadi",
+  "author": "maulana",
   "homepage_url": "https://github.com/bymaul/jari",
   "browser_specific_settings": {
     "gecko": {

@@ -10,8 +10,7 @@ npm install
 npm run check         # tsc --noEmit, must be clean
 npm run lint          # eslint, must be clean
 npm test              # node --test, ~134 unit tests
-npm run dev           # esbuild watch (chrome manifest, sourcemaps)
-npm run dev:chrome    # same as dev
+npm run dev:chrome    # esbuild watch (chrome manifest, sourcemaps)
 npm run dev:firefox   # esbuild watch (firefox manifest) + web-ext auto-reload
 npm run build:chrome  # rebuild bundles + manifest.json for Chrome
 npm run build:firefox # rebuild bundles + manifest.json for Firefox
