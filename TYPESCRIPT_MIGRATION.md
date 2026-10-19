@@ -193,6 +193,14 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
 - Test-file policy: pure-logic suites migrate to `.test.ts`; fixture-heavy
   DOM/globalThis-stub suites (e.g. tests/find-collect.test.js) stay `.js` and
   import the `.ts` modules directly.
+- `22fa91b` manifest drift fix: 78a7054 accidentally committed the firefox
+  shape of root manifest.json — gate verification runs build:chrome then
+  build:firefox, and the firefox run rewrites the root manifest last, leaking
+  its output into the commit. Not pre-existing (6e2e7fb had the chrome shape,
+  `d3fdabb`); restored byte-identical. Rule going forward: after gate runs
+  that include build:firefox, head back to a clean root manifest via
+  `npm run build:chrome` before staging — the chrome build is what the CI
+  sync check expects on disk.
 
 ## Phases
 
