@@ -18,41 +18,69 @@ import { normalizeSitePattern } from "../shared/url.ts";
 import { searchEngineDefaults } from "../shared/search-engines.ts";
 import { pageNavTextDefaults } from "../shared/page-nav-texts.ts";
 import { COMMAND_CATALOG } from "../content/catalog.ts";
+import type { CommandDef, CommandName } from "../content/catalog.ts";
+import type { Settings, HintTheme } from "../content/keymap.ts";
 import { settings } from "../content/settings.ts";
 import { ui } from "../content/ui.ts";
 import { renderEngines, initEngines } from "./engines.ts";
 import { renderPagenav, initPagenav } from "./pagenav.ts";
 
-const tableEl = document.querySelector("#keymap-table");
-const resetBtn = document.querySelector("#reset");
-const resetKeysBtn = document.querySelector("#reset-keys");
-const statusEl = document.querySelector("#status");
-const saveStateEl = document.querySelector("#save-state");
-const disabledList = document.querySelector("#disabled-list");
-const scrollStepEl = document.querySelector("#scroll-step");
-const smoothScrollEl = document.querySelector("#smooth-scroll");
-const fuzzyMatchingEl = document.querySelector("#fuzzy-matching");
-const timeoutEl = document.querySelector("#timeout");
-const passthroughEl = document.querySelector("#passthrough-timeout");
-const clueEnabledEl = document.querySelector("#clue-enabled");
-const clueDelayEl = document.querySelector("#clue-delay");
-const sourceTabEl = document.querySelector("#source-tab");
-const sourceHistoryEl = document.querySelector("#source-history");
-const sourceBookmarkEl = document.querySelector("#source-bookmark");
-const maxResultsEl = document.querySelector("#max-results");
-const copyFormatEl = document.querySelector("#copy-format");
-const hintCharsEl = document.querySelector("#hint-chars");
-const hintCharsMetaEl = document.querySelector("#hint-chars-meta");
-const clickableSelectorEl = document.querySelector("#clickable-selector");
-const hintThemeEl = document.querySelector("#hint-theme");
-const hintFontSizeEl = document.querySelector("#hint-font-size");
-const keymapFilterEl = document.querySelector("#keymap-filter");
-const keymapUnboundEl = document.querySelector("#keymap-unbound");
-const keymapCountEl = document.querySelector("#keymap-count");
-const siteInputEl = document.querySelector("#disabled-site-input");
-const addSiteBtn = document.querySelector("#add-disabled-site");
-const siteErrorEl = document.querySelector("#site-error");
-const summaries = {
+/* The unguarded elements are present in the static options.html — they are
+   asserted non-null here so every runtime access keeps its original (throwing
+   on missing) behavior; the `?.`-guarded ones stay nullable. */
+const tableEl = document.querySelector<HTMLElement>("#keymap-table")!;
+const resetBtn = document.querySelector<HTMLButtonElement>("#reset")!;
+const resetKeysBtn = document.querySelector<HTMLButtonElement>("#reset-keys");
+const statusEl = document.querySelector<
+  HTMLElement & { _timer?: ReturnType<typeof setTimeout> }
+>("#status")!;
+const saveStateEl = document.querySelector<HTMLElement>("#save-state");
+const disabledList = document.querySelector<HTMLElement>("#disabled-list")!;
+const scrollStepEl =
+  document.querySelector<HTMLInputElement>("#scroll-step")!;
+const smoothScrollEl =
+  document.querySelector<HTMLInputElement>("#smooth-scroll")!;
+const fuzzyMatchingEl =
+  document.querySelector<HTMLInputElement>("#fuzzy-matching")!;
+const timeoutEl = document.querySelector<HTMLInputElement>("#timeout")!;
+const passthroughEl =
+  document.querySelector<HTMLInputElement>("#passthrough-timeout")!;
+const clueEnabledEl =
+  document.querySelector<HTMLInputElement>("#clue-enabled")!;
+const clueDelayEl = document.querySelector<HTMLInputElement>("#clue-delay")!;
+const sourceTabEl = document.querySelector<HTMLInputElement>("#source-tab")!;
+const sourceHistoryEl =
+  document.querySelector<HTMLInputElement>("#source-history")!;
+const sourceBookmarkEl =
+  document.querySelector<HTMLInputElement>("#source-bookmark")!;
+const maxResultsEl =
+  document.querySelector<HTMLInputElement>("#max-results")!;
+const copyFormatEl =
+  document.querySelector<HTMLSelectElement>("#copy-format")!;
+const hintCharsEl = document.querySelector<HTMLInputElement>("#hint-chars")!;
+const hintCharsMetaEl = document.querySelector<HTMLElement>(
+  "#hint-chars-meta",
+);
+const clickableSelectorEl = document.querySelector<HTMLInputElement>(
+  "#clickable-selector",
+);
+const hintThemeEl =
+  document.querySelector<HTMLSelectElement>("#hint-theme");
+const hintFontSizeEl = document.querySelector<HTMLInputElement>(
+  "#hint-font-size",
+)!;
+const keymapFilterEl =
+  document.querySelector<HTMLInputElement>("#keymap-filter")!;
+const keymapUnboundEl =
+  document.querySelector<HTMLInputElement>("#keymap-unbound");
+const keymapCountEl = document.querySelector<HTMLElement>("#keymap-count");
+const siteInputEl =
+  document.querySelector<HTMLInputElement>("#disabled-site-input")!;
+const addSiteBtn = document.querySelector<HTMLButtonElement>(
+  "#add-disabled-site",
+)!;
+const siteErrorEl = document.querySelector<HTMLElement>("#site-error");
+const summaries: Record<string, HTMLElement | null> = {
   scrolling: document.querySelector("#summary-scrolling"),
   search: document.querySelector("#summary-search"),
   clipboard: document.querySelector("#summary-clipboard"),
@@ -61,7 +89,7 @@ const summaries = {
   keybindings: document.querySelector("#summary-keybindings"),
   disabled: document.querySelector("#summary-disabled"),
 };
-const cards = {
+const cards: Record<string, HTMLDetailsElement | null> = {
   scrolling: document.querySelector("#card-scrolling"),
   search: document.querySelector("#card-search"),
   clipboard: document.querySelector("#card-clipboard"),
@@ -77,7 +105,10 @@ const RECORDING_TITLE =
 
 const OPEN_KEY = "jari.options.open";
 
-function setSaveState(mode, message) {
+function setSaveState(
+  mode: "saving" | "failed" | "warn" | "saved",
+  message?: string,
+): void {
   if (!saveStateEl) return;
   saveStateEl.classList.remove("saving", "failed", "warn");
   if (mode === "saving") {
@@ -95,7 +126,7 @@ function setSaveState(mode, message) {
   }
 }
 
-function savedState() {
+function savedState(): void {
   if (settings.isPersistedLocally()) {
     setSaveState("warn", "Saved on this device only — browser sync is full");
   } else {
@@ -103,7 +134,7 @@ function savedState() {
   }
 }
 
-async function savePatch(patch) {
+async function savePatch(patch: Partial<Settings>): Promise<boolean> {
   setSaveState("saving");
   try {
     await settings.update(patch);
@@ -116,32 +147,32 @@ async function savePatch(patch) {
   return true;
 }
 
-function showFieldError(id, message) {
+function showFieldError(id: string, message: string): void {
   const el = document.querySelector(`#${id}`);
   if (!el) return;
   el.textContent = message;
-  el.hidden = false;
+  (el as HTMLElement).hidden = false;
 }
 
-function clearFieldError(id) {
+function clearFieldError(id: string): void {
   const el = document.querySelector(`#${id}`);
   if (!el) return;
   el.textContent = "";
-  el.hidden = true;
+  (el as HTMLElement).hidden = true;
 }
 
-function markInvalid(el, invalid) {
+function markInvalid(el: Element | null, invalid: boolean): void {
   if (!el) return;
   if (invalid) el.setAttribute("aria-invalid", "true");
   else el.removeAttribute("aria-invalid");
 }
 
-function uniqueHintCount(raw) {
+function uniqueHintCount(raw: unknown): number {
   if (typeof raw !== "string") return 0;
   return new Set(raw.toLowerCase().replace(/[^a-z0-9]/g, "")).size;
 }
 
-function updateHintMeta() {
+function updateHintMeta(): void {
   if (!hintCharsMetaEl) return;
   const n = uniqueHintCount(hintCharsEl.value);
   hintCharsMetaEl.textContent =
@@ -150,7 +181,7 @@ function updateHintMeta() {
       : `${n} unique letter${n === 1 ? "" : "s"}/digit${n === 1 ? "" : "s"}`;
 }
 
-function countUnbound() {
+function countUnbound(): number {
   rebuildKeyIndex();
   let unbound = 0;
   for (const name of Object.keys(COMMAND_CATALOG)) {
@@ -159,7 +190,7 @@ function countUnbound() {
   return unbound;
 }
 
-function updateSummaries() {
+function updateSummaries(): void {
   if (summaries.scrolling) {
     summaries.scrolling.textContent = `${settings.getScrollStep()}px · smooth ${settings.isSmoothScroll() ? "on" : "off"}`;
   }
@@ -206,7 +237,7 @@ function updateSummaries() {
   }
 }
 
-function restoreOpenState() {
+function restoreOpenState(): void {
   try {
     const stored = window.localStorage?.getItem(OPEN_KEY);
     if (!stored) return;
@@ -221,8 +252,8 @@ function restoreOpenState() {
   }
 }
 
-function persistOpenState() {
-  const open = {};
+function persistOpenState(): void {
+  const open: Record<string, boolean> = {};
   for (const [id, card] of Object.entries(cards)) {
     if (!card) continue;
     open[id] = card.open;
@@ -235,26 +266,32 @@ function persistOpenState() {
 
 /* Single active capture session. Only one field records at a time so tabbing
    through the grid never arms a field by accident. */
-let activeRecording = null;
+let activeRecording: {
+  button: HTMLButtonElement;
+  name: string;
+  waitingKeys: string[];
+} | null = null;
 
-function commandLabel(name) {
-  return COMMAND_CATALOG[name]?.label || name;
+function commandLabel(name: string): string {
+  return COMMAND_CATALOG[name as CommandName]?.label || name;
 }
 
-async function load() {
+async function load(): Promise<void> {
   await settings.load();
-  scrollStepEl.value = settings.getScrollStep();
+  /* Numeric settings are assigned raw and coerced by the DOM value setter —
+     the casts preserve that exact runtime. */
+  scrollStepEl.value = settings.getScrollStep() as unknown as string;
   smoothScrollEl.checked = settings.isSmoothScroll();
   fuzzyMatchingEl.checked = settings.isFuzzyMatching();
-  timeoutEl.value = settings.getTimeoutMs();
-  passthroughEl.value = settings.getPassthroughMs();
+  timeoutEl.value = settings.getTimeoutMs() as unknown as string;
+  passthroughEl.value = settings.getPassthroughMs() as unknown as string;
   clueEnabledEl.checked = settings.isClueEnabled();
-  clueDelayEl.value = settings.getClueDelayMs();
+  clueDelayEl.value = settings.getClueDelayMs() as unknown as string;
   const sources = settings.getSuggestionSources();
   sourceTabEl.checked = sources.includes("tab");
   sourceHistoryEl.checked = sources.includes("history");
   sourceBookmarkEl.checked = sources.includes("bookmark");
-  maxResultsEl.value = settings.getMaxResults();
+  maxResultsEl.value = settings.getMaxResults() as unknown as string;
   renderEngines();
   renderPagenav();
   copyFormatEl.value = settings.getCopyFormat();
@@ -262,7 +299,8 @@ async function load() {
   if (clickableSelectorEl)
     clickableSelectorEl.value = settings.getClickableSelector();
   if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
-  if (hintFontSizeEl) hintFontSizeEl.value = settings.getHintFontSize();
+  if (hintFontSizeEl)
+    hintFontSizeEl.value = settings.getHintFontSize() as unknown as string;
   for (const el of [
     scrollStepEl,
     maxResultsEl,
@@ -302,13 +340,17 @@ async function load() {
   updateAddButton();
 }
 
-function matchesFilter(name, cmd, filter) {
+function matchesFilter(
+  name: string,
+  cmd: CommandDef,
+  filter: string,
+): boolean {
   if (name.toLowerCase().includes(filter)) return true;
   if (cmd.label.toLowerCase().includes(filter)) return true;
   return keysFor(name).some((key) => key.toLowerCase().includes(filter));
 }
 
-function renderKeymap() {
+function renderKeymap(): void {
   cancelRecordingSilent();
   tableEl.textContent = "";
   rebuildKeyIndex();
@@ -316,7 +358,7 @@ function renderKeymap() {
   const filter = rawFilter.toLowerCase();
   const unboundOnly = Boolean(keymapUnboundEl?.checked);
   const total = Object.keys(COMMAND_CATALOG).length;
-  const byCategory = new Map();
+  const byCategory = new Map<string, [string, CommandDef][]>();
   let shown = 0;
   let unboundTotal = 0;
   for (const [name, cmd] of Object.entries(COMMAND_CATALOG)) {
@@ -327,7 +369,7 @@ function renderKeymap() {
     if (filter && !matchesFilter(name, cmd, filter)) continue;
     shown++;
     if (!byCategory.has(id)) byCategory.set(id, []);
-    byCategory.get(id).push([name, cmd]);
+    byCategory.get(id)!.push([name, cmd]);
   }
 
   if (keymapCountEl) {
@@ -425,29 +467,34 @@ function renderKeymap() {
   refreshKeyLabels();
 }
 
-function refreshKeyLabels() {
-  for (const el of document.querySelectorAll("code[data-key]")) {
-    const keys = keysFor(el.dataset.key);
+function refreshKeyLabels(): void {
+  for (const el of document.querySelectorAll<HTMLElement>("code[data-key]")) {
+    const keys = keysFor(el.dataset.key!);
     el.textContent =
       keys.length > 0 ? keys.map(displayCombo).join(", ") : "unbound";
   }
 }
 
-let keyByCommand = new Map();
-function rebuildKeyIndex() {
+let keyByCommand = new Map<string, string[]>();
+function rebuildKeyIndex(): void {
   keyByCommand = new Map();
   for (const [key, name] of Object.entries(settings.getKeymap())) {
     if (!keyByCommand.has(name)) keyByCommand.set(name, []);
-    keyByCommand.get(name).push(key);
+    keyByCommand.get(name)!.push(key);
   }
   for (const keys of keyByCommand.values()) keys.sort();
 }
 
-function keysFor(commandName) {
+function keysFor(commandName: string): string[] {
   return (keyByCommand.get(commandName) || []).slice();
 }
 
-function buildChip(name, cmd, combo, overlapped) {
+function buildChip(
+  name: string,
+  cmd: CommandDef,
+  combo: string,
+  overlapped: boolean,
+): HTMLSpanElement {
   const shown = displayCombo(combo);
   const chip = document.createElement("span");
   chip.className = overlapped ? "chip overlap" : "chip";
@@ -488,10 +535,12 @@ function buildChip(name, cmd, combo, overlapped) {
   return chip;
 }
 
-function rowOverlaps(name) {
+type OverlapInfo = { mine: Set<string>; others: string[] };
+
+function rowOverlaps(name: string): OverlapInfo {
   const keymap = settings.getKeymap();
-  const mine = new Set();
-  const others = new Set();
+  const mine = new Set<string>();
+  const others = new Set<string>();
   for (const combo of keysFor(name)) {
     for (const overlap of findOverlapConflicts(keymap, combo)) {
       mine.add(combo);
@@ -501,7 +550,7 @@ function rowOverlaps(name) {
   return { mine, others: [...others].sort() };
 }
 
-function buildOverlapNote(overlaps) {
+function buildOverlapNote(overlaps: OverlapInfo | null): HTMLDivElement | null {
   if (!overlaps || overlaps.others.length === 0) return null;
   const warn = document.createElement("div");
   warn.className = "key-overlap-warn";
@@ -509,24 +558,27 @@ function buildOverlapNote(overlaps) {
   return warn;
 }
 
-function recordingHintEl(button) {
+function recordingHintEl(
+  button?: HTMLButtonElement | null,
+): HTMLElement | null {
   const cell = button?.closest?.(".key-cell");
-  return cell?.querySelector?.(".key-recording-hint") || null;
+  return cell?.querySelector?.<HTMLElement>(".key-recording-hint") || null;
 }
 
-function isRecording(button) {
+function isRecording(button: HTMLButtonElement): boolean {
   return activeRecording?.button === button;
 }
 
 /* Shared with the content dispatcher (content.js): while true, Jari yields
    every key to the recorder instead of running commands. */
-function setRecordingFlag(on) {
+function setRecordingFlag(on: boolean): void {
   try {
-    window.__jariOptionsRecording = Boolean(on);
+    (window as { __jariOptionsRecording?: unknown }).__jariOptionsRecording =
+      Boolean(on);
   } catch {}
 }
 
-function startRecording(button, name) {
+function startRecording(button: HTMLButtonElement, name: string): void {
   if (isRecording(button)) return;
   cancelRecordingSilent();
   dismissConflict(button);
@@ -541,7 +593,7 @@ function startRecording(button, name) {
   }
 }
 
-function cancelRecordingSilent() {
+function cancelRecordingSilent(): void {
   if (!activeRecording) return;
   const { button } = activeRecording;
   activeRecording = null;
@@ -553,7 +605,7 @@ function cancelRecordingSilent() {
   if (hint) hint.hidden = true;
 }
 
-function cancelRecording() {
+function cancelRecording(): void {
   if (!activeRecording) return;
   const { button } = activeRecording;
   cancelRecordingSilent();
@@ -561,7 +613,7 @@ function cancelRecording() {
   if (button.isConnected) button.focus?.();
 }
 
-function exitRecording() {
+function exitRecording(): void {
   if (!activeRecording) return;
   const { button } = activeRecording;
   activeRecording = null;
@@ -573,15 +625,19 @@ function exitRecording() {
   if (hint) hint.hidden = true;
 }
 
-function onAddBlur(event, button) {
+function onAddBlur(event: FocusEvent, button: HTMLButtonElement): void {
   if (!isRecording(button)) return;
   const next = event.relatedTarget;
   const cell = button.closest(".key-cell");
-  if (next && cell && cell.contains(next)) return;
+  if (next && cell && cell.contains(next as Node)) return;
   cancelRecordingSilent();
 }
 
-function onAddKeydown(event, button, name) {
+function onAddKeydown(
+  event: KeyboardEvent,
+  button: HTMLButtonElement,
+  name: string,
+): void {
   if (!isRecording(button)) return;
   event.preventDefault();
   event.stopPropagation();
@@ -591,8 +647,8 @@ function onAddKeydown(event, button, name) {
   if (modifierKeys.has(event.key)) return;
 
   if (event.key === "Escape") {
-    if (activeRecording.waitingKeys.length > 0) {
-      activeRecording.waitingKeys = [];
+    if (activeRecording!.waitingKeys.length > 0) {
+      activeRecording!.waitingKeys = [];
       const hint = recordingHintEl(button);
       if (hint) hint.textContent = "Press a key… Esc cancels.";
       status("Sequence cancelled — press a key, or Esc again to stop");
@@ -603,9 +659,9 @@ function onAddKeydown(event, button, name) {
   }
 
   if (clearingKeys.has(event.key)) {
-    if (activeRecording.waitingKeys.length > 0) {
-      activeRecording.waitingKeys.pop();
-      const keys = activeRecording.waitingKeys.join("");
+    if (activeRecording!.waitingKeys.length > 0) {
+      activeRecording!.waitingKeys.pop();
+      const keys = activeRecording!.waitingKeys.join("");
       const shown = displayCombo(keys);
       const hint = recordingHintEl(button);
       if (hint) {
@@ -624,18 +680,18 @@ function onAddKeydown(event, button, name) {
     return;
   }
 
-  if (event.key === "Enter" && activeRecording.waitingKeys.length > 0) {
-    const combo = activeRecording.waitingKeys.join("");
-    activeRecording.waitingKeys = [];
+  if (event.key === "Enter" && activeRecording!.waitingKeys.length > 0) {
+    const combo = activeRecording!.waitingKeys.join("");
+    activeRecording!.waitingKeys = [];
     attemptCommit(combo, name, button);
     return;
   }
 
   const combo = canonicalKey(event);
 
-  if (activeRecording.waitingKeys.length > 0) {
-    activeRecording.waitingKeys.push(combo);
-    const shown = displayCombo(activeRecording.waitingKeys.join(""));
+  if (activeRecording!.waitingKeys.length > 0) {
+    activeRecording!.waitingKeys.push(combo);
+    const shown = displayCombo(activeRecording!.waitingKeys.join(""));
     const hint = recordingHintEl(button);
     if (hint) hint.textContent = `Next key for ${shown}… or Enter to save ${shown}`;
     status(`Sequence ${shown} — press the next key, or Enter to save`);
@@ -643,7 +699,7 @@ function onAddKeydown(event, button, name) {
   }
 
   if (isBindablePrefixStarter(combo)) {
-    activeRecording.waitingKeys = [combo];
+    activeRecording!.waitingKeys = [combo];
     const shown = displayCombo(combo);
     const hint = recordingHintEl(button);
     if (hint)
@@ -664,7 +720,11 @@ function onAddKeydown(event, button, name) {
   attemptCommit(combo, name, button);
 }
 
-function attemptCommit(combo, name, button) {
+function attemptCommit(
+  combo: string,
+  name: string,
+  button: HTMLButtonElement,
+): void {
   const shown = displayCombo(combo);
   if (isBrowserTrapped(combo)) {
     const hint = recordingHintEl(button);
@@ -689,7 +749,7 @@ function attemptCommit(combo, name, button) {
   showConflict(button, name, combo, conflict);
 }
 
-function persistKeymap() {
+function persistKeymap(): Promise<boolean> {
   setSaveState("saving");
   return settings
     .update({ keymap: { ...settings.getKeymap() } })
@@ -705,14 +765,19 @@ function persistKeymap() {
     });
 }
 
-async function commitCombo(combo, name, swapWith, doSwap = false) {
+async function commitCombo(
+  combo: string,
+  name: string,
+  swapWith: string | null,
+  doSwap = false,
+): Promise<void> {
   const keymap = settings.getKeymap();
   const previous =
     keysForCommand(keymap, name).filter((k) => k !== combo)[0] || "";
   delete keymap[combo];
   keymap[combo] = name;
   const swapped = doSwap && swapWith && previous && previous !== combo;
-  if (swapped) keymap[previous] = swapWith;
+  if (swapped) keymap[previous] = swapWith!;
   const overlaps = findOverlapConflicts(keymap, combo);
   const ok = await persistKeymap();
   exitRecording();
@@ -730,11 +795,11 @@ async function commitCombo(combo, name, swapWith, doSwap = false) {
   const shownPrevious = previous ? displayCombo(previous) : "";
   if (swapped) {
     status(
-      `Swapped: ${shown} → ${commandLabel(name)}, ${shownPrevious} → ${commandLabel(swapWith)}${notes}`,
+      `Swapped: ${shown} → ${commandLabel(name)}, ${shownPrevious} → ${commandLabel(swapWith!)}${notes}`,
     );
   } else if (swapWith) {
     status(
-      `Saved ${shown} → ${commandLabel(name)} (moved ${commandLabel(swapWith)} off ${shown})${notes}`,
+      `Saved ${shown} → ${commandLabel(name)} (moved ${commandLabel(swapWith!)} off ${shown})${notes}`,
     );
   } else {
     status(`Saved ${shown} → ${commandLabel(name)}${notes}`);
@@ -742,10 +807,13 @@ async function commitCombo(combo, name, swapWith, doSwap = false) {
   focusChipFor(name, combo);
 }
 
-async function clearBinding(name, specificKey) {
+async function clearBinding(
+  name: string,
+  specificKey: string,
+): Promise<void> {
   cancelRecordingSilent();
   const keymap = settings.getKeymap();
-  const removed = [];
+  const removed: string[] = [];
   if (specificKey) {
     if (keymap[specificKey] === name) {
       delete keymap[specificKey];
@@ -779,37 +847,46 @@ async function clearBinding(name, specificKey) {
   focusAddFor(name);
 }
 
-function focusChipFor(name, combo) {
-  for (const row of tableEl.querySelectorAll("tr[data-command]")) {
+function focusChipFor(name: string, combo: string): boolean {
+  for (const row of tableEl.querySelectorAll<HTMLTableRowElement>(
+    "tr[data-command]",
+  )) {
     if (row.dataset.command !== name) continue;
-    for (const chip of row.querySelectorAll(".chip")) {
+    for (const chip of row.querySelectorAll<HTMLElement>(".chip")) {
       if (chip.dataset.binding === combo) {
         chip.focus?.();
         return true;
       }
     }
-    const add = row.querySelector(".key-add");
+    const add = row.querySelector<HTMLButtonElement>(".key-add");
     if (add) add.focus?.();
     return false;
   }
   return false;
 }
 
-function focusAddFor(name) {
-  for (const row of tableEl.querySelectorAll("tr[data-command]")) {
+function focusAddFor(name: string): void {
+  for (const row of tableEl.querySelectorAll<HTMLTableRowElement>(
+    "tr[data-command]",
+  )) {
     if (row.dataset.command !== name) continue;
-    const add = row.querySelector(".key-add");
+    const add = row.querySelector<HTMLButtonElement>(".key-add");
     if (add) add.focus?.();
     return;
   }
 }
 
-function dismissConflict(anchor) {
+function dismissConflict(anchor?: HTMLButtonElement | null): void {
   const cell = anchor?.closest?.(".key-cell");
   cell?.querySelector?.(".key-conflict")?.remove();
 }
 
-function showConflict(button, name, combo, conflictingCommand) {
+function showConflict(
+  button: HTMLButtonElement,
+  name: string,
+  combo: string,
+  conflictingCommand: string,
+): void {
   const cell = button.closest(".key-cell");
   if (!cell) {
     commitCombo(combo, name, conflictingCommand);
@@ -881,11 +958,41 @@ function showConflict(button, name, combo, conflictingCommand) {
   cancel.focus();
 }
 
+type NumberGetterName =
+  | "getScrollStep"
+  | "getMaxResults"
+  | "getTimeoutMs"
+  | "getPassthroughMs"
+  | "getClueDelayMs"
+  | "getHintFontSize";
+
+type NumberSettingKey =
+  | "scrollStep"
+  | "maxResults"
+  | "timeoutMs"
+  | "passthroughMs"
+  | "clueDelayMs"
+  | "hintFontSize";
+
 function commitNumber(
-  el,
-  errorId,
-  { min, max, fallback, settingKey, label, unit },
-) {
+  el: HTMLInputElement | HTMLSelectElement,
+  errorId: string,
+  {
+    min,
+    max,
+    fallback,
+    settingKey,
+    label,
+    unit,
+  }: {
+    min: number;
+    max: number;
+    fallback: NumberGetterName;
+    settingKey: NumberSettingKey;
+    label: string;
+    unit?: string;
+  },
+): void {
   const raw = el.value.trim();
   const parsed = Number(raw);
   const invalid =
@@ -895,7 +1002,7 @@ function commitNumber(
     parsed < min ||
     parsed > max;
   if (invalid) {
-    el.value = settings[fallback]();
+    el.value = settings[fallback]() as unknown as string;
     markInvalid(el, true);
     showFieldError(
       errorId,
@@ -910,7 +1017,7 @@ function commitNumber(
   savePatch({ [settingKey]: parsed });
 }
 
-function commitHintChars() {
+function commitHintChars(): void {
   const raw = hintCharsEl.value;
   const trimmed = raw.trim().toLowerCase();
   const deduped = [...new Set(trimmed.replace(/[^a-z0-9]/g, ""))].join("");
@@ -935,7 +1042,7 @@ function commitHintChars() {
   });
 }
 
-function isValidSelector(sel) {
+function isValidSelector(sel: string): boolean {
   try {
     document.createDocumentFragment().querySelector(sel);
     return true;
@@ -944,7 +1051,7 @@ function isValidSelector(sel) {
   }
 }
 
-function commitClickableSelector() {
+function commitClickableSelector(): void {
   if (!clickableSelectorEl) return;
   const raw = clickableSelectorEl.value.trim();
   if (raw && !isValidSelector(raw)) {
@@ -963,8 +1070,8 @@ function commitClickableSelector() {
   savePatch({ clickableSelector: raw });
 }
 
-function collectSources() {
-  const sources = [];
+function collectSources(): string[] {
+  const sources: string[] = [];
   if (sourceTabEl.checked) sources.push("tab");
   if (sourceHistoryEl.checked) sources.push("history");
   if (sourceBookmarkEl.checked) sources.push("bookmark");
@@ -973,10 +1080,13 @@ function collectSources() {
 
 let confirmCount = 0;
 
-function confirmDialog(message, confirmLabel) {
+function confirmDialog(
+  message: string,
+  confirmLabel?: string,
+): Promise<boolean> {
   const previousFocus = document.activeElement;
   setRecordingFlag(true);
-  return new Promise((resolve) => {
+  return new Promise<boolean>((resolve) => {
     const dialog = document.createElement("dialog");
     dialog.className = "jari-confirm-box";
     const msgId = `jari-confirm-msg-${++confirmCount}`;
@@ -1007,7 +1117,8 @@ function confirmDialog(message, confirmLabel) {
     dialog.addEventListener("close", () => {
       dialog.remove();
       setRecordingFlag(false);
-      if (previousFocus?.isConnected) ui.safeFocus(previousFocus);
+      if (previousFocus?.isConnected)
+        ui.safeFocus(previousFocus as HTMLElement);
       resolve(dialog.returnValue === "ok");
     });
     document.body.appendChild(dialog);
@@ -1015,7 +1126,7 @@ function confirmDialog(message, confirmLabel) {
   });
 }
 
-async function resetKeys() {
+async function resetKeys(): Promise<void> {
   cancelRecordingSilent();
   if (
     !(await confirmDialog("Reset all keybindings to defaults?", "Reset keys"))
@@ -1028,7 +1139,7 @@ async function resetKeys() {
   });
 }
 
-async function reset() {
+async function reset(): Promise<void> {
   cancelRecordingSilent();
   if (
     !(await confirmDialog(
@@ -1069,7 +1180,7 @@ async function reset() {
     });
 }
 
-function renderDisabled() {
+function renderDisabled(): void {
   disabledList.textContent = "";
   const sites = settings.getDisabledSites();
   if (sites.length === 0) {
@@ -1102,7 +1213,7 @@ function renderDisabled() {
   updateSummaries();
 }
 
-function showSiteError(message) {
+function showSiteError(message: string): void {
   if (!siteErrorEl) {
     status(message);
     return;
@@ -1112,19 +1223,19 @@ function showSiteError(message) {
   markInvalid(siteInputEl, true);
 }
 
-function clearSiteError() {
+function clearSiteError(): void {
   if (!siteErrorEl) return;
   siteErrorEl.textContent = "";
   siteErrorEl.hidden = true;
   markInvalid(siteInputEl, false);
 }
 
-function updateAddButton() {
+function updateAddButton(): void {
   if (!addSiteBtn || !siteInputEl) return;
   addSiteBtn.disabled = siteInputEl.value.trim() === "";
 }
 
-async function addDisabledSite() {
+async function addDisabledSite(): Promise<void> {
   const raw = siteInputEl.value;
   const pattern = normalizeSitePattern(raw);
   if (!pattern) {
@@ -1147,11 +1258,11 @@ async function addDisabledSite() {
   siteInputEl.focus();
 }
 
-function status(message) {
-  statusEl.textContent = message;
-  clearTimeout(statusEl._timer);
-  statusEl._timer = setTimeout(() => {
-    statusEl.textContent = "";
+function status(message: string): void {
+  statusEl!.textContent = message;
+  clearTimeout(statusEl._timer ?? undefined);
+  statusEl!._timer = setTimeout(() => {
+    statusEl!.textContent = "";
   }, 2500);
 }
 
@@ -1233,7 +1344,9 @@ clueEnabledEl.addEventListener("change", () =>
   savePatch({ clueEnabled: clueEnabledEl.checked }),
 );
 copyFormatEl.addEventListener("change", () =>
-  savePatch({ copyFormat: copyFormatEl.value }).then(() => {
+  savePatch({
+    copyFormat: copyFormatEl.value as "plain" | "markdown",
+  }).then(() => {
     copyFormatEl.value = settings.getCopyFormat();
   }),
 );
@@ -1251,7 +1364,7 @@ hintCharsEl.addEventListener("input", () => {
 });
 hintCharsEl.addEventListener("change", commitHintChars);
 hintThemeEl?.addEventListener("change", () =>
-  savePatch({ hintTheme: hintThemeEl.value }).then(() => {
+  savePatch({ hintTheme: hintThemeEl!.value as HintTheme }).then(() => {
     if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
   }),
 );

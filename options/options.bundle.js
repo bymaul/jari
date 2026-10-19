@@ -1761,7 +1761,7 @@
     resetPagenavBtn?.addEventListener("click", resetPagenav);
   }
 
-  // options/options.js
+  // options/options.ts
   var tableEl = document.querySelector("#keymap-table");
   var resetBtn = document.querySelector("#reset");
   var resetKeysBtn = document.querySelector("#reset-keys");
@@ -1781,15 +1781,23 @@
   var maxResultsEl = document.querySelector("#max-results");
   var copyFormatEl = document.querySelector("#copy-format");
   var hintCharsEl = document.querySelector("#hint-chars");
-  var hintCharsMetaEl = document.querySelector("#hint-chars-meta");
-  var clickableSelectorEl = document.querySelector("#clickable-selector");
+  var hintCharsMetaEl = document.querySelector(
+    "#hint-chars-meta"
+  );
+  var clickableSelectorEl = document.querySelector(
+    "#clickable-selector"
+  );
   var hintThemeEl = document.querySelector("#hint-theme");
-  var hintFontSizeEl = document.querySelector("#hint-font-size");
+  var hintFontSizeEl = document.querySelector(
+    "#hint-font-size"
+  );
   var keymapFilterEl = document.querySelector("#keymap-filter");
   var keymapUnboundEl = document.querySelector("#keymap-unbound");
   var keymapCountEl = document.querySelector("#keymap-count");
   var siteInputEl = document.querySelector("#disabled-site-input");
-  var addSiteBtn = document.querySelector("#add-disabled-site");
+  var addSiteBtn = document.querySelector(
+    "#add-disabled-site"
+  );
   var siteErrorEl = document.querySelector("#site-error");
   var summaries = {
     scrolling: document.querySelector("#summary-scrolling"),
@@ -1963,7 +1971,8 @@
     if (clickableSelectorEl)
       clickableSelectorEl.value = settings.getClickableSelector();
     if (hintThemeEl) hintThemeEl.value = settings.getHintTheme();
-    if (hintFontSizeEl) hintFontSizeEl.value = settings.getHintFontSize();
+    if (hintFontSizeEl)
+      hintFontSizeEl.value = settings.getHintFontSize();
     for (const el of [
       scrollStepEl,
       maxResultsEl,
@@ -2417,7 +2426,9 @@
     focusAddFor(name);
   }
   function focusChipFor(name, combo) {
-    for (const row of tableEl.querySelectorAll("tr[data-command]")) {
+    for (const row of tableEl.querySelectorAll(
+      "tr[data-command]"
+    )) {
       if (row.dataset.command !== name) continue;
       for (const chip of row.querySelectorAll(".chip")) {
         if (chip.dataset.binding === combo) {
@@ -2432,7 +2443,9 @@
     return false;
   }
   function focusAddFor(name) {
-    for (const row of tableEl.querySelectorAll("tr[data-command]")) {
+    for (const row of tableEl.querySelectorAll(
+      "tr[data-command]"
+    )) {
       if (row.dataset.command !== name) continue;
       const add = row.querySelector(".key-add");
       if (add) add.focus?.();
@@ -2511,7 +2524,14 @@
     status3(`${shown} is already bound \u2014 choose Reassign or Keep both`);
     cancel.focus();
   }
-  function commitNumber(el, errorId, { min, max, fallback, settingKey, label, unit }) {
+  function commitNumber(el, errorId, {
+    min,
+    max,
+    fallback,
+    settingKey,
+    label,
+    unit
+  }) {
     const raw = el.value.trim();
     const parsed = Number(raw);
     const invalid = raw === "" || !Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max;
@@ -2622,7 +2642,8 @@
       dialog.addEventListener("close", () => {
         dialog.remove();
         setRecordingFlag(false);
-        if (previousFocus?.isConnected) ui.safeFocus(previousFocus);
+        if (previousFocus?.isConnected)
+          ui.safeFocus(previousFocus);
         resolve(dialog.returnValue === "ok");
       });
       document.body.appendChild(dialog);
@@ -2748,7 +2769,7 @@
   }
   function status3(message) {
     statusEl3.textContent = message;
-    clearTimeout(statusEl3._timer);
+    clearTimeout(statusEl3._timer ?? void 0);
     statusEl3._timer = setTimeout(() => {
       statusEl3.textContent = "";
     }, 2500);
@@ -2839,7 +2860,9 @@
   );
   copyFormatEl.addEventListener(
     "change",
-    () => savePatch3({ copyFormat: copyFormatEl.value }).then(() => {
+    () => savePatch3({
+      copyFormat: copyFormatEl.value
+    }).then(() => {
       copyFormatEl.value = settings.getCopyFormat();
     })
   );

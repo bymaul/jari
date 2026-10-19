@@ -151,7 +151,7 @@ function consume(event: Event) {
   event.stopImmediatePropagation();
 }
 
-function safeFocus(el: HTMLElement, opts: FocusOptions) {
+function safeFocus(el: HTMLElement, opts?: FocusOptions) {
   try {
     el.focus(opts);
   } catch {
