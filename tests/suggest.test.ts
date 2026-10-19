@@ -2,8 +2,8 @@ import "./setup.ts";
 import { test } from "node:test";
 import assert from "node:assert";
 
-const listeners = {};
-function treeWith(url, title) {
+const listeners: Record<string, () => void> = {};
+function treeWith(url: string, title: string) {
   return [
     {
       id: "0",
@@ -19,32 +19,35 @@ function treeWith(url, title) {
 }
 
 // Stub before importing so the module registers its invalidation listeners.
-globalThis.chrome.tabs.query = async () => [];
-globalThis.chrome.history = { search: async () => [] };
+globalThis.chrome.tabs.query =
+  (async () => []) as unknown as typeof globalThis.chrome.tabs.query;
+globalThis.chrome.history = {
+  search: async () => [],
+} as unknown as typeof chrome.history;
 globalThis.chrome.bookmarks = {
   getTree: async () => treeWith("https://alpha.example/", "Alpha"),
   search: async () => [],
   onCreated: {
-    addListener(fn) {
+    addListener(fn: () => void) {
       listeners.created = fn;
     },
   },
   onRemoved: {
-    addListener(fn) {
+    addListener(fn: () => void) {
       listeners.removed = fn;
     },
   },
   onChanged: {
-    addListener(fn) {
+    addListener(fn: () => void) {
       listeners.changed = fn;
     },
   },
   onMoved: {
-    addListener(fn) {
+    addListener(fn: () => void) {
       listeners.moved = fn;
     },
   },
-};
+} as unknown as typeof chrome.bookmarks;
 
 const { suggest } = await import("../background/suggest.ts");
 
@@ -58,8 +61,11 @@ test("bookmark suggestions refresh after a bookmark change", async () => {
   const first = await suggest({}, { query: "x" });
   assert.ok(first.some((item) => item.url === "https://alpha.example/"));
   // The tree changed but the cache stays warm until a bookmark event fires.
-  globalThis.chrome.bookmarks.getTree = async () =>
-    treeWith("https://beta.example/", "Beta");
+  globalThis.chrome.bookmarks.getTree = (async () =>
+    treeWith(
+      "https://beta.example/",
+      "Beta",
+    )) as unknown as typeof globalThis.chrome.bookmarks.getTree;
   const stale = await suggest({}, { query: "x" });
   assert.ok(stale.some((item) => item.url === "https://alpha.example/"));
   assert.ok(!stale.some((item) => item.url === "https://beta.example/"));

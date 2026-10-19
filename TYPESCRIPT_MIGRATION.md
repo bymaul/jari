@@ -224,8 +224,12 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   + `42278e5` visual-word (FakeDocWithWalker casts; one transcription slip:
   the getSelection stub must be the arrow function, not the plain object).
   Suites that stay `.js` per the fixture-heavy policy: background, content,
-  find-collect, hints, scroll, suggest. `node --test` discovers `.test.ts`
+  find-collect, hints, scroll. `node --test` discovers `.test.ts`
   with no script change; suite count unchanged at 134.
+- Trial reversal: `suggest.test.js` -> `.ts` `8f17b1b` (70 lines; the stub
+  assignments each need an `as unknown as typeof chrome.*` cast and the
+  listener bag a `Record<string, () => void>` — readable at this size,
+  verdict on the five larger suites pending).
 - Benchmarks: `benchmarks/{rank,scroll}.js` -> `.ts` (`pool: RankItem[]`
   annotation, Node/window/document/location/chrome stub casts,
   location/chrome stub casts, `moduleDetection: force` + `benchmarks/**/*`
