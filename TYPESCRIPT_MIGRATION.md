@@ -174,8 +174,10 @@ Branch `typescript`, one commit per logical unit, bundles rebuilt each time:
   timers ride the documented ?? undefined no-op; lint-driven let/const on
   ok/nodes/startIdx disclosed — bundle diff rename + rewrap only).
 - Remaining Phase 2 files (in attack order): `build.js` -> `build.ts`
-  (163 lines; order item 6; needs package.json script updates — infra,
-  flag it in that PR). Tests stay `.js` per the established policy
+  (`78a7054`, done — package.json scripts + ci.yml distFiles grep +
+  eslint plain-Node glob + tsconfig include updated in the same infra
+  commit; banner comment regenerated in the four bundles). No remaining
+  Phase 2 source files; tests stay `.js` per the established policy
   (fixture-heavy stubs import `.ts` modules).
 - GATE BUG FIXED in `df238f2`: tsconfig `include` covered only
   `shared/**/*` + `tests/**/*.ts`, so all Phase-2 content/background TS files
