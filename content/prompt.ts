@@ -61,12 +61,6 @@ const tabUrlMap = new Map<
 >();
 let cachedEngines: SearchEngine[] | null = null;
 let lastPool: Suggestion[] = [];
-let lastInputT = 0;
-const promptMs: { sync: number; refine: number } = { sync: 0, refine: 0 };
-try {
-  (globalThis as Record<string, unknown>).__jariPromptMs = promptMs;
-} catch {
-}
 
 function isActive(): boolean {
   return active;
@@ -108,7 +102,6 @@ function openEditUrl(): void {
   try {
     inputEl!.select();
   } catch {}
-  lastInputT = performance.now();
   handleOpenInput(inputEl!.value);
 }
 
@@ -138,7 +131,6 @@ function requestSuggestions(
     const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
     lastPool = items;
     onResults(items);
-    promptMs.refine = performance.now() - lastInputT;
   }, 130);
 }
 
@@ -161,7 +153,6 @@ function isOmnibarMode(): boolean {
 }
 
 function handleInput(): void {
-  lastInputT = performance.now();
   const raw = inputEl!.value;
   query = raw.trim();
   if (isOmnibarMode()) {
@@ -171,7 +162,6 @@ function handleInput(): void {
     selected = 0;
     renderList();
   }
-  promptMs.sync = performance.now() - lastInputT;
 }
 
 function syncTabUrlMap(pool: Suggestion[]): void {

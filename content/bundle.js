@@ -3621,12 +3621,6 @@
   var tabUrlMap = /* @__PURE__ */ new Map();
   var cachedEngines = null;
   var lastPool = [];
-  var lastInputT = 0;
-  var promptMs = { sync: 0, refine: 0 };
-  try {
-    globalThis.__jariPromptMs = promptMs;
-  } catch {
-  }
   function isActive() {
     return active;
   }
@@ -3663,7 +3657,6 @@
       inputEl.select();
     } catch {
     }
-    lastInputT = performance.now();
     handleOpenInput(inputEl.value);
   }
   function chooseWindow(data) {
@@ -3685,7 +3678,6 @@
       const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
       lastPool = items;
       onResults(items);
-      promptMs.refine = performance.now() - lastInputT;
     }, 130);
   }
   function toSuggestionRow(item, match) {
@@ -3702,7 +3694,6 @@
     return mode === "open" || mode === "edit" || mode === "incognito";
   }
   function handleInput() {
-    lastInputT = performance.now();
     const raw = inputEl.value;
     query = raw.trim();
     if (isOmnibarMode()) {
@@ -3712,7 +3703,6 @@
       selected = 0;
       renderList2();
     }
-    promptMs.sync = performance.now() - lastInputT;
   }
   function syncTabUrlMap(pool) {
     tabUrlMap.clear();
