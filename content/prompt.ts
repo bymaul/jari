@@ -60,6 +60,13 @@ const tabUrlMap = new Map<
   { source?: "tab" | "history" | "bookmark"; id?: number }
 >();
 let cachedEngines: SearchEngine[] | null = null;
+let lastPool: Suggestion[] = [];
+let lastInputT = 0;
+const promptMs: { sync: number; refine: number } = { sync: 0, refine: 0 };
+try {
+  (globalThis as Record<string, unknown>).__jariPromptMs = promptMs;
+} catch {
+}
 
 function isActive(): boolean {
   return active;
@@ -101,6 +108,7 @@ function openEditUrl(): void {
   try {
     inputEl!.select();
   } catch {}
+  lastInputT = performance.now();
   handleOpenInput(inputEl!.value);
 }
 
@@ -128,9 +136,9 @@ function requestSuggestions(
       })) as Suggestion[] | null) || [];
     if (!active || seq !== suggestSeq) return;
     const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
-    tabUrlMap.clear();
-    for (const it of items) if (it.url) tabUrlMap.set(it.url, it);
+    lastPool = items;
     onResults(items);
+    promptMs.refine = performance.now() - lastInputT;
   }, 130);
 }
 
@@ -153,6 +161,7 @@ function isOmnibarMode(): boolean {
 }
 
 function handleInput(): void {
+  lastInputT = performance.now();
   const raw = inputEl!.value;
   query = raw.trim();
   if (isOmnibarMode()) {
@@ -162,6 +171,39 @@ function handleInput(): void {
     selected = 0;
     renderList();
   }
+  promptMs.sync = performance.now() - lastInputT;
+}
+
+function syncTabUrlMap(pool: Suggestion[]): void {
+  tabUrlMap.clear();
+  for (const it of pool) if (it.url) tabUrlMap.set(it.url, it);
+}
+
+function renderRecents(pool: Suggestion[]): void {
+  syncTabUrlMap(pool);
+  filtered = pool
+    .slice(0, settings.getMaxResults())
+    .map((item) => toSuggestionRow(item, null));
+  selected = 0;
+  renderList();
+}
+
+function renderRanked(
+  pool: Suggestion[],
+  term: string,
+  row: PromptRow,
+  tabQuery: string | null,
+): void {
+  syncTabUrlMap(pool);
+  const scoped =
+    tabQuery != null ? pool.filter((item) => item.source === "tab") : pool;
+  const suggestions = rank(scoped, term).map(({ item, match }) =>
+    toSuggestionRow(item, match),
+  );
+  const max = settings.getMaxResults();
+  filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
+  selected = 0;
+  renderList();
 }
 
 function handleOpenInput(queryText: string): void {
@@ -180,13 +222,8 @@ function handleOpenInput(queryText: string): void {
     filtered = [];
     selected = 0;
     renderList();
-    requestSuggestions("", (res) => {
-      filtered = res
-        .slice(0, settings.getMaxResults())
-        .map((item) => toSuggestionRow(item, null));
-      selected = 0;
-      renderList();
-    });
+    if (lastPool.length) renderRecents(lastPool);
+    requestSuggestions("", renderRecents);
     return;
   }
   let row: PromptRow;
@@ -206,17 +243,8 @@ function handleOpenInput(queryText: string): void {
   filtered = [row];
   selected = 0;
   renderList();
-  requestSuggestions(term, (res) => {
-    const pool =
-      tabQuery != null ? res.filter((item) => item.source === "tab") : res;
-    const suggestions = rank(pool, term).map(({ item, match }) =>
-      toSuggestionRow(item, match),
-    );
-    const max = settings.getMaxResults();
-    filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
-    selected = 0;
-    renderList();
-  });
+  if (lastPool.length) renderRanked(lastPool, term, row, tabQuery);
+  requestSuggestions(term, (res) => renderRanked(res, term, row, tabQuery));
 }
 
 function handleTabListAll(): void {

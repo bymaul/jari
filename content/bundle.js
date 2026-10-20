@@ -3620,6 +3620,13 @@
   var restoreFocus = null;
   var tabUrlMap = /* @__PURE__ */ new Map();
   var cachedEngines = null;
+  var lastPool = [];
+  var lastInputT = 0;
+  var promptMs = { sync: 0, refine: 0 };
+  try {
+    globalThis.__jariPromptMs = promptMs;
+  } catch {
+  }
   function isActive() {
     return active;
   }
@@ -3656,6 +3663,7 @@
       inputEl.select();
     } catch {
     }
+    lastInputT = performance.now();
     handleOpenInput(inputEl.value);
   }
   function chooseWindow(data) {
@@ -3675,9 +3683,9 @@
       }) || [];
       if (!active || seq !== suggestSeq) return;
       const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
-      tabUrlMap.clear();
-      for (const it of items) if (it.url) tabUrlMap.set(it.url, it);
+      lastPool = items;
       onResults(items);
+      promptMs.refine = performance.now() - lastInputT;
     }, 130);
   }
   function toSuggestionRow(item, match) {
@@ -3694,6 +3702,7 @@
     return mode === "open" || mode === "edit" || mode === "incognito";
   }
   function handleInput() {
+    lastInputT = performance.now();
     const raw = inputEl.value;
     query = raw.trim();
     if (isOmnibarMode()) {
@@ -3703,6 +3712,28 @@
       selected = 0;
       renderList2();
     }
+    promptMs.sync = performance.now() - lastInputT;
+  }
+  function syncTabUrlMap(pool) {
+    tabUrlMap.clear();
+    for (const it of pool) if (it.url) tabUrlMap.set(it.url, it);
+  }
+  function renderRecents(pool) {
+    syncTabUrlMap(pool);
+    filtered = pool.slice(0, settings.getMaxResults()).map((item) => toSuggestionRow(item, null));
+    selected = 0;
+    renderList2();
+  }
+  function renderRanked(pool, term, row, tabQuery) {
+    syncTabUrlMap(pool);
+    const scoped = tabQuery != null ? pool.filter((item) => item.source === "tab") : pool;
+    const suggestions = rank(scoped, term).map(
+      ({ item, match }) => toSuggestionRow(item, match)
+    );
+    const max = settings.getMaxResults();
+    filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
+    selected = 0;
+    renderList2();
   }
   function handleOpenInput(queryText) {
     if (mode !== "incognito" && isTabListAll(queryText)) {
@@ -3720,11 +3751,8 @@
       filtered = [];
       selected = 0;
       renderList2();
-      requestSuggestions("", (res) => {
-        filtered = res.slice(0, settings.getMaxResults()).map((item) => toSuggestionRow(item, null));
-        selected = 0;
-        renderList2();
-      });
+      if (lastPool.length) renderRecents(lastPool);
+      requestSuggestions("", renderRecents);
       return;
     }
     let row;
@@ -3742,16 +3770,8 @@
     filtered = [row];
     selected = 0;
     renderList2();
-    requestSuggestions(term, (res) => {
-      const pool = tabQuery != null ? res.filter((item) => item.source === "tab") : res;
-      const suggestions = rank(pool, term).map(
-        ({ item, match }) => toSuggestionRow(item, match)
-      );
-      const max = settings.getMaxResults();
-      filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
-      selected = 0;
-      renderList2();
-    });
+    if (lastPool.length) renderRanked(lastPool, term, row, tabQuery);
+    requestSuggestions(term, (res) => renderRanked(res, term, row, tabQuery));
   }
   function handleTabListAll() {
     clearTimeout(suggestTimer ?? void 0);
