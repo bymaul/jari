@@ -587,9 +587,12 @@ const SMOOTH_FRACTION = 0.4;
 const SMOOTH_CAP = 80;
 const SMOOTH_MAX_DT_MS = 100;
 
+let reducedMotionMql: MediaQueryList | null = null;
+
 function prefersReducedMotion(): boolean {
   try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    reducedMotionMql ||= window.matchMedia("(prefers-reduced-motion: reduce)");
+    return reducedMotionMql.matches;
   } catch {
     return false;
   }

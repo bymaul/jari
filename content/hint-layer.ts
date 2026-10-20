@@ -81,9 +81,12 @@ export function placeHintsHost(host: HTMLElement): void {
   (document.documentElement || document.body).appendChild(host);
 }
 
-export function coordinate(
-  holderEl: HTMLElement,
-): { top: number; left: number } {
+// Holder origins are scroll-invariant (the host is position:fixed at the
+// viewport origin), so the probe layout is measured once per holder and
+// combined with the page offset at call time.
+const holderOrigins = new WeakMap<HTMLElement, { top: number; left: number }>();
+
+function probeOrigin(holderEl: HTMLElement): { top: number; left: number } {
   const probe = document.createElement("div");
   probe.style.position = "absolute";
   probe.style.top = "0";
@@ -92,13 +95,33 @@ export function coordinate(
   holderEl.prepend(probe);
   const br = probe.getBoundingClientRect();
   const ret = {
-    top: br.top + window.pageYOffset - document.documentElement.clientTop,
-    left: br.left + window.pageXOffset - document.documentElement.clientLeft,
+    top: br.top - document.documentElement.clientTop,
+    left: br.left - document.documentElement.clientLeft,
   };
   try {
     probe.remove();
   } catch {}
   return ret;
+}
+
+export function holderOrigin(
+  holderEl: HTMLElement,
+): { top: number; left: number } {
+  const cached = holderOrigins.get(holderEl);
+  if (cached) return cached;
+  const origin = probeOrigin(holderEl);
+  holderOrigins.set(holderEl, origin);
+  return origin;
+}
+
+export function coordinate(
+  holderEl: HTMLElement,
+): { top: number; left: number } {
+  const origin = probeOrigin(holderEl);
+  return {
+    top: origin.top + window.pageYOffset,
+    left: origin.left + window.pageXOffset,
+  };
 }
 
 export function updateHintText(

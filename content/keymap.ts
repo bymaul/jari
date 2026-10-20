@@ -296,15 +296,25 @@ export function keysForCommand(
     .map(([key]) => key);
 }
 
+// Candidate prefixes per keymap object; the settings module swaps the record
+// on every change, so the WeakMap entry is rebuilt without explicit teardown.
+const prefixCandidates = new WeakMap<Record<string, string>, Set<string>>();
+
 export function isPrefixKey(keymap: Record<string, string>, key: string) {
   if (!key || typeof key !== "string") return false;
   if (key.includes("+")) return false;
   if (/^[0-9]$/.test(key)) return false;
-  for (const combo of Object.keys(keymap || {})) {
-    if (combo.includes("+")) continue;
-    if (combo.length > key.length && combo.startsWith(key)) return true;
+  if (!keymap || typeof keymap !== "object") return false;
+  let candidates = prefixCandidates.get(keymap);
+  if (!candidates) {
+    candidates = new Set();
+    for (const combo of Object.keys(keymap)) {
+      if (combo.includes("+")) continue;
+      for (let i = 1; i < combo.length; i++) candidates.add(combo.slice(0, i));
+    }
+    prefixCandidates.set(keymap, candidates);
   }
-  return false;
+  return candidates.has(key);
 }
 
 export function getDynamicPrefixes(

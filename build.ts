@@ -252,12 +252,14 @@ function bundleOptions(
     outfile: outPath,
     banner: { js: banner },
     logLevel: "warning",
+    minify: true,
   };
 }
 
 // Dev watch mode: `npm run dev:chrome|:firefox`. Same options as release
-// builds plus sourcemaps (release output stays map-free and byte-stable),
-// rebuilt on every source edit. manifest.base.json is not an esbuild input,
+// builds but unminified for readable output, plus sourcemaps (release
+// output stays map-free and byte-stable), rebuilt on every source edit.
+// manifest.base.json is not an esbuild input,
 // so the contexts never see edits to it — poll-stat it and regenerate the
 // manifest when it changes. The firefox flavor additionally launches
 // `web-ext run` so the extension auto-reloads in Firefox on every rebuild.
@@ -334,6 +336,7 @@ async function watchOne(
   const ctx = await context({
     ...bundleOptions(dir, entry, outPath, banner),
     sourcemap: true,
+    minify: false,
   });
   await ctx.watch();
   console.log(`Watching ${outPath}`);

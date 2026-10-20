@@ -80,8 +80,7 @@ async function readOne(area: "sync" | "local"): Promise<unknown | null> {
 }
 
 async function load() {
-  const synced = await readOne("sync");
-  const local = await readOne("local");
+  const [synced, local] = await Promise.all([readOne("sync"), readOne("local")]);
   const winner = pickNewest(synced, local);
   if (winner.data) {
     merge(winner.data);

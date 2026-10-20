@@ -7,7 +7,7 @@ import {
   updateHintText,
   createHintsHost,
   layoutHints,
-  coordinate,
+  holderOrigin,
   hintHomeRect,
 } from "./hint-layer.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
@@ -45,6 +45,7 @@ type HintEntry = {
   label: string;
   hintEl: HintLink;
   hiddenByViewport: boolean;
+  rendered: string | null;
 };
 
 const MAX_HINTS = 800;
@@ -300,23 +301,29 @@ function focusInput(el: HTMLElement): void {
 function refresh(): void {
   if (!active) return;
   for (const h of hints) {
-    if (h.hiddenByViewport) {
-      h.hintEl.style.opacity = "0";
-      h.hintEl.style.display = "none";
+    if (h.hiddenByViewport || (prefix && !h.label.startsWith(prefix))) {
+      if (h.rendered !== "0") {
+        h.hintEl.style.opacity = "0";
+        h.hintEl.style.display = "none";
+        h.rendered = "0";
+      }
       continue;
     }
     if (!prefix) {
-      h.hintEl.style.opacity = "1";
-      h.hintEl.style.display = "";
-      h.hintEl.classList.remove("jari-hint-hidden");
-      updateHintText(h.hintEl, h.label, "");
-    } else if (h.label.startsWith(prefix)) {
+      if (h.rendered !== "1") {
+        h.hintEl.style.opacity = "1";
+        h.hintEl.style.display = "";
+        h.hintEl.classList.remove("jari-hint-hidden");
+        updateHintText(h.hintEl, h.label, "");
+        h.rendered = "1";
+      }
+      continue;
+    }
+    if (h.rendered !== `m${prefix}`) {
       h.hintEl.style.opacity = "1";
       h.hintEl.style.display = "";
       updateHintText(h.hintEl, h.label, prefix);
-    } else {
-      h.hintEl.style.opacity = "0";
-      h.hintEl.style.display = "none";
+      h.rendered = `m${prefix}`;
     }
   }
 }
@@ -352,12 +359,16 @@ function currentHintRect(el: Element): RectLike | null {
 
 function repositionHints(): void {
   if (!active || !holder) return;
-  let bof: { top: number; left: number };
+  let origin: { top: number; left: number };
   try {
-    bof = coordinate(holder);
+    origin = holderOrigin(holder);
   } catch {
     return;
   }
+  const bof = {
+    top: origin.top + window.pageYOffset,
+    left: origin.left + window.pageXOffset,
+  };
   const vw = window.innerWidth || 0;
   const vh = window.innerHeight || 0;
   for (const h of hints) {
@@ -475,6 +486,7 @@ function render(): void {
     label: link.label,
     hintEl: link,
     hiddenByViewport: false,
+    rendered: null,
   }));
   refresh();
 }
