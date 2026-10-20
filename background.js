@@ -1297,7 +1297,7 @@
 
   // background/suggest.ts
   async function getSuggestSettings() {
-    const settings = await getStoredSettings();
+    const settings = await getCachedSettings();
     const sources = settings && settings.suggestionSources;
     return {
       sources: Array.isArray(sources) ? sources.filter((s) => suggestionSources.includes(s)) : suggestionSources.slice(),
@@ -1305,7 +1305,7 @@
     };
   }
   async function getDefaultSearchUrl(text) {
-    const settings = await getStoredSettings();
+    const settings = await getCachedSettings();
     const engines = normalizeSearchEngines(
       settings && settings.searchEngines
     );
@@ -1336,8 +1336,75 @@
     } catch {
     }
   }
-  registerBookmarkInvalidation();
+  var bookmarkListenersReady = false;
+  function ensureBookmarkListeners() {
+    if (bookmarkListenersReady) return;
+    bookmarkListenersReady = true;
+    registerBookmarkInvalidation();
+  }
+  var settingsCache = null;
+  var settingsListenerReady = false;
+  function clearSettingsCache() {
+    settingsCache = null;
+  }
+  function ensureSettingsListener() {
+    if (settingsListenerReady) return;
+    settingsListenerReady = true;
+    try {
+      const onChanged = chrome.storage && chrome.storage.onChanged;
+      if (onChanged && typeof onChanged.addListener === "function") {
+        onChanged.addListener(clearSettingsCache);
+      }
+    } catch {
+    }
+  }
+  async function getCachedSettings() {
+    ensureSettingsListener();
+    if (!settingsCache) settingsCache = await getStoredSettings();
+    return settingsCache;
+  }
+  var tabCache = null;
+  var tabsDirty = true;
+  var tabListenersReady = false;
+  function markTabsDirty() {
+    tabsDirty = true;
+  }
+  function ensureTabListeners() {
+    if (tabListenersReady) return;
+    tabListenersReady = true;
+    try {
+      const tabs = chrome.tabs;
+      if (!tabs) return;
+      for (const event of [
+        tabs.onCreated,
+        tabs.onUpdated,
+        tabs.onRemoved,
+        tabs.onMoved,
+        tabs.onActivated,
+        tabs.onAttached,
+        tabs.onDetached
+      ]) {
+        if (event && typeof event.addListener === "function") {
+          event.addListener(markTabsDirty);
+        }
+      }
+    } catch {
+    }
+  }
+  async function getTabs() {
+    ensureTabListeners();
+    if (!tabCache || tabsDirty) {
+      try {
+        tabCache = await chrome.tabs.query({});
+      } catch {
+        tabCache = [];
+      }
+      tabsDirty = false;
+    }
+    return tabCache;
+  }
   async function getBookmarkData() {
+    ensureBookmarkListeners();
     if (bookmarkDataCache) return bookmarkDataCache;
     try {
       let walk2 = function(nodes, path) {
@@ -1387,7 +1454,7 @@
     const { sources, maxResults } = await getSuggestSettings();
     if (sources.includes("tab")) {
       try {
-        const tabs = await chrome.tabs.query({});
+        const tabs = (await getTabs()).slice();
         tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
         for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { id: tab.id, lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
       } catch (err) {

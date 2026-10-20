@@ -9,7 +9,7 @@ import { getStoredSettings } from "./utils.ts";
 import { openInIncognito } from "./windows.ts";
 
 async function getSuggestSettings() {
-  const settings = await getStoredSettings();
+  const settings = await getCachedSettings();
   const sources = settings && settings.suggestionSources;
   return {
     sources: Array.isArray(sources)
@@ -23,7 +23,7 @@ async function getSuggestSettings() {
 }
 
 async function getDefaultSearchUrl(text: string): Promise<string> {
-  const settings = await getStoredSettings();
+  const settings = await getCachedSettings();
   const engines = normalizeSearchEngines(
     settings && settings.searchEngines,
   );
@@ -67,9 +67,91 @@ function registerBookmarkInvalidation(): void {
   }
 }
 
-registerBookmarkInvalidation();
+let bookmarkListenersReady = false;
+
+function ensureBookmarkListeners(): void {
+  if (bookmarkListenersReady) return;
+  bookmarkListenersReady = true;
+  registerBookmarkInvalidation();
+}
+
+type StoredSettingsDoc = Awaited<ReturnType<typeof getStoredSettings>>;
+let settingsCache: StoredSettingsDoc | null = null;
+let settingsListenerReady = false;
+
+export function clearSettingsCache(): void {
+  settingsCache = null;
+}
+
+function ensureSettingsListener(): void {
+  if (settingsListenerReady) return;
+  settingsListenerReady = true;
+  try {
+    const onChanged = chrome.storage && chrome.storage.onChanged;
+    if (onChanged && typeof onChanged.addListener === "function") {
+      onChanged.addListener(clearSettingsCache);
+    }
+  } catch {
+  }
+}
+
+async function getCachedSettings(): Promise<StoredSettingsDoc> {
+  ensureSettingsListener();
+  if (!settingsCache) settingsCache = await getStoredSettings();
+  return settingsCache;
+}
+
+let tabCache: chrome.tabs.Tab[] | null = null;
+let tabsDirty = true;
+let tabListenersReady = false;
+
+export function clearTabCache(): void {
+  tabCache = null;
+  tabsDirty = true;
+}
+
+function markTabsDirty(): void {
+  tabsDirty = true;
+}
+
+function ensureTabListeners(): void {
+  if (tabListenersReady) return;
+  tabListenersReady = true;
+  try {
+    const tabs = chrome.tabs;
+    if (!tabs) return;
+    for (const event of [
+      tabs.onCreated,
+      tabs.onUpdated,
+      tabs.onRemoved,
+      tabs.onMoved,
+      tabs.onActivated,
+      tabs.onAttached,
+      tabs.onDetached,
+    ]) {
+      if (event && typeof event.addListener === "function") {
+        event.addListener(markTabsDirty);
+      }
+    }
+  } catch {
+  }
+}
+
+async function getTabs(): Promise<chrome.tabs.Tab[]> {
+  ensureTabListeners();
+  if (!tabCache || tabsDirty) {
+    try {
+      tabCache = await chrome.tabs.query({});
+    } catch {
+      tabCache = [];
+    }
+    tabsDirty = false;
+  }
+  return tabCache;
+}
 
 async function getBookmarkData(): Promise<BookmarkData> {
+  ensureBookmarkListeners();
   if (bookmarkDataCache) return bookmarkDataCache;
   try {
     const tree = await chrome.bookmarks.getTree();
@@ -130,7 +212,7 @@ export async function suggest(
   const { sources, maxResults } = await getSuggestSettings();
   if (sources.includes("tab")) {
     try {
-      const tabs = await chrome.tabs.query({});
+      const tabs = (await getTabs()).slice();
       tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
       for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { id: tab.id, lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
     } catch (err) {
