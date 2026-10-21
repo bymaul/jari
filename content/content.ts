@@ -272,7 +272,7 @@ function handleKeydown(event: KeyboardEvent): boolean | void {
     if (Find.handleGlobalEnter(event)) return;
   }
 
-  if (!commandName && /^[0-9]$/.test(key)) {
+  if (!commandName && (/^[1-9]$/.test(key) || (key === "0" && pendingCount !== ""))) {
     if (pendingCount.length < 9) pendingCount += key;
     ui.showcmd(pendingCount);
     ui.consume(event);
