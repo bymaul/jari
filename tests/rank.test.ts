@@ -98,6 +98,80 @@ test("fuzzyMatch skips terms with chars missing from the target", () => {
   assert.deepEqual(fuzzyIndices("qzx", "foo bar"), []);
 });
 
+test("rankMatches rejects a fuzzy match spanning the title/url seam", () => {
+  const items = [
+    { title: "Team", url: "https://plug.io/" },
+  ];
+  assert.equal(rankMatches("ampl", items).length, 0);
+});
+
+test("rankMatches ignores query-string token soup in urls", () => {
+  const items = [
+    {
+      title: "prefix - Google Search",
+      url: "https://www.google.com/search?q=prefix&sxsrf=APpeQnt7tnS99EhPc",
+      source: "history",
+    },
+  ];
+  assert.equal(rankMatches("axmurk", items).length, 0);
+});
+
+test("rankMatches does not match a query through tracking tokens", () => {
+  const items = [
+    {
+      title: "prefix - Google Search",
+      url: "https://www.google.com/search?q=prefix&sxsrf=APpeQnt7tnS99EhPcaDMw3ufFYHds2eqDOX3A1792574748164",
+      source: "history",
+    },
+  ];
+  assert.equal(rankMatches("facebok", items).length, 0);
+});
+
+test("rankMatches still finds a page by a literal query string", () => {
+  const items = [
+    {
+      title: "Search results",
+      url: "https://example.com/find?q=needle",
+      source: "history",
+    },
+  ];
+  assert.equal(rankMatches("needle", items).length, 1);
+});
+
+test("rankMatches favors matched fields over boosted loose matches", () => {
+  const items = [
+    { title: "Eff Ace Bed Lock", url: "https://noise.example/", visitCount: 9999 },
+    { title: "Facebook", url: "https://facebook.com/", visitCount: 1 },
+  ];
+  assert.equal(rankMatches("facebok", items)[0].item.url, "https://facebook.com/");
+});
+
+test("rankMatches ranks a title hit above a fresher url hit", () => {
+  const items = [
+    {
+      title: "Example Domain",
+      url: "https://github.com/",
+      visitCount: 9999,
+      lastVisit: Date.now(),
+    },
+    { title: "GitHub", url: "https://example.com/repo", visitCount: 1 },
+  ];
+  assert.equal(rankMatches("gh", items)[0].item.title, "GitHub");
+});
+
+test("rankMatches ranks a title hit above a query-string only hit", () => {
+  const items = [
+    {
+      title: "Search results",
+      url: "https://example.com/find?q=needle",
+      visitCount: 500,
+      lastVisit: Date.now(),
+    },
+    { title: "Needle docs", url: "https://docs.example/" },
+  ];
+  assert.equal(rankMatches("needle", items)[0].item.title, "Needle docs");
+});
+
 test("substringMatch requires every term as a substring", () => {
   assert.equal(substringMatch("pria youtube", "Pria on YouTube"), true);
   assert.equal(substringMatch("pria youtube", "Pria only"), false);

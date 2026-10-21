@@ -25,6 +25,9 @@ export interface RankMatch {
   span: number;
   hayLength: number;
   totalScore: number;
+  tier: number;
+  matchScore: number;
+  boostScore: number;
 }
 
 function normalizeWithMap(s: unknown): { norm: string; map: number[] } {
@@ -113,7 +116,7 @@ function bestAlignment(
   t: string,
   text: string,
   map: number[],
-): { score: number; indices: number[] } | null {
+): { score: number; indices: number[]; start: number } | null {
   const n = t.length;
   const q = term.length;
   if (q === 0 || q > n) return null;
@@ -131,7 +134,7 @@ function bestAlignment(
       if (best === -1 || dpPrev[i] > dpPrev[best]) best = i;
     }
     if (best === -1) return null;
-    return { score: dpPrev[best], indices: toOriginal([best]) };
+    return { score: dpPrev[best], indices: toOriginal([best]), start: best };
   }
   const backs: number[][] = new Array(q).fill(null);
   for (let j = 1; j < q; j++) {
@@ -181,18 +184,21 @@ function bestAlignment(
     cur = backs[j][cur];
   }
   indices[0] = cur;
-  return { score: dpPrev[end], indices: toOriginal(indices) };
+  return { score: dpPrev[end], indices: toOriginal(indices), start: indices[0] };
 }
 
-function matchPreamble(query: unknown, text: string) {
-  const { include, exclude, phrases } = parseQuery(query);
+interface ParsedQuery {
+  include: string[];
+  exclude: string[];
+  phrases: string[];
+}
+
+function preamble(parsed: ParsedQuery, text: string) {
   const { norm: t, map } = normalizeWithMap(text);
-  if (exclude.some((ex) => t.includes(ex))) return null;
-  return { include, exclude, phrases, t, map };
+  if (parsed.exclude.some((ex) => t.includes(ex))) return null;
+  return { t, map };
 }
 
-// Every term char must occur in the target for any alignment to exist.
-// Used to skip the O(term x target) DP on guaranteed misses.
 function termImpossible(term: string, tChars: Set<string>): boolean {
   for (let i = 0; i < term.length; i++) {
     if (!tChars.has(term[i])) return true;
@@ -200,15 +206,12 @@ function termImpossible(term: string, tChars: Set<string>): boolean {
   return false;
 }
 
-// Null for terms that cannot match, so callers keep their exact
-// semantics (fuzzyMatch rejects, fuzzyIndices ignores). Single-char
-// terms skip the set build: their DP is already a single O(n) pass.
 function alignTerms(
   include: string[],
   t: string,
   text: string,
   map: number[],
-): ({ score: number; indices: number[] } | null)[] {
+): ({ score: number; indices: number[]; start: number } | null)[] {
   const multi = include.some((term) => term.length > 1);
   const tChars = multi ? new Set(t) : null;
   return include.map((term) =>
@@ -235,57 +238,77 @@ function collectPhraseIndices(
   return true;
 }
 
-export function fuzzyMatch(query: unknown, text: string) {
-  const pre = matchPreamble(query, text);
-  if (!pre) return null;
-  const { include, exclude, phrases, t, map } = pre;
-  if (include.length === 0 && phrases.length === 0) {
-    return exclude.length > 0 ? { score: 0, indices: [] } : null;
-  }
+function matchNormalized(
+  parsed: ParsedQuery,
+  t: string,
+  map: number[],
+  text: string,
+): { score: number; indices: number[]; leading: number } | null {
+  const { include, phrases } = parsed;
+  if (include.length === 0 && phrases.length === 0) return null;
   for (const ph of phrases) if (!t.includes(ph)) return null;
   const results = alignTerms(include, t, text, map);
   if (results.some((r) => !r)) return null;
   let total = 0;
+  let leading = 0;
   for (const ph of phrases) total += 10 + ph.length * 2;
   const indices: number[] = [];
   collectPhraseIndices(phrases, t, indices, map);
   results.forEach((r) => {
     total += r!.score;
+    leading += r!.start;
     indices.push(...r!.indices);
   });
   indices.sort((a, b) => a - b);
-  return { score: total, indices };
+  return { score: total, indices, leading };
+}
+
+export function fuzzyMatch(query: unknown, text: string) {
+  const parsed = parseQuery(query);
+  const pre = preamble(parsed, text);
+  if (!pre) return null;
+  if (parsed.include.length === 0 && parsed.phrases.length === 0) {
+    return parsed.exclude.length > 0 ? { score: 0, indices: [] } : null;
+  }
+  return matchNormalized(parsed, pre.t, pre.map, text);
 }
 
 export function fuzzyIndices(query: unknown, text: string): number[] {
-  const pre = matchPreamble(query, text);
+  const parsed = parseQuery(query);
+  const pre = preamble(parsed, text);
   if (!pre) return [];
-  const { include, phrases, t, map } = pre;
+  const { t, map } = pre;
   const indices: number[] = [];
-  if (!collectPhraseIndices(phrases, t, indices, map)) return [];
-  const results = alignTerms(include, t, text, map);
+  if (!collectPhraseIndices(parsed.phrases, t, indices, map)) return [];
+  const results = alignTerms(parsed.include, t, text, map);
   for (const r of results) if (r) indices.push(...r.indices);
   return indices.sort((a, b) => a - b);
 }
 
 export function substringMatch(query: unknown, text: string): boolean {
-  const pre = matchPreamble(query, text);
+  const parsed = parseQuery(query);
+  const pre = preamble(parsed, text);
   if (!pre) return false;
-  const { include, exclude, phrases, t } = pre;
+  return substringMatchNormalized(parsed, pre.t);
+}
+
+function substringMatchNormalized(parsed: ParsedQuery, t: string): boolean {
+  const { include, exclude, phrases } = parsed;
   if (include.length === 0 && phrases.length === 0) return exclude.length > 0;
   if (phrases.some((ph) => !t.includes(ph))) return false;
   return include.every((term) => t.includes(term));
 }
 
 export function substringIndices(query: unknown, text: string): number[] {
-  const pre = matchPreamble(query, text);
+  const parsed = parseQuery(query);
+  const pre = preamble(parsed, text);
   if (!pre) return [];
-  const { include, phrases, t, map } = pre;
-  if (include.length === 0 && phrases.length === 0) return [];
-  if (phrases.some((ph) => !t.includes(ph))) return [];
+  const { t, map } = pre;
+  if (parsed.include.length === 0 && parsed.phrases.length === 0) return [];
+  if (parsed.phrases.some((ph) => !t.includes(ph))) return [];
   const indices: number[] = [];
-  collectPhraseIndices(phrases, t, indices, map);
-  for (const term of include) {
+  collectPhraseIndices(parsed.phrases, t, indices, map);
+  for (const term of parsed.include) {
     let idx = t.indexOf(term);
     while (idx !== -1) {
       for (let i = idx; i < idx + term.length; i++) indices.push(map[i]);
@@ -293,15 +316,6 @@ export function substringIndices(query: unknown, text: string): number[] {
     }
   }
   return [...new Set(indices)].sort((a, b) => a - b);
-}
-function substringFieldBonus(
-  queryTerms: string[],
-  field: unknown,
-  base: number,
-): number {
-  if (!field || queryTerms.length === 0) return 0;
-  const f = normalizeForMatch(field);
-  return queryTerms.every((t) => f.includes(t)) ? base : 0;
 }
 function recencyScore(item: RankItem): number {
   const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
@@ -327,6 +341,31 @@ const SOURCE_RANK = {
   bookmark: 2,
 } as Record<string, number>;
 
+const QUERY_FIELD_SCORE = 12;
+
+function urlParts(url: string): {
+  host: string;
+  path: string;
+  query: string;
+} {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.host,
+      path: parsed.pathname,
+      query: parsed.search.replace(/^\?/, ""),
+    };
+  } catch {
+    const qMark = url.indexOf("?");
+    const head = qMark === -1 ? url : url.slice(0, qMark);
+    return {
+      host: extractHost(head),
+      path: head,
+      query: qMark === -1 ? "" : url.slice(qMark + 1),
+    };
+  }
+}
+
 export function rankMatches(
   query: unknown,
   list: RankItem[],
@@ -350,26 +389,84 @@ export function rankMatches(
     );
   }
   const parsed = parseQuery(q);
-  const queryTerms = [...parsed.include, ...parsed.phrases];
-  return list
+  const multiTerm =
+    parsed.include.length > 1 || parsed.phrases.length > 0;
+  const ranked = list
     .map((item) => {
-      const hay = (item.title || "") + " " + (item.url || "");
-      const match = fuzzyMatch(q, hay);
+      const title = item.title || "";
+      const url = item.url || "";
+      const { host, path, query: queryString } = urlParts(url);
+      const urlFieldText = host + path;
+      const hay = title && urlFieldText ? title + " " + urlFieldText : title || urlFieldText;
+      const titleNorm = normalizeWithMap(title);
+      const hostNorm = normalizeWithMap(host);
+      const urlNorm = normalizeWithMap(urlFieldText);
+      const queryNorm = normalizeWithMap(queryString);
+      if (
+        parsed.exclude.some(
+          (ex) =>
+            titleNorm.norm.includes(ex) ||
+            hostNorm.norm.includes(ex) ||
+            urlNorm.norm.includes(ex) ||
+            queryNorm.norm.includes(ex),
+        )
+      ) {
+        return null;
+      }
+      const titleSub = substringMatchNormalized(parsed, titleNorm.norm);
+      const hostSub = substringMatchNormalized(parsed, hostNorm.norm);
+      const urlSub = substringMatchNormalized(parsed, urlNorm.norm);
+      const urlFieldSub = hostSub || urlSub;
+      const querySub = substringMatchNormalized(parsed, queryNorm.norm);
+      let match: { score: number; indices: number[]; leading: number } | null;
+      let tier = 0;
+      if (parsed.include.length === 0 && parsed.phrases.length === 0) {
+        match = { score: 0, indices: [], leading: 0 };
+      } else if (titleSub) {
+        match = matchNormalized(parsed, titleNorm.norm, titleNorm.map, title);
+        tier = 3;
+      } else if (urlFieldSub) {
+        match = matchNormalized(
+          parsed,
+          hostSub ? hostNorm.norm : urlNorm.norm,
+          hostSub ? hostNorm.map : urlNorm.map,
+          hostSub ? host : urlFieldText,
+        );
+        tier = 2;
+      } else if (multiTerm) {
+        const hayNorm = normalizeWithMap(hay);
+        match = matchNormalized(parsed, hayNorm.norm, hayNorm.map, hay);
+        tier = match ? 1 : 0;
+        if (!match && querySub) {
+          match = { score: QUERY_FIELD_SCORE, indices: [], leading: 0 };
+        }
+      } else {
+        match =
+          matchNormalized(parsed, titleNorm.norm, titleNorm.map, title) ??
+          matchNormalized(parsed, hostNorm.norm, hostNorm.map, host) ??
+          matchNormalized(parsed, urlNorm.norm, urlNorm.map, urlFieldText);
+        tier = match ? 1 : 0;
+        if (!match && querySub) {
+          match = { score: QUERY_FIELD_SCORE, indices: [], leading: 0 };
+        }
+      }
       if (!match) return null;
       const first = match.indices.length > 0 ? match.indices[0] : 0;
       const last = match.indices.length > 0 ? match.indices[match.indices.length - 1] : 0;
-      const baseScore = match.score;
-      const tBoost = substringFieldBonus(queryTerms, item.title, 8);
-      const hBoost = substringFieldBonus(queryTerms, extractHost(item.url || ""), 6);
-      const rScore = recencyScore(item);
-      const fScore = frequencyScore(item);
-      const totalScore = baseScore + tBoost + hBoost + rScore + fScore;
-      return { item, match: { ...match, score: totalScore, baseScore }, span: match.indices.length > 0 ? last - first + 1 : 0, hayLength: hay.length, totalScore };
+      const baseScore = match.score + match.leading;
+      if (baseScore < 0 && tier !== 3) return null;
+      const tBoost = titleSub ? 8 : 0;
+      const hBoost = hostSub ? 6 : 0;
+      const matchScore = baseScore + tBoost + hBoost;
+      const boostScore = recencyScore(item) + frequencyScore(item);
+      const totalScore = matchScore + boostScore;
+      return { item, match: { score: totalScore, indices: match.indices, baseScore }, span: match.indices.length > 0 ? last - first + 1 : 0, hayLength: hay.length, totalScore, tier, matchScore, boostScore };
     })
     .filter((r: RankMatch | null): r is RankMatch => r !== null)
     .sort((a, b) => {
-      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-      if (b.match.baseScore !== a.match.baseScore) return b.match.baseScore - a.match.baseScore;
+      if (a.tier !== b.tier) return b.tier - a.tier;
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      if (b.boostScore !== a.boostScore) return b.boostScore - a.boostScore;
       if (a.span !== b.span) return a.span - b.span;
       if (a.hayLength !== b.hayLength) return a.hayLength - b.hayLength;
       return (
@@ -377,4 +474,5 @@ export function rankMatches(
         (SOURCE_RANK[b.item.source as string] ?? 3)
       );
     });
+  return ranked;
 }

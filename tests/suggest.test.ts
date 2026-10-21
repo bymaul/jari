@@ -57,8 +57,17 @@ function stubStorage(doc: unknown): void {
 }
 
 let historyRows: Record<string, unknown>[] = [];
+let historyRecents: Record<string, unknown>[] = [];
 (chromeStubs as Record<string, unknown>).history = {
-  search: async () => historyRows.map((row) => ({ ...row })),
+  search: async (opts: { text?: string }) => {
+    if (opts.text) {
+      const q = String(opts.text).toLowerCase();
+      return historyRows.filter((row) =>
+        `${String(row.title || "")} ${String(row.url || "")}`.toLowerCase().includes(q),
+      ).map((row) => ({ ...row }));
+    }
+    return historyRecents.map((row) => ({ ...row }));
+  },
 };
 
 const bmListeners: Record<string, () => void> = {};
@@ -108,6 +117,7 @@ beforeEach(() => {
   storageGets = 0;
   tabRows = [{ title: "Tab One", url: "https://tab.example/1", lastAccessed: 5 }];
   historyRows = [];
+  historyRecents = [];
   bmTree = [];
   stubStorage({ suggestionSources: ["tab"], maxResults: 20 });
   clearTabCache();
@@ -164,6 +174,120 @@ test("suggest merges tab and history rows", async () => {
       ["Hist", "history"],
     ],
   );
+});
+
+test("suggest keeps recent history in the pool for fuzzy ranking", async () => {
+  stubStorage({ suggestionSources: ["history"], maxResults: 20 });
+  historyRows = [];
+  historyRecents = [
+    { title: "Facebook", url: "https://facebook.com/", visitCount: 8, lastVisitTime: 70 },
+  ];
+  const res = await suggest({}, { query: "facebok" });
+  assert.ok(res.some((s) => s.url === "https://facebook.com/"));
+});
+
+test("suggest folds www, trailing slash and tracking params into one row", async () => {
+  stubStorage({ suggestionSources: ["history"], maxResults: 20 });
+  historyRows = [
+    {
+      title: "Docs",
+      url: "https://www.example.com/docs/?utm_source=news",
+      visitCount: 2,
+      lastVisitTime: 5,
+    },
+    {
+      title: "Docs",
+      url: "https://example.com/docs",
+      visitCount: 3,
+      lastVisitTime: 9,
+    },
+  ];
+  const res = await suggest({}, { query: "docs" });
+  const rows = res.filter((s) => s.url.includes("example.com/docs"));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].visitCount, 5);
+  assert.equal(rows[0].lastVisit, 9);
+});
+
+test("suggest keeps the open tab when history repeats the same page", async () => {
+  stubStorage({ suggestionSources: ["tab", "history"], maxResults: 20 });
+  tabRows = [
+    { id: 7, title: "Tab One", url: "https://tab.example/", lastAccessed: 5 },
+  ];
+  historyRows = [
+    {
+      title: "Tab One",
+      url: "https://tab.example/",
+      visitCount: 4,
+      lastVisitTime: 99,
+    },
+  ];
+  const res = await suggest({}, { query: "x" });
+  const tab = res.find((s) => s.source === "tab");
+  assert.ok(tab);
+  assert.equal(tab!.id, 7);
+});
+
+test("suggest folds google session tokens into one search row", async () => {
+  stubStorage({ suggestionSources: ["history"], maxResults: 20 });
+  historyRows = [
+    "APpeQnt7tnS99EhPcaDMw3ufFYHds2eqDOX3A1792574748164",
+    "AQpeQnt7tnS99EhPcaDMw3ufFYHds2eqDOX3A1792574748164",
+  ].map((token, i) => ({
+    title: "prefix - Google Search",
+    url: `https://www.google.com/search?q=prefix&aep=10&ntc=1&sxsrf=${token}&mstk=token${i}`,
+    visitCount: 1,
+    lastVisitTime: 100 - i,
+  }));
+  const res = await suggest({}, { query: "prefix" });
+  const rows = res.filter((s) => s.url.includes("google.com/search"));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].visitCount, 2);
+});
+
+test("suggest fuzzy-matches a recent page the literal search misses", async () => {
+  stubStorage({ suggestionSources: ["history"], maxResults: 20 });
+  historyRows = []; // no literal match for "facebok"
+  historyRecents = [
+    { title: "Facebook", url: "https://www.facebook.com/", visitCount: 8, lastVisitTime: 70 },
+  ];
+  const res = await suggest({}, { query: "facebok" });
+  assert.ok(res.some((s) => s.url === "https://www.facebook.com/"));
+});
+
+
+test("suggest returns the full pool without slicing to maxResults", async () => {
+  stubStorage({ suggestionSources: ["history"], maxResults: 5 });
+  historyRows = [
+    { title: "One", url: "https://one.example/", lastVisitTime: 1 },
+    { title: "Two", url: "https://two.example/", lastVisitTime: 2 },
+    { title: "Three", url: "https://three.example/", lastVisitTime: 3 },
+  ];
+  historyRecents = [
+    { title: "Faces", url: "https://faces.example/", lastVisitTime: 4 },
+  ];
+  const res = await suggest({}, { query: "x" });
+  assert.equal(
+    res.some((s) => s.url === "https://faces.example/"),
+    true,
+  );
+});
+
+test("suggest collapses same-page history duplicates", async () => {
+  stubStorage({ suggestionSources: ["history"], maxResults: 20 });
+  historyRows = [1000, 2000].map((ts, i) => ({
+    title: "prefix - Google Search",
+    url: `https://www.google.com/search?q=prefix&sxsrf=token${i}`,
+    visitCount: 1,
+    lastVisitTime: ts,
+  }));
+  const res = await suggest({}, { query: "prefix" });
+  const rows = res.filter((s) =>
+    s.url.startsWith("https://www.google.com/search"),
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].visitCount, 2);
+  assert.equal(rows[0].lastVisit, 2000);
 });
 
 test("bookmark suggestions refresh after a bookmark change", async () => {

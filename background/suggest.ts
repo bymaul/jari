@@ -8,6 +8,107 @@ import {
 import { getStoredSettings } from "./utils.ts";
 import { openInIncognito } from "./windows.ts";
 
+const TRACKING_PARAMS = new Set([
+  "fbclid",
+  "gclid",
+  "dclid",
+  "gbraid",
+  "wbraid",
+  "msclkid",
+  "yclid",
+  "igshid",
+  "igsh",
+  "mc_cid",
+  "mc_eid",
+  "_hsenc",
+  "_hsmi",
+  "_ga",
+  "_gl",
+  "ref",
+  "ref_src",
+  "ref_url",
+  "referrer",
+  "source",
+  "si",
+  "spm",
+  "share_id",
+  "s_kwcid",
+  "vero_id",
+  "vero_conv",
+  "oly_anon_id",
+  "wt_mc",
+  "srsltid",
+  "cmpid",
+  "campaign_id",
+  "epik",
+  "at_medium",
+  "at_campaign",
+  "hsa_acc",
+  "hsa_cam",
+  "hsa_grp",
+  "hsa_ad",
+  "hsa_src",
+  "hsa_tgt",
+  "hsa_kw",
+  "hsa_mt",
+  "hsa_net",
+  "hsa_ver",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "utm_name",
+  "utm_source_platform",
+  "utm_creative_format",
+  "utm_marketing_tactic",
+  "sxsrf",
+  "ved",
+  "biw",
+  "bih",
+  "client",
+  "client_ms",
+  "sourceid",
+  "sa",
+  "usqp",
+  "oq",
+  "uact",
+  "aqs",
+  "cvid",
+  "csrc",
+  "sabr",
+  "gs_l",
+  "gs_lcp",
+  "_r",
+  "_d",
+  "aep",
+  "ntc",
+  "mstk",
+  "f",
+  "gws_rd",
+  "sclient",
+  "ase",
+  "async",
+  "ei",
+  "_t",
+]);
+
+function canonicalUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    const host = url.host.toLowerCase().replace(/^www\./, "");
+    const path = url.pathname.replace(/\/+$/, "") || "/";
+    const params = [...url.searchParams.entries()]
+      .filter(([key]) => !TRACKING_PARAMS.has(key.toLowerCase()))
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const query = params.map(([key, value]) => `${key}=${value}`).join("&");
+    return `${host}${path}${query ? `?${query}` : ""}${url.hash}`;
+  } catch {
+    return raw.replace(/\/+$/, "");
+  }
+}
+
 async function getSuggestSettings() {
   const settings = await getCachedSettings();
   const sources = settings && settings.suggestionSources;
@@ -63,7 +164,6 @@ function registerBookmarkInvalidation(): void {
       }
     }
   } catch {
-    // Bookmarks API unavailable (e.g. unit tests) — the cache just stays warm.
   }
 }
 
@@ -197,7 +297,8 @@ export async function suggest(
     extra = {} as Partial<Suggestion>,
   ): void {
     if (!url) return;
-    const existing = map.get(url);
+    const key = canonicalUrl(url);
+    const existing = map.get(key);
     if (existing) {
       existing.visitCount = (existing.visitCount || 0) + (extra.visitCount || 0);
       existing.typedCount = (existing.typedCount || 0) + (extra.typedCount || 0);
@@ -205,15 +306,28 @@ export async function suggest(
       existing.lastVisit = Math.max(existing.lastVisit || 0, extra.lastVisit || 0);
       existing.lastAccessed = Math.max(existing.lastAccessed || 0, extra.lastAccessed || 0);
       if (!existing.title || existing.title === existing.url) existing.title = title || url;
+      if (source === "tab" && existing.source !== "tab") {
+        existing.source = "tab";
+        existing.id = extra.id;
+        existing.audible = extra.audible;
+        existing.url = url;
+        existing.title = title || existing.title;
+      } else if (
+        existing.source !== "tab" &&
+        (title || "").length > (existing.title || "").length
+      ) {
+        existing.title = title || existing.title;
+      }
       return;
     }
-    map.set(url, { title: title || url, url, source, ...extra } as Suggestion);
+    map.set(key, { title: title || url, url, source, ...extra } as Suggestion);
   }
-  const { sources, maxResults } = await getSuggestSettings();
+  const { sources } = await getSuggestSettings();
   if (sources.includes("tab")) {
     try {
-      const tabs = (await getTabs()).slice();
-      tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+      const tabs = (await getTabs())
+        .slice()
+        .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
       for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { id: tab.id, lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
     } catch (err) {
       console.debug("[jari] Tab search failed:", err);
@@ -245,6 +359,9 @@ export async function suggest(
       try {
         const results = await chrome.history.search({ text: q, maxResults: 20, startTime: Date.now() - 90 * 86400000 });
         for (const item of results) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
+        const recents = await chrome.history.search({ text: "", maxResults: 300, startTime: Date.now() - 90 * 86400000 });
+        recents.sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
+        for (const item of recents.slice(0, 300)) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
       } catch (err) {
         console.debug("[jari] History search failed:", err);
       }
@@ -261,8 +378,7 @@ export async function suggest(
       }
     }
   }
-  const items = Array.from(map.values());
-  return items.slice(0, maxResults);
+  return Array.from(map.values());
 }
 
 export async function search(
