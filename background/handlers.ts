@@ -1,5 +1,6 @@
 import { clampCount } from "./utils.ts";
 import * as tabs from "./tabs.ts";
+import { historyTreeGo, historyTreeList } from "./history.ts";
 import { bookmarkManagerTabs, unbookmarkManagerTabs } from "./bookmarks.ts";
 import { suggest, search } from "./suggest.ts";
 
@@ -24,6 +25,8 @@ export const handlers = {
   reloadTab: tabs.reloadTab,
   goBack: tabs.goBack,
   goForward: tabs.goForward,
+  historyTreeList,
+  historyTreeGo,
   listTabs: tabs.listTabs,
   managerList: tabs.managerList,
   closeManagerTabs: tabs.closeManagerTabs,

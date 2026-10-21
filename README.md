@@ -24,7 +24,8 @@ Bindings chain into sequences of any length.
   `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder, `w` split/merge),
   `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
-- History: `H`/`L` back/forward
+- History: `H`/`L` back/forward, `gh` page history tree (branching undo-tree:
+  `Enter` jump, `t` background tab, `/` filter)
 - Page: `r`/`R` reload/hard reload, `gu`/`gU` parent/root, `ge` edit URL,
   `yy` copy URL, `Y` copy title + URL, `gss`/`gsp`/`gsr` screenshot full/page/region,
   `[[`/`]]` previous/next page
@@ -73,15 +74,16 @@ Or build from source (below) and load this folder the same way. The checked-in
 
 ## Permissions
 
-| Permission                  | Used for                                                                              |
-| --------------------------- | ------------------------------------------------------------------------------------- |
-| `tabs`, `tabGroups` (Chrome only), `sessions` | Switch, close, reopen, move, group, duplicate tabs                     |
-| `history`, `bookmarks`      | Omnibox (`t`) suggestions; tab manager (`gt`) bulk bookmark to the bar  |
-| `storage`                   | Persist your settings via the browser's synced storage                                |
-| `clipboardRead`             | Open a URL from your clipboard (`gp`/`gP`)                                            |
-| `clipboardWrite`            | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API |
-| `activeTab`, host `<all_urls>` | Capture the visible tab for screenshots (`screenshotPage`, region, full page)         |
-| `<all_urls>` content script | Link hints, scrolling, find, and visual mode on the pages you visit                   |
+| Permission                                    | Used for                                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `tabs`, `tabGroups` (Chrome only), `sessions` | Switch, close, reopen, move, group, duplicate tabs                                                                 |
+| `history`, `bookmarks`                        | Omnibox (`t`) suggestions; tab manager (`gt`) bulk bookmark to the bar                                             |
+| `webNavigation`                               | Record the page history tree (`U`): main-frame URL/title per visit, stored on this device for the browsing session |
+| `storage`                                     | Persist your settings via the browser's synced storage; history tree lives in session storage                      |
+| `clipboardRead`                               | Open a URL from your clipboard (`gp`/`gP`)                                                                         |
+| `clipboardWrite`                              | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API                              |
+| `activeTab`, host `<all_urls>`                | Capture the visible tab for screenshots (`screenshotPage`, region, full page)                                      |
+| `<all_urls>` content script                   | Link hints, scrolling, find, and visual mode on the pages you visit                                                |
 
 Jari makes no network requests of its own and sends nothing anywhere.
 Details in [PRIVACY.md](PRIVACY.md).

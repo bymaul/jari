@@ -27,6 +27,7 @@
     "clipboardRead",
     "history",
     "bookmarks",
+    "webNavigation",
     "tabGroups"
   ],
   "options_ui": {

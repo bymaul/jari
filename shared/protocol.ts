@@ -1,8 +1,3 @@
-// Cross-context message contract. Content and popup senders call these
-// actions through platforms.sendMessage; background/main.ts dispatches them
-// to the handlers table in background/handlers.js, wrapping falsy results as
-// {ok:true} and thrown errors as {ok:false, error}.
-
 export interface TabSummary {
   id?: number;
   windowId?: number;
@@ -39,6 +34,17 @@ export interface WindowSummary {
   windowId?: number;
   title: string;
   url: string;
+}
+
+export interface HistoryTreeRow {
+  id: number;
+  url: string;
+  title: string;
+  ts: number;
+  depth: number;
+  seq: number;
+  /** Undotree box-drawing prefix, composed by the recorder's linearizer. */
+  prefix: string;
 }
 
 export interface Suggestion {
@@ -155,6 +161,14 @@ export interface Messages {
     payload: Record<string, never>;
     response: Ok | Fail;
   };
+  historyTreeList: {
+    payload: Record<string, never>;
+    response: { ok: true; rows: HistoryTreeRow[]; currentId: number | null } | Fail;
+  };
+  historyTreeGo: {
+    payload: { nodeId?: number };
+    response: { ok: true; delta?: number } | Fail;
+  };
   listTabs: {
     payload: Record<string, never>;
     response: TabSummary[] | Fail;
@@ -256,7 +270,6 @@ export interface Messages {
   };
 }
 
-// popup -> content is the only direction background never sends.
 export type ShowHelpMessage = { action: "jari-show-help" };
 
 export type Action = keyof Messages;

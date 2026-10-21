@@ -9,17 +9,17 @@ device.
 All access happens locally in response to your own key presses. Nothing is
 sent to the developer or any third party.
 
-| Access | Why | Where the data goes |
-| --- | --- | --- |
-| Page content (`<all_urls>`, all frames) | Render link hints, scroll, find-in-page, visual mode | Nowhere - processed in the page and discarded |
-| Tabs, tab groups (Chrome only), recently closed sessions | Switch, close, reopen, move, group tabs (`J`/`K`, `x`/`X`, `<<`, `gt`) | Nowhere |
-| Browsing history | Omnibox (`t`) suggestions from pages you visited | Nowhere |
-| Bookmarks | Omnibox (`t`) suggestions and tab-manager (`gt`) bulk bookmarking | Nowhere |
-| Clipboard read | Open a URL from your clipboard (`gp`/`gP`) | Opened as a tab, otherwise discarded |
-| Clipboard write | Copy URL / title (`yy`, `Y`, `yf`) | Your clipboard only |
-| Visible-tab screenshot | Capture the viewport as PNG on your keypress (`screenshotPage`, `screenshotRegion`, `screenshotFullPage`, all unbound) | Saved to your downloads as `jari-<host>-<timestamp>.png`, otherwise discarded |
-| Settings (`storage.sync`) | Persist your keybindings and options | Your browser's synced storage, never to us |
-| Find history (`storage.local`) | Recall past `/` queries with `Up`/`Down` | This device only, never synced or sent anywhere |
+| Access                                                   | Why                                                                                                                      | Where the data goes                                                                                            |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Page content (`<all_urls>`, all frames)                  | Render link hints, scroll, find-in-page, visual mode                                                                     | Nowhere - processed in the page and discarded                                                                  |
+| Tabs, tab groups (Chrome only), recently closed sessions | Switch, close, reopen, move, group tabs (`J`/`K`, `x`/`X`, `<<`, `gt`)                                                   | Nowhere                                                                                                        |
+| Browsing history                                         | Omnibox (`t`) suggestions from pages you visited; the page history tree (`gh`) records each visited page's URL and title | Nowhere - the tree is a device-local IndexedDB snapshot that is erased when the browser starts a new session |
+| Bookmarks                                                | Omnibox (`t`) suggestions and tab-manager (`gt`) bulk bookmarking                                                        | Nowhere                                                                                                        |
+| Clipboard read                                           | Open a URL from your clipboard (`gp`/`gP`)                                                                               | Opened as a tab, otherwise discarded                                                                           |
+| Clipboard write                                          | Copy URL / title (`yy`, `Y`, `yf`)                                                                                       | Your clipboard only                                                                                            |
+| Visible-tab screenshot                                   | Capture the viewport as PNG on your keypress (`screenshotPage`, `screenshotRegion`, `screenshotFullPage`, all unbound)   | Saved to your downloads as `jari-<host>-<timestamp>.png`, otherwise discarded                                  |
+| Settings (`storage.sync`)                                | Persist your keybindings and options                                                                                     | Your browser's synced storage, never to us                                                                     |
+| Find history (`storage.local`)                           | Recall past `/` queries with `Up`/`Down`                                                                                 | This device only, never synced or sent anywhere                                                                |
 
 ## Network use
 

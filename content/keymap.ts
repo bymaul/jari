@@ -18,7 +18,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 
-export const SETTINGS_SCHEMA_VERSION = 12;
+export const SETTINGS_SCHEMA_VERSION = 13;
 
 // Normalized settings shape — the single schema island. RawSettings is the
 // doc-typed input contract for migrate/normalize; every field access there
@@ -112,6 +112,8 @@ export const keymapDefaults: Record<string, string> = {
 
   H: "goBack",
   L: "goForward",
+
+  gh: "openHistoryTree",
 
   r: "reloadTab",
   R: "forceReload",
@@ -375,7 +377,7 @@ export function parseRepeatCount(raw: string | undefined): number {
 }
 
 export const overlaySelectors =
-  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host, .jari-tab-manager-host";
+  ".jari-overlay, .jari-scroll-highlight, .jari-hint, .jari-hints, .jari-find, .jari-find-bar, .jari-visual-caret, .jari-visual-caret-host, .jari-clue, .jari-prompt-host, .jari-find-host, .jari-help-host, .jari-tab-manager-host, .jari-history-host";
 
 export function deepActiveElement(): Element | null {
   let el = document.activeElement;
@@ -536,6 +538,10 @@ export function migrateSettings(data: unknown): RawSettings {
     d.keymap = migrateV12Bindings(d.keymap);
     version = 12;
   }
+  if (version < 13) {
+    d.keymap = migrateV13Bindings(d.keymap);
+    version = 13;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -668,6 +674,21 @@ export function migrateV12Bindings(keymap: unknown): Record<string, string> {
   const out = { ...keymap } as Record<string, string>;
   if (out["]w"] === "cycleScrollFrame") delete out["]w"];
   for (const [combo, command] of V12_DEFAULT_FILLS) {
+    if (combo in out) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
+  }
+  return out;
+}
+
+const V13_DEFAULT_FILLS: [string, string][] = [["gh", "openHistoryTree"]];
+
+export function migrateV13Bindings(keymap: unknown): Record<string, string> {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap as Record<string, string>;
+  }
+  const out = { ...keymap } as Record<string, string>;
+  for (const [combo, command] of V13_DEFAULT_FILLS) {
     if (combo in out) continue;
     if (findOverlapConflicts(out, combo).length > 0) continue;
     out[combo] = command;

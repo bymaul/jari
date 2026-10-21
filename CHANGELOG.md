@@ -6,6 +6,25 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ## [Unreleased]
 
+### Added
+
+- Page history tree (`gh`): an undo-tree of every page the tab has visited,
+  rendered in the tab manager's floating-panel style. Regular navigation
+  branches under the page it left; pressing back/forward only slides the
+  `●` position marker around the tree, so time-traveling never pollutes
+  the branch shape. `j`/`k` move; `Enter` slides along the tab's own
+  back/forward chain when the target page is still on it (so `H`/`L`
+  keep matching the browser's session history) and loads it directly
+  otherwise. `t` opens the focused
+  page in a background tab, `/` filters. Hash and SPA (pushState) moves
+  are recorded as their own states. Trees
+  are capped at 400 states per tab and kept in a device-local IndexedDB
+  snapshot (reloads refresh the current state instead of adding one);
+  the snapshot keeps the tree across extension reloads and updates
+  mid-session and is erased when the browser starts a new session. Adds the
+  `webNavigation` permission; settings schema version 13 backfills the
+  `gh` binding without touching existing custom ones.
+
 ### Changed
 
 - Internal: the codebase is now fully TypeScript (erasable syntax, no

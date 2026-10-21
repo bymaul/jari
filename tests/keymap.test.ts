@@ -58,6 +58,20 @@ test("migrateV12Bindings lands w for cycling without clobbering customs", () => 
   assert.equal(s.keymap["[w"], undefined);
 });
 
+test("migrateV13Bindings lands gh for the history tree without clobbering customs", () => {
+  assert.deepEqual(Jari.migrateV13Bindings({ x: "closeTab" }).gh, "openHistoryTree");
+  assert.deepEqual(Jari.migrateV13Bindings({ gh: "toggleIgnore" }).gh, "toggleIgnore");
+  assert.ok(!("gh" in Jari.migrateV13Bindings({ ghi: "closeTab" })));
+  assert.ok(!("U" in Jari.keymapDefaults));
+  const s = Jari.normalizeSettings({
+    schemaVersion: 12,
+    keymap: { j: "scrollDown" },
+  });
+  assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(s.keymap.gh, "openHistoryTree");
+  assert.equal(s.keymap.j, "scrollDown");
+});
+
 test("migrateHintCharset moves only the old default charset", () => {
   assert.equal(Jari.migrateHintCharset("sadjklewcmpgh"), Jari.HINT_CHARSET_DEFAULT);
   assert.equal(Jari.migrateHintCharset("abc"), "abc");

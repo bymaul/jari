@@ -293,6 +293,7 @@ const CAPTURE_HIDE_SELECTORS = [
   ".jari-palette-host",
   ".jari-help-host",
   ".jari-tab-manager-host",
+  ".jari-history-host",
   ".jari-visual-caret-host",
   ".jari-status-stack",
   ".jari-clue",

@@ -41,6 +41,7 @@ export const COMMAND_CATALOG = {
 
   goBack: { category: "history", label: "Go back in history" },
   goForward: { category: "history", label: "Go forward in history" },
+  openHistoryTree: { category: "history", label: "Open page history tree" },
 
   reloadTab: { category: "page", label: "Reload tab" },
   forceReload: { category: "page", label: "Reload without cache" },

@@ -59,8 +59,8 @@ source (repo convention).
   `tabs.ts` tab ops, `bookmarks.ts` bookmarks, `suggest.ts` suggest/search,
   `windows.ts` window focus, `utils.ts` `clampCount`/`getStoredSettings`);
   `shared/` - `url.ts` (URL parsing, scheme policy) + `tlds.ts` (known TLD set)
-  + `constants.ts` + `protocol.ts` (message contract) + `search-engines.ts` +
-  `page-nav-texts.ts`
+  - `constants.ts` + `protocol.ts` (message contract) + `search-engines.ts` +
+    `page-nav-texts.ts`
 - `options/` - options page (`options.ts` main, `engines.ts` search engines,
   `pagenav.ts` page nav texts); `tests/setup.ts` - shared chrome/DOM stubs
 

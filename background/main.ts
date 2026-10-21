@@ -1,4 +1,5 @@
 import { handlers } from "./handlers.ts";
+import { initHistoryRecorder } from "./history.ts";
 import type { Action, Messages } from "../shared/protocol.ts";
 
 type ResponseFor<A extends Action> = Messages[A]["response"];
@@ -15,6 +16,8 @@ type Thenable = {
 // response drifts from shared/protocol.ts. Runtime dispatch stays duck-typed,
 // because message contents come from content scripts unchecked.
 const typedHandlers: { [A in Action]: HandlerFor<A> } = handlers;
+
+initHistoryRecorder();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const handler = (
