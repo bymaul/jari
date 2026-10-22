@@ -35,7 +35,7 @@ let currentIdx = 0;
 let gPending = false;
 
 const HINTS_FILTER = 'Enter done | Esc cancel';
-const HINTS_NAV = 'j/k scroll | / filter | n/N jump | esc close';
+const HINTS_NAV = 'j/k scroll | / filter | n/N jump | q close';
 
 function isActive(): boolean {
   return active;
@@ -457,7 +457,7 @@ function onKeyDown(event: KeyboardEvent): boolean | void {
   if (hasMod && !scrollOnly) return false;
   event.preventDefault();
   event.stopImmediatePropagation();
-  if (key === 'Escape') {
+  if (key === 'Escape' || key === 'q') {
     gPending = false;
     if (matches.length > 0) {
       clearFilter();

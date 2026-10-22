@@ -10,7 +10,7 @@ const POLL_MS = 2000;
 const FILTER_MAX = 200;
 
 const FOOTER =
-  "j/k move | Enter load page | t new background tab | / filter | Esc close";
+  "j/k move | Enter load page | t new background tab | / filter | q close";
 
 type ListRes = {
   ok?: boolean;
@@ -675,6 +675,7 @@ function onNormalKey(event: KeyboardEvent): boolean {
   const hasMod = event.ctrlKey || event.altKey || event.metaKey;
   if (hasMod) return false;
   switch (event.key) {
+    case "q":
     case "Escape":
       ui.consume(event);
       if (query) {

@@ -19,10 +19,10 @@ const GROUPED_NONE = -1;
 const POLL_MS = 2000;
 
 const FOOTER_MINIMAL =
-  "Space mark | Enter switch | d close | w split/merge | / filter | Esc close | ? more";
+  "Space mark | Enter switch | d close | w split/merge | / filter | q close | ? more";
 const FOOTER_FULL = [
   "Space mark | v range | V all | Enter switch | d close | y duplicate | e edit | t new tab | ? less",
-  "p pin | m mute | g group | a add to group | u ungroup | r rename | b bookmark | J/K reorder | w split/merge | Esc close",
+  "p pin | m mute | g group | a add to group | u ungroup | r rename | b bookmark | J/K reorder | w split/merge | q close",
 ];
 
 const FIELDS = {
@@ -509,7 +509,7 @@ function renderFooter(): void {
     return;
   }
   if (windowChoice) {
-    setFooterLines(["Choose window: j/k move | Enter merge | Esc cancel"], true);
+    setFooterLines(["Choose window: j/k move | Enter merge | q cancel"], true);
     return;
   }
   if (confirm) {
@@ -1454,6 +1454,7 @@ function stepChoice(delta: number): void {
 function onChoiceKey(event: KeyboardEvent): boolean {
   if (!windowChoice || windowChoice.windows.length === 0) return false;
   switch (event.key) {
+    case "q":
     case "Escape":
       ui.consume(event);
       windowChoice = null;
@@ -1515,6 +1516,7 @@ function onNormalKey(event: KeyboardEvent): boolean {
   if (hasMod) return false;
   if (windowChoice) return onChoiceKey(event);
   switch (event.key) {
+    case "q":
     case "Escape":
       ui.consume(event);
       if (confirm) {
