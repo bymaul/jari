@@ -877,30 +877,20 @@ function paintRange(): void {
 
 function move(delta: number): void {
   if (filtered.length === 0) return;
-  const hadConfirm = takeConfirm();
   endVisual();
   const prev = selected;
   selected = (selected + delta + filtered.length) % filtered.length;
-  if (hadConfirm) {
-    renderAll();
-    return;
-  }
   renderHeader();
   paintSelection(prev);
 }
 
 function moveVisual(delta: number): void {
   if (filtered.length === 0) return;
-  const hadConfirm = takeConfirm();
   const anchor = visualAnchor ?? selected;
   const lo = Math.min(anchor, selected);
   const hi = Math.max(anchor, selected);
   selected = (selected + delta + filtered.length) % filtered.length;
   paintRange();
-  if (hadConfirm) {
-    renderAll();
-    return;
-  }
   const rows: number[] = [];
   for (let i = Math.min(lo, selected); i <= Math.max(hi, selected); i++) {
     rows.push(i);
@@ -912,21 +902,10 @@ function moveVisual(delta: number): void {
 function toggleMark(): void {
   const tab = focusedTab();
   if (!tab) return;
-  const hadConfirm = takeConfirm();
   if (marked.has(tab.id!)) marked.delete(tab.id!);
   else marked.add(tab.id!);
-  if (hadConfirm) {
-    renderAll();
-    return;
-  }
   renderHeader();
   repaintRows([selected]);
-}
-
-function takeConfirm(): boolean {
-  const hadConfirm = confirm !== null;
-  confirm = null;
-  return hadConfirm;
 }
 
 function endVisual(): void {
@@ -1515,14 +1494,20 @@ function onNormalKey(event: KeyboardEvent): boolean {
   const hasMod = event.ctrlKey || event.altKey || event.metaKey;
   if (hasMod) return false;
   if (windowChoice) return onChoiceKey(event);
+  if (confirm) {
+    ui.consume(event);
+    if (event.key === "d") closeTargets();
+    else if (event.key === "q" || event.key === "Escape") {
+      confirm = null;
+      renderAll();
+    }
+    return true;
+  }
   switch (event.key) {
     case "q":
     case "Escape":
       ui.consume(event);
-      if (confirm) {
-        confirm = null;
-        renderAll();
-      } else if (visualAnchor !== null) {
+      if (visualAnchor !== null) {
         endVisual();
         renderAll();
       } else if (query) {
