@@ -74,12 +74,7 @@ let visualBaseline = new Set<number>();
 let field: Field | null = null;
 let fieldEl: HTMLInputElement | null = null;
 let fieldFocusBefore: Element | null = null;
-let confirm: {
-  kind: string;
-  key: string;
-  ids: number[];
-  message: string;
-} | null = null;
+let confirm: ConfirmState | null = null;
 let windowChoice: { ids: number[]; windows: WindowSummary[] } | null = null;
 let refreshQueued = false;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -87,6 +82,12 @@ let refreshing = false;
 
 type FieldKind = keyof typeof FIELDS;
 type Field = { kind: FieldKind; groupId?: number; tabId?: number };
+type ConfirmState = {
+  kind: string;
+  key: string;
+  ids: number[];
+  message: string;
+};
 /* Snapshot of a successful managerList answer: the shape the two
    `!res.ok`-narrowed call sites hand over. */
 type ManagerRes = {
@@ -195,6 +196,23 @@ export function confirmKey(ids?: Iterable<number>): string {
   return [...(ids || [])]
     .sort((a, b) => a - b)
     .join(",");
+}
+
+export function prunedConfirm(
+  state: ConfirmState | null,
+  aliveIds: Iterable<number>,
+): ConfirmState | null {
+  if (!state) return null;
+  const alive = new Set(aliveIds);
+  const kept = state.ids.filter((id) => alive.has(id));
+  if (kept.length === state.ids.length) return state;
+  if (kept.length === 0) return null;
+  return {
+    ...state,
+    key: confirmKey(kept),
+    ids: kept,
+    message: `Some tabs are gone — press d again to close ${kept.length}`,
+  };
 }
 
 function isActive(): boolean {
@@ -671,19 +689,11 @@ export function isSameSnapshot(
 }
 
 function pruneMarksAndConfirm() {
-  const alive = new Set(tabs.map((tab) => tab.id));
+  const alive = new Set(tabs.map((tab) => tab.id!));
   for (const id of [...marked]) {
     if (!alive.has(id)) marked.delete(id);
   }
-  if (!confirm) return;
-  const gone = confirm.ids.filter((id) => !alive.has(id));
-  if (gone.length === 0) return;
-  const kept = confirm.ids.filter((id) => alive.has(id));
-  confirm = {
-    ...confirm,
-    ids: kept,
-    message: `Some tabs are gone — press d again to close ${kept.length}`,
-  };
+  confirm = prunedConfirm(confirm, alive);
 }
 
 async function refresh(): Promise<void> {

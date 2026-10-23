@@ -3,7 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert";
 import type { GroupSummary, ManagerTab } from "../shared/protocol.ts";
 
-const { isSameSnapshot } = await import("../content/tab-manager.ts");
+const { isSameSnapshot, prunedConfirm, confirmKey } = await import(
+  "../content/tab-manager.ts"
+);
 
 function tab(over = {}) {
   return {
@@ -100,4 +102,25 @@ test("missing tab lists compare unequal", () => {
     isSameSnapshot([tab()], new Map(), 1, null as unknown as IsSameRes),
     false,
   );
+});
+
+function confirmState(ids: number[]) {
+  return { kind: "close", key: confirmKey(ids), ids, message: "confirm" };
+}
+
+test("pruning leaves an untouched confirm alone", () => {
+  const state = confirmState([1, 2]);
+  assert.equal(prunedConfirm(state, [1, 2, 3]), state);
+});
+
+test("pruning recomputes the confirm key for surviving tabs", () => {
+  const next = prunedConfirm(confirmState([1, 2, 3]), [1, 3]);
+  assert.deepEqual(next?.ids, [1, 3]);
+  assert.equal(next?.key, confirmKey([1, 3]));
+  assert.match(next?.message || "", /close 2$/);
+});
+
+test("pruning drops the confirm when every target is gone", () => {
+  assert.equal(prunedConfirm(confirmState([1, 2]), [3]), null);
+  assert.equal(prunedConfirm(null, [1]), null);
 });
