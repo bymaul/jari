@@ -91,27 +91,35 @@ function reachableUrlNode(
   startId: number,
   url: string,
 ): HistoryNode | null {
-  const target = findNodeByUrl(tree, url);
-  if (!target) return null;
+  const key = hashKey(url);
+  let exact: { node: HistoryNode; dist: number } | null = null;
+  let hash: { node: HistoryNode; dist: number } | null = null;
   const seen = new Set<number>([startId]);
-  const queue = [startId];
+  const queue: Array<{ id: number; dist: number }> = [{ id: startId, dist: 0 }];
   while (queue.length > 0) {
-    const id = queue.shift()!;
-    if (id === target.id) return target;
+    const { id, dist } = queue.shift()!;
     const node = tree.nodes.get(id);
     if (!node) continue;
+    if (id !== startId) {
+      if (node.url === url) {
+        if (!exact || dist < exact.dist) exact = { node, dist };
+      } else if (key && hashKey(node.url) === key) {
+        if (!hash || dist < hash.dist) hash = { node, dist };
+      }
+    }
     if (node.parent !== null && !seen.has(node.parent)) {
       seen.add(node.parent);
-      queue.push(node.parent);
+      queue.push({ id: node.parent, dist: dist + 1 });
     }
     for (const child of node.children) {
       if (!seen.has(child)) {
         seen.add(child);
-        queue.push(child);
+        queue.push({ id: child, dist: dist + 1 });
       }
     }
   }
-  return null;
+  if (exact) return exact.node;
+  return hash ? hash.node : null;
 }
 
 function movePointer(
@@ -208,12 +216,8 @@ export function applyCommit(
           ? (tree.nodes.get(pending.nodeId) ?? null)
           : reachableUrlNode(tree, pending.nodeId, url);
       if (target && movePointer(tree, target.id, now, ev.title)) {
-        if (traversal) {
-          spineReanchor(
-            tree,
-            url,
-            target.id === pending.nodeId ? pending.nodeId : undefined,
-          );
+        if (traversal && target.id === pending.nodeId) {
+          spineReanchor(tree, url, target.id);
         } else {
           spinePush(tree, target.id);
         }
@@ -282,6 +286,7 @@ export function gotoPlan(
   store: TreeStore,
   tabId: number,
   nodeId: number,
+  historyLength?: number,
 ): GotoPlan | null {
   const tree = store.tabs.get(tabId);
   const node = tree ? tree.nodes.get(nodeId) : undefined;
@@ -292,6 +297,13 @@ export function gotoPlan(
   if (idx < 0 || tree.spineAt < 0) return { kind: "load", node, url: node.url };
   const delta = idx - tree.spineAt;
   if (delta === 0) return { kind: "point", node };
+  if (
+    typeof historyLength === "number" &&
+    historyLength >= 1 &&
+    Math.abs(delta) >= historyLength
+  ) {
+    return { kind: "load", node, url: node.url };
+  }
   return { kind: "native", node, delta };
 }
 
@@ -665,13 +677,17 @@ export async function historyTreeList(
 
 export async function historyTreeGo(
   sender: Sender,
-  { nodeId }: MessagePayload<"historyTreeGo"> = {},
+  { nodeId, historyLength }: MessagePayload<"historyTreeGo"> = {},
 ): Promise<MessageResponse<"historyTreeGo">> {
   const tabId = senderTab(sender);
   if (tabId === null) return { ok: false };
   const current = await ensureStore();
   if (!Number.isInteger(nodeId)) return { ok: false };
-  const plan = gotoPlan(current, tabId, nodeId as number);
+  const length =
+    Number.isInteger(historyLength) && (historyLength as number) >= 1
+      ? (historyLength as number)
+      : undefined;
+  const plan = gotoPlan(current, tabId, nodeId as number, length);
   if (!plan) return { ok: false };
   const now = Date.now();
   if (plan.kind === "point") {

@@ -166,7 +166,7 @@ export interface Messages {
     response: { ok: true; rows: HistoryTreeRow[]; currentId: number | null } | Fail;
   };
   historyTreeGo: {
-    payload: { nodeId?: number };
+    payload: { nodeId?: number; historyLength?: number };
     response: { ok: true; delta?: number } | Fail;
   };
   listTabs: {

@@ -91,7 +91,10 @@ async function askGo(
   nodeId: number,
 ): Promise<MessageResponse<"historyTreeGo"> | null> {
   try {
-    return await sendMessageWithTimeout("historyTreeGo", { nodeId });
+    return await sendMessageWithTimeout("historyTreeGo", {
+      nodeId,
+      historyLength: window.history.length,
+    });
   } catch {
     return null;
   }

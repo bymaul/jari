@@ -1,6 +1,7 @@
 import "./setup.ts";
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
+import type { HistoryNode } from "../background/history.ts";
 
 const history = await import("../background/history.ts");
 const { handlers } = await import("../background/handlers.ts");
@@ -14,6 +15,8 @@ const {
   serializeStore,
   deserializeStore,
   touchTitle,
+  gotoPlan,
+  ensureTab,
   flushSavesForTest,
 } = history;
 
@@ -584,3 +587,85 @@ function stubIdb(initial: unknown = undefined): StubIdb {
   };
   return record;
 }
+
+test("gotoPlan falls back to load when the native delta exceeds the window's history length", () => {
+  const store = emptyStore();
+  const at = (t: number) => (url: string) =>
+    applyCommit(store, commitEvent(url), t);
+  at(100)("https://a.example/a");
+  at(101)("https://b.example/b");
+  at(102)("https://c.example/c");
+
+  const tree = store.tabs.get(1)!;
+  // Back to the root: delta would be -2.
+  assert.deepEqual(gotoPlan(store, 1, 1), {
+    kind: "native",
+    node: tree.nodes.get(1),
+    delta: -2,
+  });
+  // delta out of reach for the reported window length -> must load instead.
+  assert.deepEqual(gotoPlan(store, 1, 1, 2), {
+    kind: "load",
+    node: tree.nodes.get(1),
+    url: "https://a.example/a",
+  });
+  // |delta| < length stays native.
+  assert.deepEqual(gotoPlan(store, 1, 1, 3), {
+    kind: "native",
+    node: tree.nodes.get(1),
+    delta: -2,
+  });
+  // Missing/invalid length keeps the previous behavior.
+  assert.deepEqual(gotoPlan(store, 1, 1, 0), {
+    kind: "native",
+    node: tree.nodes.get(1),
+    delta: -2,
+  });
+});
+
+test("a mismatched traversal commit re-anchors to the nearest duplicate, not the oldest", () => {
+  const store = emptyStore();
+  const tree = ensureTab(store, 1);
+  const node = (
+    id: number,
+    url: string,
+    parent: number | null,
+    children: number[],
+  ): HistoryNode => ({
+    id,
+    url,
+    title: "",
+    ts: 0,
+    parent,
+    children,
+  });
+  // n4 is the nearest duplicate of the commit URL (1 hop), but the older n3
+  // (2 hops) was inserted first — the old first-inserted pick was n3.
+  tree.nodes.set(1, node(1, "https://a.example/a", null, [2, 4]));
+  tree.nodes.set(2, node(2, "https://mid.example/mid", 1, [3]));
+  tree.nodes.set(3, node(3, "https://dup.example/dup", 2, []));
+  tree.nodes.set(4, node(4, "https://dup.example/dup", 1, []));
+  tree.spine = [1, 2, 4];
+  tree.spineAt = 1;
+  tree.current = 2;
+
+  // Enter on node 1 (native back), but the browser redirects and lands on the
+  // duplicated URL instead of node 1's own URL.
+  assert.ok(markGoto(store, 1, 1, 200));
+  applyCommit(
+    store,
+    commitEvent("https://dup.example/dup", { isHistoryTraversal: true }),
+    201,
+  );
+  assert.equal(tree.current, 4);
+  // The spine got a plain push (node 4 appended), not a URL-based reanchor.
+  assert.deepEqual(tree.spine, [1, 2, 4]);
+  assert.equal(tree.spineAt, 2);
+
+  // The next hop plan is computed from the pushed node, not a stale anchor.
+  assert.deepEqual(gotoPlan(store, 1, 2), {
+    kind: "native",
+    node: tree.nodes.get(2),
+    delta: -1,
+  });
+});
