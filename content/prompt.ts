@@ -20,7 +20,7 @@ import type { RankItem, RankMatch } from "./rank.ts";
 // tab/window rows are raw TabSummary/WindowSummary entries. All-optional
 // duck matches both.
 type PromptRow = {
-  kind?: "search" | "url" | "suggestion";
+  kind?: "search" | "url" | "suggestion" | "calc";
   title?: string;
   url?: string | null;
   keyword?: string;
@@ -40,6 +40,101 @@ type PromptRow = {
 
 function parseKeyword(query: string) {
   return parseEngineKeyword(query, cachedEngines || settings.getSearchEngines());
+}
+
+const CALC_CHARS = new RegExp("^[\\d\\s.%+*/()-]*$");
+const HAS_OPERATOR = /[-+*/%]/;
+
+export function calcEval(expr: string): string | null {
+  if (!CALC_CHARS.test(expr) || !HAS_OPERATOR.test(expr)) return null;
+
+  const tokens: { type: "num" | "op" | "lparen" | "rparen"; value: string }[] = [];
+  let i = 0;
+  while (i < expr.length) {
+    const ch = expr[i];
+    if (/\s/.test(ch)) { i++; continue; }
+    if (/[\d.]/.test(ch)) {
+      let num = "";
+      while (i < expr.length && /[\d.]/.test(expr[i])) num += expr[i++];
+      tokens.push({ type: "num", value: num });
+    } else if (/[-+*/%]/.test(ch)) {
+      tokens.push({ type: "op", value: ch }); i++;
+    } else if (ch === "(") {
+      tokens.push({ type: "lparen", value: ch }); i++;
+    } else if (ch === ")") {
+      tokens.push({ type: "rparen", value: ch }); i++;
+    } else {
+      return null;
+    }
+  }
+  if (tokens.length === 0) return null;
+
+  let pos = 0;
+  const peek = (): { type: string; value: string } | null =>
+    pos < tokens.length ? tokens[pos] : null;
+  const advance = (): { type: string; value: string } | null => tokens[pos++];
+
+  const parseFactor = (): number | null => {
+    const t = peek();
+    if (!t) return null;
+    if (t.type === "num") {
+      advance();
+      const n = Number(t.value);
+      if (!Number.isFinite(n)) return null;
+      return n;
+    }
+    if (t.type === "lparen") {
+      advance();
+      const val = parseExpr();
+      if (val === null) return null;
+      const close = peek();
+      if (!close || close.type !== "rparen") return null;
+      advance();
+      return val;
+    }
+    return null;
+  };
+
+  const parseTerm = (): number | null => {
+    let left = parseFactor();
+    if (left === null) return null;
+    while (true) {
+      const t = peek();
+      if (!t || t.type !== "op" || (t.value !== "*" && t.value !== "/" && t.value !== "%")) break;
+      advance();
+      const right = parseFactor();
+      if (right === null) return null;
+      if (t.value === "*") left = left * right;
+      else if (t.value === "/") left = left / right;
+      else left = left % right;
+    }
+    return left;
+  };
+
+  const parseExpr = (): number | null => {
+    let left = parseTerm();
+    if (left === null) return null;
+    while (true) {
+      const t = peek();
+      if (!t || t.type !== "op" || (t.value !== "+" && t.value !== "-")) break;
+      advance();
+      const right = parseTerm();
+      if (right === null) return null;
+      if (t.value === "+") left = left + right;
+      else left = left - right;
+    }
+    return left;
+  };
+
+  const result = parseExpr();
+  if (result === null || !Number.isFinite(result) || pos !== tokens.length) return null;
+  return String(result);
+}
+
+function parseExpression(text: string): { expr: string; result: string } | null {
+  const expr = text.trim();
+  const result = calcEval(expr);
+  return result == null ? null : { expr, result };
 }
 
 let active = false;
@@ -202,6 +297,15 @@ function handleOpenInput(queryText: string): void {
     return;
   }
   const q = queryText.trim();
+  const calc = parseExpression(q);
+  if (calc) {
+    query = q;
+    tabUrlMap.clear();
+    filtered = [{ kind: "calc", title: calc.expr, url: calc.result }];
+    selected = 0;
+    renderList();
+    return;
+  }
   const tabQuery = parseTabPrefix(q);
   const effective = tabQuery != null ? tabQuery : q;
   const kw = tabQuery != null ? null : parseKeyword(effective);
@@ -424,6 +528,13 @@ function activate(forceNewTab: boolean = false): void {
   if (mode === "moveWindow") {
     sendMessage("moveTabIntoWindow", { targetWindowId: item.windowId });
   } else if (mode === "open" || mode === "edit" || mode === "incognito") {
+    if (item.kind === "calc") {
+      ui.copyText(item.url ?? "").then((ok) =>
+        ui.toast(ok ? "Copied" : "Copy failed"),
+      );
+      close();
+      return;
+    }
     if (item.kind === "search") {
       if (item.keyword && item.url) openUrl(item.url, forceNewTab);
       else if (kwInput && kwInput.url) openUrl(kwInput.url, forceNewTab);

@@ -5,7 +5,7 @@ import type { TabSummary } from "../../shared/protocol.ts";
 
 /** Suggestion list rows shaped like suggest/search results. */
 export interface ListRow {
-  kind: "search" | "url" | "suggestion";
+  kind: "search" | "url" | "suggestion" | "calc";
   title: string;
   url?: string | null;
   keyword?: string;
@@ -58,6 +58,8 @@ export function renderSuggestionRow(
     else titleText = `Search for "${row.title}"`;
   } else if (row.kind === "url") {
     titleText = `Open ${row.title}`;
+  } else if (row.kind === "calc") {
+    titleText = row.title || "";
   } else {
     const isSwitch =
       row.url &&
@@ -68,6 +70,7 @@ export function renderSuggestionRow(
       : row.title || "(untitled)";
   }
   let urlText = row.kind === "suggestion" ? row.url || "" : "";
+  if (row.kind === "calc" && row.url) urlText = `= ${row.url}`;
   if (row.kind === "suggestion" && row.url && tabUrlMap.has(row.url)) {
     const tabInfo = tabUrlMap.get(row.url);
     if (tabInfo && tabInfo.source === "tab") urlText = `${urlText}  •  Tab`;
