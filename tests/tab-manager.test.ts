@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import type { GroupSummary, ManagerTab } from "../shared/protocol.ts";
 
-const { isSameSnapshot, prunedConfirm, confirmKey } =
+const { isSameSnapshot, prunedConfirm, confirmKey, stateTags } =
   await import("../content/tab-manager.ts");
 
 function tab(over = {}) {
@@ -109,6 +109,21 @@ test("missing tab lists compare unequal", () => {
 function confirmState(ids: number[]) {
   return { kind: "close", key: confirmKey(ids), ids, message: "confirm" };
 }
+
+test("stateTags tags the active tab of the current window as current", () => {
+  const base = tab({ id: 1, windowId: 1, active: true });
+  assert.deepEqual(stateTags(base, 1), ["current"]);
+  assert.deepEqual(stateTags(base, 2), []);
+  assert.deepEqual(
+    stateTags(tab({ id: 2, windowId: 1, active: false, pinned: true }), 1),
+    ["pin"],
+  );
+  assert.deepEqual(
+    stateTags(tab({ id: 3, windowId: 1, active: true, pinned: true }), 1),
+    ["current", "pin"],
+  );
+  assert.deepEqual(stateTags(tab({ active: false }), 1), []);
+});
 
 test("pruning leaves an untouched confirm alone", () => {
   const state = confirmState([1, 2]);

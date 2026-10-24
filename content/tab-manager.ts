@@ -182,9 +182,13 @@ export function groupColorHex(name: string): string {
   return GROUP_COLORS[String(name || "").toLowerCase()] || "#888888";
 }
 
-export function stateTags(tab: ManagerTab): string[] {
+export function stateTags(
+  tab: ManagerTab,
+  currentWin: number | null = null,
+): string[] {
   const out: string[] = [];
   if (!tab) return out;
+  if (tab.active && tab.windowId === currentWin) out.push("current");
   if (tab.pinned) out.push("pin");
   if (tab.muted) out.push("muted");
   else if (tab.audible) out.push("playing");
@@ -454,7 +458,7 @@ function renderRow(
   appendSpan(
     li,
     "jari-mgr-tag",
-    stateTags(tab)
+    stateTags(tab, currentWin)
       .map((tag) => `[${tag}]`)
       .join(" "),
   );
