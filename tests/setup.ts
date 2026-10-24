@@ -16,7 +16,11 @@ globalThis.document = {
   activeElement: null,
   body: { appendChild: () => {} },
   documentElement: { style: {}, appendChild: () => {} },
-  createElement: () => ({ appendChild: () => {}, remove: () => {}, setAttribute: () => {} }),
+  createElement: () => ({
+    appendChild: () => {},
+    remove: () => {},
+    setAttribute: () => {},
+  }),
   querySelector: () => null,
   execCommand: () => {},
 } as unknown as typeof document;

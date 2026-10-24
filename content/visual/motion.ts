@@ -291,10 +291,7 @@ function setPosition(node: Node, offset: number, isCaret: boolean): void {
   sel.addRange(r);
 }
 
-export function fallbackLineBoundary(
-  dir: number,
-  forCaret: boolean,
-): boolean {
+export function fallbackLineBoundary(dir: number, forCaret: boolean): boolean {
   const sel = getSelection();
   if (!sel || !sel.focusNode) return false;
   const block = getBlockAncestor(sel.focusNode);
@@ -352,7 +349,10 @@ export function fallbackFirstNonBlank(forCaret: boolean): boolean {
 }
 
 export function fallbackDocBoundary(dir: number, isCaret: boolean): boolean {
-  const walker = document.createTreeWalker(document.body!, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(
+    document.body!,
+    NodeFilter.SHOW_TEXT,
+  );
   let first: Node | null = null;
   let last: Node | null = null;
   let n: Node | null;

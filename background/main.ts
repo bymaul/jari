@@ -8,7 +8,10 @@ type HandlerFor<A extends Action> = (
   payload: Messages[A]["payload"],
 ) => ResponseFor<A> | Promise<ResponseFor<A>>;
 type Thenable = {
-  then: (onFulfilled: (value: unknown) => void, onRejected: (err: unknown) => void) => unknown;
+  then: (
+    onFulfilled: (value: unknown) => void,
+    onRejected: (err: unknown) => void,
+  ) => unknown;
 };
 
 // Compile-time dispatch contract: assigning the handlers table to this mapped

@@ -24,7 +24,11 @@ function withStubs(fn: () => void): void {
   const savedNF = g.NodeFilter;
   const savedGCS = win.getComputedStyle;
   g.NodeFilter = { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 3 };
-  win.getComputedStyle = () => ({ display: "block", visibility: "visible", opacity: "1" });
+  win.getComputedStyle = () => ({
+    display: "block",
+    visibility: "visible",
+    opacity: "1",
+  });
   doc.querySelectorAll = () => [];
   try {
     fn();
@@ -59,7 +63,11 @@ test("find/collect direct import: collects text nodes and respects shadow host c
   const savedNF = g.NodeFilter;
   const savedGCS = win.getComputedStyle;
   g.NodeFilter = { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 3 };
-  win.getComputedStyle = () => ({ display: "block", visibility: "visible", opacity: "1" });
+  win.getComputedStyle = () => ({
+    display: "block",
+    visibility: "visible",
+    opacity: "1",
+  });
   const textNode = {
     nodeValue: "hello",
     parentElement: fakeParent("P"),

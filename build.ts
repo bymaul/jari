@@ -28,7 +28,9 @@ if (
     devTargetArg !== "chrome" &&
     devTargetArg !== "firefox")
 ) {
-  console.error("Usage: node build.ts <chrome|firefox|dist|dev [chrome|firefox]>");
+  console.error(
+    "Usage: node build.ts <chrome|firefox|dist|dev [chrome|firefox]>",
+  );
   process.exit(1);
 }
 
@@ -149,7 +151,10 @@ function buildDist(target: "chrome" | "firefox"): void {
     mkdirSync(join(stage, dirname(file)), { recursive: true });
     copyFileSync(join(root, file), join(stage, file));
   }
-  writeFileSync(join(stage, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  writeFileSync(
+    join(stage, "manifest.json"),
+    JSON.stringify(manifest, null, 2) + "\n",
+  );
   if (target === "firefox") {
     buildFirefoxXpi(stage, manifest.version);
   } else {

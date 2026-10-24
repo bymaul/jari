@@ -2,7 +2,19 @@ import { Url } from "../shared/url.ts";
 import type { WindowSummary } from "../shared/protocol.ts";
 import { settings } from "./settings.ts";
 import { sendMessage, sendMessageWithTimeout, ui } from "./ui.ts";
-import { Scroll, scrollHeightOf, clientHeightOf, scrollPosOf, isFrame, frameWindow, frameViewportHeight, frameScrollBox, focusTarget, smoothScrollBy, shouldSmooth } from "./scroll.ts";
+import {
+  Scroll,
+  scrollHeightOf,
+  clientHeightOf,
+  scrollPosOf,
+  isFrame,
+  frameWindow,
+  frameViewportHeight,
+  frameScrollBox,
+  focusTarget,
+  smoothScrollBy,
+  shouldSmooth,
+} from "./scroll.ts";
 import { Prompt } from "./prompt.ts";
 import { TabManager } from "./tab-manager.ts";
 import { HistoryTree } from "./history-tree.ts";
@@ -16,7 +28,12 @@ import type { CommandDef, CommandName } from "./catalog.ts";
 import { Palette } from "./palette.ts";
 import { Shot } from "./shot.ts";
 import { captureFullPage } from "./scrollshot.ts";
-import { downloadUrl, waitForPaint, isScreenshotable, isScreenshotDataUrl } from "./screenshot.ts";
+import {
+  downloadUrl,
+  waitForPaint,
+  isScreenshotable,
+  isScreenshotDataUrl,
+} from "./screenshot.ts";
 
 const PAGE_RATIO = 0.9;
 const HALF_RATIO = 0.5;
@@ -34,9 +51,10 @@ interface CommandImpl extends CommandDef {
 
 let ignoreToggle: () => void = () => {};
 let passthroughEnter: () => void = () => {};
-export function setModeActions(
-  { ignore, passthrough }: { ignore?: () => void; passthrough?: () => void } = {},
-): void {
+export function setModeActions({
+  ignore,
+  passthrough,
+}: { ignore?: () => void; passthrough?: () => void } = {}): void {
   if (ignore) ignoreToggle = ignore;
   if (passthrough) passthroughEnter = passthrough;
 }
@@ -121,7 +139,11 @@ function scrollBy({
   x = 0,
   y = 0,
   count = 1,
-}: { x?: number; y?: number; count?: number }): void {
+}: {
+  x?: number;
+  y?: number;
+  count?: number;
+}): void {
   const el = getScrollElement();
   if (isFrame(el)) {
     scrollFrameBy(el as Element, x * count, y * count);
@@ -154,7 +176,10 @@ function readClipboardText(): Promise<string> {
   } catch {}
   if (text) return Promise.resolve(text);
   try {
-    return navigator.clipboard.readText().then((t) => t.trim()).catch(() => "");
+    return navigator.clipboard
+      .readText()
+      .then((t) => t.trim())
+      .catch(() => "");
   } catch {
     return Promise.resolve("");
   }
@@ -235,25 +260,31 @@ async function screenshotPage(): Promise<void> {
       ui.toast("Screenshot failed");
       return;
     }
-    ui.toast(downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed");
+    ui.toast(
+      downloadUrl(res.dataUrl) ? "Saved screenshot" : "Screenshot failed",
+    );
   } finally {
     screenshotCapturing = false;
   }
 }
 
-function cmd(
-  name: CommandName,
-  run: (c: CommandContext) => void,
-): CommandImpl {
+function cmd(name: CommandName, run: (c: CommandContext) => void): CommandImpl {
   return { ...COMMAND_CATALOG[name], run };
 }
 
 export const commands: Record<string, CommandImpl> = {
-
-  scrollDown: cmd("scrollDown", (c) => scrollBy({ y: settings.getScrollStep(), count: c.count })),
-  scrollUp: cmd("scrollUp", (c) => scrollBy({ y: -settings.getScrollStep(), count: c.count })),
-  scrollLeft: cmd("scrollLeft", (c) => scrollBy({ x: -settings.getScrollStep(), count: c.count })),
-  scrollRight: cmd("scrollRight", (c) => scrollBy({ x: settings.getScrollStep(), count: c.count })),
+  scrollDown: cmd("scrollDown", (c) =>
+    scrollBy({ y: settings.getScrollStep(), count: c.count }),
+  ),
+  scrollUp: cmd("scrollUp", (c) =>
+    scrollBy({ y: -settings.getScrollStep(), count: c.count }),
+  ),
+  scrollLeft: cmd("scrollLeft", (c) =>
+    scrollBy({ x: -settings.getScrollStep(), count: c.count }),
+  ),
+  scrollRight: cmd("scrollRight", (c) =>
+    scrollBy({ x: settings.getScrollStep(), count: c.count }),
+  ),
   scrollToTop: {
     ...COMMAND_CATALOG.scrollToTop,
     run: () => {
@@ -281,9 +312,13 @@ export const commands: Record<string, CommandImpl> = {
         let target;
         try {
           if (box) {
-            target = Math.max(0, (box.scrollHeight || 0) - (box.clientHeight || 0));
+            target = Math.max(
+              0,
+              (box.scrollHeight || 0) - (box.clientHeight || 0),
+            );
           } else if (w) {
-            const doc = w.document.scrollingElement || w.document.documentElement;
+            const doc =
+              w.document.scrollingElement || w.document.documentElement;
             target = Math.max(0, doc.scrollHeight - w.innerHeight);
           } else {
             target = Math.max(0, scrollHeightOf(el) - clientHeightOf(el));
@@ -299,26 +334,71 @@ export const commands: Record<string, CommandImpl> = {
       else el.scrollTo({ top: target, behavior: "instant" });
     },
   },
-  scrollPageDown: { ...COMMAND_CATALOG.scrollPageDown, run: scrollPageBy(PAGE_RATIO, 1) },
-  scrollPageUp: { ...COMMAND_CATALOG.scrollPageUp, run: scrollPageBy(PAGE_RATIO, -1) },
-  scrollHalfPageDown: { ...COMMAND_CATALOG.scrollHalfPageDown, run: scrollPageBy(HALF_RATIO, 1) },
-  scrollHalfPageUp: { ...COMMAND_CATALOG.scrollHalfPageUp, run: scrollPageBy(HALF_RATIO, -1) },
-  cycleScrollFrame: { ...COMMAND_CATALOG.cycleScrollFrame, run: (c) => Scroll.cycle(c.count) },
-  resetScrollTarget: { ...COMMAND_CATALOG.resetScrollTarget, run: () => Scroll.reset() },
-  zoomIn: { ...COMMAND_CATALOG.zoomIn, run: () => sendMessage("zoomBy", { delta: 0.1 }) },
-  zoomOut: { ...COMMAND_CATALOG.zoomOut, run: () => sendMessage("zoomBy", { delta: -0.1 }) },
+  scrollPageDown: {
+    ...COMMAND_CATALOG.scrollPageDown,
+    run: scrollPageBy(PAGE_RATIO, 1),
+  },
+  scrollPageUp: {
+    ...COMMAND_CATALOG.scrollPageUp,
+    run: scrollPageBy(PAGE_RATIO, -1),
+  },
+  scrollHalfPageDown: {
+    ...COMMAND_CATALOG.scrollHalfPageDown,
+    run: scrollPageBy(HALF_RATIO, 1),
+  },
+  scrollHalfPageUp: {
+    ...COMMAND_CATALOG.scrollHalfPageUp,
+    run: scrollPageBy(HALF_RATIO, -1),
+  },
+  cycleScrollFrame: {
+    ...COMMAND_CATALOG.cycleScrollFrame,
+    run: (c) => Scroll.cycle(c.count),
+  },
+  resetScrollTarget: {
+    ...COMMAND_CATALOG.resetScrollTarget,
+    run: () => Scroll.reset(),
+  },
+  zoomIn: {
+    ...COMMAND_CATALOG.zoomIn,
+    run: () => sendMessage("zoomBy", { delta: 0.1 }),
+  },
+  zoomOut: {
+    ...COMMAND_CATALOG.zoomOut,
+    run: () => sendMessage("zoomBy", { delta: -0.1 }),
+  },
 
-  closeTab: { ...COMMAND_CATALOG.closeTab, run: (c) => sendMessage("closeTab", { count: c.count }) },
-  restoreTab: { ...COMMAND_CATALOG.restoreTab, run: (c) => sendMessage("restoreTab", { count: c.count }) },
-  openClipboard: { ...COMMAND_CATALOG.openClipboard, run: () => openClipboardWith("navigate") },
+  closeTab: {
+    ...COMMAND_CATALOG.closeTab,
+    run: (c) => sendMessage("closeTab", { count: c.count }),
+  },
+  restoreTab: {
+    ...COMMAND_CATALOG.restoreTab,
+    run: (c) => sendMessage("restoreTab", { count: c.count }),
+  },
+  openClipboard: {
+    ...COMMAND_CATALOG.openClipboard,
+    run: () => openClipboardWith("navigate"),
+  },
   openClipboardBackground: {
     ...COMMAND_CATALOG.openClipboardBackground,
     run: () => openClipboardWith("openInBackgroundTab"),
   },
-  previousTab: { ...COMMAND_CATALOG.previousTab, run: (c) => sendMessage("previousTab", { count: c.count }) },
-  nextTab: { ...COMMAND_CATALOG.nextTab, run: (c) => sendMessage("nextTab", { count: c.count }) },
-  goToFirstTab: { ...COMMAND_CATALOG.goToFirstTab, run: () => sendMessage("goToFirstTab") },
-  goToLastTab: { ...COMMAND_CATALOG.goToLastTab, run: () => sendMessage("goToLastTab") },
+  previousTab: {
+    ...COMMAND_CATALOG.previousTab,
+    run: (c) => sendMessage("previousTab", { count: c.count }),
+  },
+  nextTab: {
+    ...COMMAND_CATALOG.nextTab,
+    run: (c) => sendMessage("nextTab", { count: c.count }),
+  },
+  goToFirstTab: {
+    ...COMMAND_CATALOG.goToFirstTab,
+    run: () => sendMessage("goToFirstTab"),
+  },
+  goToLastTab: {
+    ...COMMAND_CATALOG.goToLastTab,
+    run: () => sendMessage("goToLastTab"),
+  },
   moveTabToWindow: {
     ...COMMAND_CATALOG.moveTabToWindow,
     run: async () => {
@@ -340,14 +420,38 @@ export const commands: Record<string, CommandImpl> = {
       else ui.toast("No window available");
     },
   },
-  moveTabLeft: { ...COMMAND_CATALOG.moveTabLeft, run: () => sendMessage("moveTabLeft") },
-  moveTabRight: { ...COMMAND_CATALOG.moveTabRight, run: () => sendMessage("moveTabRight") },
-  openTabManager: { ...COMMAND_CATALOG.openTabManager, run: () => TabManager.open() },
-  openOmnibar: { ...COMMAND_CATALOG.openOmnibar, run: () => Prompt.openOmnibar() },
-  openOmnibarIncognito: { ...COMMAND_CATALOG.openOmnibarIncognito, run: () => Prompt.openIncognito() },
-  reloadTab: { ...COMMAND_CATALOG.reloadTab, run: () => sendMessage("reloadTab", { bypassCache: false }) },
-  forceReload: { ...COMMAND_CATALOG.forceReload, run: () => sendMessage("reloadTab", { bypassCache: true }) },
-  goToParent: { ...COMMAND_CATALOG.goToParent, run: () => goTo(Url.parentUrlOf) },
+  moveTabLeft: {
+    ...COMMAND_CATALOG.moveTabLeft,
+    run: () => sendMessage("moveTabLeft"),
+  },
+  moveTabRight: {
+    ...COMMAND_CATALOG.moveTabRight,
+    run: () => sendMessage("moveTabRight"),
+  },
+  openTabManager: {
+    ...COMMAND_CATALOG.openTabManager,
+    run: () => TabManager.open(),
+  },
+  openOmnibar: {
+    ...COMMAND_CATALOG.openOmnibar,
+    run: () => Prompt.openOmnibar(),
+  },
+  openOmnibarIncognito: {
+    ...COMMAND_CATALOG.openOmnibarIncognito,
+    run: () => Prompt.openIncognito(),
+  },
+  reloadTab: {
+    ...COMMAND_CATALOG.reloadTab,
+    run: () => sendMessage("reloadTab", { bypassCache: false }),
+  },
+  forceReload: {
+    ...COMMAND_CATALOG.forceReload,
+    run: () => sendMessage("reloadTab", { bypassCache: true }),
+  },
+  goToParent: {
+    ...COMMAND_CATALOG.goToParent,
+    run: () => goTo(Url.parentUrlOf),
+  },
   goToRoot: { ...COMMAND_CATALOG.goToRoot, run: () => goTo(Url.rootUrlOf) },
   nextPage: { ...COMMAND_CATALOG.nextPage, run: () => goPage("next") },
   prevPage: { ...COMMAND_CATALOG.prevPage, run: () => goPage("prev") },
@@ -357,14 +461,23 @@ export const commands: Record<string, CommandImpl> = {
   },
 
   goBack: { ...COMMAND_CATALOG.goBack, run: () => sendMessage("goBack") },
-  goForward: { ...COMMAND_CATALOG.goForward, run: () => sendMessage("goForward") },
+  goForward: {
+    ...COMMAND_CATALOG.goForward,
+    run: () => sendMessage("goForward"),
+  },
   openHistoryTree: {
     ...COMMAND_CATALOG.openHistoryTree,
     run: () => HistoryTree.open(),
   },
 
-  copyUrl: { ...COMMAND_CATALOG.copyUrl, run: () => copyToClipboard(location.href, "Copied") },
-  copyTitleAndUrl: { ...COMMAND_CATALOG.copyTitleAndUrl, run: () => copyToClipboard(copyTitleAndUrlText(), "Copied") },
+  copyUrl: {
+    ...COMMAND_CATALOG.copyUrl,
+    run: () => copyToClipboard(location.href, "Copied"),
+  },
+  copyTitleAndUrl: {
+    ...COMMAND_CATALOG.copyTitleAndUrl,
+    run: () => copyToClipboard(copyTitleAndUrlText(), "Copied"),
+  },
   screenshotPage: cmd("screenshotPage", () => screenshotPage()),
   screenshotFullPage: cmd("screenshotFullPage", () => captureFullPage()),
   screenshotRegion: cmd("screenshotRegion", () => {
@@ -376,36 +489,68 @@ export const commands: Record<string, CommandImpl> = {
   }),
 
   toggleIgnore: { ...COMMAND_CATALOG.toggleIgnore, run: () => ignoreToggle() },
-  passthroughKeys: { ...COMMAND_CATALOG.passthroughKeys, run: () => passthroughEnter() },
-  toggleSiteEnabled: { ...COMMAND_CATALOG.toggleSiteEnabled, run: () => settings.toggleSiteEnabled() },
+  passthroughKeys: {
+    ...COMMAND_CATALOG.passthroughKeys,
+    run: () => passthroughEnter(),
+  },
+  toggleSiteEnabled: {
+    ...COMMAND_CATALOG.toggleSiteEnabled,
+    run: () => settings.toggleSiteEnabled(),
+  },
 
   hintClick: { ...COMMAND_CATALOG.hintClick, run: () => Hints.open("click") },
   hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
-  hintOpenBackground: { ...COMMAND_CATALOG.hintOpenBackground, run: () => Hints.open("openBackground") },
-  hintOpenCurrent: { ...COMMAND_CATALOG.hintOpenCurrent, run: () => Hints.open("openCurrent") },
+  hintOpenBackground: {
+    ...COMMAND_CATALOG.hintOpenBackground,
+    run: () => Hints.open("openBackground"),
+  },
+  hintOpenCurrent: {
+    ...COMMAND_CATALOG.hintOpenCurrent,
+    run: () => Hints.open("openCurrent"),
+  },
   hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
   hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
-  hintYankText: { ...COMMAND_CATALOG.hintYankText, run: () => Hints.open("yankText") },
+  hintYankText: {
+    ...COMMAND_CATALOG.hintYankText,
+    run: () => Hints.open("yankText"),
+  },
 
   findText: { ...COMMAND_CATALOG.findText, run: () => Find.open() },
-  findNext: { ...COMMAND_CATALOG.findNext, run: (c) => Find.next(c.count, false) },
-  findPrev: { ...COMMAND_CATALOG.findPrev, run: (c) => Find.next(c.count, true) },
+  findNext: {
+    ...COMMAND_CATALOG.findNext,
+    run: (c) => Find.next(c.count, false),
+  },
+  findPrev: {
+    ...COMMAND_CATALOG.findPrev,
+    run: (c) => Find.next(c.count, true),
+  },
 
-  enterVisual: { ...COMMAND_CATALOG.enterVisual, run: () => Visual.enter("visual") },
-  enterVisualLine: { ...COMMAND_CATALOG.enterVisualLine, run: () => Visual.enter("line") },
+  enterVisual: {
+    ...COMMAND_CATALOG.enterVisual,
+    run: () => Visual.enter("visual"),
+  },
+  enterVisualLine: {
+    ...COMMAND_CATALOG.enterVisualLine,
+    run: () => Visual.enter("line"),
+  },
 
   showHelp: { ...COMMAND_CATALOG.showHelp, run: () => Help.open() },
   showCommandPalette: {
     ...COMMAND_CATALOG.showCommandPalette,
     run: () => Palette.open(commands),
   },
-  openSettings: { ...COMMAND_CATALOG.openSettings, run: () => sendMessage("openSettings") },
+  openSettings: {
+    ...COMMAND_CATALOG.openSettings,
+    run: () => sendMessage("openSettings"),
+  },
   openExtensions: {
     ...COMMAND_CATALOG.openExtensions,
     run: async () => {
       const res = await sendMessage("openExtensions");
       if (res && res.ok) return;
-      ui.toast(isFirefox() ? addonsBlockedHint() : "Cannot open extensions page");
+      ui.toast(
+        isFirefox() ? addonsBlockedHint() : "Cannot open extensions page",
+      );
     },
   },
 };

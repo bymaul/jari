@@ -4,7 +4,10 @@ import { rankMatches } from "./rank.ts";
 import { settings } from "./settings.ts";
 import { sendMessage, createShadowHost, ui } from "./ui.ts";
 import { promptCss, renderText } from "./prompt/shared.ts";
-import { renderList as renderPromptList, move as movePrompt } from "./prompt/list.ts";
+import {
+  renderList as renderPromptList,
+  move as movePrompt,
+} from "./prompt/list.ts";
 export { promptCss, renderText };
 import { deepActiveElement } from "./keymap.ts";
 import { register, touch } from "./overlays.ts";
@@ -39,7 +42,10 @@ type PromptRow = {
 };
 
 function parseKeyword(query: string) {
-  return parseEngineKeyword(query, cachedEngines || settings.getSearchEngines());
+  return parseEngineKeyword(
+    query,
+    cachedEngines || settings.getSearchEngines(),
+  );
 }
 
 const CALC_CHARS = new RegExp("^[\\d\\s.%+*/()-]*$");
@@ -48,21 +54,28 @@ const HAS_OPERATOR = /[-+*/%]/;
 export function calcEval(expr: string): string | null {
   if (!CALC_CHARS.test(expr) || !HAS_OPERATOR.test(expr)) return null;
 
-  const tokens: { type: "num" | "op" | "lparen" | "rparen"; value: string }[] = [];
+  const tokens: { type: "num" | "op" | "lparen" | "rparen"; value: string }[] =
+    [];
   let i = 0;
   while (i < expr.length) {
     const ch = expr[i];
-    if (/\s/.test(ch)) { i++; continue; }
+    if (/\s/.test(ch)) {
+      i++;
+      continue;
+    }
     if (/[\d.]/.test(ch)) {
       let num = "";
       while (i < expr.length && /[\d.]/.test(expr[i])) num += expr[i++];
       tokens.push({ type: "num", value: num });
     } else if (/[-+*/%]/.test(ch)) {
-      tokens.push({ type: "op", value: ch }); i++;
+      tokens.push({ type: "op", value: ch });
+      i++;
     } else if (ch === "(") {
-      tokens.push({ type: "lparen", value: ch }); i++;
+      tokens.push({ type: "lparen", value: ch });
+      i++;
     } else if (ch === ")") {
-      tokens.push({ type: "rparen", value: ch }); i++;
+      tokens.push({ type: "rparen", value: ch });
+      i++;
     } else {
       return null;
     }
@@ -100,7 +113,12 @@ export function calcEval(expr: string): string | null {
     if (left === null) return null;
     while (true) {
       const t = peek();
-      if (!t || t.type !== "op" || (t.value !== "*" && t.value !== "/" && t.value !== "%")) break;
+      if (
+        !t ||
+        t.type !== "op" ||
+        (t.value !== "*" && t.value !== "/" && t.value !== "%")
+      )
+        break;
       advance();
       const right = parseFactor();
       if (right === null) return null;
@@ -127,11 +145,14 @@ export function calcEval(expr: string): string | null {
   };
 
   const result = parseExpr();
-  if (result === null || !Number.isFinite(result) || pos !== tokens.length) return null;
+  if (result === null || !Number.isFinite(result) || pos !== tokens.length)
+    return null;
   return String(result);
 }
 
-function parseExpression(text: string): { expr: string; result: string } | null {
+function parseExpression(
+  text: string,
+): { expr: string; result: string } | null {
   const expr = text.trim();
   const result = calcEval(expr);
   return result == null ? null : { expr, result };
@@ -223,7 +244,8 @@ function requestSuggestions(
         query: suggestQuery,
       })) as Suggestion[] | null) || [];
     if (!active || seq !== suggestSeq) return;
-    const items = mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
+    const items =
+      mode === "incognito" ? res.filter((it) => it.source !== "tab") : res;
     lastPool = items;
     onResults(items);
   }, 130);
@@ -286,7 +308,10 @@ function renderRanked(
     toSuggestionRow(item, match),
   );
   const max = settings.getMaxResults();
-  filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(0, max);
+  filtered = (tabQuery != null ? suggestions : [row, ...suggestions]).slice(
+    0,
+    max,
+  );
   selected = 0;
   renderList();
 }
@@ -350,7 +375,13 @@ function handleTabListAll(): void {
   selected = 0;
   renderList();
   sendMessage("listTabs").then((res) => {
-    if (!active || seq !== suggestSeq || !inputEl || !isTabListAll(inputEl.value)) return;
+    if (
+      !active ||
+      seq !== suggestSeq ||
+      !inputEl ||
+      !isTabListAll(inputEl.value)
+    )
+      return;
     tabUrlMap.clear();
     filtered = ((res || []) as TabSummary[])
       .map((item) => {
@@ -510,7 +541,9 @@ function activate(forceNewTab: boolean = false): void {
   const tabRest = inOmnibar ? parseTabPrefix(rawInput) : null;
   const effectiveInput = tabRest != null ? tabRest : rawInput;
   const kwInput = tabRest != null ? null : parseKeyword(effectiveInput);
-  const commitTerm = kwInput ? kwInput.rest : Url.suggestionTerm(effectiveInput);
+  const commitTerm = kwInput
+    ? kwInput.rest
+    : Url.suggestionTerm(effectiveInput);
   if (!item) {
     if (isTabListAll(rawValue)) {
       close();
@@ -540,9 +573,11 @@ function activate(forceNewTab: boolean = false): void {
       else if (kwInput && kwInput.url) openUrl(kwInput.url, forceNewTab);
       else searchQuery(commitTerm, forceNewTab);
     } else if (item.url) {
-      const match = mode === "edit" || forceNewTab
-        ? undefined
-        : tabUrlMap.get(item.url) || tabUrlMap.get(normalizeUrl(item.url) || "");
+      const match =
+        mode === "edit" || forceNewTab
+          ? undefined
+          : tabUrlMap.get(item.url) ||
+            tabUrlMap.get(normalizeUrl(item.url) || "");
       if (match && match.id) sendMessage("activateTab", { id: match.id });
       else openUrl(item.url, forceNewTab);
     }

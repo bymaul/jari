@@ -4,7 +4,10 @@ import * as Jari from "../content/keymap.ts";
 
 test("canonicalKey orders modifiers and keeps the bare key", () => {
   assert.equal(Jari.canonicalKey({ key: "g" }), "g");
-  assert.equal(Jari.canonicalKey({ key: "t", ctrlKey: true, altKey: true }), "ctrl+alt+t");
+  assert.equal(
+    Jari.canonicalKey({ key: "t", ctrlKey: true, altKey: true }),
+    "ctrl+alt+t",
+  );
   assert.equal(Jari.canonicalKey({ key: "G", metaKey: true }), "meta+G");
 });
 
@@ -17,7 +20,11 @@ test("parseRepeatCount clamps counts to at least 1", () => {
 });
 
 test("normalizeSettings treats a stored keymap as authoritative and drops invalid values", () => {
-  const s = Jari.normalizeSettings({ scrollStep: 100, smoothScroll: true, keymap: { j: "scrollToTop" } });
+  const s = Jari.normalizeSettings({
+    scrollStep: 100,
+    smoothScroll: true,
+    keymap: { j: "scrollToTop" },
+  });
   assert.equal(s.scrollStep, 100);
   assert.equal(s.smoothScroll, true);
   assert.equal(s.keymap.j, "scrollToTop");
@@ -26,7 +33,11 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
   assert.deepEqual(s.suggestionSources, ["tab", "history", "bookmark"]);
   assert.equal(s.copyFormat, "plain");
 
-  const bad = Jari.normalizeSettings({ scrollStep: "x", timeoutMs: -1, disabledSites: "x" });
+  const bad = Jari.normalizeSettings({
+    scrollStep: "x",
+    timeoutMs: -1,
+    disabledSites: "x",
+  });
   assert.equal(bad.scrollStep, 120);
   assert.equal(bad.timeoutMs, Jari.settingsDefaults.timeoutMs);
   assert.deepEqual(bad.disabledSites, []);
@@ -38,7 +49,10 @@ test("normalizeSettings allows a zero timeout to disable the expiry", () => {
 });
 
 test("migrateV12Bindings lands w for cycling without clobbering customs", () => {
-  assert.deepEqual(Jari.migrateV12Bindings({ x: "closeTab" }).w, "cycleScrollFrame");
+  assert.deepEqual(
+    Jari.migrateV12Bindings({ x: "closeTab" }).w,
+    "cycleScrollFrame",
+  );
   assert.deepEqual(
     Jari.migrateV12Bindings({ w: "moveTabToWindow" }).w,
     "moveTabToWindow",
@@ -48,19 +62,25 @@ test("migrateV12Bindings lands w for cycling without clobbering customs", () => 
     Jari.migrateV12Bindings({ "]w": "cycleScrollFrame", x: "closeTab" }),
     { x: "closeTab", w: "cycleScrollFrame" },
   );
-  assert.equal(
-    Jari.migrateV12Bindings({ "]w": "nextPage" })["]w"],
-    "nextPage",
-  );
-  const s = Jari.normalizeSettings({ schemaVersion: 10, keymap: { "[w": "cycleScrollFrameBack" } });
+  assert.equal(Jari.migrateV12Bindings({ "]w": "nextPage" })["]w"], "nextPage");
+  const s = Jari.normalizeSettings({
+    schemaVersion: 10,
+    keymap: { "[w": "cycleScrollFrameBack" },
+  });
   assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.equal(s.keymap.w, "cycleScrollFrame");
   assert.equal(s.keymap["[w"], undefined);
 });
 
 test("migrateV13Bindings lands gh for the history tree without clobbering customs", () => {
-  assert.deepEqual(Jari.migrateV13Bindings({ x: "closeTab" }).gh, "openHistoryTree");
-  assert.deepEqual(Jari.migrateV13Bindings({ gh: "toggleIgnore" }).gh, "toggleIgnore");
+  assert.deepEqual(
+    Jari.migrateV13Bindings({ x: "closeTab" }).gh,
+    "openHistoryTree",
+  );
+  assert.deepEqual(
+    Jari.migrateV13Bindings({ gh: "toggleIgnore" }).gh,
+    "toggleIgnore",
+  );
   assert.ok(!("gh" in Jari.migrateV13Bindings({ ghi: "closeTab" })));
   assert.ok(!("U" in Jari.keymapDefaults));
   const s = Jari.normalizeSettings({
@@ -73,16 +93,25 @@ test("migrateV13Bindings lands gh for the history tree without clobbering custom
 });
 
 test("migrateHintCharset moves only the old default charset", () => {
-  assert.equal(Jari.migrateHintCharset("sadjklewcmpgh"), Jari.HINT_CHARSET_DEFAULT);
+  assert.equal(
+    Jari.migrateHintCharset("sadjklewcmpgh"),
+    Jari.HINT_CHARSET_DEFAULT,
+  );
   assert.equal(Jari.migrateHintCharset("abc"), "abc");
   assert.equal(Jari.migrateHintCharset(undefined), undefined);
 });
 
 test("normalizeSettings migrates stored v10 data to the new hint charset", () => {
-  const s = Jari.normalizeSettings({ schemaVersion: 10, hintChars: "sadjklewcmpgh" });
+  const s = Jari.normalizeSettings({
+    schemaVersion: 10,
+    hintChars: "sadjklewcmpgh",
+  });
   assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.equal(s.hintChars, Jari.HINT_CHARSET_DEFAULT);
-  const custom = Jari.normalizeSettings({ schemaVersion: 10, hintChars: "abc" });
+  const custom = Jari.normalizeSettings({
+    schemaVersion: 10,
+    hintChars: "abc",
+  });
   assert.equal(custom.hintChars, "abc");
 });
 
@@ -130,10 +159,19 @@ test("findBindingConflict reports only bindings owned by another command", () =>
 });
 
 test("normalizeSettings stamps the schema version and migrates v0 data", () => {
-  assert.equal(Jari.normalizeSettings({}).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(
+    Jari.normalizeSettings({}).schemaVersion,
+    Jari.SETTINGS_SCHEMA_VERSION,
+  );
   const migrated = Jari.normalizeSettings({ keymap: { j: "scrollDown" } });
   assert.equal(migrated.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
   assert.equal(migrated.keymap.j, "scrollDown");
-  assert.deepEqual(Jari.migrateSettings(null).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
-  assert.equal(Jari.migrateSettings({ schemaVersion: 1 }).schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.deepEqual(
+    Jari.migrateSettings(null).schemaVersion,
+    Jari.SETTINGS_SCHEMA_VERSION,
+  );
+  assert.equal(
+    Jari.migrateSettings({ schemaVersion: 1 }).schemaVersion,
+    Jari.SETTINGS_SCHEMA_VERSION,
+  );
 });

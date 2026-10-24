@@ -20,7 +20,66 @@ export const blockedUrlSchemes = new Set([
 import { knownTlds } from "./tlds.ts";
 
 const fileExtensionDenylist = new Set([
-  "js","ts","jsx","tsx","mjs","cjs","json","css","scss","less","html","htm","md","markdown","txt","csv","xml","yaml","yml","toml","ini","conf","config","sh","bash","zsh","fish","py","rb","php","java","c","cpp","h","hpp","cs","go","rs","swift","kt","kts","dart","vue","svelte","astro","lua","pl","pm","r","sql","db","sqlite","log","lock","env","gitignore","dockerignore","gradle","makefile","cmake",
+  "js",
+  "ts",
+  "jsx",
+  "tsx",
+  "mjs",
+  "cjs",
+  "json",
+  "css",
+  "scss",
+  "less",
+  "html",
+  "htm",
+  "md",
+  "markdown",
+  "txt",
+  "csv",
+  "xml",
+  "yaml",
+  "yml",
+  "toml",
+  "ini",
+  "conf",
+  "config",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "py",
+  "rb",
+  "php",
+  "java",
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "cs",
+  "go",
+  "rs",
+  "swift",
+  "kt",
+  "kts",
+  "dart",
+  "vue",
+  "svelte",
+  "astro",
+  "lua",
+  "pl",
+  "pm",
+  "r",
+  "sql",
+  "db",
+  "sqlite",
+  "log",
+  "lock",
+  "env",
+  "gitignore",
+  "dockerignore",
+  "gradle",
+  "makefile",
+  "cmake",
 ]);
 
 function isValidHostname(host: string): boolean {
@@ -29,7 +88,7 @@ function isValidHostname(host: string): boolean {
   if (lower.startsWith("[") && lower.endsWith("]")) lower = lower.slice(1, -1);
   if (lower === "localhost") return true;
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(lower)) {
-    return lower.split(".").every(o => {
+    return lower.split(".").every((o) => {
       const n = parseInt(o, 10);
       return n >= 0 && n <= 255 && String(n) === o;
     });
@@ -38,7 +97,9 @@ function isValidHostname(host: string): boolean {
     try {
       if (typeof URL !== "undefined") new URL(`http://[${lower}]/`);
       return true;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
   const labels = lower.split(".");
   if (labels.length < 2) return false;
@@ -82,7 +143,9 @@ export function normalizeUrl(raw: unknown): string | null {
       const u = new URL("https:" + url);
       if (!isBareNavigableHostname(u.hostname)) return null;
       return "https:" + url;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
   const m = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
   if (!m) {
@@ -91,11 +154,20 @@ export function normalizeUrl(raw: unknown): string | null {
     const hostPort = url.split(/[/?#]/)[0];
     if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return null;
     const bareTld = hostPart.toLowerCase().split(".").pop()!;
-    if (!url.includes("/") && !url.includes(":") && !url.includes("?") && !url.includes("#") && fileExtensionDenylist.has(bareTld)) return null;
+    if (
+      !url.includes("/") &&
+      !url.includes(":") &&
+      !url.includes("?") &&
+      !url.includes("#") &&
+      fileExtensionDenylist.has(bareTld)
+    )
+      return null;
     try {
       const u = new URL("https://" + url);
       if (!isBareNavigableHostname(u.hostname)) return null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
     return "https://" + url;
   }
   const scheme = m[1].toLowerCase();
@@ -104,7 +176,9 @@ export function normalizeUrl(raw: unknown): string | null {
       try {
         const u = new URL(url);
         if (u.hostname && !isValidHostname(u.hostname)) return null;
-      } catch { return null; }
+      } catch {
+        return null;
+      }
     }
     return url;
   }
@@ -116,7 +190,9 @@ export function normalizeUrl(raw: unknown): string | null {
     try {
       const u = new URL("https://" + url);
       if (!isBareNavigableHostname(u.hostname)) return null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
     return "https://" + url;
   }
   return null;
@@ -175,10 +251,18 @@ export const Url = {
         }
         const host = u.hostname;
         if (!host) return false;
-        if (host === "localhost" || /^127\.0\.0\.1$/.test(host) || /^0\.0\.0\.0$/.test(host)) return true;
-        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return isBareNavigableHostname(host);
+        if (
+          host === "localhost" ||
+          /^127\.0\.0\.1$/.test(host) ||
+          /^0\.0\.0\.0$/.test(host)
+        )
+          return true;
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host))
+          return isBareNavigableHostname(host);
         return isBareNavigableHostname(host);
-      } catch { return false; }
+      } catch {
+        return false;
+      }
     }
     if (s.startsWith("//")) {
       const section = s.slice(2).split(/[/?#]/)[0];
@@ -186,7 +270,9 @@ export const Url = {
       try {
         const u = new URL("https:" + s);
         return isBareNavigableHostname(u.hostname);
-      } catch { return false; }
+      } catch {
+        return false;
+      }
     }
     const noslash = s.match(/^([a-z][a-z0-9+.-]*):/i);
     if (noslash) {
@@ -202,11 +288,20 @@ export const Url = {
     const hostPort = s.split(/[/?#]/)[0];
     if (hostPort.includes(":") && !/:\d+$/.test(hostPort)) return false;
     const tld = hostPart.toLowerCase().split(".").pop()!;
-    if (!s.includes("/") && !s.includes(":") && !s.includes("?") && !s.includes("#") && fileExtensionDenylist.has(tld)) return false;
+    if (
+      !s.includes("/") &&
+      !s.includes(":") &&
+      !s.includes("?") &&
+      !s.includes("#") &&
+      fileExtensionDenylist.has(tld)
+    )
+      return false;
     try {
       const u = new URL("https://" + s);
       return isBareNavigableHostname(u.hostname);
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   },
 
   suggestionTerm(query: string): string {
@@ -248,7 +343,11 @@ export function normalizeSitePattern(raw: unknown): string {
   return normalizeHost(pattern);
 }
 
-export function matchesSitePattern(hostname: string, pattern: string, protocol = ""): boolean {
+export function matchesSitePattern(
+  hostname: string,
+  pattern: string,
+  protocol = "",
+): boolean {
   if (!pattern) return false;
   const host = (hostname || "").toLowerCase();
   if (pattern === "file://") return protocol === "file:";

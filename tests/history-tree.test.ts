@@ -50,7 +50,10 @@ function shape(rows: ReturnType<typeof linearizeTab>["rows"]) {
 
 test("first commit creates a root and points the tree at it", () => {
   const store = emptyStore();
-  assert.equal(applyCommit(store, commitEvent("https://a.example/a", { title: "A" }), 100), true);
+  assert.equal(
+    applyCommit(store, commitEvent("https://a.example/a", { title: "A" }), 100),
+    true,
+  );
   const tree = store.tabs.get(1)!;
   assert.equal(store.seq, 1);
   assert.ok(tree.current !== null);
@@ -82,7 +85,11 @@ test("repeated exact-URL commits refresh instead of branching", () => {
 test("reloads refresh the current page without adding nodes", () => {
   const store = emptyStore();
   applyCommit(store, commitEvent("https://a.example/a"), 100);
-  applyCommit(store, commitEvent("https://a.example/a", { isReload: true }), 150);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isReload: true }),
+    150,
+  );
   assert.equal(store.tabs.get(1)!.nodes.size, 1);
   assert.equal(linearizeTab(store.tabs.get(1)!).rows[0].ts, 150);
 });
@@ -108,7 +115,11 @@ test("an outbound visit from an older state branches instead of rewiring", () =>
   const store = emptyStore();
   applyCommit(store, commitEvent("https://a.example/a", { title: "A" }), 100);
   applyCommit(store, commitEvent("https://b.example/b", { title: "B" }), 200);
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 300);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    300,
+  );
   applyCommit(store, commitEvent("https://c.example/c", { title: "C" }), 400);
   const tree = store.tabs.get(1)!;
   assert.equal(tree.nodes.size, 3);
@@ -125,8 +136,16 @@ test("traversal back then forward moves the pointer over existing nodes", () => 
   const store = emptyStore();
   applyCommit(store, commitEvent("https://a.example/a"), 100);
   applyCommit(store, commitEvent("https://b.example/b"), 200);
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 300);
-  applyCommit(store, commitEvent("https://b.example/b", { isHistoryTraversal: true }), 400);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    300,
+  );
+  applyCommit(
+    store,
+    commitEvent("https://b.example/b", { isHistoryTraversal: true }),
+    400,
+  );
   const tree = store.tabs.get(1)!;
   assert.equal(tree.nodes.size, 2);
   assert.equal(linearizeTab(tree).currentId, 2);
@@ -135,10 +154,18 @@ test("traversal back then forward moves the pointer over existing nodes", () => 
 test("traversals without an adjacent match degrade into plain visits", () => {
   const store = emptyStore();
   applyCommit(store, commitEvent("https://a.example/a"), 100);
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 200);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    200,
+  );
   assert.equal(store.tabs.get(1)!.nodes.size, 1);
   assert.equal(linearizeTab(store.tabs.get(1)!).currentId, 1);
-  applyCommit(store, commitEvent("https://uni.example/u", { isHistoryTraversal: true }), 300);
+  applyCommit(
+    store,
+    commitEvent("https://uni.example/u", { isHistoryTraversal: true }),
+    300,
+  );
   assert.equal(store.tabs.get(1)!.nodes.size, 2);
 });
 
@@ -146,9 +173,17 @@ test("linearization lays out glyphs for nested branches", () => {
   const store = emptyStore();
   applyCommit(store, commitEvent("https://a.example/a", { title: "A" }), 100);
   applyCommit(store, commitEvent("https://b.example/b", { title: "B" }), 200);
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 300);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    300,
+  );
   applyCommit(store, commitEvent("https://e.example/e", { title: "E" }), 400);
-  applyCommit(store, commitEvent("https://b.example/b", { isHistoryTraversal: true }), 500);
+  applyCommit(
+    store,
+    commitEvent("https://b.example/b", { isHistoryTraversal: true }),
+    500,
+  );
   applyCommit(store, commitEvent("https://d.example/d", { title: "D" }), 600);
   const { rows, currentId } = linearizeTab(store.tabs.get(1)!);
   assert.deepEqual(shape(rows), [
@@ -202,10 +237,18 @@ test("pruning keeps the pointer path and trims the oldest leaves", () => {
   const store = emptyStore();
   applyCommit(store, commitEvent("https://a.example/a"), 100);
   applyCommit(store, commitEvent("https://b1.example/b"), 200);
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 300);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    300,
+  );
   applyCommit(store, commitEvent("https://b2.example/b"), 400);
   applyCommit(store, commitEvent("https://c.example/c"), 500);
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 600);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    600,
+  );
   applyCommit(store, commitEvent("https://b3.example/b"), 700);
   const tree = store.tabs.get(1)!;
   assert.equal(tree.current, 5);
@@ -244,7 +287,11 @@ test("the spine tracks the native chain: pushes truncate, traversals re-anchor",
   assert.deepEqual(tree.spine, [1, 2, 3]);
   assert.equal(tree.spineAt, 2);
 
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 400);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    400,
+  );
   assert.equal(tree.spineAt, 0);
   assert.deepEqual(tree.spine, [1, 2, 3]);
 
@@ -252,16 +299,23 @@ test("the spine tracks the native chain: pushes truncate, traversals re-anchor",
   assert.deepEqual(tree.spine, [1, 4]);
   assert.equal(tree.spineAt, 1);
 
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 600);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    600,
+  );
   assert.equal(tree.spineAt, 0);
 
   assert.equal(tree.nodes.size, 4);
-  assert.deepEqual(linearizeTab(tree).rows.map((row) => row.url), [
-    "https://a.example/a",
-    "https://b.example/b",
-    "https://c.example/c",
-    "https://e.example/e",
-  ]);
+  assert.deepEqual(
+    linearizeTab(tree).rows.map((row) => row.url),
+    [
+      "https://a.example/a",
+      "https://b.example/b",
+      "https://c.example/c",
+      "https://e.example/e",
+    ],
+  );
 });
 
 test("pruning compacts the native spine and re-anchors it", () => {
@@ -270,7 +324,11 @@ test("pruning compacts the native spine and re-anchors it", () => {
   applyCommit(store, commitEvent("https://b.example/b"), 200);
   applyCommit(store, commitEvent("https://c.example/c"), 300);
   const tree = store.tabs.get(1)!;
-  applyCommit(store, commitEvent("https://b.example/b", { isHistoryTraversal: true }), 400);
+  applyCommit(
+    store,
+    commitEvent("https://b.example/b", { isHistoryTraversal: true }),
+    400,
+  );
   assert.equal(tree.spineAt, 1);
   pruneTab(tree, 2);
   assert.equal(tree.nodes.has(3), false);
@@ -292,7 +350,11 @@ test("serialization round-trips trees and pending markers", () => {
   const store = emptyStore();
   applyCommit(store, commitEvent("https://a.example/a", { title: "A" }), 100);
   applyCommit(store, commitEvent("https://b.example/b"), 200);
-  applyCommit(store, commitEvent("https://a.example/a", { isHistoryTraversal: true }), 300);
+  applyCommit(
+    store,
+    commitEvent("https://a.example/a", { isHistoryTraversal: true }),
+    300,
+  );
   applyCommit(store, commitEvent("https://e.example/e"), 400);
   markGoto(store, 1, 2, 350);
 
@@ -323,7 +385,13 @@ test("deserialization rejects foreign payload shapes", () => {
           {
             current: 3,
             nodes: [
-              { id: 1, url: "https://a.example/", title: "", ts: 1, parent: null },
+              {
+                id: 1,
+                url: "https://a.example/",
+                title: "",
+                ts: 1,
+                parent: null,
+              },
               { id: 2, url: "https://b.example/", title: "", ts: 2, parent: 1 },
             ],
           },
@@ -339,7 +407,18 @@ test("deserialization rejects foreign payload shapes", () => {
       tabs: [
         [
           1,
-          { current: 1, nodes: [{ id: 1, url: "https://a.example/", title: "A", ts: 1, parent: null }] },
+          {
+            current: 1,
+            nodes: [
+              {
+                id: 1,
+                url: "https://a.example/",
+                title: "A",
+                ts: 1,
+                parent: null,
+              },
+            ],
+          },
         ],
       ],
     })!.tabs.get(1)!.current,
@@ -363,7 +442,9 @@ test("historyTreeList serializes the tab's own tree", async () => {
   stubIdb(serializeStore(store));
   const res = await handlers.historyTreeList(senderTab(1));
   assert.equal((res as { ok?: boolean }).ok, true);
-  const rows = (res as unknown as { rows: Array<{ url: string; depth: number }> }).rows;
+  const rows = (
+    res as unknown as { rows: Array<{ url: string; depth: number }> }
+  ).rows;
   assert.deepEqual(
     rows.map((row) => row.url),
     ["https://a.example/a", "https://b.example/b"],
@@ -372,12 +453,14 @@ test("historyTreeList serializes the tab's own tree", async () => {
   assert.equal(rows[1].depth, 1);
 });
 
-function commitRequest(
-  tabId: number,
-  url: string,
-  qualifiers: string[] = [],
-) {
-  return { frameId: 0, tabId, url, transitionType: "link", transitionQualifiers: qualifiers };
+function commitRequest(tabId: number, url: string, qualifiers: string[] = []) {
+  return {
+    frameId: 0,
+    tabId,
+    url,
+    transitionType: "link",
+    transitionQualifiers: qualifiers,
+  };
 }
 
 function stubRecorderTabs(updates: unknown[]): void {

@@ -7,33 +7,66 @@ export interface CommandDef {
 }
 
 export const COMMAND_CATALOG = {
-
   scrollDown: { category: "scrolling", label: "Scroll down", repeatable: true },
   scrollUp: { category: "scrolling", label: "Scroll up", repeatable: true },
   scrollLeft: { category: "scrolling", label: "Scroll left", repeatable: true },
-  scrollRight: { category: "scrolling", label: "Scroll right", repeatable: true },
+  scrollRight: {
+    category: "scrolling",
+    label: "Scroll right",
+    repeatable: true,
+  },
   scrollToTop: { category: "scrolling", label: "Scroll to top" },
   scrollToBottom: { category: "scrolling", label: "Scroll to bottom" },
-  scrollPageDown: { category: "scrolling", label: "Scroll page down", repeatable: true },
-  scrollPageUp: { category: "scrolling", label: "Scroll page up", repeatable: true },
-  scrollHalfPageDown: { category: "scrolling", label: "Scroll half page down", repeatable: true },
-  scrollHalfPageUp: { category: "scrolling", label: "Scroll half page up", repeatable: true },
-  cycleScrollFrame: { category: "scrolling", label: "Cycle scroll area / frame", repeatable: true },
+  scrollPageDown: {
+    category: "scrolling",
+    label: "Scroll page down",
+    repeatable: true,
+  },
+  scrollPageUp: {
+    category: "scrolling",
+    label: "Scroll page up",
+    repeatable: true,
+  },
+  scrollHalfPageDown: {
+    category: "scrolling",
+    label: "Scroll half page down",
+    repeatable: true,
+  },
+  scrollHalfPageUp: {
+    category: "scrolling",
+    label: "Scroll half page up",
+    repeatable: true,
+  },
+  cycleScrollFrame: {
+    category: "scrolling",
+    label: "Cycle scroll area / frame",
+    repeatable: true,
+  },
   resetScrollTarget: { category: "scrolling", label: "Reset scroll area" },
 
   zoomIn: { category: "zoom", label: "Zoom in" },
   zoomOut: { category: "zoom", label: "Zoom out" },
 
   closeTab: { category: "tabs", label: "Close tab", repeatable: true },
-  restoreTab: { category: "tabs", label: "Reopen closed tab", repeatable: true },
+  restoreTab: {
+    category: "tabs",
+    label: "Reopen closed tab",
+    repeatable: true,
+  },
   previousTab: { category: "tabs", label: "Previous tab", repeatable: true },
   nextTab: { category: "tabs", label: "Next tab", repeatable: true },
   goToFirstTab: { category: "tabs", label: "Go to first tab" },
   goToLastTab: { category: "tabs", label: "Go to last tab" },
   openOmnibar: { category: "tabs", label: "Open URL or search" },
-  openOmnibarIncognito: { category: "tabs", label: "Open URL or search in incognito" },
+  openOmnibarIncognito: {
+    category: "tabs",
+    label: "Open URL or search in incognito",
+  },
   openClipboard: { category: "tabs", label: "Open clipboard URL in this tab" },
-  openClipboardBackground: { category: "tabs", label: "Open clipboard URL in background tab" },
+  openClipboardBackground: {
+    category: "tabs",
+    label: "Open clipboard URL in background tab",
+  },
   moveTabLeft: { category: "tabs", label: "Move tab left" },
   moveTabRight: { category: "tabs", label: "Move tab right" },
   moveTabToWindow: { category: "tabs", label: "Move tab to another window" },
@@ -53,16 +86,28 @@ export const COMMAND_CATALOG = {
   copyUrl: { category: "page", label: "Copy page URL" },
   copyTitleAndUrl: { category: "page", label: "Copy title + URL" },
   screenshotPage: { category: "page", label: "Screenshot page (PNG download)" },
-  screenshotRegion: { category: "page", label: "Screenshot region (crop to marks)" },
-  screenshotFullPage: { category: "page", label: "Screenshot full page (scroll and stitch)" },
+  screenshotRegion: {
+    category: "page",
+    label: "Screenshot region (crop to marks)",
+  },
+  screenshotFullPage: {
+    category: "page",
+    label: "Screenshot full page (scroll and stitch)",
+  },
 
   toggleIgnore: { category: "modes", label: "Ignore mode" },
   passthroughKeys: { category: "modes", label: "Passthrough keys (timed)" },
-  toggleSiteEnabled: { category: "modes", label: "Enable / disable on this site" },
+  toggleSiteEnabled: {
+    category: "modes",
+    label: "Enable / disable on this site",
+  },
 
   hintClick: { category: "hints", label: "Click link" },
   hintOpen: { category: "hints", label: "Open link in new tab" },
-  hintOpenBackground: { category: "hints", label: "Open link in background tab" },
+  hintOpenBackground: {
+    category: "hints",
+    label: "Open link in background tab",
+  },
   hintOpenCurrent: { category: "hints", label: "Open link in this tab" },
   hintInput: { category: "hints", label: "Focus input" },
   hintYank: { category: "hints", label: "Copy link URL" },

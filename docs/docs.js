@@ -19,9 +19,17 @@
   var promptIdx = 0;
   var ENGINES = [
     { k: "g", name: "Google", url: "https://www.google.com/search?q=" },
-    { k: "yt", name: "YouTube", url: "https://www.youtube.com/results?search_query=" },
+    {
+      k: "yt",
+      name: "YouTube",
+      url: "https://www.youtube.com/results?search_query=",
+    },
     { k: "gh", name: "GitHub", url: "https://github.com/search?q=" },
-    { k: "wiki", name: "Wikipedia", url: "https://en.wikipedia.org/wiki/Special:Search?search=" },
+    {
+      k: "wiki",
+      name: "Wikipedia",
+      url: "https://en.wikipedia.org/wiki/Special:Search?search=",
+    },
     { k: "r", name: "Reddit", url: "https://www.reddit.com/search/?q=" },
   ];
 
@@ -121,7 +129,9 @@
   }
 
   function genLabels(count, charset) {
-    var chars = String(charset || CHARSET).toUpperCase().split("");
+    var chars = String(charset || CHARSET)
+      .toUpperCase()
+      .split("");
     if (count <= 0 || chars.length < 2) return [];
     if (count <= chars.length) return chars.slice(0, count);
     var labels = chars.slice();
@@ -140,7 +150,9 @@
   }
 
   function visibleTargets() {
-    var nodes = document.querySelectorAll("header a[href], nav a[href], article a[href], article button, footer a[href]");
+    var nodes = document.querySelectorAll(
+      "header a[href], nav a[href], article a[href], article button, footer a[href]",
+    );
     var out = [];
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
@@ -191,7 +203,12 @@
       hintsEl.appendChild(div);
       items.push({ el: div, target: targets[i], label: labels[i] });
     }
-    hintState = { items: items, typed: "", newTab: newTab, background: background };
+    hintState = {
+      items: items,
+      typed: "",
+      newTab: newTab,
+      background: background,
+    };
     mode = "hints";
     setPill();
   }
@@ -389,7 +406,10 @@
     findState.hidden = hidden;
     if (hidden) {
       for (var i = 0; i < findState.marks.length; i++) {
-        findState.marks[i].classList.remove("demo-find-hit", "demo-find-current");
+        findState.marks[i].classList.remove(
+          "demo-find-hit",
+          "demo-find-current",
+        );
       }
     } else {
       paintCurrent();
@@ -469,7 +489,9 @@
   }
 
   function collectPromptEntries() {
-    var nodes = document.querySelectorAll("header a[href], nav a[href], article a[href], footer a[href]");
+    var nodes = document.querySelectorAll(
+      "header a[href], nav a[href], article a[href], footer a[href]",
+    );
     var seen = {};
     var out = [];
     for (var i = 0; i < nodes.length; i++) {
@@ -536,14 +558,16 @@
     while (true) {
       var at = hay.indexOf(needle, from);
       if (at === -1) break;
-      if (at > from) parent.appendChild(document.createTextNode(text.slice(from, at)));
+      if (at > from)
+        parent.appendChild(document.createTextNode(text.slice(from, at)));
       var m = document.createElement("span");
       m.className = "jari-match";
       m.textContent = text.slice(at, at + needle.length);
       parent.appendChild(m);
       from = at + Math.max(1, needle.length);
     }
-    if (from < text.length) parent.appendChild(document.createTextNode(text.slice(from)));
+    if (from < text.length)
+      parent.appendChild(document.createTextNode(text.slice(from)));
   }
 
   function filterPrompt() {
@@ -552,14 +576,22 @@
     var eng = engineFor(promptInput.value);
     if (eng && eng.query) {
       promptFiltered.push({
-        title: "Search " + eng.engine.k + " for \"" + eng.query + "\"",
+        title: "Search " + eng.engine.k + ' for "' + eng.query + '"',
         url: eng.engine.url + encodeURIComponent(eng.query),
         engine: true,
       });
     }
-    for (var i = 0; i < promptEntries.length && promptFiltered.length < 50; i++) {
+    for (
+      var i = 0;
+      i < promptEntries.length && promptFiltered.length < 50;
+      i++
+    ) {
       var e = promptEntries[i];
-      if (!needle || e.title.toLowerCase().indexOf(needle) !== -1 || e.url.toLowerCase().indexOf(needle) !== -1) {
+      if (
+        !needle ||
+        e.title.toLowerCase().indexOf(needle) !== -1 ||
+        e.url.toLowerCase().indexOf(needle) !== -1
+      ) {
         promptFiltered.push(e);
       }
     }
@@ -700,8 +732,10 @@
       var next = document.createRange();
       next.setStart(r.startContainer, r.startOffset);
       next.setEnd(r.endContainer, r.endOffset);
-      if (dir === "l" || dir === "j") next.setEnd(next.endContainer, next.endOffset + 1);
-      else next.setStart(next.startContainer, Math.max(0, next.startOffset - 1));
+      if (dir === "l" || dir === "j")
+        next.setEnd(next.endContainer, next.endOffset + 1);
+      else
+        next.setStart(next.startContainer, Math.max(0, next.startOffset - 1));
       sel.removeAllRanges();
       sel.addRange(next);
       drawCaret();
@@ -753,8 +787,10 @@
       else if (key === "k") window.scrollBy(0, -LINE_PX * c);
       else if (key === "h") window.scrollBy(-LINE_PX * c, 0);
       else if (key === "l") window.scrollBy(LINE_PX * c, 0);
-      else if (key === "d") window.scrollBy(0, Math.round(window.innerHeight / 2) * c);
-      else if (key === "u") window.scrollBy(0, -Math.round(window.innerHeight / 2) * c);
+      else if (key === "d")
+        window.scrollBy(0, Math.round(window.innerHeight / 2) * c);
+      else if (key === "u")
+        window.scrollBy(0, -Math.round(window.innerHeight / 2) * c);
       else if (key === "gg") window.scrollTo(0, 0);
       else if (key === "G") window.scrollTo(0, document.body.scrollHeight);
     } catch {
@@ -854,7 +890,8 @@
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (promptFiltered.length > 0) {
-        promptIdx = (promptIdx - 1 + promptFiltered.length) % promptFiltered.length;
+        promptIdx =
+          (promptIdx - 1 + promptFiltered.length) % promptFiltered.length;
         renderPromptList();
       }
     }
@@ -862,11 +899,15 @@
 
   promptList.addEventListener("click", function (e) {
     var li = e.target && e.target.closest ? e.target.closest("li") : null;
-    if (li && li.dataset.idx !== undefined) followPrompt(Number(li.dataset.idx), false);
+    if (li && li.dataset.idx !== undefined)
+      followPrompt(Number(li.dataset.idx), false);
   });
 
   article.addEventListener("click", function (e) {
-    var b = e.target && e.target.closest ? e.target.closest("button[data-toast]") : null;
+    var b =
+      e.target && e.target.closest
+        ? e.target.closest("button[data-toast]")
+        : null;
     if (b) toast(b.getAttribute("data-toast") || "Done");
   });
 
@@ -910,7 +951,12 @@
       } else if (e.key === "y") {
         e.preventDefault();
         yankVisual();
-      } else if (e.key === "h" || e.key === "j" || e.key === "k" || e.key === "l") {
+      } else if (
+        e.key === "h" ||
+        e.key === "j" ||
+        e.key === "k" ||
+        e.key === "l"
+      ) {
         e.preventDefault();
         moveVisual(e.key);
       } else if (e.key === "?") {
@@ -923,7 +969,8 @@
     if (pendingG) {
       pendingG = false;
       countBuf = "";
-      if (e.key === "g" || e.key === "f" || e.key === "u" || e.key === "U") e.preventDefault();
+      if (e.key === "g" || e.key === "f" || e.key === "u" || e.key === "U")
+        e.preventDefault();
       if (e.key === "g") {
         scrollStep("gg", 1);
         setPill();
@@ -1037,7 +1084,8 @@
         pendingG = false;
         countBuf = "";
         if (!help.hidden) help.hidden = true;
-        else if (findState.marks.length > 0 && !findState.hidden) setFindHidden(true);
+        else if (findState.marks.length > 0 && !findState.hidden)
+          setFindHidden(true);
         break;
       case "Enter":
         if (findState.marks.length > 0 && !findState.hidden) {

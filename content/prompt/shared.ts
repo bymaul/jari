@@ -1,4 +1,5 @@
-export function promptCss(): string {  return `
+export function promptCss(): string {
+  return `
     :host { all: initial !important; }
     .jari-overlay {
       all: initial;

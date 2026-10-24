@@ -3,13 +3,18 @@ import { settings } from "./settings.ts";
 import { ui } from "./ui.ts";
 
 function normText(value: unknown): string {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function relTokens(el: Element): string[] {
   try {
     const rel = el.getAttribute ? el.getAttribute("rel") : "";
-    return String(rel || "").toLowerCase().split(/\s+/).filter(Boolean);
+    return String(rel || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
   } catch {
     return [];
   }

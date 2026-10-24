@@ -29,13 +29,13 @@ let statusEl: HTMLSpanElement | null = null;
 let inputEl: HTMLInputElement | null = null;
 let restoreFocus: Element | null = null;
 let entries: HelpEntry[] = [];
-let query = '';
+let query = "";
 let matches: SearchMatch[] = [];
 let currentIdx = 0;
 let gPending = false;
 
-const HINTS_FILTER = 'Enter done | Esc cancel';
-const HINTS_NAV = 'j/k scroll | / filter | n/N jump | q close';
+const HINTS_FILTER = "Enter done | Esc cancel";
+const HINTS_NAV = "j/k scroll | / filter | n/N jump | q close";
 
 function isActive(): boolean {
   return active;
@@ -71,22 +71,22 @@ function focusOverlay(): void {
 
 function openFilter(): void {
   if (inputEl) return;
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'jari-prompt-input';
-  input.placeholder = 'Filter keys and commands';
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "jari-prompt-input";
+  input.placeholder = "Filter keys and commands";
   input.value = query;
-  input.setAttribute('autocomplete', 'off');
-  input.setAttribute('spellcheck', 'false');
-  input.setAttribute('maxlength', '200');
-  input.addEventListener('keydown', (event) => {
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("spellcheck", "false");
+  input.setAttribute("maxlength", "200");
+  input.addEventListener("keydown", (event) => {
     event.stopPropagation();
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      stepMatch(event.key === 'ArrowDown' ? 1 : -1);
+      stepMatch(event.key === "ArrowDown" ? 1 : -1);
     }
   });
-  input.addEventListener('input', () => {
+  input.addEventListener("input", () => {
     query = input.value;
     applySearch();
   });
@@ -228,16 +228,16 @@ function render(): void {
   const created = createShadowHost("jari-help-host", helpCss());
   host = created.host;
   const shadow = created.shadow;
-  overlay = document.createElement('div');
-  overlay.className = 'jari-overlay jari-prompt jari-help';
+  overlay = document.createElement("div");
+  overlay.className = "jari-overlay jari-prompt jari-help";
 
-  const title = document.createElement('div');
-  title.className = 'jari-prompt-header';
-  title.textContent = 'Jari keybindings';
+  const title = document.createElement("div");
+  title.className = "jari-prompt-header";
+  title.textContent = "Jari keybindings";
   overlay.appendChild(title);
 
   entries = [];
-  query = '';
+  query = "";
   matches = [];
   currentIdx = 0;
 
@@ -260,27 +260,27 @@ function render(): void {
     byCategory.get(id)!.push({ keys, label: meta.label, commandName });
   }
 
-  listEl = document.createElement('div');
-  listEl.className = 'jari-help-list';
+  listEl = document.createElement("div");
+  listEl.className = "jari-help-list";
   listEl.appendChild(
     ui.buildCategorizedGrid(byCategory, {
       columnCount: COLUMNS,
-      gridClass: 'jari-help-columns',
-      columnClass: 'jari-help-column',
-      headerClass: 'jari-help-cat-header',
+      gridClass: "jari-help-columns",
+      columnClass: "jari-help-column",
+      headerClass: "jari-help-cat-header",
       renderEntries(tbody, rowEntries) {
         for (const { keys, label, commandName } of rowEntries) {
-          const tr = document.createElement('tr');
-          const keyTd = document.createElement('td');
-          keyTd.className = 'jari-help-key';
+          const tr = document.createElement("tr");
+          const keyTd = document.createElement("td");
+          keyTd.className = "jari-help-key";
           if (keys.length === 0) {
-            keyTd.textContent = 'unbound';
-            keyTd.classList.add('jari-unbound');
+            keyTd.textContent = "unbound";
+            keyTd.classList.add("jari-unbound");
           } else {
-            keyTd.textContent = keys.map(displayCombo).join(', ');
+            keyTd.textContent = keys.map(displayCombo).join(", ");
           }
-          const labelTd = document.createElement('td');
-          labelTd.className = 'jari-help-label';
+          const labelTd = document.createElement("td");
+          labelTd.className = "jari-help-label";
           labelTd.textContent = label;
           tr.appendChild(keyTd);
           tr.appendChild(labelTd);
@@ -289,7 +289,7 @@ function render(): void {
             tr,
             keyTd,
             labelTd,
-            haystack: `${keys.join(' ')} ${label} ${commandName}`.toLowerCase(),
+            haystack: `${keys.join(" ")} ${label} ${commandName}`.toLowerCase(),
           });
         }
       },
@@ -297,10 +297,10 @@ function render(): void {
   );
   overlay.appendChild(listEl);
 
-  barEl = document.createElement('div');
-  barEl.className = 'jari-prompt-footer';
-  statusEl = document.createElement('span');
-  statusEl.className = 'jari-help-status';
+  barEl = document.createElement("div");
+  barEl.className = "jari-prompt-footer";
+  statusEl = document.createElement("span");
+  statusEl.className = "jari-help-status";
   barEl.appendChild(statusEl);
   overlay.appendChild(barEl);
 
@@ -310,13 +310,15 @@ function render(): void {
 function updateStatus(): void {
   if (!statusEl) return;
   const hints = inputEl ? HINTS_FILTER : HINTS_NAV;
-  const q = (query || '').trim();
+  const q = (query || "").trim();
   if (!q) {
     statusEl.textContent = hints;
     return;
   }
   const count =
-    matches.length === 0 ? `no match for ${q}` : `${currentIdx + 1}/${matches.length}`;
+    matches.length === 0
+      ? `no match for ${q}`
+      : `${currentIdx + 1}/${matches.length}`;
   statusEl.textContent = `${count} | ${hints}`;
 }
 
@@ -360,7 +362,7 @@ function highlightCell(td: HelpCell, q: string): HTMLSpanElement[] {
   if (!found) return [];
   parts.push({ text: orig.slice(pos), match: false });
   try {
-    td.textContent = '';
+    td.textContent = "";
   } catch {
     return [];
   }
@@ -368,8 +370,8 @@ function highlightCell(td: HelpCell, q: string): HTMLSpanElement[] {
   for (const part of parts) {
     if (!part.text) continue;
     if (part.match) {
-      const span = document.createElement('span');
-      span.className = 'jari-find-hit';
+      const span = document.createElement("span");
+      span.className = "jari-find-hit";
       span.textContent = part.text;
       td.appendChild(span);
       spans.push(span);
@@ -381,14 +383,15 @@ function highlightCell(td: HelpCell, q: string): HTMLSpanElement[] {
 }
 
 function markCurrent(): void {
-  for (const m of matches) m.span.className = 'jari-find-hit';
-  if (matches.length > 0) matches[currentIdx].span.className = 'jari-find-current';
+  for (const m of matches) m.span.className = "jari-find-hit";
+  if (matches.length > 0)
+    matches[currentIdx].span.className = "jari-find-current";
 }
 
 function scrollMatchIntoView(): void {
   if (matches.length === 0) return;
   try {
-    matches[currentIdx].entry.tr.scrollIntoView({ block: 'nearest' });
+    matches[currentIdx].entry.tr.scrollIntoView({ block: "nearest" });
   } catch {}
 }
 
@@ -422,8 +425,8 @@ function stepMatch(delta: number): void {
 }
 
 function clearFilter(): void {
-  query = '';
-  if (inputEl) inputEl.value = '';
+  query = "";
+  if (inputEl) inputEl.value = "";
   clearSearchHighlights();
 }
 
@@ -435,14 +438,14 @@ function onKeyDown(event: KeyboardEvent): boolean | void {
   }
 
   if (filterFocused()) {
-    if (key === 'Escape') {
+    if (key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
       clearFilter();
       closeFilter();
       return true;
     }
-    if (key === 'Enter') {
+    if (key === "Enter") {
       event.preventDefault();
       event.stopImmediatePropagation();
       closeFilter();
@@ -453,11 +456,14 @@ function onKeyDown(event: KeyboardEvent): boolean | void {
 
   const hasMod = event.ctrlKey || event.altKey || event.metaKey;
   const scrollOnly =
-    event.ctrlKey && ["d", "u", "f", "b"].includes(key) && !event.altKey && !event.metaKey;
+    event.ctrlKey &&
+    ["d", "u", "f", "b"].includes(key) &&
+    !event.altKey &&
+    !event.metaKey;
   if (hasMod && !scrollOnly) return false;
   event.preventDefault();
   event.stopImmediatePropagation();
-  if (key === 'Escape' || key === 'q') {
+  if (key === "Escape" || key === "q") {
     gPending = false;
     if (matches.length > 0) {
       clearFilter();
@@ -467,42 +473,42 @@ function onKeyDown(event: KeyboardEvent): boolean | void {
     close();
     return;
   }
-  if (key === '/') {
+  if (key === "/") {
     gPending = false;
     openFilter();
     return;
   }
-  if ((key === 'n' || key === 'N') && matches.length > 0) {
+  if ((key === "n" || key === "N") && matches.length > 0) {
     gPending = false;
-    stepMatch(key === 'n' ? 1 : -1);
+    stepMatch(key === "n" ? 1 : -1);
     return;
   }
-  if (key === 'g' && !gPending) {
+  if (key === "g" && !gPending) {
     gPending = true;
     return;
   }
   if (gPending) {
     gPending = false;
-    if (key === 'g') listEl!.scrollTo(0, 0);
+    if (key === "g") listEl!.scrollTo(0, 0);
     return;
   }
   if (event.ctrlKey) {
-    if (key === 'd') listEl!.scrollBy(0, listEl!.clientHeight * 0.5);
-    else if (key === 'u') listEl!.scrollBy(0, -listEl!.clientHeight * 0.5);
-    else if (key === 'f') listEl!.scrollBy(0, listEl!.clientHeight * 0.9);
-    else if (key === 'b') listEl!.scrollBy(0, -listEl!.clientHeight * 0.9);
+    if (key === "d") listEl!.scrollBy(0, listEl!.clientHeight * 0.5);
+    else if (key === "u") listEl!.scrollBy(0, -listEl!.clientHeight * 0.5);
+    else if (key === "f") listEl!.scrollBy(0, listEl!.clientHeight * 0.9);
+    else if (key === "b") listEl!.scrollBy(0, -listEl!.clientHeight * 0.9);
     return;
   }
   switch (key) {
-    case 'G':
+    case "G":
       listEl!.scrollTo(0, listEl!.scrollHeight);
       break;
-    case 'j':
-    case 'ArrowDown':
+    case "j":
+    case "ArrowDown":
       listEl!.scrollBy(0, STEP);
       break;
-    case 'k':
-    case 'ArrowUp':
+    case "k":
+    case "ArrowUp":
       listEl!.scrollBy(0, -STEP);
       break;
   }
@@ -524,7 +530,7 @@ function close(): void {
   statusEl = null;
   inputEl = null;
   entries = [];
-  query = '';
+  query = "";
   matches = [];
   currentIdx = 0;
   gPending = false;

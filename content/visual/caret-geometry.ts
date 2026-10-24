@@ -198,7 +198,11 @@ export function readAdjacentTextCharRect(
       walker.currentNode = focusNode;
       const next = walker.nextNode();
       if (next && next.nodeValue) {
-        for (let i = 0, steps = 0; i < next.nodeValue.length && steps < 32; i++, steps++) {
+        for (
+          let i = 0, steps = 0;
+          i < next.nodeValue.length && steps < 32;
+          i++, steps++
+        ) {
           out.after = readSingleCharRect(next, i, i + 1);
           if (out.after) break;
         }

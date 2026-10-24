@@ -26,9 +26,13 @@
   --jari-of-bg: #333738;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-:focus-visible { outline: none; }
+:focus-visible {
+  outline: none;
+}
 
 body {
   margin: 0;
@@ -40,8 +44,12 @@ body {
   min-height: 100vh;
 }
 
-a { color: var(--link); }
-a:visited { color: #bb9dbd; }
+a {
+  color: var(--link);
+}
+a:visited {
+  color: #bb9dbd;
+}
 
 .demo-header {
   max-width: var(--page-width);
@@ -54,12 +62,33 @@ a:visited { color: #bb9dbd; }
   padding: 18px 20px 6px;
 }
 
-.demo-brand { display: flex; gap: 12px; align-items: center; }
-.demo-brand h1 { margin: 0; font-size: 18px; font-weight: bold; color: var(--fg); }
-.demo-pron { font-size: 12px; color: var(--muted); font-weight: normal; }
-.demo-tag { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.demo-brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.demo-brand h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--fg);
+}
+.demo-pron {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: normal;
+}
+.demo-tag {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 
-.demo-install { display: flex; gap: 8px; flex-wrap: wrap; }
+.demo-install {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 .demo-btn {
   padding: 3px 12px;
@@ -148,8 +177,12 @@ kbd {
   border-bottom: 1px solid var(--border);
   padding-bottom: 6px;
 }
-.demo-article h2:not(:first-child) { margin-top: 16px; }
-.demo-article p { margin: 8px 0; }
+.demo-article h2:not(:first-child) {
+  margin-top: 16px;
+}
+.demo-article p {
+  margin: 8px 0;
+}
 .demo-article button {
   padding: 3px 12px;
   background: var(--panel);
@@ -164,7 +197,9 @@ kbd {
   border-color: var(--fg);
   color: var(--fg);
 }
-.demo-article button:active { border-style: inset; }
+.demo-article button:active {
+  border-style: inset;
+}
 
 .demo-footer {
   max-width: var(--page-width);
@@ -179,7 +214,12 @@ kbd {
   align-items: center;
 }
 
-.demo-hints { position: fixed; inset: 0; pointer-events: none; z-index: 200; }
+.demo-hints {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+}
 .demo-hint {
   position: fixed;
   display: inline-block;
@@ -198,9 +238,18 @@ kbd {
   pointer-events: none;
   text-align: left;
 }
-.demo-hint-matched { color: #6a6a6a; opacity: 0.45; }
-.demo-hint-dim { opacity: 0; display: none; }
-.demo-flash { outline: 2px solid var(--accent); outline-offset: 2px; }
+.demo-hint-matched {
+  color: #6a6a6a;
+  opacity: 0.45;
+}
+.demo-hint-dim {
+  opacity: 0;
+  display: none;
+}
+.demo-flash {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 .demo-find {
   position: fixed;
@@ -219,8 +268,14 @@ kbd {
   font-size: 12px;
   line-height: 1.5;
 }
-.demo-find[hidden] { display: none; }
-.demo-find-label { color: var(--accent); font-weight: bold; flex: 0 0 auto; }
+.demo-find[hidden] {
+  display: none;
+}
+.demo-find-label {
+  color: var(--accent);
+  font-weight: bold;
+  flex: 0 0 auto;
+}
 .demo-find-input {
   flex: 1 1 auto;
   min-width: 0;
@@ -233,11 +288,24 @@ kbd {
   line-height: 1.5;
   padding: 0;
 }
-.demo-find-status { flex: 0 0 auto; color: #878787; white-space: nowrap; }
-.demo-find-status.no-match { color: #e06c75; }
+.demo-find-status {
+  flex: 0 0 auto;
+  color: #878787;
+  white-space: nowrap;
+}
+.demo-find-status.no-match {
+  color: #e06c75;
+}
 
-.demo-find-hit { background: rgba(224, 163, 99, 0.45); color: #1a1a1a; }
-.demo-find-current { background: var(--accent); color: #1a1a1a; outline: 1px solid var(--accent-border); }
+.demo-find-hit {
+  background: rgba(224, 163, 99, 0.45);
+  color: #1a1a1a;
+}
+.demo-find-current {
+  background: var(--accent);
+  color: #1a1a1a;
+  outline: 1px solid var(--accent-border);
+}
 
 .jari-overlay {
   all: initial;
@@ -258,7 +326,9 @@ kbd {
   text-align: left;
   pointer-events: auto;
 }
-.jari-overlay.jari-prompt[hidden] { display: none; }
+.jari-overlay.jari-prompt[hidden] {
+  display: none;
+}
 .jari-prompt {
   background: #1c1c24;
   color: #cdcdcd;
@@ -376,7 +446,9 @@ kbd {
   max-height: 60vh;
   overflow: auto;
 }
-.demo-help[hidden] { display: none; }
+.demo-help[hidden] {
+  display: none;
+}
 .demo-help h2 {
   margin: 0;
   background: var(--panel);
@@ -387,15 +459,25 @@ kbd {
   border-bottom: 1px solid var(--border);
   padding: 5px 8px 3px;
 }
-.demo-help-esc { font-weight: normal; text-transform: none; letter-spacing: normal; color: var(--muted); }
-.demo-help table { width: 100%; border-collapse: collapse; }
+.demo-help-esc {
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--muted);
+}
+.demo-help table {
+  width: 100%;
+  border-collapse: collapse;
+}
 .demo-help td {
   text-align: left;
   padding: 2px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
-.demo-help td:first-child { white-space: nowrap; }
+.demo-help td:first-child {
+  white-space: nowrap;
+}
 
 .demo-status {
   position: fixed;
@@ -417,9 +499,15 @@ kbd {
   padding: 0.25ex 1em;
   pointer-events: none;
 }
-.demo-toast[hidden] { display: none; }
-.demo-pill[hidden] { display: none; }
-.demo-showcmd[hidden] { display: none; }
+.demo-toast[hidden] {
+  display: none;
+}
+.demo-pill[hidden] {
+  display: none;
+}
+.demo-showcmd[hidden] {
+  display: none;
+}
 .demo-pill {
   font-family: var(--mono);
   font-size: 12px;
@@ -458,7 +546,9 @@ kbd {
   font-family: var(--mono);
   font-size: 12px;
 }
-.demo-clue[hidden] { display: none; }
+.demo-clue[hidden] {
+  display: none;
+}
 .demo-clue-title {
   font-weight: bold;
   padding: 0 1ex 0.5ex;
@@ -468,7 +558,10 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.demo-clue-list { display: flex; flex-direction: column; }
+.demo-clue-list {
+  display: flex;
+  flex-direction: column;
+}
 .demo-clue-row {
   display: flex;
   gap: 1ex;
@@ -477,5 +570,14 @@ kbd {
   white-space: nowrap;
   overflow: hidden;
 }
-.demo-clue-key { flex: 0 0 auto; min-width: 3ex; font-weight: bold; }
-.demo-clue-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.demo-clue-key {
+  flex: 0 0 auto;
+  min-width: 3ex;
+  font-weight: bold;
+}
+.demo-clue-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}

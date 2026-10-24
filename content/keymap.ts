@@ -179,7 +179,7 @@ export const categories = [
   { id: "help", label: "Help" },
 ];
 
-export const HINT_CHARSET_DEFAULT = "saevrtwyincmp";
+export const HINT_CHARSET_DEFAULT = "saevrwncmp";
 
 export const HINT_THEMES = ["yellow", "cyan", "dark"];
 export type HintTheme = "yellow" | "cyan" | "dark";
@@ -272,8 +272,11 @@ export function findOverlapConflicts(
   keymap: Record<string, string>,
   combo: string,
 ): { key: string; command: string; kind: "shadows" | "shadowed-by" }[] {
-  const out: { key: string; command: string; kind: "shadows" | "shadowed-by" }[] =
-    [];
+  const out: {
+    key: string;
+    command: string;
+    kind: "shadows" | "shadowed-by";
+  }[] = [];
   if (!combo || typeof combo !== "string") return out;
   if (combo.includes("+")) return out;
   for (const [key, command] of Object.entries(keymap || {})) {
@@ -420,7 +423,9 @@ export function normalizeClickableSelector(raw: unknown): string {
 }
 
 export function normalizeHintTheme(raw: unknown): HintTheme {
-  return HINT_THEMES.includes(raw as string) ? (raw as HintTheme) : HINT_THEME_DEFAULT;
+  return HINT_THEMES.includes(raw as string)
+    ? (raw as HintTheme)
+    : HINT_THEME_DEFAULT;
 }
 
 export function normalizeHintFontSize(raw: unknown): number {
@@ -591,12 +596,16 @@ const HALF_PAGE_FILLS: [string, string][] = [
   ["u", "scrollHalfPageUp"],
 ];
 
-export function migrateRemovedFindToggles(keymap: unknown): Record<string, string> {
+export function migrateRemovedFindToggles(
+  keymap: unknown,
+): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
     return keymap as Record<string, string>;
   }
   const out: Record<string, string> = {};
-  for (const [combo, command] of Object.entries(keymap as Record<string, string>)) {
+  for (const [combo, command] of Object.entries(
+    keymap as Record<string, string>,
+  )) {
     if (REMOVED_FIND_COMMANDS.has(command)) continue;
     out[combo] = command;
   }
@@ -616,7 +625,9 @@ const V8_DEFAULT_FILLS: [string, string][] = [
   [":", "showCommandPalette"],
 ];
 
-export function migratePageNavBindings(keymap: unknown): Record<string, string> {
+export function migratePageNavBindings(
+  keymap: unknown,
+): Record<string, string> {
   if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
     return keymap as Record<string, string>;
   }

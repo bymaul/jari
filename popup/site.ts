@@ -1,7 +1,4 @@
-import {
-  matchesSitePattern,
-  pageSiteKey,
-} from "../shared/url.ts";
+import { matchesSitePattern, pageSiteKey } from "../shared/url.ts";
 
 export const SHOW_HELP_ACTION = "jari-show-help";
 
@@ -64,8 +61,13 @@ export function isSiteDisabled(
   );
 }
 
-export function toggleSiteInList(disabledSites: unknown, key: string): string[] {
-  const list: string[] = Array.isArray(disabledSites) ? disabledSites.slice() : [];
+export function toggleSiteInList(
+  disabledSites: unknown,
+  key: string,
+): string[] {
+  const list: string[] = Array.isArray(disabledSites)
+    ? disabledSites.slice()
+    : [];
   const idx = list.indexOf(key);
   if (idx >= 0) list.splice(idx, 1);
   else list.push(key);

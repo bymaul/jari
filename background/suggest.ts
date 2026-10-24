@@ -125,9 +125,7 @@ async function getSuggestSettings() {
 
 async function getDefaultSearchUrl(text: string): Promise<string> {
   const settings = await getCachedSettings();
-  const engines = normalizeSearchEngines(
-    settings && settings.searchEngines,
-  );
+  const engines = normalizeSearchEngines(settings && settings.searchEngines);
   const keyword = normalizeDefaultEngine(
     settings && settings.defaultEngine,
     engines,
@@ -139,7 +137,12 @@ async function getDefaultSearchUrl(text: string): Promise<string> {
 }
 
 interface BookmarkData {
-  entries: { title: string; url: string; parentId?: string; dateAdded: number }[];
+  entries: {
+    title: string;
+    url: string;
+    parentId?: string;
+    dateAdded: number;
+  }[];
   folderMap: Map<string, string[]>;
 }
 
@@ -163,8 +166,7 @@ function registerBookmarkInvalidation(): void {
         event.addListener(clearBookmarkDataCache);
       }
     }
-  } catch {
-  }
+  } catch {}
 }
 
 let bookmarkListenersReady = false;
@@ -191,8 +193,7 @@ function ensureSettingsListener(): void {
     if (onChanged && typeof onChanged.addListener === "function") {
       onChanged.addListener(clearSettingsCache);
     }
-  } catch {
-  }
+  } catch {}
 }
 
 async function getCachedSettings(): Promise<StoredSettingsDoc> {
@@ -233,8 +234,7 @@ function ensureTabListeners(): void {
         event.addListener(markTabsDirty);
       }
     }
-  } catch {
-  }
+  } catch {}
 }
 
 async function getTabs(): Promise<chrome.tabs.Tab[]> {
@@ -300,12 +300,22 @@ export async function suggest(
     const key = canonicalUrl(url);
     const existing = map.get(key);
     if (existing) {
-      existing.visitCount = (existing.visitCount || 0) + (extra.visitCount || 0);
-      existing.typedCount = (existing.typedCount || 0) + (extra.typedCount || 0);
-      existing.typedVisits = (existing.typedVisits || 0) + (extra.typedVisits || 0);
-      existing.lastVisit = Math.max(existing.lastVisit || 0, extra.lastVisit || 0);
-      existing.lastAccessed = Math.max(existing.lastAccessed || 0, extra.lastAccessed || 0);
-      if (!existing.title || existing.title === existing.url) existing.title = title || url;
+      existing.visitCount =
+        (existing.visitCount || 0) + (extra.visitCount || 0);
+      existing.typedCount =
+        (existing.typedCount || 0) + (extra.typedCount || 0);
+      existing.typedVisits =
+        (existing.typedVisits || 0) + (extra.typedVisits || 0);
+      existing.lastVisit = Math.max(
+        existing.lastVisit || 0,
+        extra.lastVisit || 0,
+      );
+      existing.lastAccessed = Math.max(
+        existing.lastAccessed || 0,
+        extra.lastAccessed || 0,
+      );
+      if (!existing.title || existing.title === existing.url)
+        existing.title = title || url;
       if (source === "tab" && existing.source !== "tab") {
         existing.source = "tab";
         existing.id = extra.id;
@@ -328,7 +338,12 @@ export async function suggest(
       const tabs = (await getTabs())
         .slice()
         .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-      for (const tab of tabs) push(tab.title || "", tab.url || "", "tab", { id: tab.id, lastAccessed: tab.lastAccessed || 0, audible: !!tab.audible });
+      for (const tab of tabs)
+        push(tab.title || "", tab.url || "", "tab", {
+          id: tab.id,
+          lastAccessed: tab.lastAccessed || 0,
+          audible: !!tab.audible,
+        });
     } catch (err) {
       console.debug("[jari] Tab search failed:", err);
     }
@@ -336,9 +351,18 @@ export async function suggest(
   if (!q) {
     if (sources.includes("history")) {
       try {
-        const recents = await chrome.history.search({ text: "", maxResults: 24, startTime: Date.now() - 90 * 86400000 });
+        const recents = await chrome.history.search({
+          text: "",
+          maxResults: 24,
+          startTime: Date.now() - 90 * 86400000,
+        });
         recents.sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
-        for (const item of recents.slice(0, 12)) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
+        for (const item of recents.slice(0, 12))
+          push(item.title, item.url, "history", {
+            visitCount: item.visitCount || 0,
+            lastVisit: item.lastVisitTime || 0,
+            typedCount: item.typedCount || 0,
+          });
       } catch (err) {
         console.debug("[jari] Recent history failed:", err);
       }
@@ -347,9 +371,18 @@ export async function suggest(
       try {
         const { folderMap } = await getBookmarkData();
         const bms = await chrome.bookmarks.search("");
-        const withPath = bms.filter(bm => bm.url).map(bm => ({ bm, path: folderMap.get(bm.parentId as string) || [] }));
-        withPath.sort((a,b) => (b.bm.dateAdded||0)-(a.bm.dateAdded||0));
-        for (const {bm, path} of withPath.slice(0, 8)) push(bm.title, bm.url, "bookmark", { dateAdded: bm.dateAdded || 0, folderPath: path.join(" / ") });
+        const withPath = bms
+          .filter((bm) => bm.url)
+          .map((bm) => ({
+            bm,
+            path: folderMap.get(bm.parentId as string) || [],
+          }));
+        withPath.sort((a, b) => (b.bm.dateAdded || 0) - (a.bm.dateAdded || 0));
+        for (const { bm, path } of withPath.slice(0, 8))
+          push(bm.title, bm.url, "bookmark", {
+            dateAdded: bm.dateAdded || 0,
+            folderPath: path.join(" / "),
+          });
       } catch (err) {
         console.debug("[jari] Bookmark recents failed:", err);
       }
@@ -357,11 +390,29 @@ export async function suggest(
   } else {
     if (sources.includes("history")) {
       try {
-        const results = await chrome.history.search({ text: q, maxResults: 20, startTime: Date.now() - 90 * 86400000 });
-        for (const item of results) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
-        const recents = await chrome.history.search({ text: "", maxResults: 300, startTime: Date.now() - 90 * 86400000 });
+        const results = await chrome.history.search({
+          text: q,
+          maxResults: 20,
+          startTime: Date.now() - 90 * 86400000,
+        });
+        for (const item of results)
+          push(item.title, item.url, "history", {
+            visitCount: item.visitCount || 0,
+            lastVisit: item.lastVisitTime || 0,
+            typedCount: item.typedCount || 0,
+          });
+        const recents = await chrome.history.search({
+          text: "",
+          maxResults: 300,
+          startTime: Date.now() - 90 * 86400000,
+        });
         recents.sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
-        for (const item of recents.slice(0, 300)) push(item.title, item.url, "history", { visitCount: item.visitCount || 0, lastVisit: item.lastVisitTime || 0, typedCount: item.typedCount || 0 });
+        for (const item of recents.slice(0, 300))
+          push(item.title, item.url, "history", {
+            visitCount: item.visitCount || 0,
+            lastVisit: item.lastVisitTime || 0,
+            typedCount: item.typedCount || 0,
+          });
       } catch (err) {
         console.debug("[jari] History search failed:", err);
       }
@@ -371,7 +422,10 @@ export async function suggest(
         const { entries, folderMap } = await getBookmarkData();
         for (const entry of entries) {
           const path = folderMap.get(entry.parentId as string) || [];
-          push(entry.title, entry.url, "bookmark", { dateAdded: entry.dateAdded, folderPath: path.join(" / ") });
+          push(entry.title, entry.url, "bookmark", {
+            dateAdded: entry.dateAdded,
+            folderPath: path.join(" / "),
+          });
         }
       } catch (err) {
         console.debug("[jari] Bookmark search failed:", err);

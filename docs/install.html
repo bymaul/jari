@@ -1,139 +1,215 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Jari — install</title>
-<link rel="icon" href="./icons/jari.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="./docs.css" />
-</head>
-<body>
-<header class="demo-header">
-  <div class="demo-brand">
-    <img src="./icons/jari.svg" alt="Jari logo" width="40" height="40" />
-    <div>
-      <h1>Jari <span class="demo-pron">/ja·ri/</span></h1>
-      <p class="demo-tag">Install in under a minute. These keys work here too — try <kbd>f</kbd>.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jari — install</title>
+    <link rel="icon" href="./icons/jari.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./docs.css" />
+  </head>
+  <body>
+    <header class="demo-header">
+      <div class="demo-brand">
+        <img src="./icons/jari.svg" alt="Jari logo" width="40" height="40" />
+        <div>
+          <h1>Jari <span class="demo-pron">/ja·ri/</span></h1>
+          <p class="demo-tag">
+            Install in under a minute. These keys work here too — try
+            <kbd>f</kbd>.
+          </p>
+        </div>
+      </div>
+      <nav class="demo-install">
+        <a
+          class="demo-btn"
+          href="https://github.com/bymaul/jari/releases"
+          target="_blank"
+          rel="noopener"
+          >Install for Firefox / Chrome</a
+        >
+        <a class="demo-btn demo-btn-ghost" href="./index.html">Playground</a>
+      </nav>
+    </header>
+
+    <div class="demo-keys-bar" role="note">
+      <span><kbd>j</kbd><kbd>k</kbd> scroll</span>
+      <span><kbd>f</kbd> follow link</span>
+      <span><kbd>/</kbd> find</span>
+      <span><kbd>?</kbd> all keys</span>
     </div>
-  </div>
-  <nav class="demo-install">
-    <a class="demo-btn" href="https://github.com/bymaul/jari/releases" target="_blank" rel="noopener">Install for Firefox / Chrome</a>
-    <a class="demo-btn demo-btn-ghost" href="./index.html">Playground</a>
-  </nav>
-</header>
 
-<div class="demo-keys-bar" role="note">
-  <span><kbd>j</kbd><kbd>k</kbd> scroll</span>
-  <span><kbd>f</kbd> follow link</span>
-  <span><kbd>/</kbd> find</span>
-  <span><kbd>?</kbd> all keys</span>
-</div>
+    <nav class="demo-docsnav" aria-label="Docs">
+      <a href="./index.html">Playground</a>
+      <a href="./guide.html">Key guide</a>
+      <a href="./install.html">Install</a>
+      <a href="./settings.html">Settings</a>
+      <a href="./privacy.html">Privacy</a>
+    </nav>
 
-<nav class="demo-docsnav" aria-label="Docs">
-  <a href="./index.html">Playground</a>
-  <a href="./guide.html">Key guide</a>
-  <a href="./install.html">Install</a>
-  <a href="./settings.html">Settings</a>
-  <a href="./privacy.html">Privacy</a>
-</nav>
+    <main class="demo-main">
+      <article id="playground" class="demo-article" aria-label="Install">
+        <h2>Get the release</h2>
+        <p>
+          Download the latest release from
+          <a href="https://github.com/bymaul/jari/releases">GitHub Releases</a>.
+          Chrome, Edge, and Firefox are supported (Manifest V3).
+        </p>
+        <h2>Firefox</h2>
+        <p>
+          Install <code>jari-firefox-&lt;version&gt;-signed.xpi</code> directly
+          — it is signed, so Firefox accepts it with one click.
+        </p>
+        <h2>Chrome and Edge</h2>
+        <p>
+          Unzip <code>jari-chrome-&lt;version&gt;.zip</code>, then open
+          <code>chrome://extensions</code>, enable Developer mode, and Load
+          unpacked. The attached <code>.crx</code> is only for enterprise policy
+          deployment with a self-hosted update URL — Chrome rejects
+          hand-installing it with <code>CRX_REQUIRED_PROOF_MISSING</code>.
+        </p>
+        <h2>Firefox development without a release</h2>
+        <p>
+          Open <code>about:debugging#/runtime/this-firefox</code>, Load
+          Temporary Add-on, and select <code>manifest.json</code>. Temporary
+          add-ons vanish on restart. Or build from source below and load the
+          folder the same way — the checked-in
+          <code>manifest.json</code> targets Chrome, so run
+          <code>npm run build:firefox</code> first for Firefox.
+        </p>
+        <h2>Build from source</h2>
+        <p>
+          <code>npm install</code>, then <code>npm run lint</code> (must be
+          clean), <code>npm test</code>, and
+          <code>npm run build:chrome</code> (or <code>build:firefox</code>).
+          <code>npm run dist</code> produces the zips and xpi;
+          <code>npm run sign:firefox</code> signs via AMO (unlisted). Tagging
+          <code>vX.Y.Z</code> runs the release workflow and attaches the install
+          files to the GitHub Release.
+        </p>
+        <h2>FAQ</h2>
+        <p>
+          <code>CRX_REQUIRED_PROOF_MISSING</code> means you tried
+          double-clicking the <code>.crx</code> — unzip the
+          <code>.zip</code> and Load unpacked instead. A Firefox temporary
+          add-on disappearing after restart is normal; install the signed xpi
+          for permanence. Settings sync through your browser's synced storage,
+          so rebinding keys once covers every device.
+        </p>
+        <p>
+          Next: open <a href="./settings.html">settings</a> to see what
+          <kbd>;e</kbd> configures, or read the
+          <a href="./guide.html">key guide</a> to practice <kbd>H</kbd> back to
+          this page afterwards.
+        </p>
+      </article>
+    </main>
 
-<main class="demo-main">
-  <article id="playground" class="demo-article" aria-label="Install">
-    <h2>Get the release</h2>
-    <p>
-      Download the latest release from
-      <a href="https://github.com/bymaul/jari/releases">GitHub Releases</a>.
-      Chrome, Edge, and Firefox are supported (Manifest V3).
-    </p>
-    <h2>Firefox</h2>
-    <p>
-      Install <code>jari-firefox-&lt;version&gt;-signed.xpi</code> directly —
-      it is signed, so Firefox accepts it with one click.
-    </p>
-    <h2>Chrome and Edge</h2>
-    <p>
-      Unzip <code>jari-chrome-&lt;version&gt;.zip</code>, then open
-      <code>chrome://extensions</code>, enable Developer mode, and Load
-      unpacked. The attached <code>.crx</code> is only for enterprise policy
-      deployment with a self-hosted update URL — Chrome rejects hand-installing
-      it with <code>CRX_REQUIRED_PROOF_MISSING</code>.
-    </p>
-    <h2>Firefox development without a release</h2>
-    <p>
-      Open <code>about:debugging#/runtime/this-firefox</code>, Load Temporary
-      Add-on, and select <code>manifest.json</code>. Temporary add-ons vanish
-      on restart. Or build from source below and load the folder the same way —
-      the checked-in <code>manifest.json</code> targets Chrome, so run
-      <code>npm run build:firefox</code> first for Firefox.
-    </p>
-    <h2>Build from source</h2>
-    <p>
-      <code>npm install</code>, then <code>npm run lint</code> (must be clean),
-      <code>npm test</code>, and <code>npm run build:chrome</code> (or
-      <code>build:firefox</code>). <code>npm run dist</code> produces the zips
-      and xpi; <code>npm run sign:firefox</code> signs via AMO (unlisted).
-      Tagging <code>vX.Y.Z</code> runs the release workflow and attaches the
-      install files to the GitHub Release.
-    </p>
-    <h2>FAQ</h2>
-    <p>
-      <code>CRX_REQUIRED_PROOF_MISSING</code> means you tried double-clicking
-      the <code>.crx</code> — unzip the <code>.zip</code> and Load unpacked
-      instead. A Firefox temporary add-on disappearing after restart is normal;
-      install the signed xpi for permanence. Settings sync through your
-      browser's synced storage, so rebinding keys once covers every device.
-    </p>
-    <p>
-      Next: open <a href="./settings.html">settings</a> to see what
-      <kbd>;e</kbd> configures, or read the <a href="./guide.html">key guide</a>
-      to practice <kbd>H</kbd> back to this page afterwards.
-    </p>
-  </article>
-</main>
+    <footer class="demo-footer">
+      <span
+        >Demo simulation — every link here takes real <kbd>f</kbd> hints.</span
+      >
+      <a href="./index.html">Back to playground</a>
+    </footer>
 
-<footer class="demo-footer">
-  <span>Demo simulation — every link here takes real <kbd>f</kbd> hints.</span>
-  <a href="./index.html">Back to playground</a>
-</footer>
+    <div id="hints" class="demo-hints" aria-hidden="true"></div>
 
-<div id="hints" class="demo-hints" aria-hidden="true"></div>
+    <div id="prompt" class="jari-overlay jari-prompt" hidden>
+      <ul id="promptlist" class="jari-prompt-list"></ul>
+      <div class="jari-prompt-header">Open</div>
+      <input
+        id="promptinput"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Search links, URL, or keyword query"
+        aria-label="Go to page link or search"
+      />
+    </div>
 
-<div id="prompt" class="jari-overlay jari-prompt" hidden>
-  <ul id="promptlist" class="jari-prompt-list"></ul>
-  <div class="jari-prompt-header">Open</div>
-  <input id="promptinput" type="text" autocomplete="off" spellcheck="false" placeholder="Search links, URL, or keyword query" aria-label="Go to page link or search" />
-</div>
+    <div id="findbar" class="demo-find" hidden>
+      <span class="demo-find-label">/</span>
+      <input
+        id="findinput"
+        class="demo-find-input"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Find in demo page"
+      />
+      <span id="findstatus" class="demo-find-status"></span>
+    </div>
 
-<div id="findbar" class="demo-find" hidden>
-  <span class="demo-find-label">/</span>
-  <input id="findinput" class="demo-find-input" type="text" autocomplete="off" spellcheck="false" aria-label="Find in demo page" />
-  <span id="findstatus" class="demo-find-status"></span>
-</div>
+    <div
+      id="help"
+      class="demo-help"
+      hidden
+      role="dialog"
+      aria-label="Demo keys"
+    >
+      <h2>
+        Demo keys
+        <span class="demo-help-esc"
+          >(<kbd>Esc</kbd> or <kbd>?</kbd> closes)</span
+        >
+      </h2>
+      <table>
+        <tr>
+          <td><kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd></td>
+          <td>scroll (prefix a count: <kbd>3j</kbd>)</td>
+        </tr>
+        <tr>
+          <td><kbd>d</kbd> / <kbd>u</kbd></td>
+          <td>half page down / up</td>
+        </tr>
+        <tr>
+          <td><kbd>gg</kbd> / <kbd>G</kbd></td>
+          <td>top / bottom</td>
+        </tr>
+        <tr>
+          <td><kbd>H</kbd> / <kbd>L</kbd></td>
+          <td>history back / forward (counts work: <kbd>2H</kbd>)</td>
+        </tr>
+        <tr>
+          <td><kbd>gu</kbd> / <kbd>gU</kbd></td>
+          <td>parent URL / site root</td>
+        </tr>
+        <tr>
+          <td><kbd>r</kbd> / <kbd>R</kbd></td>
+          <td>reload (cache bypass needs the extension)</td>
+        </tr>
+        <tr>
+          <td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td>
+          <td>hint: same tab / new tab / background tab</td>
+        </tr>
+        <tr>
+          <td><kbd>t</kbd></td>
+          <td>go to this page0027s links, or search an engine</td>
+        </tr>
+        <tr>
+          <td><kbd>/</kbd> then <kbd>Enter</kbd></td>
+          <td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td>
+        </tr>
+        <tr>
+          <td><kbd>Esc</kbd></td>
+          <td>close bar, hide highlights</td>
+        </tr>
+        <tr>
+          <td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td>
+          <td>visual select, then yank to clipboard</td>
+        </tr>
+        <tr>
+          <td><kbd>?</kbd></td>
+          <td>this cheatsheet</td>
+        </tr>
+      </table>
+    </div>
 
-<div id="help" class="demo-help" hidden role="dialog" aria-label="Demo keys">
-  <h2>Demo keys <span class="demo-help-esc">(<kbd>Esc</kbd> or <kbd>?</kbd> closes)</span></h2>
-  <table>
-    <tr><td><kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd></td><td>scroll (prefix a count: <kbd>3j</kbd>)</td></tr>
-    <tr><td><kbd>d</kbd> / <kbd>u</kbd></td><td>half page down / up</td></tr>
-    <tr><td><kbd>gg</kbd> / <kbd>G</kbd></td><td>top / bottom</td></tr>
-    <tr><td><kbd>H</kbd> / <kbd>L</kbd></td><td>history back / forward (counts work: <kbd>2H</kbd>)</td></tr>
-    <tr><td><kbd>gu</kbd> / <kbd>gU</kbd></td><td>parent URL / site root</td></tr>
-    <tr><td><kbd>r</kbd> / <kbd>R</kbd></td><td>reload (cache bypass needs the extension)</td></tr>
-    <tr><td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td><td>hint: same tab / new tab / background tab</td></tr>
-    <tr><td><kbd>t</kbd></td><td>go to this page0027s links, or search an engine</td></tr>
-    <tr><td><kbd>/</kbd> then <kbd>Enter</kbd></td><td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td></tr>
-    <tr><td><kbd>Esc</kbd></td><td>close bar, hide highlights</td></tr>
-    <tr><td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td><td>visual select, then yank to clipboard</td></tr>
-    <tr><td><kbd>?</kbd></td><td>this cheatsheet</td></tr>
-  </table>
-</div>
+    <div class="demo-status" aria-live="polite">
+      <span id="toast" class="demo-toast" hidden></span>
+      <span id="pill" class="demo-pill" hidden></span>
+      <span id="showcmd" class="demo-showcmd" hidden></span>
+    </div>
 
-<div class="demo-status" aria-live="polite">
-  <span id="toast" class="demo-toast" hidden></span>
-  <span id="pill" class="demo-pill" hidden></span>
-  <span id="showcmd" class="demo-showcmd" hidden></span>
-</div>
-
-<script src="./docs.js"></script>
-</body>
+    <script src="./docs.js"></script>
+  </body>
 </html>

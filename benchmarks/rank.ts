@@ -35,5 +35,8 @@ for (const q of queries) {
   const passes = 30;
   const start = performance.now();
   for (let i = 0; i < passes; i++) rankMatches(q, pool);
-  console.log(q.padEnd(16), `${((performance.now() - start) / passes).toFixed(2)}ms/pass`);
+  console.log(
+    q.padEnd(16),
+    `${((performance.now() - start) / passes).toFixed(2)}ms/pass`,
+  );
 }

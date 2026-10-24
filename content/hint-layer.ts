@@ -1,5 +1,10 @@
 import { settings } from "./settings.ts";
-import { HINT_CHARSET_DEFAULT, HINT_FONT_SIZE_DEFAULT, HINT_FONT_SIZE_MAX, HINT_FONT_SIZE_MIN } from "./keymap.ts";
+import {
+  HINT_CHARSET_DEFAULT,
+  HINT_FONT_SIZE_DEFAULT,
+  HINT_FONT_SIZE_MAX,
+  HINT_FONT_SIZE_MIN,
+} from "./keymap.ts";
 import { getHintRect, getRealRect } from "./hints-elements.ts";
 
 export function normalizeCharset(): string {
@@ -104,9 +109,10 @@ function probeOrigin(holderEl: HTMLElement): { top: number; left: number } {
   return ret;
 }
 
-export function holderOrigin(
-  holderEl: HTMLElement,
-): { top: number; left: number } {
+export function holderOrigin(holderEl: HTMLElement): {
+  top: number;
+  left: number;
+} {
   const cached = holderOrigins.get(holderEl);
   if (cached) return cached;
   const origin = probeOrigin(holderEl);
@@ -114,9 +120,10 @@ export function holderOrigin(
   return origin;
 }
 
-export function coordinate(
-  holderEl: HTMLElement,
-): { top: number; left: number } {
+export function coordinate(holderEl: HTMLElement): {
+  top: number;
+  left: number;
+} {
   const origin = probeOrigin(holderEl);
   return {
     top: origin.top + window.pageYOffset,
@@ -189,7 +196,10 @@ const HINT_THEMES: Record<
 function hintFontSize(raw: unknown): number {
   const n = Number(raw);
   if (!Number.isFinite(n)) return HINT_FONT_SIZE_DEFAULT;
-  return Math.min(HINT_FONT_SIZE_MAX, Math.max(HINT_FONT_SIZE_MIN, Math.round(n)));
+  return Math.min(
+    HINT_FONT_SIZE_MAX,
+    Math.max(HINT_FONT_SIZE_MIN, Math.round(n)),
+  );
 }
 
 function hintCss(theme: string, fontSize: unknown): string {

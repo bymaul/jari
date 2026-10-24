@@ -24,14 +24,12 @@ try {
 } catch {}
 
 function storedAt(data: StoredThing | null): number {
-  return (data && Number.isFinite(data.updatedAt)
+  return data && Number.isFinite(data.updatedAt)
     ? (data.updatedAt as number)
-    : 0);
+    : 0;
 }
 
-async function readOne(
-  area: "sync" | "local",
-): Promise<StoredThing | null> {
+async function readOne(area: "sync" | "local"): Promise<StoredThing | null> {
   try {
     const stored = await chrome.storage[area].get(STORAGE_KEY);
     if (stored && stored[STORAGE_KEY])
@@ -51,7 +49,7 @@ async function readSettings(): Promise<StoredThing | null> {
 
 function isQuotaError(err: unknown): boolean {
   return /quota/i.test(
-    String(err && (err as { message?: unknown }).message || err || ""),
+    String((err && (err as { message?: unknown }).message) || err || ""),
   );
 }
 

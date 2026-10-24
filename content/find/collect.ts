@@ -9,7 +9,16 @@ function shouldSkipNode(node: Node): boolean {
   const parent = node.parentElement;
   if (!parent) return true;
   const tag = parent.tagName;
-  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "IFRAME" || tag === "CANVAS" || tag === "SVG") return true;
+  if (
+    tag === "SCRIPT" ||
+    tag === "STYLE" ||
+    tag === "NOSCRIPT" ||
+    tag === "TEMPLATE" ||
+    tag === "IFRAME" ||
+    tag === "CANVAS" ||
+    tag === "SVG"
+  )
+    return true;
   try {
     if (parent.closest && parent.closest(SKIP_SELECTOR)) return true;
   } catch {}
@@ -56,17 +65,14 @@ export function collectTextNodes(): Node[] {
   const rootEl = document.body || document.documentElement;
   if (!rootEl) return out;
   try {
-    const walker = document.createTreeWalker(
-      rootEl,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node) {
-          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-          if (shouldSkipNode(node)) return NodeFilter.FILTER_REJECT;
-          return NodeFilter.FILTER_ACCEPT;
-        },
+    const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue || !node.nodeValue.trim())
+          return NodeFilter.FILTER_REJECT;
+        if (shouldSkipNode(node)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
       },
-    );
+    });
     let node = walker.nextNode();
     while (node) {
       out.push(node);
@@ -79,7 +85,9 @@ export function collectTextNodes(): Node[] {
       let els: NodeListOf<Element>;
       try {
         els = root.querySelectorAll("*");
-      } catch { return; }
+      } catch {
+        return;
+      }
       for (const el of els) {
         if (el.shadowRoot) {
           try {
@@ -88,7 +96,8 @@ export function collectTextNodes(): Node[] {
               NodeFilter.SHOW_TEXT,
               {
                 acceptNode(n) {
-                  if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                  if (!n.nodeValue || !n.nodeValue.trim())
+                    return NodeFilter.FILTER_REJECT;
                   if (shouldSkipNode(n)) return NodeFilter.FILTER_REJECT;
                   return NodeFilter.FILTER_ACCEPT;
                 },
@@ -109,11 +118,13 @@ export function collectTextNodes(): Node[] {
             if (doc && doc.body) {
               const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
                 acceptNode(n) {
-                  if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                  if (!n.nodeValue || !n.nodeValue.trim())
+                    return NodeFilter.FILTER_REJECT;
                   const p = n.parentElement;
                   if (!p) return NodeFilter.FILTER_REJECT;
                   const tag = p.tagName;
-                  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
+                  if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT")
+                    return NodeFilter.FILTER_REJECT;
                   return NodeFilter.FILTER_ACCEPT;
                 },
               });

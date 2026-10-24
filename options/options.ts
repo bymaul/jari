@@ -36,15 +36,15 @@ const statusEl = document.querySelector<
 >("#status")!;
 const saveStateEl = document.querySelector<HTMLElement>("#save-state");
 const disabledList = document.querySelector<HTMLElement>("#disabled-list")!;
-const scrollStepEl =
-  document.querySelector<HTMLInputElement>("#scroll-step")!;
+const scrollStepEl = document.querySelector<HTMLInputElement>("#scroll-step")!;
 const smoothScrollEl =
   document.querySelector<HTMLInputElement>("#smooth-scroll")!;
 const fuzzyMatchingEl =
   document.querySelector<HTMLInputElement>("#fuzzy-matching")!;
 const timeoutEl = document.querySelector<HTMLInputElement>("#timeout")!;
-const passthroughEl =
-  document.querySelector<HTMLInputElement>("#passthrough-timeout")!;
+const passthroughEl = document.querySelector<HTMLInputElement>(
+  "#passthrough-timeout",
+)!;
 const clueEnabledEl =
   document.querySelector<HTMLInputElement>("#clue-enabled")!;
 const clueDelayEl = document.querySelector<HTMLInputElement>("#clue-delay")!;
@@ -53,32 +53,26 @@ const sourceHistoryEl =
   document.querySelector<HTMLInputElement>("#source-history")!;
 const sourceBookmarkEl =
   document.querySelector<HTMLInputElement>("#source-bookmark")!;
-const maxResultsEl =
-  document.querySelector<HTMLInputElement>("#max-results")!;
-const copyFormatEl =
-  document.querySelector<HTMLSelectElement>("#copy-format")!;
+const maxResultsEl = document.querySelector<HTMLInputElement>("#max-results")!;
+const copyFormatEl = document.querySelector<HTMLSelectElement>("#copy-format")!;
 const hintCharsEl = document.querySelector<HTMLInputElement>("#hint-chars")!;
-const hintCharsMetaEl = document.querySelector<HTMLElement>(
-  "#hint-chars-meta",
-);
+const hintCharsMetaEl = document.querySelector<HTMLElement>("#hint-chars-meta");
 const clickableSelectorEl = document.querySelector<HTMLInputElement>(
   "#clickable-selector",
 );
-const hintThemeEl =
-  document.querySelector<HTMLSelectElement>("#hint-theme");
-const hintFontSizeEl = document.querySelector<HTMLInputElement>(
-  "#hint-font-size",
-)!;
+const hintThemeEl = document.querySelector<HTMLSelectElement>("#hint-theme");
+const hintFontSizeEl =
+  document.querySelector<HTMLInputElement>("#hint-font-size")!;
 const keymapFilterEl =
   document.querySelector<HTMLInputElement>("#keymap-filter")!;
 const keymapUnboundEl =
   document.querySelector<HTMLInputElement>("#keymap-unbound");
 const keymapCountEl = document.querySelector<HTMLElement>("#keymap-count");
-const siteInputEl =
-  document.querySelector<HTMLInputElement>("#disabled-site-input")!;
-const addSiteBtn = document.querySelector<HTMLButtonElement>(
-  "#add-disabled-site",
+const siteInputEl = document.querySelector<HTMLInputElement>(
+  "#disabled-site-input",
 )!;
+const addSiteBtn =
+  document.querySelector<HTMLButtonElement>("#add-disabled-site")!;
 const siteErrorEl = document.querySelector<HTMLElement>("#site-error");
 const summaries: Record<string, HTMLElement | null> = {
   scrolling: document.querySelector("#summary-scrolling"),
@@ -340,11 +334,7 @@ async function load(): Promise<void> {
   updateAddButton();
 }
 
-function matchesFilter(
-  name: string,
-  cmd: CommandDef,
-  filter: string,
-): boolean {
+function matchesFilter(name: string, cmd: CommandDef, filter: string): boolean {
   if (name.toLowerCase().includes(filter)) return true;
   if (cmd.label.toLowerCase().includes(filter)) return true;
   return keysFor(name).some((key) => key.toLowerCase().includes(filter));
@@ -670,7 +660,9 @@ function onAddKeydown(
           : "Press a key… Esc cancels.";
       }
       status(
-        keys ? `Sequence ${shown} — press the next key, or Enter to save` : "Press a key",
+        keys
+          ? `Sequence ${shown} — press the next key, or Enter to save`
+          : "Press a key",
       );
       return;
     }
@@ -693,7 +685,8 @@ function onAddKeydown(
     activeRecording!.waitingKeys.push(combo);
     const shown = displayCombo(activeRecording!.waitingKeys.join(""));
     const hint = recordingHintEl(button);
-    if (hint) hint.textContent = `Next key for ${shown}… or Enter to save ${shown}`;
+    if (hint)
+      hint.textContent = `Next key for ${shown}… or Enter to save ${shown}`;
     status(`Sequence ${shown} — press the next key, or Enter to save`);
     return;
   }
@@ -807,10 +800,7 @@ async function commitCombo(
   focusChipFor(name, combo);
 }
 
-async function clearBinding(
-  name: string,
-  specificKey: string,
-): Promise<void> {
+async function clearBinding(name: string, specificKey: string): Promise<void> {
   cancelRecordingSilent();
   const keymap = settings.getKeymap();
   const removed: string[] = [];

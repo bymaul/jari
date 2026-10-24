@@ -163,7 +163,8 @@ export interface Messages {
   };
   historyTreeList: {
     payload: Record<string, never>;
-    response: { ok: true; rows: HistoryTreeRow[]; currentId: number | null } | Fail;
+    response:
+      { ok: true; rows: HistoryTreeRow[]; currentId: number | null } | Fail;
   };
   historyTreeGo: {
     payload: { nodeId?: number; historyLength?: number };
@@ -210,11 +211,15 @@ export interface Messages {
   };
   groupManagerTabs: {
     payload: { ids?: number[]; groupId?: number };
-    response: { ok: true; groupId?: number } | { ok: false; reason?: "unsupported"; error?: string };
+    response:
+      | { ok: true; groupId?: number }
+      | { ok: false; reason?: "unsupported"; error?: string };
   };
   ungroupManagerTabs: {
     payload: { ids?: number[] };
-    response: { ok: true; ungrouped: number } | { ok: false; reason?: "unsupported"; error?: string };
+    response:
+      | { ok: true; ungrouped: number }
+      | { ok: false; reason?: "unsupported"; error?: string };
   };
   renameGroup: {
     payload: { groupId?: number; title?: unknown };
@@ -237,7 +242,12 @@ export interface Messages {
     response: Suggestion[] | Fail;
   };
   search: {
-    payload: { query?: string; newTab?: boolean; incognito?: boolean; background?: boolean };
+    payload: {
+      query?: string;
+      newTab?: boolean;
+      incognito?: boolean;
+      background?: boolean;
+    };
     response: { ok: true; id?: number } | Fail;
   };
   activateTab: {
@@ -274,4 +284,5 @@ export type ShowHelpMessage = { action: "jari-show-help" };
 
 export type Action = keyof Messages;
 export type MessagePayload<A extends Action = Action> = Messages[A]["payload"];
-export type MessageResponse<A extends Action = Action> = Messages[A]["response"];
+export type MessageResponse<A extends Action = Action> =
+  Messages[A]["response"];

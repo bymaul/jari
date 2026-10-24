@@ -168,7 +168,11 @@ export function getVisibleElements(
   prefilter?: (e: Element) => boolean,
 ): Element[] {
   const visibleElements: Element[] = [];
-  for (const e of listElements(document.documentElement, SHOW_ELEMENT, () => true)) {
+  for (const e of listElements(
+    document.documentElement,
+    SHOW_ELEMENT,
+    () => true,
+  )) {
     if (prefilter) {
       let pass;
       try {
@@ -209,11 +213,7 @@ function pushSubtree(
   seen: Set<Node>,
   pool: Element[],
 ): void {
-  if (
-    !root ||
-    (root.nodeType !== 1 && root.nodeType !== 11) ||
-    seen.has(root)
-  )
+  if (!root || (root.nodeType !== 1 && root.nodeType !== 11) || seen.has(root))
     return;
   seen.add(root);
   if (root.nodeType === 1) pool.push(root as Element);
@@ -413,10 +413,7 @@ export function filterAncestors(
     }
     for (let j = 0; j < result.length; j++) {
       if (result[j].contains(e)) {
-        if (
-          result[j].tagName !== "A" ||
-          !(result[j] as HTMLAnchorElement).href
-        )
+        if (result[j].tagName !== "A" || !(result[j] as HTMLAnchorElement).href)
           result[j] = e;
         return;
       } else if (result[j].shadowRoot && result[j].shadowRoot!.contains(e)) {
@@ -440,8 +437,7 @@ export function filterOverlapElements(elements: Element[]): Element[] {
     )
       return false;
     if (
-      (e.matches &&
-        e.matches("input, textarea, select, form")) ||
+      (e.matches && e.matches("input, textarea, select, form")) ||
       (e as HTMLElement).contentEditable === "true" ||
       isExplicitlyRequested(e)
     )
@@ -449,9 +445,10 @@ export function filterOverlapElements(elements: Element[]): Element[] {
     try {
       if (e.closest && e.closest(overlaySelectors)) return false;
     } catch {}
-    const el = (
-      e.getRootNode() as Document | ShadowRoot
-    ).elementFromPoint(be.left + be.width / 2, be.top + be.height / 2);
+    const el = (e.getRootNode() as Document | ShadowRoot).elementFromPoint(
+      be.left + be.width / 2,
+      be.top + be.height / 2,
+    );
     return (
       !el ||
       (el.shadowRoot &&
@@ -536,16 +533,16 @@ export function getFrameElements(): Element[] {
   return elements;
 }
 
-export function getHref(
-  el: Element,
-  base?: string,
-): string | null {
+export function getHref(el: Element, base?: string): string | null {
   const raw = el.getAttribute
     ? (el.getAttribute("href") ?? el.getAttribute("xlink:href"))
     : null;
   if (raw != null && (raw.startsWith("#") || raw.trim() === "")) return null;
   try {
-    if (typeof (el as HTMLAnchorElement).href === "string" && (el as HTMLAnchorElement).href)
+    if (
+      typeof (el as HTMLAnchorElement).href === "string" &&
+      (el as HTMLAnchorElement).href
+    )
       return (el as HTMLAnchorElement).href;
   } catch {}
   if (!raw) return null;
@@ -606,8 +603,9 @@ export function getLinkAncestor(
       cur = parent;
     } else {
       const root: unknown = cur.getRootNode && cur.getRootNode();
-      const host: Element | null | undefined =
-        root ? (root as unknown as { host?: Element }).host : null;
+      const host: Element | null | undefined = root
+        ? (root as unknown as { host?: Element }).host
+        : null;
       if (host) cur = host;
       else break;
     }
@@ -679,11 +677,7 @@ export function collectElements(requestedMode: string): Element[] {
   return raw;
 }
 
-export function translateRect(
-  rect: DOMRect,
-  dx: number,
-  dy: number,
-): RectLike {
+export function translateRect(rect: DOMRect, dx: number, dy: number): RectLike {
   return {
     left: rect.left + dx,
     top: rect.top + dy,
@@ -735,7 +729,12 @@ function getAccessibleFrameDocs(): {
       continue;
     }
     if (!rect) continue;
-    if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
+    if (
+      rect.bottom <= 0 ||
+      rect.right <= 0 ||
+      rect.top >= vh ||
+      rect.left >= vw
+    )
       continue;
     out.push({ frame: htmlFrame, doc, rect });
   }
@@ -762,10 +761,7 @@ function eachInnerElement(doc: Document, fn: (el: Element) => void): void {
   } catch {}
 }
 
-function innerPointVisible(
-  el: Element,
-  be: RectLike,
-): boolean {
+function innerPointVisible(el: Element, be: RectLike): boolean {
   try {
     const doc = el.ownerDocument;
     if (!doc || typeof doc.elementFromPoint !== "function") return true;
@@ -843,7 +839,11 @@ export function collectIframeElements(requestedMode: string): Element[] {
       try {
         if (el.closest && el.closest(overlaySelectors)) return;
       } catch {}
-      if ((el as HTMLInputElement).disabled || (el as HTMLInputElement).readOnly) return;
+      if (
+        (el as HTMLInputElement).disabled ||
+        (el as HTMLInputElement).readOnly
+      )
+        return;
       if (!innerPointVisible(el, be)) return;
       try {
         const jel = el as JariElement;

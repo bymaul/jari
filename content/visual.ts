@@ -43,11 +43,7 @@ type LastFindChar = PendingFindChar & { ch: string };
 /** DOM selection.modify() direction/granularity spellings. */
 type SelectionModifyDirection = "forward" | "backward" | "left" | "right";
 type SelectionModifyGranularity =
-  | "character"
-  | "word"
-  | "line"
-  | "lineboundary"
-  | "documentboundary";
+  "character" | "word" | "line" | "lineboundary" | "documentboundary";
 
 let active = false;
 let mode: VisualMode = "visual"; // "visual" | "line" | "caret"
@@ -151,10 +147,7 @@ function caretCss(): string {
 function showBlockCaret(): void {
   if (caretEl) return;
   try {
-    const created = ui.createShadowHost(
-      "jari-visual-caret-host",
-      caretCss(),
-    );
+    const created = ui.createShadowHost("jari-visual-caret-host", caretCss());
     caretHost = created.host;
     const shadow = created.shadow;
     caretEl = document.createElement("div");
@@ -232,7 +225,8 @@ function updateBlockCaretImmediate(): void {
         if (parentEl) {
           const cr = parentEl.getClientRects();
           parentRect =
-            (cr && cr.length ? cr[0] : null) || parentEl.getBoundingClientRect();
+            (cr && cr.length ? cr[0] : null) ||
+            parentEl.getBoundingClientRect();
         }
       } catch {
         parentRect = null;
@@ -654,11 +648,6 @@ function doMoveChar(dir: number): void {
   updateBlockCaret();
 }
 
-
-
-
-
-
 function doMoveLine(dir: number): void {
   if (isCaret()) {
     let ok = moveCaret(dir < 0 ? "backward" : "forward", "line");
@@ -968,7 +957,8 @@ function getCaretLinkElement(): Element | null {
   if (!sel || !sel.focusNode) return null;
   const el =
     sel.focusNode.parentElement ||
-    ((sel.focusNode.parentNode as Element | null) || null);
+    (sel.focusNode.parentNode as Element | null) ||
+    null;
   return getLinkAncestor(el);
 }
 
@@ -1002,7 +992,12 @@ function handleFChar(ch: string): void {
         const p = node.parentElement;
         if (p) {
           const tag = p.tagName;
-          if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
+          if (
+            tag === "SCRIPT" ||
+            tag === "STYLE" ||
+            tag === "NOSCRIPT" ||
+            tag === "TEMPLATE"
+          ) {
             return NodeFilter.FILTER_REJECT;
           }
         }

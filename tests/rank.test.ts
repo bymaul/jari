@@ -32,7 +32,11 @@ test("rankMatches orders by score, then tightness, then text length", () => {
   const items = [
     { title: "g h", url: "https://g-h.example", source: "history" },
     { title: "GitHub", url: "https://github.com", source: "tab" },
-    { title: "GitHub Actions", url: "https://github.com/actions", source: "history" },
+    {
+      title: "GitHub Actions",
+      url: "https://github.com/actions",
+      source: "history",
+    },
     { title: "Go home", url: "https://home.example", source: "history" },
   ];
   const titles = rankMatches("gh", items).map((x) => x.item.title);
@@ -41,7 +45,11 @@ test("rankMatches orders by score, then tightness, then text length", () => {
 
 test("rankMatches breaks score ties by shorter text, then source", () => {
   const items = [
-    { title: "GitHub Actions", url: "https://github.com/actions", source: "history" },
+    {
+      title: "GitHub Actions",
+      url: "https://github.com/actions",
+      source: "history",
+    },
     { title: "GitHub", url: "https://github.com", source: "tab" },
   ];
   assert.deepEqual(
@@ -83,8 +91,16 @@ test("rankMatches with fuzzy matching off keeps the original order", () => {
 
 test("rankMatches finds youtube from the ytb shorthand", () => {
   const items = [
-    { title: "GitHub: opencode", url: "https://github.com/anomalyco/opencode", source: "tab" },
-    { title: "lofi hip hop radio - YouTube", url: "https://www.youtube.com/watch?v=jfKfPfyJRdk", source: "tab" },
+    {
+      title: "GitHub: opencode",
+      url: "https://github.com/anomalyco/opencode",
+      source: "tab",
+    },
+    {
+      title: "lofi hip hop radio - YouTube",
+      url: "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+      source: "tab",
+    },
   ];
   const titles = rankMatches("ytb", items).map((x) => x.item.title);
   assert.ok(titles.includes("lofi hip hop radio - YouTube"));
@@ -99,9 +115,7 @@ test("fuzzyMatch skips terms with chars missing from the target", () => {
 });
 
 test("rankMatches rejects a fuzzy match spanning the title/url seam", () => {
-  const items = [
-    { title: "Team", url: "https://plug.io/" },
-  ];
+  const items = [{ title: "Team", url: "https://plug.io/" }];
   assert.equal(rankMatches("ampl", items).length, 0);
 });
 
@@ -140,10 +154,17 @@ test("rankMatches still finds a page by a literal query string", () => {
 
 test("rankMatches favors matched fields over boosted loose matches", () => {
   const items = [
-    { title: "Eff Ace Bed Lock", url: "https://noise.example/", visitCount: 9999 },
+    {
+      title: "Eff Ace Bed Lock",
+      url: "https://noise.example/",
+      visitCount: 9999,
+    },
     { title: "Facebook", url: "https://facebook.com/", visitCount: 1 },
   ];
-  assert.equal(rankMatches("facebok", items)[0].item.url, "https://facebook.com/");
+  assert.equal(
+    rankMatches("facebok", items)[0].item.url,
+    "https://facebook.com/",
+  );
 });
 
 test("rankMatches ranks a title hit above a fresher url hit", () => {

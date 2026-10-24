@@ -1,7 +1,11 @@
 import { normalizeUrl } from "../shared/url.ts";
 import { clampCount } from "./utils.ts";
 import { bookmarkedUrlKeys, bookmarkUrlKey } from "./bookmarks.ts";
-import { focusWindow, moveTabIntoWindowAndFocus, openInIncognito } from "./windows.ts";
+import {
+  focusWindow,
+  moveTabIntoWindowAndFocus,
+  openInIncognito,
+} from "./windows.ts";
 import type {
   GroupSummary,
   ManagerTab,
@@ -243,7 +247,10 @@ export async function moveManagerTabsToWindow(
   }
   for (const id of live) {
     const tab = byId.get(id);
-    selectedByWindow.set(tab!.windowId, (selectedByWindow.get(tab!.windowId) || 0) + 1);
+    selectedByWindow.set(
+      tab!.windowId,
+      (selectedByWindow.get(tab!.windowId) || 0) + 1,
+    );
   }
   const emptied = new Set();
   for (const [windowId, count] of selectedByWindow) {
@@ -337,11 +344,15 @@ export async function moveManagerTabsIntoWindow(
   return { ok: true, moved: live.length };
 }
 
-export async function moveTabLeft(sender: Sender): Promise<MessageResponse<"moveTabLeft">> {
+export async function moveTabLeft(
+  sender: Sender,
+): Promise<MessageResponse<"moveTabLeft">> {
   return moveTab(sender, -1);
 }
 
-export async function moveTabRight(sender: Sender): Promise<MessageResponse<"moveTabRight">> {
+export async function moveTabRight(
+  sender: Sender,
+): Promise<MessageResponse<"moveTabRight">> {
   return moveTab(sender, 1);
 }
 
@@ -364,11 +375,15 @@ export async function reloadTab(
   return { ok: false };
 }
 
-export async function goBack(sender: Sender): Promise<MessageResponse<"goBack">> {
+export async function goBack(
+  sender: Sender,
+): Promise<MessageResponse<"goBack">> {
   return goHistory(sender.tab, -1);
 }
 
-export async function goForward(sender: Sender): Promise<MessageResponse<"goForward">> {
+export async function goForward(
+  sender: Sender,
+): Promise<MessageResponse<"goForward">> {
   return goHistory(sender.tab, 1);
 }
 
@@ -472,12 +487,15 @@ export async function managerList(
       }));
     }
   } catch {}
-  return { ok: true, tabs, groups, currentWindowId: await currentWindowId(sender) };
+  return {
+    ok: true,
+    tabs,
+    groups,
+    currentWindowId: await currentWindowId(sender),
+  };
 }
 
-async function currentWindowId(
-  sender: Sender,
-): Promise<number | null> {
+async function currentWindowId(sender: Sender): Promise<number | null> {
   if (sender && sender.tab && Number.isInteger(sender.tab.windowId)) {
     return sender.tab.windowId as number;
   }
@@ -590,9 +608,7 @@ export async function moveManagerTabs(
       const sequenced = group
         .filter((id) => pos.has(id))
         .sort((a, b) =>
-          dir > 0
-            ? pos.get(b)! - pos.get(a)!
-            : pos.get(a)! - pos.get(b)!,
+          dir > 0 ? pos.get(b)! - pos.get(a)! : pos.get(a)! - pos.get(b)!,
         );
       for (const id of sequenced) {
         const from = order.indexOf(id);
@@ -627,7 +643,8 @@ export async function duplicateManagerTabs(
   const activeBefore = new Map<number | undefined, number | undefined>();
   try {
     for (const tab of (await chrome.tabs.query({ active: true })) || []) {
-      if (tab && Number.isInteger(tab.windowId)) activeBefore.set(tab.windowId, tab.id);
+      if (tab && Number.isInteger(tab.windowId))
+        activeBefore.set(tab.windowId, tab.id);
     }
   } catch {}
   const created: chrome.tabs.Tab[] = [];
@@ -640,7 +657,9 @@ export async function duplicateManagerTabs(
   for (const windowId of new Set(created.map((tab) => tab.windowId))) {
     const previous = activeBefore.get(windowId);
     if (previous === undefined) continue;
-    if (created.some((tab) => tab.windowId === windowId && tab.id === previous)) {
+    if (
+      created.some((tab) => tab.windowId === windowId && tab.id === previous)
+    ) {
       continue;
     }
     try {
@@ -879,7 +898,9 @@ function extensionsPageUrl(): string | null {
   return "chrome://extensions";
 }
 
-export async function openExtensions(): Promise<MessageResponse<"openExtensions">> {
+export async function openExtensions(): Promise<
+  MessageResponse<"openExtensions">
+> {
   const url = extensionsPageUrl();
   if (!url) return { ok: false, reason: "blocked" };
   try {

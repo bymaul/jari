@@ -46,7 +46,9 @@ function restoreWordStubs(saved: {
 }): void {
   const doc = globalThis.document as unknown as FakeDocWithWalker;
   if (saved.walker === undefined) delete doc.createTreeWalker;
-  else doc.createTreeWalker = saved.walker as FakeDocWithWalker["createTreeWalker"];
+  else
+    doc.createTreeWalker =
+      saved.walker as FakeDocWithWalker["createTreeWalker"];
   const globalNodeFilter = globalThis as unknown as { NodeFilter?: unknown };
   if (saved.nf === undefined) delete globalNodeFilter.NodeFilter;
   else globalNodeFilter.NodeFilter = saved.nf;

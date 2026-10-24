@@ -134,8 +134,7 @@ function isJariUiTarget(event: Event): boolean {
   try {
     if (typeof event.composedPath === "function") path = event.composedPath();
   } catch {}
-  const nodes =
-    Array.isArray(path) && path.length > 0 ? path : [event.target];
+  const nodes = Array.isArray(path) && path.length > 0 ? path : [event.target];
   for (const node of nodes) {
     try {
       const cls = node && (node as { className?: unknown }).className;
@@ -165,9 +164,7 @@ export function shieldOverlayKey(event: KeyboardEvent): void {
 function handleKeydown(event: KeyboardEvent): boolean | void {
   if (!event.isTrusted) return;
 
-  if (
-    (window as { __jariOptionsRecording?: unknown }).__jariOptionsRecording
-  ) {
+  if ((window as { __jariOptionsRecording?: unknown }).__jariOptionsRecording) {
     clearPending();
     return;
   }
@@ -272,7 +269,10 @@ function handleKeydown(event: KeyboardEvent): boolean | void {
     if (Find.handleGlobalEnter(event)) return;
   }
 
-  if (!commandName && (/^[1-9]$/.test(key) || (key === "0" && pendingCount !== ""))) {
+  if (
+    !commandName &&
+    (/^[1-9]$/.test(key) || (key === "0" && pendingCount !== ""))
+  ) {
     if (pendingCount.length < 9) pendingCount += key;
     ui.showcmd(pendingCount);
     ui.consume(event);

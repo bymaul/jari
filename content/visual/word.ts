@@ -11,17 +11,26 @@ export function findNextWordEnd(
   if (!sel || !sel.focusNode) return null;
   const startNode = sel.focusNode;
   const startOffset = sel.focusOffset;
-  const walker = document.createTreeWalker(document.body!, NodeFilter.SHOW_TEXT, {
-    acceptNode(n: Node) {
-      const p = n.parentElement;
-      if (!p) return NodeFilter.FILTER_REJECT;
-      const tag = p.tagName;
-      if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return NodeFilter.FILTER_ACCEPT;
+  const walker = document.createTreeWalker(
+    document.body!,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(n: Node) {
+        const p = n.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        const tag = p.tagName;
+        if (
+          tag === "SCRIPT" ||
+          tag === "STYLE" ||
+          tag === "NOSCRIPT" ||
+          tag === "TEMPLATE"
+        ) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
     },
-  });
+  );
   const nodes: Node[] = [];
   let n = walker.nextNode();
   while (n) {
@@ -46,7 +55,8 @@ export function findNextWordEnd(
       } else {
         while (pos < txt.length && isWordChar(txt[pos])) pos++;
         if (pos >= txt.length) {
-          const nextTxt = i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
+          const nextTxt =
+            i + 1 < nodes.length ? nodes[i + 1].nodeValue || "" : "";
           if (nextTxt && isWordChar(nextTxt[0])) break;
           if (txt.length === 0) break;
           const wordEnd = txt.length - 1;

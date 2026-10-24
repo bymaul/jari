@@ -20,7 +20,10 @@ test("normalizeUrl assumes https for bare hosts", () => {
 test("normalizeUrl assumes http for localhost", () => {
   assert.equal(normalizeUrl("localhost"), "http://localhost");
   assert.equal(normalizeUrl("localhost:3000"), "http://localhost:3000");
-  assert.equal(normalizeUrl("localhost:8080/path"), "http://localhost:8080/path");
+  assert.equal(
+    normalizeUrl("localhost:8080/path"),
+    "http://localhost:8080/path",
+  );
   assert.equal(normalizeUrl("127.0.0.1:3000"), "http://127.0.0.1:3000");
 });
 
@@ -41,9 +44,18 @@ test("normalizeUrl keeps host:port but rejects unknown schemes", () => {
   assert.equal(normalizeUrl("tel:+123"), null);
   assert.equal(normalizeUrl("steam:run/xyz"), null);
   assert.equal(normalizeUrl("example.com:8080"), "https://example.com:8080");
-  assert.equal(normalizeUrl("example.com:8080?x=1"), "https://example.com:8080?x=1");
-  assert.equal(normalizeUrl("example.com:8080#h"), "https://example.com:8080#h");
-  assert.equal(normalizeUrl("example.com:8080/path?x=1#y"), "https://example.com:8080/path?x=1#y");
+  assert.equal(
+    normalizeUrl("example.com:8080?x=1"),
+    "https://example.com:8080?x=1",
+  );
+  assert.equal(
+    normalizeUrl("example.com:8080#h"),
+    "https://example.com:8080#h",
+  );
+  assert.equal(
+    normalizeUrl("example.com:8080/path?x=1#y"),
+    "https://example.com:8080/path?x=1#y",
+  );
   assert.equal(normalizeUrl("example.com:"), null);
   assert.equal(normalizeUrl("example.com:/path"), null);
   assert.equal(normalizeUrl("example.com:99999"), null);
@@ -69,7 +81,10 @@ test("normalizeUrl treats unknown bare TLDs as search, explicit scheme as URL", 
 test("normalizeUrl keeps http for localhost variants with query or fragment", () => {
   assert.equal(normalizeUrl("localhost?x=1"), "http://localhost?x=1");
   assert.equal(normalizeUrl("localhost#frag"), "http://localhost#frag");
-  assert.equal(normalizeUrl("localhost:3000/path?q=1#h"), "http://localhost:3000/path?q=1#h");
+  assert.equal(
+    normalizeUrl("localhost:3000/path?q=1#h"),
+    "http://localhost:3000/path?q=1#h",
+  );
   assert.equal(normalizeUrl("0.0.0.0:3000"), "http://0.0.0.0:3000");
 });
 
@@ -93,7 +108,10 @@ test("Url.parentUrlOf climbs one path segment", () => {
   const { parentUrlOf } = Url;
   assert.equal(parentUrlOf("https://acme.com/1/2/3"), "https://acme.com/1/2");
   assert.equal(parentUrlOf("https://acme.com/1/2/"), "https://acme.com/1");
-  assert.equal(parentUrlOf("https://acme.com/1/2/3.html"), "https://acme.com/1/2");
+  assert.equal(
+    parentUrlOf("https://acme.com/1/2/3.html"),
+    "https://acme.com/1/2",
+  );
   assert.equal(parentUrlOf("https://acme.com/"), "https://acme.com/");
   assert.equal(parentUrlOf("not a url"), "not a url");
 });
@@ -182,7 +200,10 @@ test("URL schemes are the single shared source", () => {
 test("normalizeSitePattern keeps hosts and *. wildcards", () => {
   assert.equal(normalizeSitePattern("example.com"), "example.com");
   assert.equal(normalizeSitePattern("*.Example.COM"), "*.example.com");
-  assert.equal(normalizeSitePattern(" https://sub.example.com:8080/a "), "sub.example.com");
+  assert.equal(
+    normalizeSitePattern(" https://sub.example.com:8080/a "),
+    "sub.example.com",
+  );
   assert.equal(normalizeSitePattern("file://"), "file://");
   assert.equal(normalizeSitePattern(""), "");
   assert.equal(normalizeSitePattern("not a host"), "");
@@ -195,9 +216,15 @@ test("matchesSitePattern matches exact, wildcard and file entries", () => {
   assert.equal(matchesSitePattern("other.com", "example.com"), false);
   assert.equal(matchesSitePattern("sub.example.com", "*.example.com"), true);
   assert.equal(matchesSitePattern("example.com", "*.example.com"), true);
-  assert.equal(matchesSitePattern("deep.sub.example.com", "*.example.com"), true);
+  assert.equal(
+    matchesSitePattern("deep.sub.example.com", "*.example.com"),
+    true,
+  );
   assert.equal(matchesSitePattern("notexample.com", "*.example.com"), false);
-  assert.equal(matchesSitePattern("example.com.evil.com", "*.example.com"), false);
+  assert.equal(
+    matchesSitePattern("example.com.evil.com", "*.example.com"),
+    false,
+  );
   assert.equal(matchesSitePattern("", "file://", "file:"), true);
   assert.equal(matchesSitePattern("example.com", "file://", "https:"), false);
   assert.equal(matchesSitePattern("a.com", ""), false);

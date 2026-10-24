@@ -2,7 +2,8 @@ import "./setup.ts";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
-const { Scroll, frameScrollBox, __smoothFrameMove } = await import("../content/scroll.ts");
+const { Scroll, frameScrollBox, __smoothFrameMove } =
+  await import("../content/scroll.ts");
 
 const VW = 800;
 const VH = 600;
@@ -242,7 +243,10 @@ test("a frame with a scrollable inner panel is a stop", () => {
 test("frameScrollBox resolves the inner panel, null for the rest", () => {
   const { frame, inner } = makeChatFrame();
   assert.equal(frameScrollBox(frame as unknown as HTMLIFrameElement), inner);
-  assert.equal(frameScrollBox(makeDeadFrame() as unknown as HTMLIFrameElement), null);
+  assert.equal(
+    frameScrollBox(makeDeadFrame() as unknown as HTMLIFrameElement),
+    null,
+  );
   assert.equal(frameScrollBox(area as unknown as HTMLIFrameElement), null);
 });
 
@@ -278,23 +282,21 @@ test("reset releases frame focus and returns to the page", () => {
   assert.ok(windowCalls.focus > 0, "expected focus to return to the page");
 });
 
-function makeAreaAt(
-  {
-    top = 0,
-    left = 0,
-    w = 200,
-    h = 200,
-    overflow = 400,
-    tag = "DIV",
-  }: {
-    top?: number;
-    left?: number;
-    w?: number;
-    h?: number;
-    overflow?: number;
-    tag?: string;
-  } = {},
-) {
+function makeAreaAt({
+  top = 0,
+  left = 0,
+  w = 200,
+  h = 200,
+  overflow = 400,
+  tag = "DIV",
+}: {
+  top?: number;
+  left?: number;
+  w?: number;
+  h?: number;
+  overflow?: number;
+  tag?: string;
+} = {}) {
   const el = makeArea();
   el.tagName = tag;
   el.clientHeight = h;
@@ -387,7 +389,13 @@ test("stops after the first pick follow visual top-to-bottom order", () => {
 
 test("nested wrappers collapse to a single stop", () => {
   const outer = makeAreaAt({ overflow: 900 });
-  const inner = makeAreaAt({ left: 10, top: 10, w: 100, h: 100, overflow: 400 });
+  const inner = makeAreaAt({
+    left: 10,
+    top: 10,
+    w: 100,
+    h: 100,
+    overflow: 400,
+  });
   outer.contains = (node) => node === inner;
   useFixtures([outer, inner]);
   try {

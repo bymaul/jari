@@ -45,16 +45,13 @@ function hide() {
 
 function displaySuffix(suffix: string): string {
   if (suffix === " ") return "<Space>";
-  return suffix.length > 1
-    ? `${suffix[0]} ▸ ${suffix.slice(1)}`
-    : suffix;
+  return suffix.length > 1 ? `${suffix[0]} ▸ ${suffix.slice(1)}` : suffix;
 }
 
 function paint(): void {
   if (!clueEl || !listEl || !titleEl) return;
   const rows = getPrefixEntries(settings.getKeymap(), renderPrefix);
-  titleEl.textContent =
-    `${renderCount || ""}${displayCombo(renderPrefix)} — ${rows.length} bindings`;
+  titleEl.textContent = `${renderCount || ""}${displayCombo(renderPrefix)} — ${rows.length} bindings`;
   listEl.textContent = "";
   for (const { suffix, command } of rows) {
     const row = document.createElement("div");

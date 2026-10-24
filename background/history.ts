@@ -147,11 +147,7 @@ function spinePush(tree: TabTree, nodeId: number): void {
   tree.spineAt = tree.spine.length - 1;
 }
 
-function spineReanchor(
-  tree: TabTree,
-  url: string,
-  exactId?: number,
-): void {
+function spineReanchor(tree: TabTree, url: string, exactId?: number): void {
   if (exactId !== undefined) {
     const idx = tree.spine.indexOf(exactId);
     if (idx >= 0) {
@@ -319,8 +315,7 @@ export function linearizeTab(tree: TabTree): {
     marks: string[],
     isLast: boolean,
   ): void => {
-    const glyph =
-      depth === 0 ? "" : `${isLast ? "└─" : "├─"} `;
+    const glyph = depth === 0 ? "" : `${isLast ? "└─" : "├─"} `;
     rows.push({
       id: node.id,
       url: node.url,
@@ -330,17 +325,11 @@ export function linearizeTab(tree: TabTree): {
       seq: ++seq,
       prefix: marks.join("") + glyph,
     });
-    const childMarks =
-      depth === 0 ? marks : [...marks, isLast ? "   " : "│  "];
+    const childMarks = depth === 0 ? marks : [...marks, isLast ? "   " : "│  "];
     for (let i = 0; i < node.children.length; i++) {
       const child = tree.nodes.get(node.children[i]);
       if (!child) continue;
-      visit(
-        child,
-        depth + 1,
-        childMarks,
-        i === node.children.length - 1,
-      );
+      visit(child, depth + 1, childMarks, i === node.children.length - 1);
     }
   };
   for (const node of tree.nodes.values()) {
@@ -423,7 +412,12 @@ export function serializeStore(store: TreeStore): unknown {
 
 export function deserializeStore(raw: unknown): TreeStore | null {
   if (!raw || typeof raw !== "object") return null;
-  const bag = raw as { v?: unknown; seq?: unknown; tabs?: unknown; pending?: unknown };
+  const bag = raw as {
+    v?: unknown;
+    seq?: unknown;
+    tabs?: unknown;
+    pending?: unknown;
+  };
   if (bag.v !== SNAPSHOT_VERSION) return null;
   const seq = Number(bag.seq);
   if (!Number.isInteger(seq) || seq < 0) return null;
@@ -496,9 +490,10 @@ function restoreTree(raw: unknown): TabTree | null {
   const spineAt = Number.isInteger(bag.spineAt) ? (bag.spineAt as number) : -1;
   const tree: TabTree = {
     nodes,
-    current: Number.isInteger(current) && nodes.has(current as number)
-      ? (current as number)
-      : null,
+    current:
+      Number.isInteger(current) && nodes.has(current as number)
+        ? (current as number)
+        : null,
     spine,
     spineAt:
       spine.length === 0
@@ -533,7 +528,10 @@ interface IdbTransactionApi {
 interface IdbConnectionApi {
   objectStoreNames: { contains: (name: string) => boolean };
   createObjectStore: (name: string) => unknown;
-  transaction: (name: string, mode: "readonly" | "readwrite") => IdbTransactionApi;
+  transaction: (
+    name: string,
+    mode: "readonly" | "readwrite",
+  ) => IdbTransactionApi;
 }
 interface IdbFactoryApi {
   open: (name: string, version?: number) => IdbRequestApi;
@@ -543,10 +541,7 @@ interface IdbFactoryApi {
 function idbFactory(): IdbFactoryApi | null {
   try {
     const holder = globalThis as unknown as { indexedDB?: IdbFactoryApi };
-    if (
-      holder.indexedDB &&
-      typeof holder.indexedDB.open === "function"
-    ) {
+    if (holder.indexedDB && typeof holder.indexedDB.open === "function") {
       return holder.indexedDB;
     }
   } catch {}
@@ -560,8 +555,13 @@ function idbOpen(): Promise<IdbConnectionApi | null> {
     try {
       const req = factory.open(DB_NAME, 1);
       req.onupgradeneeded = (ev) => {
-        const target = (ev as { target?: { result?: IdbConnectionApi } }).target;
-        if (target && target.result && !target.result.objectStoreNames.contains(DB_STORE)) {
+        const target = (ev as { target?: { result?: IdbConnectionApi } })
+          .target;
+        if (
+          target &&
+          target.result &&
+          !target.result.objectStoreNames.contains(DB_STORE)
+        ) {
           target.result.createObjectStore(DB_STORE);
         }
       };
@@ -579,7 +579,10 @@ async function idbRead(): Promise<TreeStore | null> {
   if (!conn || !conn.objectStoreNames.contains(DB_STORE)) return null;
   return new Promise((resolve) => {
     try {
-      const req = conn.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(DB_KEY);
+      const req = conn
+        .transaction(DB_STORE, "readonly")
+        .objectStore(DB_STORE)
+        .get(DB_KEY);
       req.onsuccess = () => {
         diskAnswered = true;
         resolve(deserializeStore(req.result));
@@ -730,7 +733,9 @@ export function initHistoryRecorder(): void {
       onStartup?: { addListener: (fn: () => void) => void };
     };
     webNavigation?: {
-      onCommitted?: { addListener: (fn: (details: CommitDetails) => void) => void };
+      onCommitted?: {
+        addListener: (fn: (details: CommitDetails) => void) => void;
+      };
       onHistoryStateUpdated?: {
         addListener: (fn: (details: CommitDetails) => void) => void;
       };
@@ -744,29 +749,31 @@ export function initHistoryRecorder(): void {
       };
     };
   };
-  const onCommit = (isHistoryTraversal: boolean) => (details: CommitDetails): void => {
-    if (!details || (details.frameId ?? 0) !== 0) return;
-    if (!Number.isInteger(details.tabId)) return;
-    ensureStore()
-      .then((current) => {
-        const qualifiers = details.transitionQualifiers || [];
-        const changed = applyCommit(
-          current,
-          {
-            tabId: details.tabId as number,
-            url: String(details.url || ""),
-            isReload: details.transitionType === "reload",
-            isHistoryTraversal:
-              isHistoryTraversal || qualifiers.includes("forward_back"),
-          },
-          Date.now(),
+  const onCommit =
+    (isHistoryTraversal: boolean) =>
+    (details: CommitDetails): void => {
+      if (!details || (details.frameId ?? 0) !== 0) return;
+      if (!Number.isInteger(details.tabId)) return;
+      ensureStore()
+        .then((current) => {
+          const qualifiers = details.transitionQualifiers || [];
+          const changed = applyCommit(
+            current,
+            {
+              tabId: details.tabId as number,
+              url: String(details.url || ""),
+              isReload: details.transitionType === "reload",
+              isHistoryTraversal:
+                isHistoryTraversal || qualifiers.includes("forward_back"),
+            },
+            Date.now(),
+          );
+          if (changed) scheduleSave();
+        })
+        .catch((err: unknown) =>
+          console.debug("[jari] history recorder failed:", err),
         );
-        if (changed) scheduleSave();
-      })
-      .catch((err: unknown) =>
-        console.debug("[jari] history recorder failed:", err),
-      );
-  };
+    };
   if (bag.runtime?.onStartup) {
     bag.runtime.onStartup.addListener(() => idbClear());
   }
@@ -794,7 +801,8 @@ export function initHistoryRecorder(): void {
       ensureStore()
         .then((current) => {
           const url = String(info.url || tab.url || "");
-          if (touchTitle(current, tabId, url, info.title as string)) scheduleSave();
+          if (touchTitle(current, tabId, url, info.title as string))
+            scheduleSave();
         })
         .catch(() => {});
     });

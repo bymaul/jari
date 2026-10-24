@@ -161,15 +161,15 @@ test("tab actions succeed with a sender tab", async () => {
       { ok: true },
     );
     assert.deepEqual(
-      await handlers.goBack(
-        { tab: { id: 7 } } as unknown as chrome.runtime.MessageSender,
-      ),
+      await handlers.goBack({
+        tab: { id: 7 },
+      } as unknown as chrome.runtime.MessageSender),
       { ok: true },
     );
     assert.deepEqual(
-      await handlers.moveTabLeft(
-        { tab: { id: 7, index: 2 } } as unknown as chrome.runtime.MessageSender,
-      ),
+      await handlers.moveTabLeft({
+        tab: { id: 7, index: 2 },
+      } as unknown as chrome.runtime.MessageSender),
       { ok: true },
     );
     assert.deepEqual(calls[0], ["reload", 7, { bypassCache: false }]);
@@ -324,9 +324,7 @@ test("moveManagerTabsToWindow merges into the lone survivor", async () => {
   try {
     const res = await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] });
     assert.deepEqual(res, { ok: true, movedToWindow: true, moved: 2 });
-    assert.deepEqual(moved, [
-      [[1, 2], { windowId: 20, index: -1 }],
-    ]);
+    assert.deepEqual(moved, [[[1, 2], { windowId: 20, index: -1 }]]);
     assert.deepEqual(focused, [[20, { focused: true }]]);
   } finally {
     restore();
@@ -347,7 +345,10 @@ test("moveManagerTabsToWindow offers a choice with several survivors", async () 
     ],
   });
   try {
-    const res = (await handlers.moveManagerTabsToWindow({}, { ids: [1] })) as unknown as {
+    const res = (await handlers.moveManagerTabsToWindow(
+      {},
+      { ids: [1] },
+    )) as unknown as {
       ok: boolean;
       needWindowChoice?: boolean;
       ownIds?: number[];
@@ -371,10 +372,13 @@ test("moveManagerTabsToWindow reports no other window", async () => {
     windows: [{ id: 10, tabs: [{ id: 1 }, { id: 2 }] }],
   });
   try {
-    assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] }), {
-      ok: true,
-      needWindowChoice: false,
-    });
+    assert.deepEqual(
+      await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] }),
+      {
+        ok: true,
+        needWindowChoice: false,
+      },
+    );
     assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [] }), {
       ok: false,
     });
@@ -406,9 +410,7 @@ test("moveManagerTabsIntoWindow moves into the chosen window", async () => {
       { ids: [1, 2], targetWindowId: 20 },
     );
     assert.deepEqual(res, { ok: true, moved: 2 });
-    assert.deepEqual(moved, [
-      [[1, 2], { windowId: 20, index: -1 }],
-    ]);
+    assert.deepEqual(moved, [[[1, 2], { windowId: 20, index: -1 }]]);
     assert.deepEqual(
       await handlers.moveManagerTabsIntoWindow({}, { ids: [1] }),
       { ok: false },
@@ -520,14 +522,14 @@ test("group and ungroup tolerate dead ids", async () => {
     windows: [],
   });
   try {
-    assert.deepEqual(
-      await handlers.groupManagerTabs({}, { ids: [1, 9] }),
-      { ok: true, groupId: 99 },
-    );
-    assert.deepEqual(
-      await handlers.ungroupManagerTabs({}, { ids: [1, 9] }),
-      { ok: true, ungrouped: 1 },
-    );
+    assert.deepEqual(await handlers.groupManagerTabs({}, { ids: [1, 9] }), {
+      ok: true,
+      groupId: 99,
+    });
+    assert.deepEqual(await handlers.ungroupManagerTabs({}, { ids: [1, 9] }), {
+      ok: true,
+      ungrouped: 1,
+    });
     assert.deepEqual(await handlers.groupManagerTabs({}, { ids: [9] }), {
       ok: false,
     });
@@ -566,10 +568,13 @@ test("window moves refuse incognito mixing", async () => {
     ],
   });
   try {
-    assert.deepEqual(await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] }), {
-      ok: false,
-      reason: "incognito",
-    });
+    assert.deepEqual(
+      await handlers.moveManagerTabsToWindow({}, { ids: [1, 2] }),
+      {
+        ok: false,
+        reason: "incognito",
+      },
+    );
     assert.deepEqual(
       await handlers.moveManagerTabsIntoWindow(
         {},

@@ -1,172 +1,251 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Jari — key guide</title>
-<link rel="icon" href="./icons/jari.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="./docs.css" />
-</head>
-<body>
-<header class="demo-header">
-  <div class="demo-brand">
-    <img src="./icons/jari.svg" alt="Jari logo" width="40" height="40" />
-    <div>
-      <h1>Jari <span class="demo-pron">/ja·ri/</span></h1>
-      <p class="demo-tag">Full key reference. Every key below with no badge works on this page.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jari — key guide</title>
+    <link rel="icon" href="./icons/jari.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./docs.css" />
+  </head>
+  <body>
+    <header class="demo-header">
+      <div class="demo-brand">
+        <img src="./icons/jari.svg" alt="Jari logo" width="40" height="40" />
+        <div>
+          <h1>Jari <span class="demo-pron">/ja·ri/</span></h1>
+          <p class="demo-tag">
+            Full key reference. Every key below with no badge works on this
+            page.
+          </p>
+        </div>
+      </div>
+      <nav class="demo-install">
+        <a
+          class="demo-btn"
+          href="https://github.com/bymaul/jari/releases"
+          target="_blank"
+          rel="noopener"
+          >Install for Firefox / Chrome</a
+        >
+        <a class="demo-btn demo-btn-ghost" href="./index.html">Playground</a>
+      </nav>
+    </header>
+
+    <div class="demo-keys-bar" role="note">
+      <span><kbd>H</kbd><kbd>L</kbd> history</span>
+      <span><kbd>gu</kbd><kbd>gU</kbd> parent / root</span>
+      <span><kbd>?</kbd> all keys</span>
     </div>
-  </div>
-  <nav class="demo-install">
-    <a class="demo-btn" href="https://github.com/bymaul/jari/releases" target="_blank" rel="noopener">Install for Firefox / Chrome</a>
-    <a class="demo-btn demo-btn-ghost" href="./index.html">Playground</a>
-  </nav>
-</header>
 
-<div class="demo-keys-bar" role="note">
-  <span><kbd>H</kbd><kbd>L</kbd> history</span>
-  <span><kbd>gu</kbd><kbd>gU</kbd> parent / root</span>
-  <span><kbd>?</kbd> all keys</span>
-</div>
+    <nav class="demo-docsnav" aria-label="Docs">
+      <a href="./index.html">Playground</a>
+      <a href="./guide.html">Key guide</a>
+      <a href="./install.html">Install</a>
+      <a href="./settings.html">Settings</a>
+      <a href="./privacy.html">Privacy</a>
+    </nav>
 
-<nav class="demo-docsnav" aria-label="Docs">
-  <a href="./index.html">Playground</a>
-  <a href="./guide.html">Key guide</a>
-  <a href="./install.html">Install</a>
-  <a href="./settings.html">Settings</a>
-  <a href="./privacy.html">Privacy</a>
-</nav>
+    <main class="demo-main">
+      <article id="playground" class="demo-article" aria-label="Key guide">
+        <h2>History and page addresses — try this now</h2>
+        <p>
+          This page exists so <kbd>H</kbd>, <kbd>L</kbd>, <kbd>gu</kbd>, and
+          <kbd>gU</kbd> have somewhere to go. Walk the loop: <kbd>f</kbd> the
+          <a href="./index.html">playground</a> link, then <kbd>H</kbd> back
+          here, <kbd>L</kbd> forward again, <kbd>gu</kbd> up to the demo root,
+          <kbd>gU</kbd> to the site root.
+        </p>
+        <p>
+          Serve the demo over HTTP for the full effect (<code
+            >python3 -m http.server</code
+          >
+          in <code>docs/</code>) so <kbd>gu</kbd> lands on the playground index.
+          Counts work on history too: <kbd>2H</kbd> jumps back two entries.
+        </p>
+        <h2>Scrolling</h2>
+        <p>
+          <kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd> step,
+          <kbd>d</kbd> / <kbd>u</kbd> half page, <kbd>gg</kbd> top,
+          <kbd>G</kbd> bottom. Prefix any step with a count: <kbd>3j</kbd>,
+          <kbd>2d</kbd>. This guide is long on purpose — scroll it.
+        </p>
+        <h2>History</h2>
+        <p>
+          <kbd>H</kbd> back, <kbd>L</kbd> forward through this tab's history,
+          exactly like the extension's history commands. Same-tab hint jumps
+          (<kbd>f</kbd>) and plain clicks both add entries you can walk with
+          <kbd>H</kbd> and <kbd>L</kbd>.
+        </p>
+        <h2>Page addresses</h2>
+        <p>
+          <kbd>gu</kbd> goes to the parent URL (drops the last path segment),
+          <kbd>gU</kbd> goes to the site root; both strip query and hash,
+          matching the extension. From here, <kbd>gu</kbd> yields the demo
+          folder and <kbd>gU</kbd> the server root.
+        </p>
+        <h2>Reloading</h2>
+        <p>
+          <kbd>r</kbd> reloads the page, exactly like the extension.
+          <kbd>R</kbd>
+          reloads too, but cache bypass is browser-privileged: the demo performs
+          a normal reload and says so, while the extension bypasses the cache.
+        </p>
+        <h2>Hints</h2>
+        <p>
+          <kbd>f</kbd> same tab, <kbd>F</kbd> new tab, <kbd>gf</kbd> background
+          tab. Labels use the real charset; typing filters, exact match
+          activates, <kbd>Esc</kbd> cancels. Try every link on this page:
+          <a href="./index.html">playground</a>,
+          <a href="https://github.com/bymaul/jari">jari repo</a>,
+          <a href="https://github.com/bymaul/jari/releases">releases</a>.
+        </p>
+        <h2>Find</h2>
+        <p>
+          <kbd>/</kbd> opens find, <kbd>Enter</kbd> commits, <kbd>n</kbd> /
+          <kbd>N</kbd> step through matches (counts work: <kbd>2n</kbd>),
+          <kbd>Esc</kbd> hides with <kbd>n</kbd> to resume, <kbd>Enter</kbd> on
+          a link match follows it. Smart-case: lowercase matches anything,
+          uppercase is exact.
+        </p>
+        <h2>Omnibox</h2>
+        <p>
+          <kbd>t</kbd> opens the go-to prompt. Empty, it lists every link on
+          this page; typing filters by title or URL. <kbd>Up</kbd>/<kbd
+            >Down</kbd
+          >
+          move, <kbd>Enter</kbd> follows, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> opens
+          a new tab, <kbd>Esc</kbd> closes. A keyword plus query (<code
+            >g cats</code
+          >, <code>yt demo</code>, <code>gh jari</code>,
+          <code>wiki keyboard</code>, <code>r vim</code>) searches that engine
+          instead. Sources here are this page's links plus engines — your real
+          tabs, history, and bookmarks appear only with the extension installed.
+        </p>
+        <h2>Visual</h2>
+        <p>
+          <kbd>v</kbd> drops a caret,
+          <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd> extend the
+          selection, <kbd>y</kbd> yanks to the clipboard, <kbd>Esc</kbd> exits.
+        </p>
+        <h2>Beyond the demo — needs the install</h2>
+        <p>
+          Tabs (<kbd>T</kbd> incognito, <kbd>J</kbd>/<kbd>K</kbd> switch,
+          <kbd>x</kbd> close, <kbd>gt</kbd> manager), <kbd>yy</kbd> copy URL,
+          screenshots (<kbd>gss</kbd>/<kbd>gsp</kbd>/<kbd>gsr</kbd>), page jumps
+          (<kbd>[[</kbd>/<kbd>]]</kbd>), and settings (<kbd>;e</kbd>) need the
+          real extension:
+          <a href="https://github.com/bymaul/jari/releases">install jari</a>.
+        </p>
+      </article>
+    </main>
 
-<main class="demo-main">
-  <article id="playground" class="demo-article" aria-label="Key guide">
-    <h2>History and page addresses — try this now</h2>
-    <p>
-      This page exists so <kbd>H</kbd>, <kbd>L</kbd>, <kbd>gu</kbd>, and
-      <kbd>gU</kbd> have somewhere to go. Walk the loop:
-      <kbd>f</kbd> the <a href="./index.html">playground</a> link, then
-      <kbd>H</kbd> back here, <kbd>L</kbd> forward again, <kbd>gu</kbd> up to
-      the demo root, <kbd>gU</kbd> to the site root.
-    </p>
-    <p>
-      Serve the demo over HTTP for the full effect
-      (<code>python3 -m http.server</code> in <code>docs/</code>) so
-      <kbd>gu</kbd> lands on the playground index. Counts work on history too:
-      <kbd>2H</kbd> jumps back two entries.
-    </p>
-    <h2>Scrolling</h2>
-    <p>
-      <kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd> step,
-      <kbd>d</kbd> / <kbd>u</kbd> half page, <kbd>gg</kbd> top,
-      <kbd>G</kbd> bottom. Prefix any step with a count: <kbd>3j</kbd>,
-      <kbd>2d</kbd>. This guide is long on purpose — scroll it.
-    </p>
-    <h2>History</h2>
-    <p>
-      <kbd>H</kbd> back, <kbd>L</kbd> forward through this tab's history,
-      exactly like the extension's history commands. Same-tab hint jumps
-      (<kbd>f</kbd>) and plain clicks both add entries you can walk with
-      <kbd>H</kbd> and <kbd>L</kbd>.
-    </p>
-    <h2>Page addresses</h2>
-    <p>
-      <kbd>gu</kbd> goes to the parent URL (drops the last path segment),
-      <kbd>gU</kbd> goes to the site root; both strip query and hash, matching
-      the extension. From here, <kbd>gu</kbd> yields the demo folder and
-      <kbd>gU</kbd> the server root.
-    </p>
-    <h2>Reloading</h2>
-    <p>
-      <kbd>r</kbd> reloads the page, exactly like the extension. <kbd>R</kbd>
-      reloads too, but cache bypass is browser-privileged: the demo performs a
-      normal reload and says so, while the extension bypasses the cache.
-    </p>
-    <h2>Hints</h2>
-    <p>
-      <kbd>f</kbd> same tab, <kbd>F</kbd> new tab, <kbd>gf</kbd> background
-      tab. Labels use the real charset; typing filters, exact match activates,
-      <kbd>Esc</kbd> cancels. Try every link on this page:
-      <a href="./index.html">playground</a>,
-      <a href="https://github.com/bymaul/jari">jari repo</a>,
-      <a href="https://github.com/bymaul/jari/releases">releases</a>.
-    </p>
-    <h2>Find</h2>
-    <p>
-      <kbd>/</kbd> opens find, <kbd>Enter</kbd> commits, <kbd>n</kbd> /
-      <kbd>N</kbd> step through matches (counts work: <kbd>2n</kbd>),
-      <kbd>Esc</kbd> hides with <kbd>n</kbd> to resume, <kbd>Enter</kbd> on a
-      link match follows it. Smart-case: lowercase matches anything, uppercase
-      is exact.
-    </p>
-    <h2>Omnibox</h2>
-    <p>
-      <kbd>t</kbd> opens the go-to prompt. Empty, it lists every link on this
-      page; typing filters by title or URL. <kbd>Up</kbd>/<kbd>Down</kbd> move,
-      <kbd>Enter</kbd> follows, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> opens a new
-      tab, <kbd>Esc</kbd> closes. A keyword plus query
-      (<code>g cats</code>, <code>yt demo</code>, <code>gh jari</code>,
-      <code>wiki keyboard</code>, <code>r vim</code>) searches that engine
-      instead. Sources here are this page's links plus engines — your real
-      tabs, history, and bookmarks appear only with the extension installed.
-    </p>
-    <h2>Visual</h2>
-    <p>
-      <kbd>v</kbd> drops a caret, <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd>
-      extend the selection, <kbd>y</kbd> yanks to the clipboard,
-      <kbd>Esc</kbd> exits.
-    </p>
-    <h2>Beyond the demo — needs the install</h2>
-    <p>
-      Tabs (<kbd>T</kbd> incognito, <kbd>J</kbd>/<kbd>K</kbd> switch,
-      <kbd>x</kbd> close, <kbd>gt</kbd> manager), <kbd>yy</kbd> copy URL,
-      screenshots (<kbd>gss</kbd>/<kbd>gsp</kbd>/<kbd>gsr</kbd>), page jumps
-      (<kbd>[[</kbd>/<kbd>]]</kbd>), and settings (<kbd>;e</kbd>) need the real
-      extension: <a href="https://github.com/bymaul/jari/releases">install jari</a>.
-    </p>
-  </article>
-</main>
+    <footer class="demo-footer">
+      <span
+        >Demo simulation — served over HTTP, <kbd>gu</kbd> from here lands on
+        the playground.</span
+      >
+      <a href="./index.html">Back to playground</a>
+    </footer>
 
-<footer class="demo-footer">
-  <span>Demo simulation — served over HTTP, <kbd>gu</kbd> from here lands on the playground.</span>
-  <a href="./index.html">Back to playground</a>
-</footer>
+    <div id="hints" class="demo-hints" aria-hidden="true"></div>
 
-<div id="hints" class="demo-hints" aria-hidden="true"></div>
+    <div id="prompt" class="jari-overlay jari-prompt" hidden>
+      <ul id="promptlist" class="jari-prompt-list"></ul>
+      <div class="jari-prompt-header">Open</div>
+      <input
+        id="promptinput"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Search links, URL, or keyword query"
+        aria-label="Go to page link or search"
+      />
+    </div>
 
-<div id="prompt" class="jari-overlay jari-prompt" hidden>
-  <ul id="promptlist" class="jari-prompt-list"></ul>
-  <div class="jari-prompt-header">Open</div>
-  <input id="promptinput" type="text" autocomplete="off" spellcheck="false" placeholder="Search links, URL, or keyword query" aria-label="Go to page link or search" />
-</div>
+    <div id="findbar" class="demo-find" hidden>
+      <span class="demo-find-label">/</span>
+      <input
+        id="findinput"
+        class="demo-find-input"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Find in demo page"
+      />
+      <span id="findstatus" class="demo-find-status"></span>
+    </div>
 
-<div id="findbar" class="demo-find" hidden>
-  <span class="demo-find-label">/</span>
-  <input id="findinput" class="demo-find-input" type="text" autocomplete="off" spellcheck="false" aria-label="Find in demo page" />
-  <span id="findstatus" class="demo-find-status"></span>
-</div>
+    <div
+      id="help"
+      class="demo-help"
+      hidden
+      role="dialog"
+      aria-label="Demo keys"
+    >
+      <h2>
+        Demo keys
+        <span class="demo-help-esc"
+          >(<kbd>Esc</kbd> or <kbd>?</kbd> closes)</span
+        >
+      </h2>
+      <table>
+        <tr>
+          <td><kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd></td>
+          <td>scroll (prefix a count: <kbd>3j</kbd>)</td>
+        </tr>
+        <tr>
+          <td><kbd>d</kbd> / <kbd>u</kbd></td>
+          <td>half page down / up</td>
+        </tr>
+        <tr>
+          <td><kbd>gg</kbd> / <kbd>G</kbd></td>
+          <td>top / bottom</td>
+        </tr>
+        <tr>
+          <td><kbd>H</kbd> / <kbd>L</kbd></td>
+          <td>history back / forward (counts work: <kbd>2H</kbd>)</td>
+        </tr>
+        <tr>
+          <td><kbd>gu</kbd> / <kbd>gU</kbd></td>
+          <td>parent URL / site root</td>
+        </tr>
+        <tr>
+          <td><kbd>r</kbd> / <kbd>R</kbd></td>
+          <td>reload (cache bypass needs the extension)</td>
+        </tr>
+        <tr>
+          <td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td>
+          <td>hint: same tab / new tab / background tab</td>
+        </tr>
+        <tr>
+          <td><kbd>t</kbd></td>
+          <td>go to this page0027s links, or search an engine</td>
+        </tr>
+        <tr>
+          <td><kbd>/</kbd> then <kbd>Enter</kbd></td>
+          <td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td>
+        </tr>
+        <tr>
+          <td><kbd>Esc</kbd></td>
+          <td>close bar, hide highlights</td>
+        </tr>
+        <tr>
+          <td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td>
+          <td>visual select, then yank to clipboard</td>
+        </tr>
+        <tr>
+          <td><kbd>?</kbd></td>
+          <td>this cheatsheet</td>
+        </tr>
+      </table>
+    </div>
 
-<div id="help" class="demo-help" hidden role="dialog" aria-label="Demo keys">
-  <h2>Demo keys <span class="demo-help-esc">(<kbd>Esc</kbd> or <kbd>?</kbd> closes)</span></h2>
-  <table>
-    <tr><td><kbd>j</kbd> / <kbd>k</kbd> / <kbd>h</kbd> / <kbd>l</kbd></td><td>scroll (prefix a count: <kbd>3j</kbd>)</td></tr>
-    <tr><td><kbd>d</kbd> / <kbd>u</kbd></td><td>half page down / up</td></tr>
-    <tr><td><kbd>gg</kbd> / <kbd>G</kbd></td><td>top / bottom</td></tr>
-    <tr><td><kbd>H</kbd> / <kbd>L</kbd></td><td>history back / forward (counts work: <kbd>2H</kbd>)</td></tr>
-    <tr><td><kbd>gu</kbd> / <kbd>gU</kbd></td><td>parent URL / site root</td></tr>
-    <tr><td><kbd>r</kbd> / <kbd>R</kbd></td><td>reload (cache bypass needs the extension)</td></tr>
-    <tr><td><kbd>f</kbd> / <kbd>F</kbd> / <kbd>gf</kbd></td><td>hint: same tab / new tab / background tab</td></tr>
-    <tr><td><kbd>t</kbd></td><td>go to this page0027s links, or search an engine</td></tr>
-    <tr><td><kbd>/</kbd> then <kbd>Enter</kbd></td><td>find; <kbd>n</kbd>/<kbd>N</kbd> next/prev</td></tr>
-    <tr><td><kbd>Esc</kbd></td><td>close bar, hide highlights</td></tr>
-    <tr><td><kbd>v</kbd>, <kbd>h/j/k/l</kbd>, <kbd>y</kbd></td><td>visual select, then yank to clipboard</td></tr>
-    <tr><td><kbd>?</kbd></td><td>this cheatsheet</td></tr>
-  </table>
-</div>
+    <div class="demo-status" aria-live="polite">
+      <span id="toast" class="demo-toast" hidden></span>
+      <span id="pill" class="demo-pill" hidden></span>
+      <span id="showcmd" class="demo-showcmd" hidden></span>
+    </div>
 
-<div class="demo-status" aria-live="polite">
-  <span id="toast" class="demo-toast" hidden></span>
-  <span id="pill" class="demo-pill" hidden></span>
-  <span id="showcmd" class="demo-showcmd" hidden></span>
-</div>
-
-<script src="./docs.js"></script>
-</body>
+    <script src="./docs.js"></script>
+  </body>
 </html>

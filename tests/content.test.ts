@@ -6,7 +6,8 @@ import type { CommandContext } from "../content/commands.ts";
 const { settings } = await import("../content/settings.ts");
 const { commands } = await import("../content/commands.ts");
 const { keymapDefaults } = await import("../content/keymap.ts");
-const { handleKeydown, shieldOverlayKey, __resetState } = await import("../content/content.ts");
+const { handleKeydown, shieldOverlayKey, __resetState } =
+  await import("../content/content.ts");
 const { Overlays, register, touch } = await import("../content/overlays.ts");
 
 let shieldActive = false;
@@ -92,7 +93,8 @@ function assertUnclaimed(ev: FakeKey) {
 const originals: Record<string, (typeof commands)[string]> = {};
 const spiedCalls: Record<string, CommandContext[]> = {};
 function spyOn(commandName: string) {
-  if (!(commandName in originals)) originals[commandName] = commands[commandName];
+  if (!(commandName in originals))
+    originals[commandName] = commands[commandName];
   spiedCalls[commandName] = [];
   const original = originals[commandName];
   commands[commandName] = {
@@ -101,7 +103,8 @@ function spyOn(commandName: string) {
   };
 }
 function restoreSpies() {
-  for (const [name, original] of Object.entries(originals)) commands[name] = original;
+  for (const [name, original] of Object.entries(originals))
+    commands[name] = original;
   for (const name of Object.keys(spiedCalls)) delete spiedCalls[name];
 }
 
@@ -116,7 +119,8 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetState();
-  (globalThis.document as unknown as Record<string, unknown>).activeElement = null;
+  (globalThis.document as unknown as Record<string, unknown>).activeElement =
+    null;
   shieldActive = false;
   shieldKeys.length = 0;
   Overlays.closeAll();

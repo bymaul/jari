@@ -1,5 +1,9 @@
 import { balanceCategories, displayCombo } from "./keymap.ts";
-import type { Action, MessagePayload, MessageResponse } from "../shared/protocol.ts";
+import type {
+  Action,
+  MessagePayload,
+  MessageResponse,
+} from "../shared/protocol.ts";
 
 export function sendMessage<A extends Action>(
   action: A,
@@ -169,7 +173,13 @@ function eventView(el: Element): Window {
   return window;
 }
 
-function pointerEvent(el: Element, type: string, x: number, y: number, buttons: number) {
+function pointerEvent(
+  el: Element,
+  type: string,
+  x: number,
+  y: number,
+  buttons: number,
+) {
   const view = eventView(el);
   try {
     if (typeof PointerEvent === "function") {
@@ -200,7 +210,13 @@ function pointerEvent(el: Element, type: string, x: number, y: number, buttons: 
   });
 }
 
-function mouseEvent(el: Element, type: string, x: number, y: number, buttons: number) {
+function mouseEvent(
+  el: Element,
+  type: string,
+  x: number,
+  y: number,
+  buttons: number,
+) {
   return new MouseEvent(type, {
     bubbles: true,
     cancelable: true,

@@ -3,10 +3,7 @@ import { register, touch } from "./overlays.ts";
 import { ui, createShadowHost } from "./ui.ts";
 import { deepActiveElement } from "./keymap.ts";
 import { getLinkAncestor } from "./hints-elements.ts";
-import {
-  detectHighlightSupport,
-  clearHighlightNames,
-} from "./highlight.ts";
+import { detectHighlightSupport, clearHighlightNames } from "./highlight.ts";
 import { buildMatcher, hasUpperCase } from "./find/matcher.ts";
 import { collectTextNodes } from "./find/collect.ts";
 import { Visual } from "./visual.ts";
@@ -94,14 +91,22 @@ function startFindObserver() {
   stopFindObserver();
   try {
     findObserver = new MutationObserver(scheduleFindRebuild);
-    findObserver.observe(document.body || document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style", "class", "hidden", "aria-hidden"] });
+    findObserver.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["style", "class", "hidden", "aria-hidden"],
+    });
   } catch {}
 }
 function stopFindObserver() {
   clearTimeout(findObserverTimer ?? undefined);
   findObserverTimer = null;
   if (findObserver) {
-    try { findObserver.disconnect(); } catch {}
+    try {
+      findObserver.disconnect();
+    } catch {}
     findObserver = null;
   }
 }
@@ -183,15 +188,26 @@ function applyHighlights() {
   clearHighlightApi();
   if (matches.length === 0) return;
   if (highlightsHidden) return;
-  const valid = matches.filter(r => {
+  const valid = matches.filter((r) => {
     try {
-      return r.startContainer && r.startContainer.isConnected !== false && r.endContainer && r.endContainer.isConnected !== false;
-    } catch { return false; }
+      return (
+        r.startContainer &&
+        r.startContainer.isConnected !== false &&
+        r.endContainer &&
+        r.endContainer.isConnected !== false
+      );
+    } catch {
+      return false;
+    }
   });
   if (valid.length !== matches.length) {
     matches = valid;
-    if (currentIdx >= matches.length) currentIdx = Math.max(0, matches.length - 1);
-    if (matches.length === 0) { updateStatus(); return; }
+    if (currentIdx >= matches.length)
+      currentIdx = Math.max(0, matches.length - 1);
+    if (matches.length === 0) {
+      updateStatus();
+      return;
+    }
   }
   const cur = matches[currentIdx];
   if (!useHighlights) return;
@@ -200,12 +216,16 @@ function applyHighlights() {
     if (others.length > 0) {
       CSS.highlights.set("jari-find", new Highlight(...others));
     } else {
-      try { CSS.highlights.delete("jari-find"); } catch {}
+      try {
+        CSS.highlights.delete("jari-find");
+      } catch {}
     }
     if (cur) {
       CSS.highlights.set("jari-find-current", new Highlight(cur));
     } else {
-      try { CSS.highlights.delete("jari-find-current"); } catch {}
+      try {
+        CSS.highlights.delete("jari-find-current");
+      } catch {}
     }
   } catch {
     useHighlights = false;
@@ -218,26 +238,43 @@ function scrollToCurrent() {
   if (!r) return;
   try {
     if (r.startContainer && r.startContainer.isConnected === false) return;
-    const el = r.startContainer && r.startContainer.parentElement ? r.startContainer.parentElement : null;
+    const el =
+      r.startContainer && r.startContainer.parentElement
+        ? r.startContainer.parentElement
+        : null;
     if (!el || !el.isConnected) return;
     try {
       const style = window.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") return;
     } catch {}
     let rect: DOMRect | null = null;
-    try { rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect(); } catch {}
+    try {
+      rect = r.getBoundingClientRect
+        ? r.getBoundingClientRect()
+        : el.getBoundingClientRect();
+    } catch {}
     if (rect && rectIntersectsViewport(rect)) return;
     const fixed = findFixedAncestor(el);
     if (fixed) {
       scrollFixedMatchIntoView(el, fixed, rect);
       return;
     }
-    el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
-    try { rect = r.getBoundingClientRect ? r.getBoundingClientRect() : el.getBoundingClientRect(); } catch {}
+    el.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: "instant",
+    });
+    try {
+      rect = r.getBoundingClientRect
+        ? r.getBoundingClientRect()
+        : el.getBoundingClientRect();
+    } catch {}
     if (rect) {
       const vh = window.innerHeight || document.documentElement.clientHeight;
       if (rect.top < 0 || rect.bottom > vh) {
-        try { window.scrollBy(0, rect.top - vh / 2); } catch {}
+        try {
+          window.scrollBy(0, rect.top - vh / 2);
+        } catch {}
       }
     }
   } catch {}
@@ -322,9 +359,11 @@ function scrollFixedMatchIntoView(
     if (!box) return;
     const crect = box.getBoundingClientRect();
     if (crect.top > rect.top) box.scrollTop -= crect.top - rect.top;
-    else if (rect.bottom > crect.bottom) box.scrollTop += rect.bottom - crect.bottom;
+    else if (rect.bottom > crect.bottom)
+      box.scrollTop += rect.bottom - crect.bottom;
     if (crect.left > rect.left) box.scrollLeft -= crect.left - rect.left;
-    else if (rect.right > crect.right) box.scrollLeft += rect.right - crect.right;
+    else if (rect.right > crect.right)
+      box.scrollLeft += rect.right - crect.right;
   } catch {}
 }
 
@@ -361,7 +400,9 @@ async function loadFindHistory(): Promise<void> {
     const stored = await chrome.storage.local.get(FIND_HISTORY_KEY);
     const list = stored && stored[FIND_HISTORY_KEY];
     if (Array.isArray(list)) {
-      findHistory = list.filter((s) => typeof s === "string" && s).slice(0, MAX_FIND_HISTORY);
+      findHistory = list
+        .filter((s) => typeof s === "string" && s)
+        .slice(0, MAX_FIND_HISTORY);
     }
   } catch {}
 }
@@ -679,7 +720,9 @@ function next(count: number = 1, reverse: boolean = false): void {
   }
   if (matches.length > 0) {
     try {
-      const stale = matches.some(r => !r.startContainer || r.startContainer.isConnected === false);
+      const stale = matches.some(
+        (r) => !r.startContainer || r.startContainer.isConnected === false,
+      );
       if (stale) {
         const q = (lastQuery || pendingQuery || "").trim();
         if (q) {
@@ -725,7 +768,8 @@ function next(count: number = 1, reverse: boolean = false): void {
     if (c > 1) {
       const delta = reverse ? -c : c;
       const len = matches.length;
-      currentIdx = (((currentIdx + (delta > 0 ? delta - 1 : delta)) % len) + len) % len;
+      currentIdx =
+        (((currentIdx + (delta > 0 ? delta - 1 : delta)) % len) + len) % len;
       applyHighlights();
       updateStatus();
     }
@@ -824,7 +868,10 @@ register("find", { close: closeAndClear, onKeyDown, isActive });
 
 try {
   Visual.setFindOpen(() => open());
-  if (typeof Visual.setFindNav === "function") Visual.setFindNav((count: number, reverse: boolean) => next(count, reverse));
+  if (typeof Visual.setFindNav === "function")
+    Visual.setFindNav((count: number, reverse: boolean) =>
+      next(count, reverse),
+    );
 } catch {}
 
 export const __testHelpers = {
@@ -882,7 +929,9 @@ export function __getFindTestState() {
 }
 
 export function __resetFindState() {
-  try { stopFindObserver(); } catch {}
+  try {
+    stopFindObserver();
+  } catch {}
   closeAndClear();
   highlightsHidden = false;
   lastQuery = "";
@@ -895,4 +944,3 @@ export function __resetFindState() {
   historyIdx = -1;
   historyDraft = "";
 }
-

@@ -1,7 +1,4 @@
-import type {
-  MessagePayload,
-  MessageResponse,
-} from "../shared/protocol.ts";
+import type { MessagePayload, MessageResponse } from "../shared/protocol.ts";
 
 export async function findBookmarkBarId(): Promise<string> {
   let roots;

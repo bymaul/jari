@@ -80,7 +80,10 @@ async function readOne(area: "sync" | "local"): Promise<unknown | null> {
 }
 
 async function load() {
-  const [synced, local] = await Promise.all([readOne("sync"), readOne("local")]);
+  const [synced, local] = await Promise.all([
+    readOne("sync"),
+    readOne("local"),
+  ]);
   const winner = pickNewest(synced, local);
   if (winner.data) {
     merge(winner.data);
@@ -106,7 +109,9 @@ function snapshot(): SettingsState {
 }
 
 function isQuotaError(err: unknown) {
-  return /quota/i.test(String((err as { message?: unknown })?.message || err || ""));
+  return /quota/i.test(
+    String((err as { message?: unknown })?.message || err || ""),
+  );
 }
 
 async function persist() {

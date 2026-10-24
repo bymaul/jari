@@ -120,5 +120,7 @@ export const knownTlds = new Set(
   xn--w4r85el8fhu5dnra xn--w4rs40l xn--wgbh1c xn--wgbl6a xn--xhq521b xn--xkc2al3hye2a xn--xkc2dl3a5ee0h xn--y9a3aq xn--yfro4i67o xn--ygbi2ammx xn--zfr164b xxx
   xyz yachts yahoo yamaxun yandex ye yodobashi yoga yokohama you youtube yt
   yun za zappos zara zero zip zm zone zuerich zw
-  `.trim().split(/\s+/),
+  `
+    .trim()
+    .split(/\s+/),
 );

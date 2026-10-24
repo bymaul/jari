@@ -173,7 +173,9 @@ function syncDefaultEngineOptions(): void {
 function failEngines(message: string, badEls?: Element[]): void {
   for (const el of badEls || []) markInvalid(el, true);
   showFieldError("error-engines", `${message} (not saved)`);
-  status(`Search engines: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+  status(
+    `Search engines: ${message.charAt(0).toLowerCase() + message.slice(1)}`,
+  );
 }
 
 function commitEngines(): void {

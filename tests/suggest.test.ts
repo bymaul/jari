@@ -62,9 +62,13 @@ let historyRecents: Record<string, unknown>[] = [];
   search: async (opts: { text?: string }) => {
     if (opts.text) {
       const q = String(opts.text).toLowerCase();
-      return historyRows.filter((row) =>
-        `${String(row.title || "")} ${String(row.url || "")}`.toLowerCase().includes(q),
-      ).map((row) => ({ ...row }));
+      return historyRows
+        .filter((row) =>
+          `${String(row.title || "")} ${String(row.url || "")}`
+            .toLowerCase()
+            .includes(q),
+        )
+        .map((row) => ({ ...row }));
     }
     return historyRecents.map((row) => ({ ...row }));
   },
@@ -115,7 +119,9 @@ const bookmarksStubs = {
 beforeEach(() => {
   tabQueryCalls = 0;
   storageGets = 0;
-  tabRows = [{ title: "Tab One", url: "https://tab.example/1", lastAccessed: 5 }];
+  tabRows = [
+    { title: "Tab One", url: "https://tab.example/1", lastAccessed: 5 },
+  ];
   historyRows = [];
   historyRecents = [];
   bmTree = [];
@@ -142,7 +148,9 @@ test("suggest queries tabs once across repeated calls", async () => {
 test("a tab event re-queries on the next suggest", async () => {
   await suggest({}, { query: "x" });
   assert.equal(tabQueryCalls, 1);
-  tabRows = [{ title: "Tab Two", url: "https://tab.example/2", lastAccessed: 9 }];
+  tabRows = [
+    { title: "Tab Two", url: "https://tab.example/2", lastAccessed: 9 },
+  ];
   for (const fn of tabListeners.onCreated) fn();
   const res = await suggest({}, { query: "x" });
   assert.equal(tabQueryCalls, 2);
@@ -164,7 +172,12 @@ test("settings are read once until storage changes", async () => {
 test("suggest merges tab and history rows", async () => {
   stubStorage({ suggestionSources: ["tab", "history"], maxResults: 20 });
   historyRows = [
-    { title: "Hist", url: "https://hist.example/", visitCount: 3, lastVisitTime: 7 },
+    {
+      title: "Hist",
+      url: "https://hist.example/",
+      visitCount: 3,
+      lastVisitTime: 7,
+    },
   ];
   const res = await suggest({}, { query: "x" });
   assert.deepEqual(
@@ -180,7 +193,12 @@ test("suggest keeps recent history in the pool for fuzzy ranking", async () => {
   stubStorage({ suggestionSources: ["history"], maxResults: 20 });
   historyRows = [];
   historyRecents = [
-    { title: "Facebook", url: "https://facebook.com/", visitCount: 8, lastVisitTime: 70 },
+    {
+      title: "Facebook",
+      url: "https://facebook.com/",
+      visitCount: 8,
+      lastVisitTime: 70,
+    },
   ];
   const res = await suggest({}, { query: "facebok" });
   assert.ok(res.some((s) => s.url === "https://facebook.com/"));
@@ -249,12 +267,16 @@ test("suggest fuzzy-matches a recent page the literal search misses", async () =
   stubStorage({ suggestionSources: ["history"], maxResults: 20 });
   historyRows = []; // no literal match for "facebok"
   historyRecents = [
-    { title: "Facebook", url: "https://www.facebook.com/", visitCount: 8, lastVisitTime: 70 },
+    {
+      title: "Facebook",
+      url: "https://www.facebook.com/",
+      visitCount: 8,
+      lastVisitTime: 70,
+    },
   ];
   const res = await suggest({}, { query: "facebok" });
   assert.ok(res.some((s) => s.url === "https://www.facebook.com/"));
 });
-
 
 test("suggest returns the full pool without slicing to maxResults", async () => {
   stubStorage({ suggestionSources: ["history"], maxResults: 5 });

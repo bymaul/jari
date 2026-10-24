@@ -50,7 +50,10 @@ export async function moveTabIntoWindowAndFocus(
   targetWindowId: number,
   context: string,
 ): Promise<void> {
-  await chrome.tabs.move(tabId as number, { windowId: targetWindowId, index: -1 });
+  await chrome.tabs.move(tabId as number, {
+    windowId: targetWindowId,
+    index: -1,
+  });
   const tabs = await chrome.tabs.query({ windowId: targetWindowId });
   const last = tabs[tabs.length - 1];
   if (last) {

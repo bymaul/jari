@@ -15,8 +15,12 @@ test("background/utils direct import: clampCount", () => {
 test("background/utils direct import: getStoredSettings prefers newer", async () => {
   const savedSync = globalThis.chrome.storage.sync.get;
   const savedLocal = globalThis.chrome.storage.local.get;
-  globalThis.chrome.storage.sync.get = async () => ({ settings: { updatedAt: 1000, suggestionSources: ["tab"] } });
-  globalThis.chrome.storage.local.get = async () => ({ settings: { updatedAt: 2000, suggestionSources: ["bookmark"] } });
+  globalThis.chrome.storage.sync.get = async () => ({
+    settings: { updatedAt: 1000, suggestionSources: ["tab"] },
+  });
+  globalThis.chrome.storage.local.get = async () => ({
+    settings: { updatedAt: 2000, suggestionSources: ["bookmark"] },
+  });
   try {
     const s = await getStoredSettings();
     assert.deepEqual(s.suggestionSources, ["bookmark"]);

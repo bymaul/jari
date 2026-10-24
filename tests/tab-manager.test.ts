@@ -3,9 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert";
 import type { GroupSummary, ManagerTab } from "../shared/protocol.ts";
 
-const { isSameSnapshot, prunedConfirm, confirmKey } = await import(
-  "../content/tab-manager.ts"
-);
+const { isSameSnapshot, prunedConfirm, confirmKey } =
+  await import("../content/tab-manager.ts");
 
 function tab(over = {}) {
   return {
@@ -62,27 +61,35 @@ test("added or removed tabs compare unequal", () => {
     isSameSnapshot([tab()], new Map(), 1, res([tab(), tab({ id: 2 })])),
     false,
   );
-  assert.equal(isSameSnapshot([tab(), tab({ id: 2 })], new Map(), 1, res([tab()])), false);
+  assert.equal(
+    isSameSnapshot([tab(), tab({ id: 2 })], new Map(), 1, res([tab()])),
+    false,
+  );
 });
 
 test("group and window changes compare unequal", () => {
   const prev = [tab()];
-  const base = groupedRes([tab()], [
-    { id: 7, title: "g", color: "blue", collapsed: false },
-  ]);
+  const base = groupedRes(
+    [tab()],
+    [{ id: 7, title: "g", color: "blue", collapsed: false }],
+  );
   assert.equal(isSameSnapshot(prev, groups, 1, base), true);
   assert.equal(
     isSameSnapshot(
       prev,
       groups,
       1,
-      groupedRes([tab()], [
-        { id: 7, title: "renamed", color: "blue", collapsed: false },
-      ]),
+      groupedRes(
+        [tab()],
+        [{ id: 7, title: "renamed", color: "blue", collapsed: false }],
+      ),
     ),
     false,
   );
-  assert.equal(isSameSnapshot(prev, groups, 1, { ...base, currentWindowId: 2 }), false);
+  assert.equal(
+    isSameSnapshot(prev, groups, 1, { ...base, currentWindowId: 2 }),
+    false,
+  );
 });
 
 test("missing tab lists compare unequal", () => {
@@ -90,12 +97,7 @@ test("missing tab lists compare unequal", () => {
   // contract is looser and these passes keep covering that branch.
   type IsSameRes = Parameters<typeof isSameSnapshot>[3];
   assert.equal(
-    isSameSnapshot(
-      [tab()],
-      new Map(),
-      1,
-      { ok: true } as unknown as IsSameRes,
-    ),
+    isSameSnapshot([tab()], new Map(), 1, { ok: true } as unknown as IsSameRes),
     false,
   );
   assert.equal(

@@ -126,15 +126,17 @@ function findFrameElements(): HTMLIFrameElement[] {
       continue;
     }
     if (!rect) continue;
-    if (
-      rect.width < MIN_SCROLL_AREA_SIZE ||
-      rect.height < MIN_SCROLL_AREA_SIZE
-    )
+    if (rect.width < MIN_SCROLL_AREA_SIZE || rect.height < MIN_SCROLL_AREA_SIZE)
       continue;
     if (!isScrollVisible(el)) continue;
     const vw = window.innerWidth || 0;
     const vh = window.innerHeight || 0;
-    if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= vh || rect.left >= vw)
+    if (
+      rect.bottom <= 0 ||
+      rect.right <= 0 ||
+      rect.top >= vh ||
+      rect.left >= vw
+    )
       continue;
     if (!isFrameScrollable(el as HTMLIFrameElement, rect)) continue;
     frames.push(el as HTMLIFrameElement);
@@ -156,8 +158,7 @@ function frameDoc(frame: HTMLIFrameElement): Document | null {
 }
 
 function docScrolls(doc: Document): boolean {
-  const root =
-    doc.scrollingElement || doc.documentElement || doc.body || null;
+  const root = doc.scrollingElement || doc.documentElement || doc.body || null;
   if (!root) return false;
   return (
     root.scrollHeight > root.clientHeight + 1 ||
@@ -496,7 +497,8 @@ function cycle(steps = 1) {
 
 function scrollHeightOf(el: Element | Window): number {
   return el === window
-    ? (document.scrollingElement || document.documentElement || document.body).scrollHeight
+    ? (document.scrollingElement || document.documentElement || document.body)
+        .scrollHeight
     : (el as Element).scrollHeight;
 }
 
@@ -549,7 +551,8 @@ function showHighlight(precomputedStops?: (Element | null)[]): void {
   label.className = "jari-scroll-highlight-label";
   let kind = "current scroll area";
   if (area === window) kind = "global scroll";
-  else if (isFrame(area)) kind = isUnverifiedFrame(area as Element) ? "frame?" : "frame";
+  else if (isFrame(area))
+    kind = isUnverifiedFrame(area as Element) ? "frame?" : "frame";
   else if (isDialogStop(area)) kind = "dialog scroll area";
   label.textContent = kind;
   el.appendChild(label);

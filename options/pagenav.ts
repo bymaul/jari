@@ -96,7 +96,9 @@ export function renderPagenav(): void {
 function failPagenav(message: string, badEls?: Element[]): void {
   for (const el of badEls || []) markInvalid(el, true);
   showFieldError("error-pagenav", `${message} (not saved)`);
-  status(`Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`);
+  status(
+    `Page navigation: ${message.charAt(0).toLowerCase() + message.slice(1)}`,
+  );
 }
 
 function parsePagenavField(
@@ -126,7 +128,10 @@ function parsePagenavField(
     return { error: `At least one ${label} text is required`, bad: [input] };
   }
   if (list.length > MAX_PAGE_NAV_TEXTS) {
-    return { error: `At most ${MAX_PAGE_NAV_TEXTS} texts per field`, bad: [input] };
+    return {
+      error: `At most ${MAX_PAGE_NAV_TEXTS} texts per field`,
+      bad: [input],
+    };
   }
   return { list };
 }

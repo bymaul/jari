@@ -3,9 +3,12 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert";
 
 const { settings } = await import("../content/settings.ts");
-const { genLabels, normalizeCharset, classifyHintKey, __testHelpers } = await import("../content/hints.ts");
-const { collectMutationRoots, collectNewcomers } = await import("../content/hints-elements.ts");
-const { HINT_CHARSET_DEFAULT, keymapDefaults } = await import("../content/keymap.ts");
+const { genLabels, normalizeCharset, classifyHintKey, __testHelpers } =
+  await import("../content/hints.ts");
+const { collectMutationRoots, collectNewcomers } =
+  await import("../content/hints-elements.ts");
+const { HINT_CHARSET_DEFAULT, keymapDefaults } =
+  await import("../content/keymap.ts");
 
 const { isExplicitlyRequested, isElementClickable, collectIframeElements } =
   __testHelpers;
@@ -66,15 +69,21 @@ test("isElementClickable reuses a passed style for the cursor check", () => {
     closest: () => null,
   } as unknown as Element;
   assert.equal(
-    isElementClickable(el, { cursor: "pointer" } as unknown as CSSStyleDeclaration),
+    isElementClickable(el, {
+      cursor: "pointer",
+    } as unknown as CSSStyleDeclaration),
     true,
   );
   assert.equal(
-    isElementClickable(el, { cursor: "url(foo.png)" } as unknown as CSSStyleDeclaration),
+    isElementClickable(el, {
+      cursor: "url(foo.png)",
+    } as unknown as CSSStyleDeclaration),
     true,
   );
   assert.equal(
-    isElementClickable(el, { cursor: "default" } as unknown as CSSStyleDeclaration),
+    isElementClickable(el, {
+      cursor: "default",
+    } as unknown as CSSStyleDeclaration),
     false,
   );
 });
@@ -126,8 +135,9 @@ test("iframe inners are hinted only for the focused frame", () => {
   const prevStyle = globalThis.window.getComputedStyle;
   const prevW = globalThis.window.innerWidth;
   const prevH = globalThis.window.innerHeight;
-  globalThis.document.querySelectorAll = (() =>
-    [frame]) as unknown as typeof globalThis.document.querySelectorAll;
+  globalThis.document.querySelectorAll = (() => [
+    frame,
+  ]) as unknown as typeof globalThis.document.querySelectorAll;
   globalThis.window.innerWidth = 800;
   globalThis.window.innerHeight = 600;
   globalThis.window.getComputedStyle = (() => ({
@@ -156,31 +166,53 @@ test("classifyHintKey routes scrolling keys before label matching", () => {
     type: "scroll",
     command: "scrollDown",
   });
-  assert.deepEqual(classifyHintKey("f", { ...ctx, labels: ["F", "FA"], prefix: "" }), {
-    type: "activate",
-    prefix: "F",
-    label: "F",
-  });
-  assert.deepEqual(classifyHintKey("e", { ...ctx, labels: ["S", "SA"], prefix: "S" }), {
-    type: "filter",
-    prefix: "SE",
-  });
+  assert.deepEqual(
+    classifyHintKey("f", { ...ctx, labels: ["F", "FA"], prefix: "" }),
+    {
+      type: "activate",
+      prefix: "F",
+      label: "F",
+    },
+  );
+  assert.deepEqual(
+    classifyHintKey("e", { ...ctx, labels: ["S", "SA"], prefix: "S" }),
+    {
+      type: "filter",
+      prefix: "SE",
+    },
+  );
   assert.deepEqual(classifyHintKey("x", { ...ctx, labels: [], prefix: "" }), {
     type: "ignore",
   });
-  assert.deepEqual(classifyHintKey("Enter", { ...ctx, labels: [], prefix: "" }), {
-    type: "ignore",
-  });
+  assert.deepEqual(
+    classifyHintKey("Enter", { ...ctx, labels: [], prefix: "" }),
+    {
+      type: "ignore",
+    },
+  );
 });
 
 test("classifyHintKey sends unbound g to the top", () => {
   const keymap = { j: "scrollDown" };
-  assert.deepEqual(classifyHintKey("g", { labels: ["G"], prefix: "", keymap, charset: "saewcmp" }), {
-    type: "scroll",
-    command: "scrollToTop",
-  });
   assert.deepEqual(
-    classifyHintKey("g", { labels: ["G"], prefix: "", keymap: { g: "hintClick" }, charset: "saewcmp" }),
+    classifyHintKey("g", {
+      labels: ["G"],
+      prefix: "",
+      keymap,
+      charset: "saewcmp",
+    }),
+    {
+      type: "scroll",
+      command: "scrollToTop",
+    },
+  );
+  assert.deepEqual(
+    classifyHintKey("g", {
+      labels: ["G"],
+      prefix: "",
+      keymap: { g: "hintClick" },
+      charset: "saewcmp",
+    }),
     { type: "ignore" },
   );
 });
@@ -193,10 +225,10 @@ test("classifyHintKey never diverts cycle or reset commands", () => {
     prefix: "W",
     label: "W",
   });
-  assert.deepEqual(
-    classifyHintKey("w", { ...ctx, labels: ["WA"] }),
-    { type: "filter", prefix: "W" },
-  );
+  assert.deepEqual(classifyHintKey("w", { ...ctx, labels: ["WA"] }), {
+    type: "filter",
+    prefix: "W",
+  });
   assert.deepEqual(classifyHintKey(";", ctx), { type: "ignore" });
 });
 
@@ -206,7 +238,10 @@ test("collectMutationRoots gathers added subtrees and changed targets", () => {
   const textParent = { nodeType: 1 };
   const out: Node[] = [];
   collectMutationRoots(
-    { addedNodes: [added, { nodeType: 3 }], target } as unknown as MutationRecord,
+    {
+      addedNodes: [added, { nodeType: 3 }],
+      target,
+    } as unknown as MutationRecord,
     out,
   );
   collectMutationRoots(
@@ -273,12 +308,22 @@ test("collectNewcomers accepts visible clickables and skips the rest", () => {
     });
     const plain = stubEl({ matches: () => false });
     const root = stubEl({ querySelectorAll: () => [good, hidden, plain] });
-    assert.deepEqual(collectNewcomers([root], "click", new Set([good])), [root]);
-    assert.deepEqual(collectNewcomers([root], "click", new Set()), [root, good]);
+    assert.deepEqual(collectNewcomers([root], "click", new Set([good])), [
+      root,
+    ]);
+    assert.deepEqual(collectNewcomers([root], "click", new Set()), [
+      root,
+      good,
+    ]);
     assert.deepEqual(collectNewcomers([], "click", new Set()), []);
     const input = stubEl({ tagName: "INPUT", type: "text" });
-    const inputRoot = stubEl({ matches: () => false, querySelectorAll: () => [input] });
-    assert.deepEqual(collectNewcomers([inputRoot], "input", new Set()), [input]);
+    const inputRoot = stubEl({
+      matches: () => false,
+      querySelectorAll: () => [input],
+    });
+    assert.deepEqual(collectNewcomers([inputRoot], "input", new Set()), [
+      input,
+    ]);
   } finally {
     globalThis.window.innerWidth = prevW;
     globalThis.window.innerHeight = prevH;

@@ -94,13 +94,14 @@ export function classifyHintKey(
     keymap?: Record<string, string> | null;
     charset?: string;
   } = {},
-): 
+):
   | { type: "ignore" }
   | { type: "scroll"; command: string }
   | { type: "activate"; prefix: string; label: string }
   | { type: "filter"; prefix: string } {
   if (key.length !== 1) return { type: "ignore" };
-  const command = (keymap && keymap[key]) || (key === "g" ? "scrollToTop" : null);
+  const command =
+    (keymap && keymap[key]) || (key === "g" ? "scrollToTop" : null);
   const entry = (command && COMMAND_CATALOG[command as CommandName]) || null;
   if (
     entry &&
@@ -112,7 +113,8 @@ export function classifyHintKey(
   const lower = key.toLowerCase();
   if (!charset.includes(lower)) return { type: "ignore" };
   const next = prefix + lower.toUpperCase();
-  if (labels.includes(next)) return { type: "activate", prefix: next, label: next };
+  if (labels.includes(next))
+    return { type: "activate", prefix: next, label: next };
   return { type: "filter", prefix: next };
 }
 
@@ -162,7 +164,11 @@ function isOwnMutation(mutation: MutationRecord): boolean {
     ];
     const allOwn = (list: Node[]) =>
       list.every((n: Node) => n.nodeType !== 1 || hasJariClass(n));
-    if (mutation.target && mutation.target.nodeType === 1 && hasJariClass(mutation.target)) {
+    if (
+      mutation.target &&
+      mutation.target.nodeType === 1 &&
+      hasJariClass(mutation.target)
+    ) {
       return allOwn(nodes);
     }
     return nodes.length > 0 && allOwn(nodes);
@@ -418,10 +424,7 @@ function flip(): void {
   });
 }
 
-function assignLabels(
-  nextElements: JariElement[],
-  charset: string,
-): string[] {
+function assignLabels(nextElements: JariElement[], charset: string): string[] {
   const oldByEl = new Map(hints.map((h) => [h.el, h.label]));
   const assigned = new Map<JariElement, string>();
   const taken: string[] = [];
@@ -437,8 +440,13 @@ function assignLabels(
   }
   if (newcomers.length > 0) {
     if (taken.length === 0) return genLabels(nextElements.length, charset);
-    const pool = genLabels(nextElements.length + newcomers.length, charset).filter(
-      (label) => taken.every((t) => t !== label && !t.startsWith(label) && !label.startsWith(t)),
+    const pool = genLabels(
+      nextElements.length + newcomers.length,
+      charset,
+    ).filter((label) =>
+      taken.every(
+        (t) => t !== label && !t.startsWith(label) && !label.startsWith(t),
+      ),
     );
     newcomers.forEach((el, i) => {
       if (i < pool.length) {
@@ -769,7 +777,7 @@ function activate(el: Element): void {
     }
     close();
   } else if (mode === "yankText") {
-    const text = (((el as HTMLElement).innerText || el.textContent) || "").trim();
+    const text = ((el as HTMLElement).innerText || el.textContent || "").trim();
     if (text) {
       ui.copyText(text).then((ok) =>
         ui.toast(ok ? "Yanked text" : "Copy failed"),

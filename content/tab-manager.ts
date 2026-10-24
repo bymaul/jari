@@ -193,9 +193,7 @@ export function stateTags(tab: ManagerTab): string[] {
 }
 
 export function confirmKey(ids?: Iterable<number>): string {
-  return [...(ids || [])]
-    .sort((a, b) => a - b)
-    .join(",");
+  return [...(ids || [])].sort((a, b) => a - b).join(",");
 }
 
 export function prunedConfirm(
@@ -492,7 +490,8 @@ function renderHeader(): void {
   stats.className = "jari-mgr-stats";
   const labels = windowLabels(tabs);
   let summary = `${tabs.length} tabs · ${wins} windows`;
-  if (windowId !== null) summary += ` · current W${labels.get(windowId) || "?"}`;
+  if (windowId !== null)
+    summary += ` · current W${labels.get(windowId) || "?"}`;
   summary += " · ";
   stats.textContent = summary;
   const marks = document.createElement("span");
@@ -1004,7 +1003,8 @@ async function runOnTargets<A extends TargetAction>(
     renderAll();
     return;
   }
-  if (outcome.done) outcome.done(res as Extract<MessageResponse<A>, { ok: true }>, targets);
+  if (outcome.done)
+    outcome.done(res as Extract<MessageResponse<A>, { ok: true }>, targets);
   if (!opts.keepMarks) consumeMarks();
   await refresh();
 }
@@ -1022,11 +1022,10 @@ async function closeTargets(): Promise<void> {
     );
     return;
   }
-  await runOnTargets(
-    "closeManagerTabs",
-    () => ({ ids }),
-    { failed: "Close failed", done: (res) => ui.toast(`Closed ${res.closed}`) },
-  );
+  await runOnTargets("closeManagerTabs", () => ({ ids }), {
+    failed: "Close failed",
+    done: (res) => ui.toast(`Closed ${res.closed}`),
+  });
 }
 
 const FLAGS = {
@@ -1151,8 +1150,7 @@ function startRename(): void {
   }
   openField(
     "group",
-    (groupsById.get(focused.groupId) || ({} as { title?: string })).title ||
-      "",
+    (groupsById.get(focused.groupId) || ({} as { title?: string })).title || "",
     { groupId: focused.groupId },
   );
 }
@@ -1212,33 +1210,25 @@ function bookmarkPayload(targets: ManagerTab[]) {
 }
 
 function saveBookmarks(): Promise<void> {
-  return runOnTargets(
-    "bookmarkManagerTabs",
-    bookmarkPayload,
-    {
-      failed: "Bookmark failed",
-      done: (res) =>
-        ui.toast(
-          res.saved > 0
-            ? `Bookmarked ${res.saved}${res.skipped ? ` (${res.skipped} skipped)` : ""}`
-            : "Already bookmarked",
-        ),
-    },
-  );
+  return runOnTargets("bookmarkManagerTabs", bookmarkPayload, {
+    failed: "Bookmark failed",
+    done: (res) =>
+      ui.toast(
+        res.saved > 0
+          ? `Bookmarked ${res.saved}${res.skipped ? ` (${res.skipped} skipped)` : ""}`
+          : "Already bookmarked",
+      ),
+  });
 }
 
 function removeBookmarks(): Promise<void> {
-  return runOnTargets(
-    "unbookmarkManagerTabs",
-    bookmarkPayload,
-    {
-      failed: "Unbookmark failed",
-      done: (res) => {
-        const plural = res.removed === 1 ? "" : "s";
-        ui.toast(`Removed ${res.removed} bookmark${plural}`);
-      },
+  return runOnTargets("unbookmarkManagerTabs", bookmarkPayload, {
+    failed: "Unbookmark failed",
+    done: (res) => {
+      const plural = res.removed === 1 ? "" : "s";
+      ui.toast(`Removed ${res.removed} bookmark${plural}`);
     },
-  );
+  });
 }
 
 function bookmarkTargets(): Promise<void> {
@@ -1394,9 +1384,7 @@ async function moveWindowTargets(): Promise<void> {
     return;
   }
   if (res.movedToWindow) {
-    ui.toast(
-      res.moved! > 1 ? `Merged ${res.moved!} tabs` : "Merged to window",
-    );
+    ui.toast(res.moved! > 1 ? `Merged ${res.moved!} tabs` : "Merged to window");
     consumeMarks();
     await refresh();
     return;

@@ -21,8 +21,7 @@ let capturing = false;
 
 function computedPosition(el: Element): string {
   try {
-    const view =
-      (el.ownerDocument && el.ownerDocument.defaultView) || window;
+    const view = (el.ownerDocument && el.ownerDocument.defaultView) || window;
     return view.getComputedStyle(el).position;
   } catch {
     return "";
@@ -192,7 +191,8 @@ export async function captureFullPage({
     const rootEl = document.documentElement;
     let prevBehavior: string | null | undefined;
     try {
-      prevBehavior = rootEl && rootEl.style ? rootEl.style.scrollBehavior : undefined;
+      prevBehavior =
+        rootEl && rootEl.style ? rootEl.style.scrollBehavior : undefined;
       if (rootEl && rootEl.style) rootEl.style.scrollBehavior = "auto";
     } catch {}
     const startX = window.scrollX || 0;
@@ -262,7 +262,17 @@ export async function captureFullPage({
           ) {
             const scale = canvasWidth / (naturalW as number);
             const destH = Math.max(1, Math.round((naturalH as number) * scale));
-            ctx.drawImage(img, 0, 0, naturalW as number, naturalH as number, 0, destY, canvasWidth, destH);
+            ctx.drawImage(
+              img,
+              0,
+              0,
+              naturalW as number,
+              naturalH as number,
+              0,
+              destY,
+              canvasWidth,
+              destH,
+            );
           } else {
             ctx.drawImage(img, 0, destY);
           }
@@ -307,31 +317,31 @@ export async function captureFullPage({
       if (!ok) ui.toast("Screenshot failed");
       else if (truncated) ui.toast("Saved partial screenshot");
       else ui.toast("Saved screenshot");
-  } finally {
-    scrollTo(startX, startY);
-    try {
-      if (rootEl && rootEl.style) {
-        if (
-          (prevBehavior === undefined ||
-            prevBehavior === null ||
-            prevBehavior === "") &&
-          typeof rootEl.style.removeProperty === "function"
-        ) {
-          rootEl.style.removeProperty("scroll-behavior");
-        } else {
-          rootEl.style.scrollBehavior = prevBehavior as string;
-        }
-      }
-    } catch {}
-    for (const restore of fixedRestores.splice(0).reverse()) {
+    } finally {
+      scrollTo(startX, startY);
       try {
-        restore();
+        if (rootEl && rootEl.style) {
+          if (
+            (prevBehavior === undefined ||
+              prevBehavior === null ||
+              prevBehavior === "") &&
+            typeof rootEl.style.removeProperty === "function"
+          ) {
+            rootEl.style.removeProperty("scroll-behavior");
+          } else {
+            rootEl.style.scrollBehavior = prevBehavior as string;
+          }
+        }
+      } catch {}
+      for (const restore of fixedRestores.splice(0).reverse()) {
+        try {
+          restore();
+        } catch {}
+      }
+      try {
+        restoreOverlays();
       } catch {}
     }
-    try {
-      restoreOverlays();
-    } catch {}
-  }
   } finally {
     capturing = false;
   }

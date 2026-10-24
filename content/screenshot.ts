@@ -1,6 +1,7 @@
 /* global Image */
 
-const UNSCREENSHOTABLE_PROTOCOLS = /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
+const UNSCREENSHOTABLE_PROTOCOLS =
+  /^(chrome|edge|about|view-source|chrome-extension|moz-extension|opera|brave|javascript|data):/i;
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 const IMAGE_LOAD_TIMEOUT_MS = 5000;
 const PAINT_TIMEOUT_MS = 500;
@@ -83,9 +84,9 @@ export function downloadUrl(
   }
 }
 
-export async function waitForPaint(
-  { timeoutMs = PAINT_TIMEOUT_MS } = {},
-): Promise<void> {
+export async function waitForPaint({
+  timeoutMs = PAINT_TIMEOUT_MS,
+} = {}): Promise<void> {
   const cap =
     Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : PAINT_TIMEOUT_MS;
   try {
@@ -140,9 +141,9 @@ export function downloadBlob(
   return ok;
 }
 
-export async function waitForMediaReady(
-  { timeoutMs = 1500 } = {},
-): Promise<void> {
+export async function waitForMediaReady({
+  timeoutMs = 1500,
+} = {}): Promise<void> {
   const cap = Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : 1500;
   const deadline = Date.now() + cap;
   try {
@@ -151,18 +152,13 @@ export async function waitForMediaReady(
         ? document.fonts.ready
         : null;
     if (fontsReady) {
-      await Promise.race([
-        fontsReady,
-        new Promise((r) => setTimeout(r, cap)),
-      ]);
+      await Promise.race([fontsReady, new Promise((r) => setTimeout(r, cap))]);
     }
   } catch {}
   for (;;) {
     let pending = false;
     try {
-      const vh = Number.isFinite(window.innerHeight)
-        ? window.innerHeight
-        : 0;
+      const vh = Number.isFinite(window.innerHeight) ? window.innerHeight : 0;
       const imgs = document.images || [];
       const count = Math.min(imgs.length || 0, 500);
       for (let i = 0; i < count; i++) {
@@ -200,8 +196,7 @@ export function computeSlices(
   maxH = 8000,
 ): { slices: number[]; truncated: boolean } {
   const total = Number.isFinite(totalH) && totalH > 0 ? totalH : 0;
-  const limit =
-    Number.isFinite(maxH) && maxH > 0 ? Math.min(maxH, 8000) : 8000;
+  const limit = Number.isFinite(maxH) && maxH > 0 ? Math.min(maxH, 8000) : 8000;
   const step = Number.isFinite(vh) && vh > 0 ? vh : 1;
   const cap =
     Number.isFinite(maxSlices) && maxSlices > 0
@@ -249,11 +244,15 @@ export function normalizeRect(
 }
 
 export function scaleRect(
-  rect?: { left?: unknown; top?: unknown; width?: unknown; height?: unknown } | null,
+  rect?: {
+    left?: unknown;
+    top?: unknown;
+    width?: unknown;
+    height?: unknown;
+  } | null,
   dpr?: number,
 ): { x: number; y: number; w: number; h: number } {
-  const s =
-    dpr !== undefined && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  const s = dpr !== undefined && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
   const parts = rect
     ? [rect.left, rect.top, rect.width, rect.height].map(Number)
     : [NaN, NaN, NaN, NaN];

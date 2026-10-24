@@ -65,12 +65,19 @@ export function parseQuery(query: unknown) {
     if (t) exclude.push(t);
     return " ";
   });
-  const withoutPhrases = withoutExcludedPhrases.replace(/"([^"]+)"/g, (_, p) => {
-    const t = p.trim();
-    if (t) phrases.push(t);
-    return " ";
-  });
-  const rawTerms = withoutPhrases.replace(/"/g, " ").trim().split(/\s+/).filter(Boolean);
+  const withoutPhrases = withoutExcludedPhrases.replace(
+    /"([^"]+)"/g,
+    (_, p) => {
+      const t = p.trim();
+      if (t) phrases.push(t);
+      return " ";
+    },
+  );
+  const rawTerms = withoutPhrases
+    .replace(/"/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   const include: string[] = [];
   for (const t of rawTerms) {
     if (t.startsWith("-") && t.length > 1) exclude.push(t.slice(1));
@@ -184,7 +191,11 @@ function bestAlignment(
     cur = backs[j][cur];
   }
   indices[0] = cur;
-  return { score: dpPrev[end], indices: toOriginal(indices), start: indices[0] };
+  return {
+    score: dpPrev[end],
+    indices: toOriginal(indices),
+    start: indices[0],
+  };
 }
 
 interface ParsedQuery {
@@ -318,12 +329,17 @@ export function substringIndices(query: unknown, text: string): number[] {
   return [...new Set(indices)].sort((a, b) => a - b);
 }
 function recencyScore(item: RankItem): number {
-  const ts = item.lastVisit || item.lastAccessed || item.lastVisitTime || item.dateAdded || 0;
+  const ts =
+    item.lastVisit ||
+    item.lastAccessed ||
+    item.lastVisitTime ||
+    item.dateAdded ||
+    0;
   if (!ts) return 0;
   const days = (Date.now() - ts) / 86400000;
   if (days < 0 || !Number.isFinite(days)) return 0;
   const base = Math.max(0, 7 * Math.exp(-days / 14));
-  const typedBonus = item.typedVisits ? 2 : (item.typedCount ? 1 : 0);
+  const typedBonus = item.typedVisits ? 2 : item.typedCount ? 1 : 0;
   return base + typedBonus;
 }
 
@@ -389,15 +405,17 @@ export function rankMatches(
     );
   }
   const parsed = parseQuery(q);
-  const multiTerm =
-    parsed.include.length > 1 || parsed.phrases.length > 0;
+  const multiTerm = parsed.include.length > 1 || parsed.phrases.length > 0;
   const ranked = list
     .map((item) => {
       const title = item.title || "";
       const url = item.url || "";
       const { host, path, query: queryString } = urlParts(url);
       const urlFieldText = host + path;
-      const hay = title && urlFieldText ? title + " " + urlFieldText : title || urlFieldText;
+      const hay =
+        title && urlFieldText
+          ? title + " " + urlFieldText
+          : title || urlFieldText;
       const titleNorm = normalizeWithMap(title);
       const hostNorm = normalizeWithMap(host);
       const urlNorm = normalizeWithMap(urlFieldText);
@@ -452,7 +470,8 @@ export function rankMatches(
       }
       if (!match) return null;
       const first = match.indices.length > 0 ? match.indices[0] : 0;
-      const last = match.indices.length > 0 ? match.indices[match.indices.length - 1] : 0;
+      const last =
+        match.indices.length > 0 ? match.indices[match.indices.length - 1] : 0;
       const baseScore = match.score + match.leading;
       if (baseScore < 0 && tier !== 3) return null;
       const tBoost = titleSub ? 8 : 0;
@@ -460,7 +479,16 @@ export function rankMatches(
       const matchScore = baseScore + tBoost + hBoost;
       const boostScore = recencyScore(item) + frequencyScore(item);
       const totalScore = matchScore + boostScore;
-      return { item, match: { score: totalScore, indices: match.indices, baseScore }, span: match.indices.length > 0 ? last - first + 1 : 0, hayLength: hay.length, totalScore, tier, matchScore, boostScore };
+      return {
+        item,
+        match: { score: totalScore, indices: match.indices, baseScore },
+        span: match.indices.length > 0 ? last - first + 1 : 0,
+        hayLength: hay.length,
+        totalScore,
+        tier,
+        matchScore,
+        boostScore,
+      };
     })
     .filter((r: RankMatch | null): r is RankMatch => r !== null)
     .sort((a, b) => {

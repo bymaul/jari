@@ -117,9 +117,7 @@ export function renderList({
   const frag = document.createDocumentFragment();
   if (mode === "open" || mode === "edit" || mode === "incognito") {
     for (const row of rows)
-      frag.appendChild(
-        renderSuggestionRow(row as ListRow, query, tabUrlMap),
-      );
+      frag.appendChild(renderSuggestionRow(row as ListRow, query, tabUrlMap));
   } else {
     const winLabels = new Map<number | undefined, number>();
     let winIndex = 0;
