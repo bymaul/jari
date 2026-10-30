@@ -30,7 +30,6 @@ function isScrollVisible(
           : window.getComputedStyle(node);
       if (style.display === "none" || style.visibility === "hidden")
         return false;
-      if (parseFloat(style.opacity) === 0) return false;
     }
     first = false;
     const root = node.getRootNode() as { host?: Element | null };
@@ -85,8 +84,10 @@ function findScrollableElements(): Element[] {
     const bottom = Number.isFinite(rect.bottom)
       ? rect.bottom
       : (rect.top || 0) + (rect.height || 0);
+
     if (bottom <= 0 || right <= 0 || rect.top >= vh || rect.left >= vw)
       continue;
+
     const visibleW = Math.min(right, vw) - Math.max(rect.left || 0, 0);
     const visibleH = Math.min(bottom, vh) - Math.max(rect.top || 0, 0);
     if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
@@ -131,6 +132,7 @@ function findFrameElements(): HTMLIFrameElement[] {
     if (!isScrollVisible(el)) continue;
     const vw = window.innerWidth || 0;
     const vh = window.innerHeight || 0;
+
     if (
       rect.bottom <= 0 ||
       rect.right <= 0 ||
@@ -138,6 +140,7 @@ function findFrameElements(): HTMLIFrameElement[] {
       rect.left >= vw
     )
       continue;
+
     if (!isFrameScrollable(el as HTMLIFrameElement, rect)) continue;
     frames.push(el as HTMLIFrameElement);
   }
@@ -243,7 +246,9 @@ function frameInnerBoxes(
       const top = (r.top || 0) + (frameRect.top || 0);
       const right = left + (r.width || 0);
       const bottom = top + (r.height || 0);
+
       if (bottom <= 0 || right <= 0 || top >= vh || left >= vw) continue;
+
       const visibleW = Math.min(right, vw) - Math.max(left, 0);
       const visibleH = Math.min(bottom, vh) - Math.max(top, 0);
       if (visibleW < MIN_SCROLL_AREA_SIZE || visibleH < MIN_SCROLL_AREA_SIZE)
@@ -375,12 +380,6 @@ function forwardCycleToTop(dir?: number) {
 function pageCanScroll(): boolean {
   const el = document.scrollingElement || document.documentElement;
   if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
-  const y = window.getComputedStyle(el).overflowY;
-  if (y === "hidden" || y === "clip") return false;
-  if (y === "visible" && document.body) {
-    const bodyY = window.getComputedStyle(document.body).overflowY;
-    if (bodyY === "hidden" || bodyY === "clip") return false;
-  }
   return true;
 }
 
@@ -440,24 +439,30 @@ function sortStopsVisually(stops: Element[]): Element[] {
 
 function dedupeNestedAreas(areas: Element[]): Element[] {
   const kept: Element[] = [];
-  const contains = (outer: Element, inner: Element): boolean => {
-    try {
-      return (
-        outer !== inner &&
-        typeof outer.contains === "function" &&
-        outer.contains(inner)
-      );
-    } catch {
-      return false;
-    }
-  };
   for (const el of areas) {
     if (kept.includes(el)) continue;
-    if (kept.some((k) => contains(el, k))) continue;
-    for (let j = kept.length - 1; j >= 0; j--) {
-      if (contains(kept[j], el)) kept.splice(j, 1);
+    let rectA: DOMRect | null = null;
+    try {
+      rectA = el.getBoundingClientRect();
+    } catch {}
+    if (!rectA) {
+      kept.push(el);
+      continue;
     }
-    kept.push(el);
+    const duplicate = kept.some((k) => {
+      try {
+        const rectB = k.getBoundingClientRect();
+        return (
+          Math.abs(rectA!.left - rectB.left) < 2 &&
+          Math.abs(rectA!.top - rectB.top) < 2 &&
+          Math.abs(rectA!.width - rectB.width) < 2 &&
+          Math.abs(rectA!.height - rectB.height) < 2
+        );
+      } catch {
+        return false;
+      }
+    });
+    if (!duplicate) kept.push(el);
   }
   return kept;
 }
@@ -572,9 +577,14 @@ function reset() {
     forwardCycleToTop();
     return;
   }
-  target = null;
+  const stops = currentStops();
+  if (pageCanScroll()) {
+    target = null;
+  } else {
+    target = stops.length > 0 ? stops[0] : null;
+  }
   releaseFrameFocus();
-  showHighlight();
+  showHighlight(stops);
 }
 
 let smoothState: {
