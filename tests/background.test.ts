@@ -24,12 +24,15 @@ function tabsStubs(): Record<string, unknown> {
 
 const savedWindows = chromeStubs.windows;
 const savedTabsCreate = tabsStubs().create;
+const savedSessions = chromeStubs.sessions;
 
 afterEach(() => {
   if (savedWindows === undefined) delete chromeStubs.windows;
   else chromeStubs.windows = savedWindows;
   if (savedTabsCreate === undefined) delete tabsStubs().create;
   else tabsStubs().create = savedTabsCreate;
+  if (savedSessions === undefined) delete chromeStubs.sessions;
+  else chromeStubs.sessions = savedSessions;
 });
 
 function stubChrome({
@@ -585,4 +588,87 @@ test("window moves refuse incognito mixing", async () => {
   } finally {
     restore();
   }
+});
+
+test("recentSessionsList maps closed tabs and windows in recency order", async () => {
+  chromeStubs.sessions = {
+    getRecentlyClosed: async () => [
+      {
+        lastModified: 2000,
+        tab: { sessionId: "t1", title: "Tab", url: "https://tab.example/" },
+      },
+      {
+        lastModified: 1000,
+        window: {
+          sessionId: "w1",
+          tabs: [
+            { title: "Old", url: "https://old.example/" },
+            { title: "Active", url: "https://active.example/", active: true },
+          ],
+        },
+      },
+      { lastModified: 500 },
+    ],
+  };
+  assert.deepEqual(await handlers.recentSessionsList(), {
+    ok: true,
+    rows: [
+      {
+        sessionId: "t1",
+        kind: "tab",
+        title: "Tab",
+        url: "https://tab.example/",
+        tabCount: 1,
+        lastModified: 2000,
+      },
+      {
+        sessionId: "w1",
+        kind: "window",
+        title: "Active",
+        url: "https://active.example/",
+        tabCount: 2,
+        lastModified: 1000,
+      },
+    ],
+  });
+});
+
+test("restoreRecentSessions restores only known ids and dedupes", async () => {
+  const restored: string[] = [];
+  chromeStubs.sessions = {
+    getRecentlyClosed: async () => [
+      {
+        lastModified: 2000,
+        tab: { sessionId: "t1", title: "A", url: "https://a.example/" },
+      },
+    ],
+    restore: async (id: string) => {
+      restored.push(id);
+      return {};
+    },
+  };
+  assert.deepEqual(
+    await handlers.restoreRecentSessions(
+      {},
+      { sessionIds: ["t1", "t1", "gone", 42 as unknown as string] },
+    ),
+    { ok: true, restored: 1, skipped: 1 },
+  );
+  assert.deepEqual(restored, ["t1"]);
+  assert.deepEqual(
+    await handlers.restoreRecentSessions({}, { sessionIds: ["gone"] }),
+    { ok: false },
+  );
+});
+
+test("session actions report unsupported without the sessions api", async () => {
+  delete chromeStubs.sessions;
+  assert.deepEqual(await handlers.recentSessionsList(), {
+    ok: false,
+    reason: "unsupported",
+  });
+  assert.deepEqual(
+    await handlers.restoreRecentSessions({}, { sessionIds: ["t1"] }),
+    { ok: false, reason: "unsupported" },
+  );
 });

@@ -36,6 +36,15 @@ export interface WindowSummary {
   url: string;
 }
 
+export interface ClosedSessionRow {
+  sessionId: string;
+  kind: "tab" | "window";
+  title: string;
+  url: string;
+  tabCount: number;
+  lastModified: number;
+}
+
 export interface HistoryTreeRow {
   id: number;
   url: string;
@@ -85,6 +94,18 @@ export interface Messages {
   restoreTab: {
     payload: { count?: number };
     response: Ok | Fail;
+  };
+  recentSessionsList: {
+    payload: Record<string, never>;
+    response:
+      | { ok: true; rows: ClosedSessionRow[] }
+      | { ok: false; reason?: "unsupported"; error?: string };
+  };
+  restoreRecentSessions: {
+    payload: { sessionIds?: string[] };
+    response:
+      | { ok: true; restored: number; skipped: number }
+      | { ok: false; reason?: "unsupported"; error?: string };
   };
   previousTab: {
     payload: { count?: number };

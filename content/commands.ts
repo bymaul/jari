@@ -17,6 +17,7 @@ import {
 } from "./scroll.ts";
 import { Prompt } from "./prompt.ts";
 import { TabManager } from "./tab-manager.ts";
+import { RestoreManager } from "./restore-manager.ts";
 import { HistoryTree } from "./history-tree.ts";
 import { Help } from "./help.ts";
 import { Hints, setCommandRunner } from "./hints.ts";
@@ -431,6 +432,10 @@ export const commands: Record<string, CommandImpl> = {
   openTabManager: {
     ...COMMAND_CATALOG.openTabManager,
     run: () => TabManager.open(),
+  },
+  openRestoreManager: {
+    ...COMMAND_CATALOG.openRestoreManager,
+    run: () => RestoreManager.open(),
   },
   openOmnibar: {
     ...COMMAND_CATALOG.openOmnibar,

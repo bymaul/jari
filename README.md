@@ -22,7 +22,7 @@ Bindings chain into sequences of any length.
 - Zoom: `+`/`=`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
   `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder, `w` split/merge),
-  `<<`/`>>` move, `W` move to window,
+  `gr` recently closed tabs/windows (mark and restore), `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
 - History: `H`/`L` back/forward, `gh` page history tree (branching undo-tree:
   `Enter` jump, `t` background tab, `/` filter)

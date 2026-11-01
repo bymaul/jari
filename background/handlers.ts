@@ -12,6 +12,8 @@ export const handlers = {
   navigate: tabs.navigate,
   closeTab: tabs.closeTab,
   restoreTab: tabs.restoreTab,
+  recentSessionsList: tabs.recentSessionsList,
+  restoreRecentSessions: tabs.restoreRecentSessions,
   previousTab: tabs.previousTab,
   nextTab: tabs.nextTab,
   moveTabToWindow: tabs.moveTabToWindow,

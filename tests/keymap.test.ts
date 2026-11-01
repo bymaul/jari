@@ -92,6 +92,25 @@ test("migrateV13Bindings lands gh for the history tree without clobbering custom
   assert.equal(s.keymap.j, "scrollDown");
 });
 
+test("migrateV14Bindings lands gr for recently closed tabs without clobbering customs", () => {
+  assert.deepEqual(
+    Jari.migrateV14Bindings({ x: "closeTab" }).gr,
+    "openRestoreManager",
+  );
+  assert.deepEqual(
+    Jari.migrateV14Bindings({ gr: "reloadTab" }).gr,
+    "reloadTab",
+  );
+  assert.ok(!("gr" in Jari.migrateV14Bindings({ grx: "closeTab" })));
+  const s = Jari.normalizeSettings({
+    schemaVersion: 13,
+    keymap: { j: "scrollDown" },
+  });
+  assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(s.keymap.gr, "openRestoreManager");
+  assert.equal(s.keymap.j, "scrollDown");
+});
+
 test("migrateHintCharset moves only the old default charset", () => {
   assert.equal(
     Jari.migrateHintCharset("sadjklewcmpgh"),

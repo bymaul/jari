@@ -7,6 +7,7 @@ import {
   openInIncognito,
 } from "./windows.ts";
 import type {
+  ClosedSessionRow,
   GroupSummary,
   ManagerTab,
   MessagePayload,
@@ -95,6 +96,106 @@ export async function restoreTab(
     }
   }
   return { ok: true };
+}
+
+const MAX_SESSIONS = 25;
+const MAX_SESSION_ID = 200;
+
+function sessionRows(
+  sessions: chrome.sessions.Session[] | null | undefined,
+): ClosedSessionRow[] {
+  const rows: ClosedSessionRow[] = [];
+  for (const session of sessions || []) {
+    if (!session) continue;
+    const lastModified = Number(session.lastModified) || 0;
+    if (session.tab && session.tab.sessionId) {
+      rows.push({
+        sessionId: session.tab.sessionId,
+        kind: "tab",
+        title: session.tab.title || "",
+        url: session.tab.url || "",
+        tabCount: 1,
+        lastModified,
+      });
+    } else if (session.window && session.window.sessionId) {
+      const tabs = session.window.tabs || [];
+      const tab = tabs.find((entry) => entry.active) || tabs[0];
+      rows.push({
+        sessionId: session.window.sessionId,
+        kind: "window",
+        title: (tab && tab.title) || "Window",
+        url: (tab && tab.url) || "",
+        tabCount: tabs.length,
+        lastModified,
+      });
+    }
+  }
+  return rows;
+}
+
+function sanitizeSessionIds(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of ids) {
+    if (typeof id !== "string") continue;
+    const value = id.trim();
+    if (!value || value.length > MAX_SESSION_ID || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+    if (out.length >= MAX_SESSIONS) break;
+  }
+  return out;
+}
+
+export async function recentSessionsList(): Promise<
+  MessageResponse<"recentSessionsList">
+> {
+  if (!hasApi(["sessions", "getRecentlyClosed"])) {
+    return { ok: false, reason: "unsupported" };
+  }
+  let sessions;
+  try {
+    sessions = await chrome.sessions.getRecentlyClosed({
+      maxResults: MAX_SESSIONS,
+    });
+  } catch {
+    return { ok: false };
+  }
+  return { ok: true, rows: sessionRows(sessions) };
+}
+
+export async function restoreRecentSessions(
+  _: Sender,
+  { sessionIds }: MessagePayload<"restoreRecentSessions"> = {},
+): Promise<MessageResponse<"restoreRecentSessions">> {
+  if (
+    !hasApi(["sessions", "getRecentlyClosed"]) ||
+    !hasApi(["sessions", "restore"])
+  ) {
+    return { ok: false, reason: "unsupported" };
+  }
+  const ids = sanitizeSessionIds(sessionIds);
+  if (ids.length === 0) return { ok: false };
+  let sessions;
+  try {
+    sessions = await chrome.sessions.getRecentlyClosed({
+      maxResults: MAX_SESSIONS,
+    });
+  } catch {
+    return { ok: false };
+  }
+  const known = new Set(sessionRows(sessions).map((row) => row.sessionId));
+  let restored = 0;
+  for (const id of ids) {
+    if (!known.has(id)) continue;
+    try {
+      await chrome.sessions.restore(id);
+      restored++;
+    } catch {}
+  }
+  if (restored === 0) return { ok: false };
+  return { ok: true, restored, skipped: ids.length - restored };
 }
 
 export async function previousTab(

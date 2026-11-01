@@ -18,7 +18,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 
-export const SETTINGS_SCHEMA_VERSION = 13;
+export const SETTINGS_SCHEMA_VERSION = 14;
 
 // Normalized settings shape — the single schema island. RawSettings is the
 // doc-typed input contract for migrate/normalize; every field access there
@@ -140,6 +140,7 @@ export const keymapDefaults: Record<string, string> = {
   g0: "goToFirstTab",
   g$: "goToLastTab",
   gt: "openTabManager",
+  gr: "openRestoreManager",
   ";e": "openSettings",
   ";x": "openExtensions",
   ";w": "resetScrollTarget",
@@ -547,6 +548,10 @@ export function migrateSettings(data: unknown): RawSettings {
     d.keymap = migrateV13Bindings(d.keymap);
     version = 13;
   }
+  if (version < 14) {
+    d.keymap = migrateV14Bindings(d.keymap);
+    version = 14;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -700,6 +705,21 @@ export function migrateV13Bindings(keymap: unknown): Record<string, string> {
   }
   const out = { ...keymap } as Record<string, string>;
   for (const [combo, command] of V13_DEFAULT_FILLS) {
+    if (combo in out) continue;
+    if (findOverlapConflicts(out, combo).length > 0) continue;
+    out[combo] = command;
+  }
+  return out;
+}
+
+const V14_DEFAULT_FILLS: [string, string][] = [["gr", "openRestoreManager"]];
+
+export function migrateV14Bindings(keymap: unknown): Record<string, string> {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap as Record<string, string>;
+  }
+  const out = { ...keymap } as Record<string, string>;
+  for (const [combo, command] of V14_DEFAULT_FILLS) {
     if (combo in out) continue;
     if (findOverlapConflicts(out, combo).length > 0) continue;
     out[combo] = command;
