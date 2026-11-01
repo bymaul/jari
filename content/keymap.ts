@@ -158,15 +158,6 @@ export const keymapDefaults: Record<string, string> = {
   ":": "showCommandPalette",
 };
 
-export const prefixes = {
-  g: {},
-  ";": {},
-  y: {},
-  "[": {},
-  "<": {},
-  ">": {},
-};
-
 export const categories = [
   { id: "scrolling", label: "Scrolling" },
   { id: "zoom", label: "Zoom" },
@@ -221,8 +212,6 @@ export const settingsDefaults: Omit<
   hintTheme: HINT_THEME_DEFAULT,
   hintFontSize: HINT_FONT_SIZE_DEFAULT,
 };
-
-export const prefixKeys = new Set(Object.keys(prefixes));
 
 export const modifierKeys = new Set([
   "Control",
@@ -321,21 +310,6 @@ export function isPrefixKey(keymap: Record<string, string>, key: string) {
     prefixCandidates.set(keymap, candidates);
   }
   return candidates.has(key);
-}
-
-export function getDynamicPrefixes(
-  keymap: Record<string, string>,
-): Set<string> {
-  const out = new Set<string>();
-  for (const combo of Object.keys(keymap || {})) {
-    if (combo.includes("+")) continue;
-    if (combo.length < 2) continue;
-    if (/^[0-9]$/.test(combo[0])) continue;
-    const prefix = combo[0];
-    if (keymap[prefix]) continue;
-    out.add(prefix);
-  }
-  return out;
 }
 
 export function getPrefixEntries(

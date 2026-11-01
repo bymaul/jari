@@ -752,13 +752,6 @@ function stopPolling(): void {
   }
 }
 
-export function pollState(): {
-  active: boolean;
-  polling: boolean;
-  refreshing: boolean;
-} {
-  return { active, polling: pollTimer !== null, refreshing };
-}
 
 async function open(): Promise<void> {
   if (active) return;
@@ -1641,9 +1634,6 @@ function onKeyDown(event: KeyboardEvent): boolean {
   return onNormalKey(event);
 }
 
-export function fieldState(): { kind: FieldKind; text: string } | null {
-  return field ? { kind: field.kind, text: fieldValue() } : null;
-}
 
 export const TabManager = {
   open,

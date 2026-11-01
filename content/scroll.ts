@@ -439,30 +439,44 @@ function sortStopsVisually(stops: Element[]): Element[] {
 
 function dedupeNestedAreas(areas: Element[]): Element[] {
   const kept: Element[] = [];
+  const contains = (outer: Element, inner: Element): boolean => {
+    try {
+      return (
+        outer !== inner &&
+        typeof outer.contains === "function" &&
+        outer.contains(inner)
+      );
+    } catch {
+      return false;
+    }
+  };
   for (const el of areas) {
     if (kept.includes(el)) continue;
+    if (kept.some((k) => contains(el, k))) continue;
     let rectA: DOMRect | null = null;
     try {
       rectA = el.getBoundingClientRect();
     } catch {}
-    if (!rectA) {
-      kept.push(el);
-      continue;
+    const duplicate =
+      rectA !== null &&
+      kept.some((k) => {
+        try {
+          const rectB = k.getBoundingClientRect();
+          return (
+            Math.abs(rectA!.left - rectB.left) < 2 &&
+            Math.abs(rectA!.top - rectB.top) < 2 &&
+            Math.abs(rectA!.width - rectB.width) < 2 &&
+            Math.abs(rectA!.height - rectB.height) < 2
+          );
+        } catch {
+          return false;
+        }
+      });
+    if (duplicate) continue;
+    for (let j = kept.length - 1; j >= 0; j--) {
+      if (contains(kept[j], el)) kept.splice(j, 1);
     }
-    const duplicate = kept.some((k) => {
-      try {
-        const rectB = k.getBoundingClientRect();
-        return (
-          Math.abs(rectA!.left - rectB.left) < 2 &&
-          Math.abs(rectA!.top - rectB.top) < 2 &&
-          Math.abs(rectA!.width - rectB.width) < 2 &&
-          Math.abs(rectA!.height - rectB.height) < 2
-        );
-      } catch {
-        return false;
-      }
-    });
-    if (!duplicate) kept.push(el);
+    kept.push(el);
   }
   return kept;
 }

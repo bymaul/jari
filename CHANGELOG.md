@@ -24,12 +24,45 @@ versioned for the extension manifest (`manifest.base.json`).
   mid-session and is erased when the browser starts a new session. Adds the
   `webNavigation` permission; settings schema version 13 backfills the
   `gh` binding without touching existing custom ones.
+- Recently closed tab manager (`gr`): lists closed tabs and windows
+  newest first. `j`/`k` move, `Space` marks, `V` marks all visible,
+  `Enter` restores the marks (or the focused row), and `/` filters.
+  Sessions come from the browser's own closed-session list and never
+  leave the device. Settings schema version 14 backfills `gr`.
+- Calculator in the omnibar: typing a bare arithmetic expression
+  (`12*12`, `2/8`) in `t` or `ge` shows a single `= <result>` row, and
+  `Enter` copies the result. Plain words and lone numbers still search
+  normally. Parsed with a safe recursive-descent parser, not `eval`.
+- The tab manager tags the current tab with `[current]` alongside the
+  existing pin/mute/playing/bookmark tags.
+- `q` closes the tab manager, recently closed, history tree, and help
+  overlays, matching `Esc`.
 
 ### Changed
 
 - Internal: the codebase is now fully TypeScript (erasable syntax, no
   runtime change). `npm run check` type-checks; `npm run dev:chrome`
   rebuilds on save with sourcemaps.
+- Scroll-area detection no longer treats hidden overflow styling on the
+  page as a reason to skip it, and `;w` selects the first available stop
+  when the page itself cannot scroll. Nested wrappers still collapse to
+  the innermost area.
+- Omnibar ranking uses the cached tab/history/bookmark pool immediately
+  and refines when the background responds, so results appear without
+  waiting for a round trip.
+- Firefox release builds now sign for the listed AMO channel instead of
+  unlisted, so the signed xpi goes through public AMO review and is
+  installable from the add-on listing.
+
+### Fixed
+
+- History tree `Enter` no longer lands on the first page when the
+  browser's history delta exceeds the window's reported session-history
+  length; duplicate URLs resolve to the nearest reachable node.
+- Omnibar fuzzy matching no longer matches across URL query tokens.
+- A bare `0` no longer starts a repeat count.
+- The tab manager refreshes a pending close confirmation when its tabs
+  disappear and blocks other keys while it is pending.
 
 ## [0.7.0] - 2026-10-15
 

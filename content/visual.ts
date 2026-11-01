@@ -17,7 +17,6 @@ import {
   resolveCaretGeometry,
   readNeighborCharRects,
 } from "./visual/caret-geometry.ts";
-import { isWordChar, findNextWordEnd } from "./visual/word.ts";
 import {
   fallbackMoveChar,
   fallbackMoveCaret,
@@ -1629,14 +1628,6 @@ export const Visual = {
   updateBlockCaret,
 };
 
-export const __visualCaret = {
-  isUsableCaretRect,
-  firstUsableRect,
-  lineHeightForElement,
-  resolveCaretGeometry,
-  isWordChar,
-  findNextWordEnd,
-};
 
 register("visual", {
   close: () => {

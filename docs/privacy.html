@@ -63,9 +63,13 @@
           Page content (<code>&lt;all_urls&gt;</code>, all frames) renders
           hints, scrolling, find, and visual mode — processed in the page and
           discarded. Tabs, tab groups (Chrome only), and sessions power
-          <kbd>J</kbd>/<kbd>K</kbd> switching, <kbd>x</kbd> close/reopen, and
-          the <kbd>gt</kbd> manager. History and bookmarks feed
-          <kbd>t</kbd> omnibox suggestions. Clipboard read opens a URL from your
+          <kbd>J</kbd>/<kbd>K</kbd> switching, <kbd>x</kbd> close/reopen,
+          <kbd>gt</kbd> manager, and <kbd>gr</kbd> restoring recently closed
+          tabs and windows. History and bookmarks feed the
+          <kbd>t</kbd> omnibox suggestions. The page history tree
+          (<kbd>gh</kbd>) keeps each visited page's URL and title in a
+          device-local IndexedDB snapshot, erased when the browser starts a new
+          session. Clipboard read opens a URL from your
           clipboard (<kbd>gp</kbd>/<kbd>gP</kbd>); clipboard write copies URLs
           and titles (<kbd>yy</kbd>, <kbd>Y</kbd>, <kbd>yf</kbd>). Screenshots
           save the viewport to your downloads on your keypress. All of it goes

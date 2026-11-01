@@ -18,16 +18,3 @@ export function clearHighlightNames(...names: string[]): void {
   } catch {}
 }
 
-export function unwrapSpans(spans: HTMLElement[]): void {
-  for (const span of spans) {
-    try {
-      const parent = span.parentNode;
-      if (!parent) continue;
-      const text = span.textContent;
-      const tn = document.createTextNode(text as string);
-      parent.replaceChild(tn, span);
-      parent.normalize();
-    } catch {}
-  }
-  spans.length = 0;
-}

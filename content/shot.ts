@@ -382,13 +382,3 @@ export const Shot = {
 
 register("shot", { close, onKeyDown, isActive });
 
-export const __shotTest = {
-  state() {
-    return {
-      active,
-      cursor: { ...cursor },
-      start: start ? { ...start } : null,
-      finishing,
-    };
-  },
-};

@@ -9,13 +9,13 @@ into IIFE bundles (content scripts cannot use runtime ESM imports).
 npm install
 npm run check         # tsc --noEmit, must be clean
 npm run lint          # eslint, must be clean
-npm test              # node --test, ~134 unit tests
+npm test              # node --test, ~195 unit tests
 npm run dev:chrome    # esbuild watch (chrome manifest, sourcemaps)
 npm run dev:firefox   # esbuild watch (firefox manifest) + web-ext auto-reload
 npm run build:chrome  # rebuild bundles + manifest.json for Chrome
 npm run build:firefox # rebuild bundles + manifest.json for Firefox
 npm run dist          # zips + firefox xpi (+ chrome crx with CRX_PRIVATE_KEY)
-npm run sign:firefox  # AMO sign (unlisted) via WEB_EXT_API_KEY/SECRET
+npm run sign:firefox  # AMO sign (listed) via WEB_EXT_API_KEY/SECRET
 ```
 
 ## Generated files - never hand-edit

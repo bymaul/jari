@@ -13,10 +13,6 @@ import {
 import { COMMAND_CATALOG } from "./catalog.ts";
 import {
   isEditable,
-  isElementDrawn,
-  isElementPartiallyInViewport,
-  getVisibleElements,
-  filterInvisibleElements,
   getRealRect,
   getHintRect,
   translateRect,
@@ -26,15 +22,11 @@ import {
   filterAncestors,
   filterOverlapElements,
   getHref,
-  isOpenableLink,
   collectElements,
   collectIframeElements,
   collectMutationRoots,
   collectNewcomers,
-  getClickableElements,
-  listElements,
   prioritizeForViewport,
-  viewportScore,
 } from "./hints-elements.ts";
 import type { JariElement, RectLike } from "./hints-elements.ts";
 import type { HintLink } from "./hint-layer.ts";
@@ -871,29 +863,8 @@ export const Hints = { open, close, isActive, onKeyDown, onKeyUp, genLabels };
 
 register("hints", { close, onKeyDown, onKeyUp, isActive });
 
-export function __testReset() {
-  close();
-}
-
 export const __testHelpers = {
-  getHref,
-  isOpenableLink,
-  isOwnMutation,
   isElementClickable,
   isExplicitlyRequested,
-  getRealRect,
-  getHintRect,
-  translateRect,
-  collectElements,
   collectIframeElements,
-  getClickableElements,
-  listElements,
-  isElementDrawn,
-  isElementPartiallyInViewport,
-  getVisibleElements,
-  filterInvisibleElements,
-  filterOverlapElements,
-  filterAncestors,
-  prioritizeForViewport,
-  viewportScore,
 };

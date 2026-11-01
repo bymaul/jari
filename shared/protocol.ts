@@ -301,7 +301,6 @@ export interface Messages {
   };
 }
 
-export type ShowHelpMessage = { action: "jari-show-help" };
 
 export type Action = keyof Messages;
 export type MessagePayload<A extends Action = Action> = Messages[A]["payload"];

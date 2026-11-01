@@ -20,7 +20,7 @@
     "dev:chrome": "node build.ts dev chrome",
     "dev:firefox": "node build.ts dev firefox",
     "dist": "node build.ts dist",
-    "sign:firefox": "web-ext sign --source-dir=dist/jari-firefox --artifacts-dir=dist/signed --channel=unlisted"
+    "sign:firefox": "web-ext sign --source-dir=dist/jari-firefox --artifacts-dir=dist/signed --channel=listed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

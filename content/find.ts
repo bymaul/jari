@@ -874,60 +874,6 @@ try {
     );
 } catch {}
 
-export const __testHelpers = {
-  buildMatches,
-  buildMatcher,
-  hasUpperCase,
-  matchesChanged,
-  syncObserver,
-  rectIntersectsViewport,
-  findFixedAncestor,
-  nearestScrollableAncestor,
-  scrollFixedMatchIntoView,
-  executeQuery,
-  runQuery,
-  commitQuery,
-  closeDiscardPending,
-};
-
-export function __setFindTestState({
-  matches: seed = [],
-  query = "",
-  index = 0,
-  pending = "",
-  committed = null,
-  committedIndex = null,
-  hidden = false,
-}: {
-  matches?: Range[];
-  query?: string;
-  index?: number;
-  pending?: string;
-  committed?: string | null;
-  committedIndex?: number | null;
-  hidden?: boolean;
-} = {}) {
-  matches = seed;
-  currentIdx = index;
-  lastQuery = query;
-  pendingQuery = pending;
-  highlightsHidden = hidden;
-  committedQuery = committed === null ? query : committed;
-  committedIdx = committedIndex === null ? index : committedIndex;
-  committedHidden = hidden;
-}
-
-export function __getFindTestState() {
-  return {
-    matchCount: matches.length,
-    currentIdx,
-    lastQuery,
-    pendingQuery,
-    committedQuery,
-    highlightsHidden,
-  };
-}
-
 export function __resetFindState() {
   try {
     stopFindObserver();

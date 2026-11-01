@@ -20,7 +20,9 @@ Bindings chain into sequences of any length.
   until switched), `w` cycle scroll area (`3w` skips ahead),
   `;w` reset scroll area
 - Zoom: `+`/`=`/`-`
-- Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them), `T` incognito, `x`/`X` close/reopen,
+- Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them;
+  typing a bare expression such as `12*12` evaluates it and `Enter` copies the
+  result), `T` incognito, `x`/`X` close/reopen,
   `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder, `w` split/merge),
   `gr` recently closed tabs/windows (mark and restore), `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
@@ -76,10 +78,10 @@ Or build from source (below) and load this folder the same way. The checked-in
 
 | Permission                                    | Used for                                                                                                           |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `tabs`, `tabGroups` (Chrome only), `sessions` | Switch, close, reopen, move, group, duplicate tabs                                                                 |
+| `tabs`, `tabGroups` (Chrome only), `sessions` | Switch, close, reopen, move, group, duplicate, and restore recently closed tabs/windows                            |
 | `history`, `bookmarks`                        | Omnibox (`t`) suggestions; tab manager (`gt`) bulk bookmark to the bar                                             |
-| `webNavigation`                               | Record the page history tree (`U`): main-frame URL/title per visit, stored on this device for the browsing session |
-| `storage`                                     | Persist your settings via the browser's synced storage; history tree lives in session storage                      |
+| `webNavigation`                               | Record the page history tree (`gh`): main-frame URL/title per visit                                                |
+| `storage`                                     | Persist your settings via the browser's synced storage; the history tree uses a device-local IndexedDB snapshot    |
 | `clipboardRead`                               | Open a URL from your clipboard (`gp`/`gP`)                                                                         |
 | `clipboardWrite`                              | Copy URL / title (`yy`, `Y`, `yf`) - Firefox only; Chrome uses the page clipboard API                              |
 | `activeTab`, host `<all_urls>`                | Capture the visible tab for screenshots (`screenshotPage`, region, full page)                                      |
@@ -99,7 +101,7 @@ npm run lint          # eslint, must be clean
 npm test              # node --test
 npm run build:chrome  # or: npm run build:firefox
 npm run dist          # zips + firefox xpi (+ chrome crx with CRX_PRIVATE_KEY)
-npm run sign:firefox  # AMO sign (unlisted) via WEB_EXT_API_KEY/SECRET
+npm run sign:firefox  # AMO sign (listed) via WEB_EXT_API_KEY/SECRET
 ```
 
 Tagging `vX.Y.Z` (matching `package.json` + `manifest.base.json`) runs
