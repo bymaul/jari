@@ -19,7 +19,7 @@ import { searchEngineDefaults } from "../shared/search-engines.ts";
 import { pageNavTextDefaults } from "../shared/page-nav-texts.ts";
 import { COMMAND_CATALOG } from "../content/catalog.ts";
 import type { CommandDef, CommandName } from "../content/catalog.ts";
-import type { Settings, HintTheme } from "../content/keymap.ts";
+import type { Settings, HintTheme, PassthroughMode } from "../content/keymap.ts";
 import { settings } from "../content/settings.ts";
 import { ui } from "../content/ui.ts";
 import { renderEngines, initEngines } from "./engines.ts";
@@ -45,6 +45,8 @@ const timeoutEl = document.querySelector<HTMLInputElement>("#timeout")!;
 const passthroughEl = document.querySelector<HTMLInputElement>(
   "#passthrough-timeout",
 )!;
+const passthroughModeEl =
+  document.querySelector<HTMLSelectElement>("#passthrough-mode")!;
 const clueEnabledEl =
   document.querySelector<HTMLInputElement>("#clue-enabled")!;
 const clueDelayEl = document.querySelector<HTMLInputElement>("#clue-delay")!;
@@ -207,7 +209,15 @@ function updateSummaries(): void {
     const clue = settings.isClueEnabled()
       ? `${settings.getClueDelayMs()}ms`
       : "off";
-    summaries.timing.textContent = `timeout ${settings.getTimeoutMs()}ms · passthrough ${settings.getPassthroughMs()}ms · clue ${clue}`;
+    const modeLabels: Record<string, string> = {
+      single: "single",
+      fixed: "fixed",
+      reset: "reset",
+    };
+    const modeLabel =
+      modeLabels[settings.getPassthroughMode()] ||
+      settings.getPassthroughMode();
+    summaries.timing.textContent = `timeout ${settings.getTimeoutMs()}ms · passthrough ${settings.getPassthroughMs()}ms (${modeLabel}) · clue ${clue}`;
   }
   if (summaries.hints) {
     const chars = settings.getHintChars();
@@ -279,6 +289,7 @@ async function load(): Promise<void> {
   fuzzyMatchingEl.checked = settings.isFuzzyMatching();
   timeoutEl.value = settings.getTimeoutMs() as unknown as string;
   passthroughEl.value = settings.getPassthroughMs() as unknown as string;
+  passthroughModeEl.value = settings.getPassthroughMode();
   clueEnabledEl.checked = settings.isClueEnabled();
   clueDelayEl.value = settings.getClueDelayMs() as unknown as string;
   const sources = settings.getSuggestionSources();
@@ -1148,6 +1159,7 @@ async function reset(): Promise<void> {
       fuzzyMatching: settingsDefaults.fuzzyMatching,
       timeoutMs: settingsDefaults.timeoutMs,
       passthroughMs: settingsDefaults.passthroughMs,
+      passthroughMode: settingsDefaults.passthroughMode,
       clueEnabled: settingsDefaults.clueEnabled,
       clueDelayMs: settingsDefaults.clueDelayMs,
       suggestionSources: settingsDefaults.suggestionSources.slice(),
@@ -1312,6 +1324,13 @@ passthroughEl.addEventListener("change", () =>
     settingKey: "passthroughMs",
     label: "Passthrough duration",
     unit: "ms",
+  }),
+);
+passthroughModeEl.addEventListener("change", () =>
+  savePatch({
+    passthroughMode: passthroughModeEl.value as PassthroughMode,
+  }).then(() => {
+    passthroughModeEl.value = settings.getPassthroughMode();
   }),
 );
 clueDelayEl.addEventListener("change", () =>

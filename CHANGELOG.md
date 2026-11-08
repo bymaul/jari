@@ -8,6 +8,7 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Added
 
+- Passthrough mode setting: choose between single key, fixed timeout, or current reset-on-keypress behavior. Settings schema version 15 adds the field.
 - Page history tree (`gh`): an undo-tree of every page the tab has visited,
   rendered in the tab manager's floating-panel style. Regular navigation
   branches under the page it left; pressing back/forward only slides the

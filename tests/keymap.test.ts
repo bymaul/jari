@@ -24,9 +24,11 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
     scrollStep: 100,
     smoothScroll: true,
     keymap: { j: "scrollToTop" },
+    passthroughMode: "single",
   });
   assert.equal(s.scrollStep, 100);
   assert.equal(s.smoothScroll, true);
+  assert.equal(s.passthroughMode, "single");
   assert.equal(s.keymap.j, "scrollToTop");
   assert.equal(s.keymap.t, "openOmnibar");
   assert.equal(s.timeoutMs, Jari.settingsDefaults.timeoutMs);
@@ -37,9 +39,11 @@ test("normalizeSettings treats a stored keymap as authoritative and drops invali
     scrollStep: "x",
     timeoutMs: -1,
     disabledSites: "x",
+    passthroughMode: "invalid",
   });
   assert.equal(bad.scrollStep, 120);
   assert.equal(bad.timeoutMs, Jari.settingsDefaults.timeoutMs);
+  assert.equal(bad.passthroughMode, "reset");
   assert.deepEqual(bad.disabledSites, []);
 });
 

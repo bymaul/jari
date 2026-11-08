@@ -4,6 +4,7 @@ import {
   keymapDefaults,
   normalizeSettings,
   type HintTheme,
+  type PassthroughMode,
   type Settings,
   settingsDefaults,
 } from "./keymap.ts";
@@ -28,6 +29,7 @@ const state: SettingsState = {
   fuzzyMatching: settingsDefaults.fuzzyMatching,
   timeoutMs: settingsDefaults.timeoutMs,
   passthroughMs: settingsDefaults.passthroughMs,
+  passthroughMode: settingsDefaults.passthroughMode,
   suggestionSources: settingsDefaults.suggestionSources.slice(),
   maxResults: settingsDefaults.maxResults,
   searchEngines: settingsDefaults.searchEngines.map((e) => ({ ...e })),
@@ -182,6 +184,10 @@ function getPassthroughMs(): number {
   return state.passthroughMs;
 }
 
+function getPassthroughMode(): PassthroughMode {
+  return state.passthroughMode;
+}
+
 function getSuggestionSources(): string[] {
   return state.suggestionSources;
 }
@@ -265,6 +271,7 @@ export const settings = {
   isFuzzyMatching,
   getTimeoutMs,
   getPassthroughMs,
+  getPassthroughMode,
   getSuggestionSources,
   getMaxResults,
   getSearchEngines,

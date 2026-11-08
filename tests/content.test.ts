@@ -114,6 +114,7 @@ beforeEach(() => {
     disabledSites: [],
     timeoutMs: 2000,
     passthroughMs: 1000,
+    passthroughMode: "reset",
   });
 });
 
@@ -207,6 +208,76 @@ test("passthrough lets every key through until Escape", () => {
 
   press(key({ key: "j" }));
   assert.equal(spiedCalls.scrollDown.length, 1);
+});
+
+test("single-key passthrough mode passes one non-modifier key then exits", () => {
+  settings.set({ passthroughMode: "single" });
+  spyOn("scrollDown");
+
+  const on = key({ key: "p" });
+  press(on);
+  assertClaimed(on);
+
+  const mod = key({ key: "Control" });
+  press(mod);
+  assertUnclaimed(mod);
+
+  const pass = key({ key: "j" });
+  press(pass);
+  assert.equal(spiedCalls.scrollDown.length, 0);
+  assertUnclaimed(pass);
+
+  const next = key({ key: "j" });
+  press(next);
+  assert.equal(spiedCalls.scrollDown.length, 1);
+  assertClaimed(next);
+});
+
+test("fixed passthrough mode does not reset timer on keypress", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  settings.set({ passthroughMode: "fixed", passthroughMs: 1000 });
+  spyOn("scrollDown");
+
+  press(key({ key: "p" }));
+  t.mock.timers.tick(600);
+
+  const pass = key({ key: "j" });
+  press(pass);
+  assertUnclaimed(pass);
+
+  t.mock.timers.tick(500);
+
+  const afterExpiry = key({ key: "j" });
+  press(afterExpiry);
+  assert.equal(spiedCalls.scrollDown.length, 1);
+  assertClaimed(afterExpiry);
+});
+
+test("reset passthrough mode resets timer on keypress", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  settings.set({ passthroughMode: "reset", passthroughMs: 1000 });
+  spyOn("scrollDown");
+
+  press(key({ key: "p" }));
+  t.mock.timers.tick(600);
+
+  const pass = key({ key: "j" });
+  press(pass);
+  assertUnclaimed(pass);
+
+  t.mock.timers.tick(600);
+
+  const pass2 = key({ key: "j" });
+  press(pass2);
+  assertUnclaimed(pass2);
+  assert.equal(spiedCalls.scrollDown.length, 0);
+
+  t.mock.timers.tick(1100);
+
+  const afterExpiry = key({ key: "j" });
+  press(afterExpiry);
+  assert.equal(spiedCalls.scrollDown.length, 1);
+  assertClaimed(afterExpiry);
 });
 
 test("disabled sites pass every key through except the toggle", () => {

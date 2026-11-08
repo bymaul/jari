@@ -26,7 +26,9 @@ const pills: Record<string, HTMLDivElement> = {};
 
 const PILL_IGNORE_TEXT = "ignore";
 function pillPassthroughText(): string {
-  return "passthrough (" + settings.getPassthroughMs() + "ms)";
+  return settings.getPassthroughMode() === "single"
+    ? "passthrough (single key)"
+    : "passthrough (" + settings.getPassthroughMs() + "ms)";
 }
 
 function clearPending(): void {
@@ -69,12 +71,19 @@ function toggleIgnore(): boolean {
   return ignoreMode;
 }
 
-function restartPassthroughTimer(): void {
+function startPassthroughTimer(): void {
   clearTimeout(passthroughTimer ?? undefined);
   passthroughTimer = null;
+  if (settings.getPassthroughMode() === "single") return;
   const passthroughMs = settings.getPassthroughMs();
   if (Number.isFinite(passthroughMs) && passthroughMs > 0) {
     passthroughTimer = setTimeout(exitPassthrough, passthroughMs);
+  }
+}
+
+function restartPassthroughTimer(): void {
+  if (settings.getPassthroughMode() === "reset") {
+    startPassthroughTimer();
   }
 }
 
@@ -85,7 +94,7 @@ function enterPassthrough(): void {
   Overlays.closeAll();
   passthroughMode = true;
   showPill("passthrough", pillPassthroughText());
-  restartPassthroughTimer();
+  startPassthroughTimer();
 }
 
 function exitPassthrough(): void {
@@ -182,6 +191,8 @@ function handleKeydown(event: KeyboardEvent): boolean | void {
   if (passthroughMode) {
     if (event.key === "Escape") {
       ui.consume(event);
+      exitPassthrough();
+    } else if (settings.getPassthroughMode() === "single") {
       exitPassthrough();
     } else {
       restartPassthroughTimer();

@@ -250,10 +250,24 @@
         </div>
         <div class="setting">
           <div class="setting-text">
+            <label for="passthrough-mode">Passthrough mode</label>
+            <p class="helper">
+              Single passes one key. Fixed uses a timer from entry; Reset restarts the timer on each keypress.
+            </p>
+          </div>
+          <div class="setting-control">
+            <select id="passthrough-mode">
+              <option value="single">Single</option>
+              <option value="fixed">Fixed</option>
+              <option value="reset">Reset</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
             <label for="passthrough-timeout">Passthrough duration</label>
             <p class="helper">
-              How long <code data-key="passthroughKeys"></code> lets the page
-              have the keys after the last keypress. 0 means no timeout.
+              Timer for Fixed and Reset modes. 0 means no timeout.
             </p>
             <p
               class="field-error"

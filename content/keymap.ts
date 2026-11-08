@@ -18,7 +18,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 
-export const SETTINGS_SCHEMA_VERSION = 14;
+export const SETTINGS_SCHEMA_VERSION = 15;
 
 // Normalized settings shape — the single schema island. RawSettings is the
 // doc-typed input contract for migrate/normalize; every field access there
@@ -32,6 +32,7 @@ export interface Settings {
   fuzzyMatching: boolean;
   timeoutMs: number;
   passthroughMs: number;
+  passthroughMode: PassthroughMode;
   suggestionSources: string[];
   maxResults: number;
   searchEngines: SearchEngine[];
@@ -55,6 +56,7 @@ export interface RawSettings {
   fuzzyMatching: boolean;
   timeoutMs: number;
   passthroughMs: number;
+  passthroughMode: string;
   suggestionSources: string[];
   maxResults: number;
   searchEngines: unknown;
@@ -173,6 +175,10 @@ export const categories = [
 
 export const HINT_CHARSET_DEFAULT = "saevrwncmp";
 
+export const PASSTHROUGH_MODES = ["reset", "fixed", "single"] as const;
+export type PassthroughMode = "reset" | "fixed" | "single";
+export const PASSTHROUGH_MODE_DEFAULT: PassthroughMode = "reset";
+
 export const HINT_THEMES = ["yellow", "cyan", "dark"];
 export type HintTheme = "yellow" | "cyan" | "dark";
 export const HINT_THEME_DEFAULT: HintTheme = "yellow";
@@ -191,6 +197,7 @@ export const settingsDefaults: Omit<
   timeoutMs: 0,
 
   passthroughMs: 1500,
+  passthroughMode: PASSTHROUGH_MODE_DEFAULT,
 
   clueEnabled: true,
   clueDelayMs: 300,
@@ -403,6 +410,12 @@ export function normalizeHintTheme(raw: unknown): HintTheme {
     : HINT_THEME_DEFAULT;
 }
 
+export function normalizePassthroughMode(raw: unknown): PassthroughMode {
+  return PASSTHROUGH_MODES.includes(raw as PassthroughMode)
+    ? (raw as PassthroughMode)
+    : PASSTHROUGH_MODE_DEFAULT;
+}
+
 export function normalizeHintFontSize(raw: unknown): number {
   const n = Math.round(Number(raw));
   if (!Number.isFinite(n)) return settingsDefaults.hintFontSize;
@@ -525,6 +538,9 @@ export function migrateSettings(data: unknown): RawSettings {
   if (version < 14) {
     d.keymap = migrateV14Bindings(d.keymap);
     version = 14;
+  }
+  if (version < 15) {
+    version = 15;
   }
   d.schemaVersion = version;
   return d;
@@ -749,6 +765,7 @@ export function normalizeSettings(data: unknown): Settings {
       Number.isFinite(d.passthroughMs) && d.passthroughMs >= 0
         ? Math.min(30000, d.passthroughMs)
         : settingsDefaults.passthroughMs,
+    passthroughMode: normalizePassthroughMode(d.passthroughMode),
     suggestionSources: Array.isArray(d.suggestionSources)
       ? d.suggestionSources.filter((s) => suggestionSources.includes(s))
       : settingsDefaults.suggestionSources.slice(),
