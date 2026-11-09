@@ -242,6 +242,14 @@ kbd {
   color: #6a6a6a;
   opacity: 0.45;
 }
+.demo-hint-visual {
+  border-color: #1a7f8f;
+  background: linear-gradient(#b0f2ff, #00b4d8);
+  color: #0a2e3a;
+}
+.demo-hint-visual .demo-hint-matched {
+  color: #3a6a7a;
+}
 .demo-hint-dim {
   opacity: 0;
   display: none;
@@ -426,9 +434,13 @@ kbd {
   width: 7px;
   height: 1.2em;
   background: var(--accent);
+  opacity: 0.85;
   border: 1px solid var(--accent-border);
-  z-index: 190;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  z-index: 2147483645;
   pointer-events: none;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .jari-help-list {

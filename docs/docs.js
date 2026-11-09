@@ -43,6 +43,8 @@
   var clueEl = null;
   var findOpen = false;
   var hintState = null;
+  var visualHintState = null;
+  var visualListenersBound = false;
   var caretEl = null;
   var findState = { marks: [], idx: 0, query: "", hidden: false };
   var toastTimer = null;
@@ -105,7 +107,7 @@
       pill.textContent = "hint";
       pill.hidden = false;
     } else if (mode === "visual") {
-      pill.textContent = "visual";
+      pill.textContent = visualHintState ? "visual hint" : "visual";
       pill.hidden = false;
     } else {
       pill.hidden = true;
@@ -676,36 +678,271 @@
     }
   }
 
-  function startVisual() {
+  function visualTextTargets() {
+    var nodes = article.querySelectorAll(
+      "h2, h3, p, li, blockquote, pre, td, th, dt, dd",
+    );
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      var text = (el.textContent || "").trim();
+      if (text.length < 3) continue;
+      var r = el.getBoundingClientRect();
+      if (!r || r.width < 16 || r.height < 8) continue;
+      out.push(el);
+    }
+    return out;
+  }
+
+  function textNodesInArticle() {
+    var walker = document.createTreeWalker(article, 4, {
+      acceptNode: function (node) {
+        return node.nodeValue && node.nodeValue.trim() ? 1 : 3;
+      },
+    });
+    var nodes = [];
+    var n = walker.nextNode();
+    while (n) {
+      nodes.push(n);
+      n = walker.nextNode();
+    }
+    return nodes;
+  }
+
+  function firstTextNode(el) {
+    var walker = document.createTreeWalker(el, 4, {
+      acceptNode: function (node) {
+        return node.nodeValue && node.nodeValue.trim() ? 1 : 3;
+      },
+    });
+    return walker.nextNode();
+  }
+
+  function extendSelectionTo(node, offset) {
+    var sel = window.getSelection();
+    if (!sel) return false;
+    if (typeof sel.extend === "function") {
+      try {
+        sel.extend(node, offset);
+        return true;
+      } catch {}
+    }
+    var anchor = sel.anchorNode;
+    var anchorOffset = sel.anchorOffset;
+    if (!anchor) return false;
+    var range = document.createRange();
+    try {
+      range.setStart(anchor, anchorOffset);
+      range.setEnd(node, offset);
+    } catch {
+      try {
+        range.setStart(node, offset);
+        range.setEnd(anchor, anchorOffset);
+      } catch {
+        return false;
+      }
+    }
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return true;
+  }
+
+  function moveVisualCharacter(dir) {
+    var sel = window.getSelection();
+    if (!sel || !sel.focusNode) return false;
+    var focus = sel.focusNode;
+    var offset = sel.focusOffset;
+    if (focus.nodeType !== 3) return false;
+    var nodes = textNodesInArticle();
+    var idx = nodes.indexOf(focus);
+    if (dir === "l") {
+      if (offset < focus.nodeValue.length)
+        return extendSelectionTo(focus, offset + 1);
+      if (idx >= 0 && idx + 1 < nodes.length)
+        return extendSelectionTo(nodes[idx + 1], 1);
+      return false;
+    }
+    if (offset > 0) return extendSelectionTo(focus, offset - 1);
+    if (idx > 0) {
+      var prev = nodes[idx - 1];
+      return extendSelectionTo(prev, prev.nodeValue.length);
+    }
+    return false;
+  }
+
+  function moveVisualLine(dir) {
+    var rect = caretRect();
+    if (!rect) return false;
+    var x = rect.left + 2;
+    var y =
+      dir === "j"
+        ? rect.bottom + Math.max(8, rect.height * 0.5)
+        : rect.top - Math.max(8, rect.height * 0.5);
+    var range = null;
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(x, y);
+    } else if (document.caretPositionFromPoint) {
+      var pos = document.caretPositionFromPoint(x, y);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+    if (range) return extendSelectionTo(range.startContainer, range.startOffset);
+    var sel = window.getSelection();
+    if (!sel || !sel.focusNode) return false;
+    var nodes = textNodesInArticle();
+    var idx = nodes.indexOf(sel.focusNode);
+    if (dir === "j" && idx >= 0 && idx + 1 < nodes.length) {
+      var next = nodes[idx + 1];
+      return extendSelectionTo(
+        next,
+        Math.min(sel.focusOffset, next.nodeValue.length),
+      );
+    }
+    if (dir === "k" && idx > 0) {
+      var prev = nodes[idx - 1];
+      return extendSelectionTo(
+        prev,
+        Math.min(sel.focusOffset, prev.nodeValue.length),
+      );
+    }
+    return false;
+  }
+
+  function updateVisualCaret() {
+    if (mode === "visual" && !visualHintState && caretEl) drawCaret();
+  }
+
+  function attachVisualListeners() {
+    if (visualListenersBound) return;
+    visualListenersBound = true;
+    window.addEventListener("scroll", updateVisualCaret, true);
+    window.addEventListener("resize", updateVisualCaret);
+    document.addEventListener("selectionchange", updateVisualCaret);
+  }
+
+  function detachVisualListeners() {
+    if (!visualListenersBound) return;
+    visualListenersBound = false;
+    window.removeEventListener("scroll", updateVisualCaret, true);
+    window.removeEventListener("resize", updateVisualCaret);
+    document.removeEventListener("selectionchange", updateVisualCaret);
+  }
+
+  function closeVisualHints() {
+    visualHintState = null;
+    hintsEl.textContent = "";
+  }
+
+  function refreshVisualHints() {
+    var typed = visualHintState.typed;
+    for (var i = 0; i < visualHintState.items.length; i++) {
+      var it = visualHintState.items[i];
+      if (!typed || it.label.startsWith(typed)) {
+        it.el.classList.remove("demo-hint-dim");
+        setHintText(it.el, it.label, typed);
+      } else {
+        it.el.classList.add("demo-hint-dim");
+      }
+      if (typed && it.label === typed) {
+        enterVisualAtElement(it.target);
+        return;
+      }
+    }
+  }
+
+  function onVisualHintKey(key) {
+    if (!visualHintState) return false;
+    if (key === "Escape") {
+      closeVisualHints();
+      mode = "normal";
+      setPill();
+      return true;
+    }
+    if (key === "Backspace") {
+      visualHintState.typed = visualHintState.typed.slice(0, -1);
+      refreshVisualHints();
+      return true;
+    }
+    if (/^[a-z]$/i.test(key)) {
+      visualHintState.typed += key.toUpperCase();
+      refreshVisualHints();
+      return true;
+    }
+    return false;
+  }
+
+  function openVisualHints() {
+    closeVisualHints();
     countBuf = "";
     pendingG = false;
-    var sel = window.getSelection();
-    var range = null;
+    var targets = visualTextTargets();
+    if (targets.length === 0) {
+      toast("No text to select");
+      return;
+    }
+    var labels = genLabels(targets.length, CHARSET);
+    var items = [];
+    hintsEl.textContent = "";
+    for (var i = 0; i < targets.length; i++) {
+      var div = document.createElement("div");
+      div.className = "demo-hint demo-hint-visual";
+      div.textContent = labels[i];
+      var r = targets[i].getBoundingClientRect();
+      div.style.left = Math.max(0, r.left) + "px";
+      div.style.top = Math.max(0, r.top) + "px";
+      hintsEl.appendChild(div);
+      items.push({ el: div, target: targets[i], label: labels[i] });
+    }
+    visualHintState = { items: items, typed: "" };
+    mode = "visual";
+    setPill();
+    toast("Hints: " + items.length + " text targets");
+  }
+
+  function enterVisualAtElement(el) {
+    closeVisualHints();
+    mode = "visual";
+    var first = firstTextNode(el);
+    var range = document.createRange();
     try {
-      if (sel && sel.rangeCount > 0) {
-        var r = sel.getRangeAt(0);
-        if (article.contains(r.commonAncestorContainer)) range = r.cloneRange();
-      }
-    } catch {}
-    if (!range) {
-      var p = article.querySelector("p");
-      range = document.createRange();
-      try {
-        range.setStart(p.firstChild || p, 0);
+      if (first) {
+        range.setStart(first, 0);
         range.collapse(true);
-      } catch {}
+      } else {
+        range.selectNodeContents(el);
+        range.collapse(true);
+      }
+    } catch {
+      range.selectNodeContents(el);
+      range.collapse(true);
+    }
+    var sel = window.getSelection();
+    if (!sel) {
+      mode = "normal";
+      setPill();
+      return;
     }
     try {
       sel.removeAllRanges();
       sel.addRange(range);
     } catch {}
-    mode = "visual";
+    attachVisualListeners();
+    if (sel.isCollapsed) moveVisual("l");
+    drawCaret();
     setPill();
     toast("VISUAL — hjkl move, y yank, Esc exits");
-    drawCaret();
+  }
+
+  function startVisual() {
+    openVisualHints();
   }
 
   function stopVisual() {
+    closeVisualHints();
+    detachVisualListeners();
     removeCaret();
     try {
       window.getSelection().removeAllRanges();
@@ -717,29 +954,19 @@
   function moveVisual(dir) {
     var sel = window.getSelection();
     if (!sel) return;
-    try {
-      if (typeof sel.modify === "function") {
+    if (typeof sel.modify === "function") {
+      try {
         if (dir === "h") sel.modify("extend", "backward", "character");
         else if (dir === "l") sel.modify("extend", "forward", "character");
         else if (dir === "j") sel.modify("extend", "forward", "line");
         else if (dir === "k") sel.modify("extend", "backward", "line");
         drawCaret();
         return;
-      }
-    } catch {}
-    try {
-      var r = sel.getRangeAt(0);
-      var next = document.createRange();
-      next.setStart(r.startContainer, r.startOffset);
-      next.setEnd(r.endContainer, r.endOffset);
-      if (dir === "l" || dir === "j")
-        next.setEnd(next.endContainer, next.endOffset + 1);
-      else
-        next.setStart(next.startContainer, Math.max(0, next.startOffset - 1));
-      sel.removeAllRanges();
-      sel.addRange(next);
-      drawCaret();
-    } catch {}
+      } catch {}
+    }
+    if (dir === "h" || dir === "l") moveVisualCharacter(dir);
+    else moveVisualLine(dir);
+    drawCaret();
   }
 
   function yankVisual() {
@@ -1057,6 +1284,12 @@
     if (!help.hidden && e.key === "Escape") {
       e.preventDefault();
       help.hidden = true;
+      return;
+    }
+
+    if (visualHintState) {
+      e.preventDefault();
+      onVisualHintKey(e.key);
       return;
     }
 
