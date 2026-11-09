@@ -115,6 +115,55 @@ test("migrateV14Bindings lands gr for recently closed tabs without clobbering cu
   assert.equal(s.keymap.j, "scrollDown");
 });
 
+test("migrateV16Bindings drops half-page d/u and moves tab binds from x/X to d/D", () => {
+  assert.deepEqual(
+    Jari.migrateV16Bindings({
+      d: "scrollHalfPageDown",
+      u: "scrollHalfPageUp",
+      x: "closeTab",
+      X: "restoreTab",
+    }),
+    { d: "closeTab", D: "restoreTab" },
+  );
+  assert.deepEqual(
+    Jari.migrateV16Bindings({
+      d: "moveTabToWindow",
+      u: "scrollUp",
+      x: "closeTab",
+      X: "restoreTab",
+    }),
+    {
+      d: "moveTabToWindow",
+      u: "scrollUp",
+      x: "closeTab",
+      D: "restoreTab",
+    },
+  );
+  assert.deepEqual(
+    Jari.migrateV16Bindings({
+      d: "reloadTab",
+      u: "scrollHalfPageUp",
+      X: "restoreTab",
+    }),
+    { d: "reloadTab", D: "restoreTab" },
+  );
+  const s = Jari.normalizeSettings({
+    schemaVersion: 15,
+    keymap: {
+      d: "scrollHalfPageDown",
+      u: "scrollHalfPageUp",
+      x: "closeTab",
+      X: "restoreTab",
+    },
+  });
+  assert.equal(s.schemaVersion, Jari.SETTINGS_SCHEMA_VERSION);
+  assert.equal(s.keymap.d, "closeTab");
+  assert.equal(s.keymap.D, "restoreTab");
+  assert.equal(s.keymap.u, undefined);
+  assert.equal(s.keymap.x, undefined);
+  assert.equal(s.keymap.X, undefined);
+});
+
 test("migrateHintCharset moves only the old default charset", () => {
   assert.equal(
     Jari.migrateHintCharset("sadjklewcmpgh"),

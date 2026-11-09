@@ -18,7 +18,7 @@ import {
 import { normalizeSitePattern } from "../shared/url.ts";
 import { COMMAND_CATALOG } from "./catalog.ts";
 
-export const SETTINGS_SCHEMA_VERSION = 15;
+export const SETTINGS_SCHEMA_VERSION = 16;
 
 // Normalized settings shape — the single schema island. RawSettings is the
 // doc-typed input contract for migrate/normalize; every field access there
@@ -90,16 +90,14 @@ export const keymapDefaults: Record<string, string> = {
   l: "scrollRight",
   G: "scrollToBottom",
   w: "cycleScrollFrame",
-  d: "scrollHalfPageDown",
-  u: "scrollHalfPageUp",
   "+": "zoomIn",
   "=": "zoomIn",
   "-": "zoomOut",
 
   t: "openOmnibar",
   T: "openOmnibarIncognito",
-  x: "closeTab",
-  X: "restoreTab",
+  d: "closeTab",
+  D: "restoreTab",
   J: "previousTab",
   K: "nextTab",
   "<<": "moveTabLeft",
@@ -542,6 +540,14 @@ export function migrateSettings(data: unknown): RawSettings {
   if (version < 15) {
     version = 15;
   }
+  // v15 -> v16: half-page scroll defaults leave d/u and tab close/reopen
+  // move from x/X to d/D. Only default-shaped entries move, so custom
+  // rebinds are never clobbered; x/X stays when d/D is a custom bind so
+  // close/reopen remain reachable.
+  if (version < 16) {
+    d.keymap = migrateV16Bindings(d.keymap);
+    version = 16;
+  }
   d.schemaVersion = version;
   return d;
 }
@@ -713,6 +719,30 @@ export function migrateV14Bindings(keymap: unknown): Record<string, string> {
     if (combo in out) continue;
     if (findOverlapConflicts(out, combo).length > 0) continue;
     out[combo] = command;
+  }
+  return out;
+}
+
+const TAB_BINDING_SWAPS: [string, string, string][] = [
+  ["x", "d", "closeTab"],
+  ["X", "D", "restoreTab"],
+];
+
+export function migrateV16Bindings(keymap: unknown): Record<string, string> {
+  if (!keymap || typeof keymap !== "object" || Array.isArray(keymap)) {
+    return keymap as Record<string, string>;
+  }
+  const out = { ...keymap } as Record<string, string>;
+  if (out.d === "scrollHalfPageDown") delete out.d;
+  if (out.u === "scrollHalfPageUp") delete out.u;
+  for (const [oldCombo, newCombo, command] of TAB_BINDING_SWAPS) {
+    if (
+      out[oldCombo] === command &&
+      (!(newCombo in out) || out[newCombo] === command)
+    ) {
+      delete out[oldCombo];
+      out[newCombo] = command;
+    }
   }
   return out;
 }

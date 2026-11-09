@@ -13,16 +13,16 @@ see [PRIVACY.md](PRIVACY.md).
 
 ## Keys
 
-Commands take a repeat count (`3j`, `2x`); `0-9` are reserved for it.
+Commands take a repeat count (`3j`, `2d`); `0-9` are reserved for it.
 Bindings chain into sequences of any length.
 
-- Scroll: `j`/`k`/`h`/`l`, `d`/`u` half page, `gg`/`G` top/bottom (always the page
+- Scroll: `j`/`k`/`h`/`l`, `gg`/`G` top/bottom (always the page
   until switched), `w` cycle scroll area (`3w` skips ahead),
   `;w` reset scroll area
 - Zoom: `+`/`=`/`-`
 - Tabs: `t` URL/search (`t ` lists all open tabs, `t ` + query searches them;
   typing a bare expression such as `12*12` evaluates it and `Enter` copies the
-  result), `T` incognito, `x`/`X` close/reopen,
+  result), `T` incognito, `d`/`D` close/reopen,
   `J`/`K` prev/next, `g0`/`g$` first/last, `gt` tab manager (mark, group, pin/mute, bookmark, reorder, `w` split/merge),
   `gr` recently closed tabs/windows (mark and restore), `<<`/`>>` move, `W` move to window,
   `gp`/`gP` open clipboard here/background
