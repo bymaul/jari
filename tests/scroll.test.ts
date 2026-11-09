@@ -387,20 +387,37 @@ test("stops after the first pick follow visual top-to-bottom order", () => {
   }
 });
 
-test("nested wrappers collapse to a single stop", () => {
+test("stacked wrappers at the same box collapse to a single stop", () => {
   const outer = makeAreaAt({ overflow: 900 });
-  const inner = makeAreaAt({
-    left: 10,
-    top: 10,
-    w: 100,
-    h: 100,
-    overflow: 400,
-  });
+  const inner = makeAreaAt({ overflow: 400 });
   outer.contains = (node) => node === inner;
   useFixtures([outer, inner]);
   try {
     Scroll.cycle();
-    assert.equal(Scroll.getTarget(), inner);
+    assert.equal(Scroll.getTarget(), outer);
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), globalThis.window);
+  } finally {
+    restoreFixtures();
+  }
+});
+
+test("a scrollable child does not hide its scrollable parent", () => {
+  const parent = makeAreaAt({ overflow: 900 });
+  const child = makeAreaAt({
+    left: 20,
+    top: 20,
+    w: 160,
+    h: 120,
+    overflow: 400,
+  });
+  parent.contains = (node) => node === child;
+  useFixtures([parent, child]);
+  try {
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), parent);
+    Scroll.cycle();
+    assert.equal(Scroll.getTarget(), child);
     Scroll.cycle();
     assert.equal(Scroll.getTarget(), globalThis.window);
   } finally {

@@ -405,7 +405,7 @@ function isDialogStop(el: Element | Window | null | undefined): boolean {
 }
 
 function currentStops(): (Element | null)[] {
-  const areas = dedupeNestedAreas(findScrollableElements());
+  const areas = dedupeStackedAreas(findScrollableElements());
   const frames = findFrameElements();
   const pageScrolls = pageCanScroll();
   const rest = sortStopsVisually([...areas, ...frames]);
@@ -437,22 +437,10 @@ function sortStopsVisually(stops: Element[]): Element[] {
     .map(({ el }) => el);
 }
 
-function dedupeNestedAreas(areas: Element[]): Element[] {
+function dedupeStackedAreas(areas: Element[]): Element[] {
   const kept: Element[] = [];
-  const contains = (outer: Element, inner: Element): boolean => {
-    try {
-      return (
-        outer !== inner &&
-        typeof outer.contains === "function" &&
-        outer.contains(inner)
-      );
-    } catch {
-      return false;
-    }
-  };
   for (const el of areas) {
     if (kept.includes(el)) continue;
-    if (kept.some((k) => contains(el, k))) continue;
     let rectA: DOMRect | null = null;
     try {
       rectA = el.getBoundingClientRect();
@@ -473,9 +461,6 @@ function dedupeNestedAreas(areas: Element[]): Element[] {
         }
       });
     if (duplicate) continue;
-    for (let j = kept.length - 1; j >= 0; j--) {
-      if (contains(kept[j], el)) kept.splice(j, 1);
-    }
     kept.push(el);
   }
   return kept;

@@ -46,8 +46,9 @@ versioned for the extension manifest (`manifest.base.json`).
   rebuilds on save with sourcemaps.
 - Scroll-area detection no longer treats hidden overflow styling on the
   page as a reason to skip it, and `;w` selects the first available stop
-  when the page itself cannot scroll. Nested wrappers still collapse to
-  the innermost area.
+  when the page itself cannot scroll. Same-box wrapper stacks still
+  collapse to a single stop, while genuinely nested scroll areas cycle
+  as separate stops.
 - Omnibar ranking uses the cached tab/history/bookmark pool immediately
   and refines when the background responds, so results appear without
   waiting for a round trip.
@@ -57,6 +58,8 @@ versioned for the extension manifest (`manifest.base.json`).
 
 ### Fixed
 
+- `w` no longer skips a scrollable parent when one of its descendants is
+  also scrollable; both are stops, parent first in visual order.
 - History tree `Enter` no longer lands on the first page when the
   browser's history delta exceeds the window's reported session-history
   length; duplicate URLs resolve to the nearest reachable node.
