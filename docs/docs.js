@@ -846,6 +846,132 @@
     return false;
   }
 
+  var HELP_COLUMNS = [
+    [
+      {
+        label: "Scrolling",
+        rows: [
+          ["j", "Scroll down"],
+          ["k", "Scroll up"],
+          ["h", "Scroll left"],
+          ["l", "Scroll right"],
+          ["d", "Scroll half page down"],
+          ["u", "Scroll half page up"],
+          ["gg", "Scroll to top"],
+          ["G", "Scroll to bottom"],
+        ],
+      },
+    ],
+    [
+      {
+        label: "Tabs",
+        rows: [["t", "Open URL or search"]],
+      },
+      {
+        label: "History",
+        rows: [
+          ["H", "Go back in history"],
+          ["L", "Go forward in history"],
+        ],
+      },
+      {
+        label: "Page",
+        rows: [
+          ["gu", "Go to parent page"],
+          ["gU", "Go to site root"],
+          ["r", "Reload tab"],
+          ["R", "Reload without cache"],
+        ],
+      },
+    ],
+    [
+      {
+        label: "Hints",
+        rows: [
+          ["f", "Click link"],
+          ["F", "Open link in new tab"],
+          ["gf", "Open link in background tab"],
+        ],
+      },
+      {
+        label: "Find",
+        rows: [
+          ["/", "Find in page"],
+          ["n", "Next match"],
+          ["N", "Previous match"],
+        ],
+      },
+      {
+        label: "Visual",
+        rows: [["v", "Visual mode"]],
+      },
+      {
+        label: "Help",
+        rows: [["?", "Show this help"]],
+      },
+    ],
+  ];
+
+  function renderHelpCategory(category) {
+    var table = document.createElement("table");
+    var tbody = document.createElement("tbody");
+    var headerRow = document.createElement("tr");
+    headerRow.className = "jari-help-cat-header";
+    var th = document.createElement("th");
+    th.colSpan = 2;
+    th.textContent = category.label;
+    headerRow.appendChild(th);
+    tbody.appendChild(headerRow);
+    for (var i = 0; i < category.rows.length; i++) {
+      var row = category.rows[i];
+      var tr = document.createElement("tr");
+      var keyTd = document.createElement("td");
+      keyTd.className = "jari-help-key";
+      keyTd.textContent = row[0];
+      var labelTd = document.createElement("td");
+      labelTd.className = "jari-help-label";
+      labelTd.textContent = row[1];
+      tr.appendChild(keyTd);
+      tr.appendChild(labelTd);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function renderHelp() {
+    if (!help) return;
+    help.textContent = "";
+
+    var header = document.createElement("div");
+    header.className = "jari-prompt-header";
+    header.textContent = "Jari keybindings";
+    help.appendChild(header);
+
+    var list = document.createElement("div");
+    list.className = "jari-help-list";
+    var grid = document.createElement("div");
+    grid.className = "jari-help-columns";
+    for (var c = 0; c < HELP_COLUMNS.length; c++) {
+      var column = document.createElement("div");
+      column.className = "jari-help-column";
+      for (var i = 0; i < HELP_COLUMNS[c].length; i++) {
+        column.appendChild(renderHelpCategory(HELP_COLUMNS[c][i]));
+      }
+      grid.appendChild(column);
+    }
+    list.appendChild(grid);
+    help.appendChild(list);
+
+    var footer = document.createElement("div");
+    footer.className = "jari-prompt-footer";
+    var status = document.createElement("span");
+    status.className = "jari-help-status";
+    status.textContent = "Esc closes";
+    footer.appendChild(status);
+    help.appendChild(footer);
+  }
+
   findinput.addEventListener("input", function () {
     findState.query = findinput.value;
     findState.hidden = false;
@@ -928,7 +1054,7 @@
       return;
     }
 
-    if (!help.hidden && (e.key === "?" || e.key === "Escape")) {
+    if (!help.hidden && e.key === "Escape") {
       e.preventDefault();
       help.hidden = true;
       return;
@@ -961,7 +1087,7 @@
         moveVisual(e.key);
       } else if (e.key === "?") {
         e.preventDefault();
-        help.hidden = !help.hidden;
+        help.hidden = false;
       }
       return;
     }
@@ -1077,7 +1203,7 @@
         return;
       case "?":
         e.preventDefault();
-        help.hidden = !help.hidden;
+        help.hidden = false;
         return;
       case "Escape":
         e.preventDefault();
@@ -1100,5 +1226,6 @@
     setPill();
   });
 
+  renderHelp();
   setPill();
 })();

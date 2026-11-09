@@ -416,8 +416,7 @@ kbd {
   color: #1a1a1a;
 }
 
-.demo-article ::selection,
-.demo-help ::selection {
+.demo-article ::selection {
   background: var(--accent);
   color: #1a1a1a;
 }
@@ -432,51 +431,74 @@ kbd {
   pointer-events: none;
 }
 
-.demo-help {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 220;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--mono);
-  font-size: 12px;
-  border-top: 1px solid var(--border);
+.jari-help-list {
+  display: block;
   max-height: 60vh;
   overflow: auto;
 }
-.demo-help[hidden] {
-  display: none;
+.jari-help-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0 3ex;
+  align-items: start;
 }
-.demo-help h2 {
-  margin: 0;
-  background: var(--panel);
-  font-size: 11px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  border-bottom: 1px solid var(--border);
-  padding: 5px 8px 3px;
+.jari-help-column {
+  min-width: 0;
 }
-.demo-help-esc {
-  font-weight: normal;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--muted);
-}
-.demo-help table {
+.jari-help table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
+  margin-bottom: 2ex;
+  margin-top: 0;
 }
-.demo-help td {
+.jari-help tr.jari-help-cat-header th {
+  background: #252530;
+  font-size: var(--jari-header-font-size, 9pt) !important;
+  font-weight: var(--jari-header-font-weight, bold) !important;
+  color: #cdcdcd;
   text-align: left;
-  padding: 2px 8px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
+  border-bottom: 1px solid #333738;
+  padding: 0.25ex 0.5ex;
 }
-.demo-help td:first-child {
+.jari-help td {
+  padding: 0 0.5ex;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: var(--jari-cmplt-option-height, 1.4em);
+  line-height: var(--jari-cmplt-option-height, 1.4em) !important;
+  text-align: left !important;
+}
+.jari-help td.jari-help-key {
+  width: 40%;
+  font-weight: bold !important;
+  color: #cdcdcd;
+}
+.jari-help td.jari-help-key.jari-unbound {
+  font-weight: normal !important;
+  font-style: italic;
+  color: #878787;
+}
+.jari-prompt-footer {
+  display: flex;
+  align-items: baseline;
+  gap: 1ex;
+  background: #252530;
+  color: #cdcdcd;
+  font-size: var(--jari-header-font-size, 9pt);
+  border-top: 1px solid #333738;
+  padding: 0.25ex 0.5ex;
+  margin: 0;
+  line-height: var(--jari-cmdl-line-height, 1.5);
+  white-space: normal;
+  overflow: hidden;
+  text-align: left;
+}
+.jari-help-status {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .demo-status {
