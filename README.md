@@ -4,7 +4,7 @@
   <h1>Jari</h1>
 </div>
 
-**Jari** _/ja·ri/_ - simple keyboard-driven navigation for modern browsers.
+**Jari** _/ja·ri/_ - simple keyboard-driven navigation extension for modern browsers.
 Scroll, tabs, history, link hints, find in page, and text selection
 without leaving the home row.
 
