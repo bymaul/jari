@@ -26,6 +26,8 @@ const statusEl = document.querySelector<
 >("#status");
 const saveStateEl = document.querySelector<HTMLElement>("#save-state");
 
+let onSaved: (() => void) | undefined;
+
 function setSaveState(
   mode: "saving" | "failed" | "warn" | "saved",
   message?: string,
@@ -64,6 +66,7 @@ async function savePatch(patch: Partial<Settings>): Promise<boolean> {
     return false;
   }
   savedState();
+  onSaved?.();
   return true;
 }
 
@@ -280,7 +283,8 @@ function resetEngines(): void {
   });
 }
 
-export function initEngines(): void {
+export function initEngines(savedListener?: () => void): void {
+  onSaved = savedListener;
   addEngineBtn?.addEventListener("click", addEngine);
   resetEnginesBtn?.addEventListener("click", resetEngines);
   defaultEngineEl?.addEventListener("change", () =>

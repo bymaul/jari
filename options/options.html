@@ -18,10 +18,10 @@
     </header>
 
     <main>
-      <details class="card" id="card-scrolling">
+      <details class="card" id="card-general" open>
         <summary class="card-toggle">
-          <span class="card-title">Scrolling</span
-          ><span class="card-summary" id="summary-scrolling"></span>
+          <span class="card-title">General</span
+          ><span class="card-summary" id="summary-general"></span>
         </summary>
         <div class="setting">
           <div class="setting-text">
@@ -56,6 +56,42 @@
             <input id="smooth-scroll" type="checkbox" />
           </div>
         </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="copy-format">Copy title + URL as</label>
+            <p class="helper">
+              Format for the <code data-key="copyTitleAndUrl"></code> command.
+            </p>
+          </div>
+          <div class="setting-control">
+            <select id="copy-format">
+              <option value="plain">Plain (title + URL)</option>
+              <option value="markdown">Markdown link</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <span class="setting-label" id="disabled-label">Disabled sites</span>
+            <p class="helper">
+              Jari is turned off on these sites. Press
+              <code data-key="toggleSiteEnabled"></code> on a page to toggle it
+              there, or add a host here. Use <code>*.example.com</code> to
+              include all subdomains.
+            </p>
+          </div>
+        </div>
+        <div class="add-site">
+          <input
+            id="disabled-site-input"
+            type="text"
+            placeholder="example.com"
+            aria-label="Add a disabled site host"
+          />
+          <button id="add-disabled-site" type="button">Add</button>
+        </div>
+        <p class="field-error" id="site-error" aria-live="polite" hidden></p>
+        <ul id="disabled-list" aria-labelledby="disabled-label"></ul>
       </details>
 
       <details class="card" id="card-search">
@@ -149,174 +185,6 @@
         <div class="engine-actions">
           <button id="add-engine" type="button">Add engine</button>
           <button id="reset-engines" type="button">Restore defaults</button>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <span class="setting-label" id="pagenav-label"
-              >Page navigation texts</span
-            >
-            <p class="helper">
-              <code data-key="nextPage"></code> and
-              <code data-key="prevPage"></code> activate the first link or
-              button whose text matches these comma-separated lists.
-              <code>rel="next"</code> and <code>rel="prev"</code> links always
-              match.
-            </p>
-            <p
-              class="field-error"
-              id="error-pagenav"
-              aria-live="polite"
-              hidden
-            ></p>
-          </div>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="pagenav-next">Next page texts</label>
-          </div>
-          <div class="setting-control">
-            <input
-              id="pagenav-next"
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="Next, Next page, ›"
-            />
-          </div>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="pagenav-prev">Previous page texts</label>
-          </div>
-          <div class="setting-control">
-            <input
-              id="pagenav-prev"
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="Previous, Prev, ‹"
-            />
-          </div>
-        </div>
-        <div class="pagenav-actions">
-          <button id="reset-pagenav" type="button">Restore defaults</button>
-        </div>
-      </details>
-
-      <details class="card" id="card-clipboard">
-        <summary class="card-toggle">
-          <span class="card-title">Clipboard</span
-          ><span class="card-summary" id="summary-clipboard"></span>
-        </summary>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="copy-format">Copy title + URL as</label>
-            <p class="helper">
-              Format for the <code data-key="copyTitleAndUrl"></code> command.
-            </p>
-          </div>
-          <div class="setting-control">
-            <select id="copy-format">
-              <option value="plain">Plain (title + URL)</option>
-              <option value="markdown">Markdown link</option>
-            </select>
-          </div>
-        </div>
-      </details>
-
-      <details class="card" id="card-timing">
-        <summary class="card-toggle">
-          <span class="card-title">Timing</span
-          ><span class="card-summary" id="summary-timing"></span>
-        </summary>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="timeout">Sequence timeout</label>
-            <p class="helper">
-              How long a half-typed <code>g</code> prefix or count waits. 0
-              means no timeout.
-            </p>
-            <p
-              class="field-error"
-              id="error-timeout"
-              aria-live="polite"
-              hidden
-            ></p>
-          </div>
-          <div class="setting-control">
-            <input id="timeout" type="number" min="0" max="10000" step="100" />
-            <span class="unit">ms</span>
-          </div>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="passthrough-mode">Passthrough mode</label>
-            <p class="helper">
-              Single passes one key. Fixed uses a timer from entry; Reset restarts the timer on each keypress.
-            </p>
-          </div>
-          <div class="setting-control">
-            <select id="passthrough-mode">
-              <option value="single">Single</option>
-              <option value="fixed">Fixed</option>
-              <option value="reset">Reset</option>
-            </select>
-          </div>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="passthrough-timeout">Passthrough duration</label>
-            <p class="helper">
-              Timer for Fixed and Reset modes. 0 means no timeout.
-            </p>
-            <p
-              class="field-error"
-              id="error-passthrough-timeout"
-              aria-live="polite"
-              hidden
-            ></p>
-          </div>
-          <div class="setting-control">
-            <input
-              id="passthrough-timeout"
-              type="number"
-              min="0"
-              max="30000"
-              step="100"
-            />
-            <span class="unit">ms</span>
-          </div>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="clue-enabled">Prefix clue</label>
-            <p class="helper">
-              Show available keys after a prefix like <code>g</code> or
-              <code>y</code>.
-            </p>
-          </div>
-          <div class="setting-control">
-            <input id="clue-enabled" type="checkbox" />
-          </div>
-        </div>
-        <div class="setting">
-          <div class="setting-text">
-            <label for="clue-delay">Clue delay</label>
-            <p class="helper">
-              How long to wait after a prefix before showing the clue. 0 shows
-              instantly.
-            </p>
-            <p
-              class="field-error"
-              id="error-clue-delay"
-              aria-live="polite"
-              hidden
-            ></p>
-          </div>
-          <div class="setting-control">
-            <input id="clue-delay" type="number" min="0" max="5000" step="50" />
-            <span class="unit">ms</span>
-          </div>
         </div>
       </details>
 
@@ -415,6 +283,160 @@
             />
           </div>
         </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="clue-enabled">Prefix clue</label>
+            <p class="helper">
+              Show available keys after a prefix like <code>g</code> or
+              <code>y</code>.
+            </p>
+          </div>
+          <div class="setting-control">
+            <input id="clue-enabled" type="checkbox" />
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="clue-delay">Clue delay</label>
+            <p class="helper">
+              How long to wait after a prefix before showing the clue. 0 shows
+              instantly.
+            </p>
+            <p
+              class="field-error"
+              id="error-clue-delay"
+              aria-live="polite"
+              hidden
+            ></p>
+          </div>
+          <div class="setting-control">
+            <input id="clue-delay" type="number" min="0" max="5000" step="50" />
+            <span class="unit">ms</span>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" id="card-pagenav">
+        <summary class="card-toggle">
+          <span class="card-title">Page navigation</span
+          ><span class="card-summary" id="summary-pagenav"></span>
+        </summary>
+        <div class="setting">
+          <div class="setting-text">
+            <span class="setting-label" id="pagenav-label"
+              >Page navigation texts</span
+            >
+            <p class="helper">
+              <code data-key="nextPage"></code> and
+              <code data-key="prevPage"></code> activate the first link or
+              button whose text matches these comma-separated lists.
+              <code>rel="next"</code> and <code>rel="prev"</code> links always
+              match.
+            </p>
+            <p
+              class="field-error"
+              id="error-pagenav"
+              aria-live="polite"
+              hidden
+            ></p>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="pagenav-next">Next page texts</label>
+          </div>
+          <div class="setting-control">
+            <input
+              id="pagenav-next"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Next, Next page, ›"
+            />
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="pagenav-prev">Previous page texts</label>
+          </div>
+          <div class="setting-control">
+            <input
+              id="pagenav-prev"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Previous, Prev, ‹"
+            />
+          </div>
+        </div>
+        <div class="pagenav-actions">
+          <button id="reset-pagenav" type="button">Restore defaults</button>
+        </div>
+      </details>
+
+      <details class="card" id="card-timing">
+        <summary class="card-toggle">
+          <span class="card-title">Timing</span
+          ><span class="card-summary" id="summary-timing"></span>
+        </summary>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="timeout">Sequence timeout</label>
+            <p class="helper">
+              How long a half-typed <code>g</code> prefix or count waits. 0
+              means no timeout.
+            </p>
+            <p
+              class="field-error"
+              id="error-timeout"
+              aria-live="polite"
+              hidden
+            ></p>
+          </div>
+          <div class="setting-control">
+            <input id="timeout" type="number" min="0" max="10000" step="100" />
+            <span class="unit">ms</span>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="passthrough-mode">Passthrough mode</label>
+            <p class="helper">
+              Single passes one key. Fixed uses a timer from entry; Reset restarts the timer on each keypress.
+            </p>
+          </div>
+          <div class="setting-control">
+            <select id="passthrough-mode">
+              <option value="single">Single</option>
+              <option value="fixed">Fixed</option>
+              <option value="reset">Reset</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-text">
+            <label for="passthrough-timeout">Passthrough duration</label>
+            <p class="helper">
+              Timer for Fixed and Reset modes. 0 means no timeout.
+            </p>
+            <p
+              class="field-error"
+              id="error-passthrough-timeout"
+              aria-live="polite"
+              hidden
+            ></p>
+          </div>
+          <div class="setting-control">
+            <input
+              id="passthrough-timeout"
+              type="number"
+              min="0"
+              max="30000"
+              step="100"
+            />
+            <span class="unit">ms</span>
+          </div>
+        </div>
       </details>
 
       <details class="card" id="card-keybindings" open>
@@ -447,30 +469,6 @@
           ></span>
         </div>
         <div id="keymap-table"></div>
-      </details>
-
-      <details class="card" id="card-disabled" open>
-        <summary class="card-toggle">
-          <span class="card-title">Disabled sites</span
-          ><span class="card-summary" id="summary-disabled"></span>
-        </summary>
-        <p class="helper">
-          Jari is turned off on these sites. Press
-          <code data-key="toggleSiteEnabled"></code> on a page to toggle it
-          there, or add a host here. Use <code>*.example.com</code> to include
-          all subdomains.
-        </p>
-        <div class="add-site">
-          <input
-            id="disabled-site-input"
-            type="text"
-            placeholder="example.com"
-            aria-label="Add a disabled site host"
-          />
-          <button id="add-disabled-site" type="button">Add</button>
-        </div>
-        <p class="field-error" id="site-error" aria-live="polite" hidden></p>
-        <ul id="disabled-list"></ul>
       </details>
 
       <div class="actions">

@@ -93,6 +93,8 @@ export function renderPagenav(): void {
   clearFieldError("error-pagenav");
 }
 
+let onSaved: (() => void) | undefined;
+
 function failPagenav(message: string, badEls?: Element[]): void {
   for (const el of badEls || []) markInvalid(el, true);
   showFieldError("error-pagenav", `${message} (not saved)`);
@@ -153,6 +155,7 @@ function commitPagenav() {
     (ok) => {
       if (!ok) return;
       renderPagenav();
+      onSaved?.();
     },
   );
 }
@@ -161,12 +164,14 @@ function resetPagenav(): void {
   savePatch({ pageNavTexts: pageNavTextDefaults() }).then((ok) => {
     if (ok) {
       renderPagenav();
+      onSaved?.();
       status("Page navigation texts restored to defaults");
     }
   });
 }
 
-export function initPagenav(): void {
+export function initPagenav(savedListener?: () => void): void {
+  onSaved = savedListener;
   pagenavNextEl?.addEventListener("change", commitPagenav);
   pagenavPrevEl?.addEventListener("change", commitPagenav);
   resetPagenavBtn?.addEventListener("click", resetPagenav);

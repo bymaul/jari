@@ -77,22 +77,20 @@ const addSiteBtn =
   document.querySelector<HTMLButtonElement>("#add-disabled-site")!;
 const siteErrorEl = document.querySelector<HTMLElement>("#site-error");
 const summaries: Record<string, HTMLElement | null> = {
-  scrolling: document.querySelector("#summary-scrolling"),
+  general: document.querySelector("#summary-general"),
   search: document.querySelector("#summary-search"),
-  clipboard: document.querySelector("#summary-clipboard"),
-  timing: document.querySelector("#summary-timing"),
   hints: document.querySelector("#summary-hints"),
+  pagenav: document.querySelector("#summary-pagenav"),
+  timing: document.querySelector("#summary-timing"),
   keybindings: document.querySelector("#summary-keybindings"),
-  disabled: document.querySelector("#summary-disabled"),
 };
 const cards: Record<string, HTMLDetailsElement | null> = {
-  scrolling: document.querySelector("#card-scrolling"),
+  general: document.querySelector("#card-general"),
   search: document.querySelector("#card-search"),
-  clipboard: document.querySelector("#card-clipboard"),
-  timing: document.querySelector("#card-timing"),
   hints: document.querySelector("#card-hints"),
+  pagenav: document.querySelector("#card-pagenav"),
+  timing: document.querySelector("#card-timing"),
   keybindings: document.querySelector("#card-keybindings"),
-  disabled: document.querySelector("#card-disabled"),
 };
 
 const ADD_LABEL = "+";
@@ -187,28 +185,28 @@ function countUnbound(): number {
 }
 
 function updateSummaries(): void {
-  if (summaries.scrolling) {
-    summaries.scrolling.textContent = `${settings.getScrollStep()}px · smooth ${settings.isSmoothScroll() ? "on" : "off"}`;
+  if (summaries.general) {
+    const sites = settings.getDisabledSites().length;
+    const copy =
+      settings.getCopyFormat() === "markdown"
+        ? "Markdown link"
+        : "Plain (title + URL)";
+    summaries.general.textContent =
+      `${settings.getScrollStep()}px · smooth ${settings.isSmoothScroll() ? "on" : "off"}` +
+      ` · ${copy} · ${sites === 0 ? "enabled everywhere" : `${sites} site${sites === 1 ? "" : "s"}`}`;
   }
   if (summaries.search) {
     const n = settings.getSuggestionSources().length;
     const engines = settings.getSearchEngines();
-    const nav = settings.getPageNavTexts();
     summaries.search.textContent =
       `fuzzy ${settings.isFuzzyMatching() ? "on" : "off"} · ${n} source${n === 1 ? "" : "s"} · max ${settings.getMaxResults()}` +
-      ` · ${engines.length} engine${engines.length === 1 ? "" : "s"} · default ${settings.getDefaultEngine()}` +
-      ` · page nav ${nav.next.length}+${nav.prev.length}`;
+      ` · ${engines.length} engine${engines.length === 1 ? "" : "s"} · default ${settings.getDefaultEngine()}`;
   }
-  if (summaries.clipboard) {
-    summaries.clipboard.textContent =
-      settings.getCopyFormat() === "markdown"
-        ? "Markdown link"
-        : "Plain (title + URL)";
+  if (summaries.pagenav) {
+    const nav = settings.getPageNavTexts();
+    summaries.pagenav.textContent = `next ${nav.next.length} · prev ${nav.prev.length}`;
   }
   if (summaries.timing) {
-    const clue = settings.isClueEnabled()
-      ? `${settings.getClueDelayMs()}ms`
-      : "off";
     const modeLabels: Record<string, string> = {
       single: "single",
       fixed: "fixed",
@@ -217,14 +215,18 @@ function updateSummaries(): void {
     const modeLabel =
       modeLabels[settings.getPassthroughMode()] ||
       settings.getPassthroughMode();
-    summaries.timing.textContent = `timeout ${settings.getTimeoutMs()}ms · passthrough ${settings.getPassthroughMs()}ms (${modeLabel}) · clue ${clue}`;
+    summaries.timing.textContent = `timeout ${settings.getTimeoutMs()}ms · passthrough ${settings.getPassthroughMs()}ms (${modeLabel})`;
   }
   if (summaries.hints) {
     const chars = settings.getHintChars();
     const custom = settings.getClickableSelector();
+    const clue = settings.isClueEnabled()
+      ? `${settings.getClueDelayMs()}ms`
+      : "off";
     summaries.hints.textContent =
       `${chars} (${chars.length}) · ${settings.getHintTheme()} ${settings.getHintFontSize()}px` +
-      (custom ? " · custom selector" : "");
+      (custom ? " · custom selector" : "") +
+      ` · clue ${clue}`;
   }
   if (summaries.keybindings) {
     const total = Object.keys(COMMAND_CATALOG).length;
@@ -233,11 +235,6 @@ function updateSummaries(): void {
       unbound === 0
         ? `${total} commands · all bound`
         : `${total - unbound}/${total} bound · ${unbound} unbound`;
-  }
-  if (summaries.disabled) {
-    const n = settings.getDisabledSites().length;
-    summaries.disabled.textContent =
-      n === 0 ? "enabled everywhere" : `${n} site${n === 1 ? "" : "s"}`;
   }
 }
 
@@ -1364,8 +1361,8 @@ for (const el of [sourceTabEl, sourceHistoryEl, sourceBookmarkEl]) {
     savePatch({ suggestionSources: collectSources() }),
   );
 }
-initEngines();
-initPagenav();
+initEngines(updateSummaries);
+initPagenav(updateSummaries);
 hintCharsEl.addEventListener("input", () => {
   clearFieldError("error-hint-chars");
   markInvalid(hintCharsEl, false);
