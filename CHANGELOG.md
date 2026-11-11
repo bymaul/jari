@@ -38,6 +38,10 @@ versioned for the extension manifest (`manifest.base.json`).
   existing pin/mute/playing/bookmark tags.
 - `q` closes the tab manager, recently closed, history tree, and help
   overlays, matching `Esc`.
+- Restore manager (`gr`) gains visual range selection: `v` anchors at the
+  focused row, `j`/`k` expand the marked range between anchor and cursor,
+  `q`/Escape exit visual, and a `(visual)` header badge shows while active.
+  The selected row now highlights the full row.
 
 ### Changed
 
@@ -55,6 +59,11 @@ versioned for the extension manifest (`manifest.base.json`).
 - Firefox release builds now sign for the listed AMO channel instead of
   unlisted, so the signed xpi goes through public AMO review and is
   installable from the add-on listing.
+- Scroll no longer requires a first cycle: when the page itself can
+  scroll, scroll keys apply to it immediately instead of waiting for `w`
+  to establish stops.
+- The help sheet footer no longer lists `j/k` scroll in its hints
+  navigation hint.
 
 ### Fixed
 
@@ -70,6 +79,8 @@ versioned for the extension manifest (`manifest.base.json`).
 - Default tab close/reopen bindings move from `x`/`X` to `d`/`D`, and
   half-page scroll defaults leave `d`/`u` (settings schema v16). Custom
   rebinds are preserved.
+- Keys typed into the omnibar and command palette no longer leak to page
+  shortcuts; unhandled keys are consumed by the overlay.
 
 ## [0.7.0] - 2026-10-15
 
