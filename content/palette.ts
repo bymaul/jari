@@ -190,6 +190,9 @@ function onKeyDown(event: KeyboardEvent): void {
     ) {
       ui.consume(event);
       move(event.shiftKey ? -1 : 1);
+    } else {
+      event.stopPropagation();
+      event.stopImmediatePropagation();
     }
     return;
   }

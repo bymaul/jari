@@ -8,6 +8,7 @@ const { commands } = await import("../content/commands.ts");
 const { keymapDefaults } = await import("../content/keymap.ts");
 const { handleKeydown, shieldOverlayKey, __resetState } =
   await import("../content/content.ts");
+const { Prompt } = await import("../content/prompt.ts");
 const { Overlays, register, touch } = await import("../content/overlays.ts");
 
 let shieldActive = false;
@@ -315,6 +316,112 @@ test("keys typed into a form field reach the page, Escape blurs", () => {
   press(esc);
   assertClaimed(esc);
   assert.deepEqual(calls, ["blur"]);
+});
+
+test("printable keys typed into the omnibar stay in the input and never reach page shortcuts", () => {
+  spyOn("scrollDown");
+
+  let capturedInput: unknown = null;
+  const realCreateElement = globalThis.document.createElement.bind(
+    globalThis.document,
+  );
+  const origCreateFragment =
+    globalThis.document.createDocumentFragment;
+  try {
+    (globalThis.document as unknown as Record<string, unknown>).createElement =
+      (tag: string) => {
+        const el: Record<string, unknown> = {
+          appendChild: () => {},
+          remove: () => {},
+          setAttribute: () => {},
+          addEventListener: () => {},
+          focus: () => {},
+          blur: () => {},
+          tagName: tag.toUpperCase(),
+          type: "",
+          value: "",
+          className: "",
+          classList: {
+            add: () => {},
+            remove: () => {},
+            toggle: () => {},
+            contains: () => false,
+          },
+          style: {},
+          children: [],
+          parentElement: null,
+          ownerDocument: globalThis.document,
+          textContent: "",
+          insertBefore: () => null,
+          shadowRoot: null,
+        };
+        if (tag === "input") capturedInput = el;
+        return el;
+      };
+    (globalThis.document as unknown as Record<string, unknown>).createDocumentFragment =
+      () => ({ appendChild: () => {}, children: [] });
+
+    Prompt.openOmnibar();
+    assert.equal(Prompt.isActive(), true);
+
+    const input = capturedInput as HTMLInputElement;
+    (globalThis.document as unknown as Record<string, unknown>).activeElement =
+      input;
+
+    const calls: string[] = [];
+    const ev = {
+      isTrusted: true,
+      key: "a",
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      shiftKey: false,
+      target: input,
+      composedPath: () => [],
+      preventDefault() {
+        calls.push("preventDefault");
+      },
+      stopImmediatePropagation() {
+        calls.push("stopImmediatePropagation");
+      },
+      stopPropagation() {
+        calls.push("stopPropagation");
+      },
+    };
+    press(ev as unknown as KeyboardEvent);
+
+    assert.equal(
+      spiedCalls.scrollDown.length,
+      0,
+      "page shortcut must not run while typing in the omnibar",
+    );
+    assert.ok(
+      calls.includes("stopPropagation"),
+      "expected the key to be stopped from reaching the page",
+    );
+    assert.ok(
+      calls.includes("stopImmediatePropagation"),
+      "expected the key to be claimed by the omnibar",
+    );
+    assert.ok(
+      !calls.includes("preventDefault"),
+      "expected text insertion to not be blocked",
+    );
+  } finally {
+    (globalThis.document as unknown as Record<string, unknown>).createElement =
+      realCreateElement;
+    if (origCreateFragment) {
+      (globalThis.document as unknown as Record<string, unknown>).createDocumentFragment =
+        origCreateFragment;
+    } else {
+      delete (globalThis.document as unknown as Record<string, unknown>)
+        .createDocumentFragment;
+    }
+    (globalThis.document as unknown as Record<string, unknown>).activeElement =
+      null;
+    Prompt.close();
+    __resetState();
+  }
 });
 
 test("keys typed into overlay UI are shielded from the page", () => {

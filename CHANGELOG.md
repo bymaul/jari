@@ -67,6 +67,9 @@ versioned for the extension manifest (`manifest.base.json`).
 - A bare `0` no longer starts a repeat count.
 - The tab manager refreshes a pending close confirmation when its tabs
   disappear and blocks other keys while it is pending.
+- Default tab close/reopen bindings move from `x`/`X` to `d`/`D`, and
+  half-page scroll defaults leave `d`/`u` (settings schema v16). Custom
+  rebinds are preserved.
 
 ## [0.7.0] - 2026-10-15
 
