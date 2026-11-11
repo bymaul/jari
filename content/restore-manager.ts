@@ -10,7 +10,7 @@ const POLL_MS = 2000;
 const FILTER_MAX = 200;
 
 const FOOTER =
-  "j/k move | Space mark | V all | Enter restore | / filter | q close";
+  "j/k move | Space mark | v range | V all | Enter restore | / filter | q close";
 
 type ListRes = {
   ok?: boolean;
@@ -30,6 +30,9 @@ let filtered: ClosedSessionRow[] = [];
 let selected = 0;
 let marked = new Set<string>();
 let query = "";
+let visualAnchor: number | null = null;
+let visualPainted = new Set<string>();
+let visualBaseline = new Set<string>();
 let fieldEl: HTMLInputElement | null = null;
 let fieldFocusBefore: Element | null = null;
 let matchCache = new Map<
@@ -175,6 +178,9 @@ function restoreCss() {
     .jari-prompt-list li.jari-rest-row.marked {
       background: rgba(224, 163, 99, 0.16) !important;
     }
+    .jari-prompt-list li.jari-rest-row.selected {
+      background: var(--jari-of-bg, #333738) !important;
+    }
     .jari-prompt-list li.jari-rest-row .title,
     .jari-prompt-list li.jari-rest-row .url {
       overflow: hidden;
@@ -298,6 +304,8 @@ function renderHeader(): void {
 
   if (query) appendSpan(headerEl!, "jari-rest-badge", `/${query}`);
   if (fieldEl) appendSpan(headerEl!, "jari-rest-badge", "(filtering)");
+  if (visualAnchor !== null)
+    appendSpan(headerEl!, "jari-rest-badge", "(visual)");
 
   const total = filtered.length;
   appendSpan(
@@ -463,6 +471,7 @@ async function open(): Promise<void> {
   fieldEl = null;
   fieldFocusBefore = null;
   refreshQueued = false;
+  endVisual();
   active = true;
   touch("restore-manager");
 
@@ -505,6 +514,7 @@ function onVisibility(): void {
 
 function close(): void {
   stopPolling();
+  endVisual();
   refreshing = false;
   document.removeEventListener("visibilitychange", onVisibility);
   if (host) {
@@ -542,10 +552,56 @@ function close(): void {
 
 function move(delta: number): void {
   if (filtered.length === 0) return;
+  endVisual();
   const prev = selected;
   selected = (selected + delta + filtered.length) % filtered.length;
   renderHeader();
   paintSelection(prev);
+}
+
+function paintRange(): void {
+  if (visualAnchor === null) return;
+  const from = Math.min(visualAnchor, selected);
+  const to = Math.max(visualAnchor, selected);
+  const painted = new Set<string>();
+  for (let i = from; i <= to; i++) {
+    const row = filtered[i];
+    if (!row) continue;
+    painted.add(row.sessionId);
+    marked.add(row.sessionId);
+  }
+  for (const id of visualPainted) {
+    if (painted.has(id) || visualBaseline.has(id)) continue;
+    marked.delete(id);
+  }
+  visualPainted = painted;
+}
+
+function moveVisual(delta: number): void {
+  if (filtered.length === 0) return;
+  const anchor = visualAnchor ?? selected;
+  const lo = Math.min(anchor, selected);
+  const hi = Math.max(anchor, selected);
+  selected = (selected + delta + filtered.length) % filtered.length;
+  paintRange();
+  renderHeader();
+  const from = Math.min(lo, selected);
+  const to = Math.max(hi, selected);
+  for (let i = from; i <= to; i++) repaintRow(i);
+}
+
+function endVisual(): void {
+  visualAnchor = null;
+  visualPainted = new Set();
+  visualBaseline = new Set();
+}
+
+function startVisual(): void {
+  if (filtered.length === 0) return;
+  visualAnchor = selected;
+  visualBaseline = new Set(marked);
+  visualPainted = new Set();
+  paintRange();
 }
 
 function toggleMark(): void {
@@ -558,6 +614,7 @@ function toggleMark(): void {
 }
 
 function markAllVisible(): void {
+  endVisual();
   for (const row of filtered) marked.add(row.sessionId);
   renderAll();
 }
@@ -682,7 +739,10 @@ function onNormalKey(event: KeyboardEvent): boolean {
     case "q":
     case "Escape":
       ui.consume(event);
-      if (query) {
+      if (visualAnchor !== null) {
+        endVisual();
+        renderAll();
+      } else if (query) {
         query = "";
         applyFilter();
         renderAll();
@@ -712,12 +772,20 @@ function onNormalKey(event: KeyboardEvent): boolean {
     case "ArrowDown":
     case "j":
       ui.consume(event);
-      move(1);
+      if (visualAnchor !== null) moveVisual(1);
+      else move(1);
       return true;
     case "ArrowUp":
     case "k":
       ui.consume(event);
-      move(-1);
+      if (visualAnchor !== null) moveVisual(-1);
+      else move(-1);
+      return true;
+    case "v":
+      ui.consume(event);
+      if (visualAnchor !== null) endVisual();
+      else startVisual();
+      renderAll();
       return true;
     case "V":
       ui.consume(event);
