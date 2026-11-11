@@ -12,6 +12,10 @@ function getTarget(): Element | Window {
   if (target !== null && !target.isConnected) {
     target = null;
   }
+  if (target !== null) return target;
+  if (pageCanScroll()) return window;
+  const stops = currentStops();
+  target = stops.length > 0 ? (stops[0] as Element) : null;
   return target === null ? window : target;
 }
 
