@@ -35,7 +35,7 @@ let currentIdx = 0;
 let gPending = false;
 
 const HINTS_FILTER = "Enter done | Esc cancel";
-const HINTS_NAV = "j/k scroll | / filter | n/N jump | q close";
+const HINTS_NAV = "/ filter | n/N jump | q close";
 
 function isActive(): boolean {
   return active;
