@@ -4,7 +4,7 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
-## [0.8.1] - 2026-11-15
+## [0.8.0] - 2026-11-15
 
 ### Added
 
@@ -56,9 +56,6 @@ versioned for the extension manifest (`manifest.base.json`).
 - Omnibar ranking uses the cached tab/history/bookmark pool immediately
   and refines when the background responds, so results appear without
   waiting for a round trip.
-- Firefox release builds now sign for the listed AMO channel instead of
-  unlisted, so the signed xpi goes through public AMO review and is
-  installable from the add-on listing.
 - Scroll no longer requires a first cycle: when the page itself can
   scroll, scroll keys apply to it immediately instead of waiting for `w`
   to establish stops.

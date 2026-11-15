@@ -1,6 +1,6 @@
 {
   "name": "jari",
-  "version": "0.8.1",
+  "version": "0.8.0",
   "description": "Simple keyboard-driven navigation extension for modern browsers.",
   "license": "MIT",
   "author": "maulana",
@@ -20,7 +20,7 @@
     "dev:chrome": "node build.ts dev chrome",
     "dev:firefox": "node build.ts dev firefox",
     "dist": "node build.ts dist",
-    "sign:firefox": "web-ext sign --source-dir=dist/jari-firefox --artifacts-dir=dist/signed --channel=listed --amo-metadata=amo-metadata.json"
+    "sign:firefox": "web-ext sign --source-dir=dist/jari-firefox --artifacts-dir=dist/signed --channel=unlisted"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
