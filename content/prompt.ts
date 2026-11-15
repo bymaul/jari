@@ -57,6 +57,7 @@ export function calcEval(expr: string): string | null {
   const tokens: { type: "num" | "op" | "lparen" | "rparen"; value: string }[] =
     [];
   let i = 0;
+  let depth = 0;
   while (i < expr.length) {
     const ch = expr[i];
     if (/\s/.test(ch)) {
@@ -71,6 +72,7 @@ export function calcEval(expr: string): string | null {
       tokens.push({ type: "op", value: ch });
       i++;
     } else if (ch === "(") {
+      if (++depth > 32) return null;
       tokens.push({ type: "lparen", value: ch });
       i++;
     } else if (ch === ")") {

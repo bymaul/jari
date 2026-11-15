@@ -77,7 +77,9 @@ async function readOne(area: "sync" | "local"): Promise<unknown | null> {
   try {
     const stored = await chrome.storage[area].get(STORAGE_KEY);
     if (stored && stored[STORAGE_KEY]) return stored[STORAGE_KEY];
-  } catch {}
+  } catch (err) {
+    console.debug(`[jari] Settings read from ${area} failed:`, err);
+  }
   return null;
 }
 

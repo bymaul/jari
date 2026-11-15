@@ -64,6 +64,11 @@ versioned for the extension manifest (`manifest.base.json`).
   to establish stops.
 - The help sheet footer no longer lists `j/k` scroll in its hints
   navigation hint.
+- Internal: failed regroup-after-move, bookmark removal, and settings
+  reads log a console diagnostic instead of failing silently; the
+  options page imports the shared min/max limits for max results and
+  hint font size, and the omnibar history fetch cap reuses
+  `maxResultsDefault`, so the duplicated literals are gone.
 
 ### Fixed
 
@@ -81,6 +86,13 @@ versioned for the extension manifest (`manifest.base.json`).
   rebinds are preserved.
 - Keys typed into the omnibar and command palette no longer leak to page
   shortcuts; unhandled keys are consumed by the overlay.
+- A double open (`gh`/`gr`/tab manager pressed again while the first open
+  is still awaiting its data) no longer leaks a second shadow host that
+  `Esc` cannot close.
+- Calculator nesting is capped, so a pasted pile of `(` shows no result
+  row instead of overflowing the call stack.
+- Screenshots hide the recently closed overlay along with the other
+  Jari overlays.
 
 ## [0.7.0] - 2026-10-15
 

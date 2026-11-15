@@ -441,8 +441,10 @@ function stopPolling(): void {
 
 async function open(): Promise<void> {
   if (active) return;
+  active = true;
   const res = await askList();
   if (!res || res.ok !== true) {
+    active = false;
     ui.toast("History tree unavailable");
     return;
   }

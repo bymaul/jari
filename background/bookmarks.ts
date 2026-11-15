@@ -151,7 +151,9 @@ export async function unbookmarkManagerTabs(
     try {
       await chrome.bookmarks.remove(id);
       removed++;
-    } catch {}
+    } catch (err) {
+      console.error("[jari] Bookmark remove failed:", id, err);
+    }
   }
   let skipped = 0;
   for (const tab of selected) {

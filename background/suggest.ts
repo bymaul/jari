@@ -1,5 +1,9 @@
 import type { Suggestion } from "../shared/protocol.ts";
-import { clampMaxResults, suggestionSources } from "../shared/constants.ts";
+import {
+  clampMaxResults,
+  maxResultsDefault,
+  suggestionSources,
+} from "../shared/constants.ts";
 import {
   buildEngineUrl,
   normalizeDefaultEngine,
@@ -392,7 +396,7 @@ export async function suggest(
       try {
         const results = await chrome.history.search({
           text: q,
-          maxResults: 20,
+          maxResults: maxResultsDefault,
           startTime: Date.now() - 90 * 86400000,
         });
         for (const item of results)

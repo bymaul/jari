@@ -755,8 +755,10 @@ function stopPolling(): void {
 
 async function open(): Promise<void> {
   if (active) return;
+  active = true;
   const res = await ask("managerList");
   if (!res || !res.ok || !Array.isArray(res.tabs)) {
+    active = false;
     ui.toast("Tab manager unavailable");
     return;
   }

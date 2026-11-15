@@ -729,7 +729,9 @@ export async function moveManagerTabs(
     for (const [groupId, ids] of regroup) {
       try {
         await chrome.tabs.group({ tabIds: asTabIds(ids), groupId });
-      } catch {}
+      } catch (err) {
+        console.error("[jari] Regroup after move failed:", err);
+      }
     }
   }
   return viable ? { ok: true, moved } : { ok: false };

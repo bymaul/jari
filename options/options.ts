@@ -13,10 +13,16 @@ import {
   modifierKeys,
   normalizeHintChars,
   settingsDefaults,
+  HINT_FONT_SIZE_MIN,
+  HINT_FONT_SIZE_MAX,
 } from "../content/keymap.ts";
 import { normalizeSitePattern } from "../shared/url.ts";
 import { searchEngineDefaults } from "../shared/search-engines.ts";
 import { pageNavTextDefaults } from "../shared/page-nav-texts.ts";
+import {
+  maxResultsMin,
+  maxResultsMax,
+} from "../shared/constants.ts";
 import { COMMAND_CATALOG } from "../content/catalog.ts";
 import type { CommandDef, CommandName } from "../content/catalog.ts";
 import type { Settings, HintTheme, PassthroughMode } from "../content/keymap.ts";
@@ -1296,8 +1302,8 @@ scrollStepEl.addEventListener("change", () =>
 );
 maxResultsEl.addEventListener("change", () =>
   commitNumber(maxResultsEl, "error-max-results", {
-    min: 5,
-    max: 100,
+    min: maxResultsMin,
+    max: maxResultsMax,
     fallback: "getMaxResults",
     settingKey: "maxResults",
     label: "Max results",
@@ -1376,8 +1382,8 @@ hintThemeEl?.addEventListener("change", () =>
 );
 hintFontSizeEl.addEventListener("change", () =>
   commitNumber(hintFontSizeEl, "error-hint-font-size", {
-    min: 8,
-    max: 20,
+    min: HINT_FONT_SIZE_MIN,
+    max: HINT_FONT_SIZE_MAX,
     fallback: "getHintFontSize",
     settingKey: "hintFontSize",
     label: "Hint font size",

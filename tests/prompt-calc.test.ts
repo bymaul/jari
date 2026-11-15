@@ -28,3 +28,8 @@ test("calcEval rejects invalid expressions", () => {
   assert.equal(calcEval("2; console.log(1)"), null);
   assert.equal(calcEval("2 & 1"), null);
 });
+
+test("calcEval rejects absurdly deep nesting", () => {
+  assert.equal(calcEval("(".repeat(200) + "1+1" + ")".repeat(200)), null);
+  assert.equal(calcEval("(".repeat(32) + "1+1" + ")".repeat(32)), "2");
+});
