@@ -60,7 +60,6 @@
 
   var CLUE_G = [
     { suffix: "g", label: "scroll to top" },
-    { suffix: "f", label: "hint link in background tab" },
     { suffix: "u", label: "go to parent URL" },
     { suffix: "U", label: "go to site root" },
   ];
@@ -184,7 +183,7 @@
     div.appendChild(rest);
   }
 
-  function openHints(newTab, background) {
+  function openHints(newTab, sticky) {
     closeHints();
     countBuf = "";
     pendingG = false;
@@ -209,7 +208,7 @@
       items: items,
       typed: "",
       newTab: newTab,
-      background: background,
+      sticky: sticky,
     };
     mode = "hints";
     setPill();
@@ -250,10 +249,16 @@
 
   function activateHint(it) {
     var target = it.target;
-    var isNew = hintState.newTab || hintState.background;
+    var isNew = hintState.newTab;
+    var isSticky = hintState.sticky;
     flash(target);
     var href = target.getAttribute("href");
-    closeHints();
+    if (isSticky) {
+      hintState.typed = "";
+      refreshHints();
+    } else {
+      closeHints();
+    }
     if (target.tagName === "BUTTON") {
       try {
         target.click();
@@ -263,7 +268,7 @@
     if (!href) return;
     if (isNew) {
       window.open(href, "_blank", "noopener");
-      toast("Opened in new tab — demo stays open");
+      toast("Opened in a new tab (the demo cannot open background tabs)");
       return;
     }
     try {
@@ -1115,9 +1120,8 @@
       {
         label: "Hints",
         rows: [
-          ["f", "Click link"],
-          ["F", "Open link in new tab"],
-          ["gf", "Open link in background tab"],
+          ["f", "Open in this tab"],
+          ["F", "Open repeatedly in background"],
         ],
       },
       {
@@ -1328,15 +1332,10 @@
     if (pendingG) {
       pendingG = false;
       countBuf = "";
-      if (e.key === "g" || e.key === "f" || e.key === "u" || e.key === "U")
-        e.preventDefault();
+      if (e.key === "g" || e.key === "u" || e.key === "U") e.preventDefault();
       if (e.key === "g") {
         scrollStep("gg", 1);
         setPill();
-        return;
-      }
-      if (e.key === "f") {
-        openHints(true, true);
         return;
       }
       if (e.key === "u") {
@@ -1412,7 +1411,7 @@
         return;
       case "F":
         e.preventDefault();
-        openHints(true, false);
+        openHints(true, true);
         return;
       case "t":
         e.preventDefault();

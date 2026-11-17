@@ -22,6 +22,7 @@ import {
   filterAncestors,
   filterOverlapElements,
   getHref,
+  isOpenableLink,
   collectElements,
   collectIframeElements,
   collectMutationRoots,
@@ -50,7 +51,7 @@ let elements: JariElement[] = [];
 let hints: HintEntry[] = [];
 let prefix = "";
 let mode = "click";
-let multipleHits = false;
+let sticky = false;
 let resizeHandler: (() => void) | null = null;
 let mutationObserver: MutationObserver | null = null;
 let regenerateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -673,8 +674,6 @@ function close(): void {
 const VALID_HINT_MODES: Set<string> = new Set([
   "click",
   "open",
-  "openBackground",
-  "openCurrent",
   "input",
   "yank",
   "yankText",
@@ -683,7 +682,7 @@ const VALID_HINT_MODES: Set<string> = new Set([
 function open(requestedMode: string): void {
   if (active) close();
   mode = VALID_HINT_MODES.has(requestedMode) ? requestedMode : "click";
-  multipleHits = mode === "openBackground";
+  sticky = mode === "open";
 
   let candidates = collectElements(mode);
 
@@ -718,7 +717,7 @@ function open(requestedMode: string): void {
 }
 
 function handleActivationEnd(): void {
-  if (!multipleHits) close();
+  if (!sticky) close();
   else {
     prefix = "";
     refresh();
@@ -728,32 +727,26 @@ function handleActivationEnd(): void {
 function activate(el: Element): void {
   flashElement(el);
   if (mode === "click") {
-    if (isFrameElement(el)) focusFrame(el);
-    else if (isEditable(el)) focusInput(el as HTMLElement);
-    else ui.dispatchClick(el);
-    handleActivationEnd();
-  } else if (mode === "open") {
-    const url = getHref(el);
-    if (url) sendMessage("openInForegroundTab", { url });
-    else if (isFrameElement(el)) focusFrame(el);
-    else ui.dispatchClick(el);
-    handleActivationEnd();
-  } else if (mode === "openBackground") {
-    const url = getHref(el);
-    if (url) sendMessage("openInBackgroundTab", { url });
-    else if (isFrameElement(el)) focusFrame(el);
-    handleActivationEnd();
-  } else if (mode === "openCurrent") {
-    const url = getHref(el);
-    if (url) {
-      sendMessage("navigate", { url });
-      close();
-    } else if (isFrameElement(el)) {
-      focusFrame(el);
+    if (isFrameElement(el) || isEditable(el)) {
+      if (isFrameElement(el)) focusFrame(el);
+      else focusInput(el as HTMLElement);
       close();
     } else {
       ui.dispatchClick(el);
+      handleActivationEnd();
+    }
+  } else if (mode === "open") {
+    const url = isOpenableLink(el) ? getHref(el) : null;
+    if (url) {
+      sendMessage("openInBackgroundTab", { url });
+      handleActivationEnd();
+    } else if (isFrameElement(el) || isEditable(el)) {
+      if (isFrameElement(el)) focusFrame(el);
+      else focusInput(el as HTMLElement);
       close();
+    } else {
+      ui.dispatchClick(el);
+      handleActivationEnd();
     }
   } else if (mode === "input") {
     focusInput(el as HTMLElement);

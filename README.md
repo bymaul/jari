@@ -32,7 +32,8 @@ Bindings chain into sequences of any length.
   `yy` copy URL, `Y` copy title + URL, `gss`/`gsp`/`gsr` screenshot full/page/region,
   `[[`/`]]` previous/next page
   (customizable link texts in settings)
-- Hints: `f` click, `F` new tab, `gf` background tab, `i` focus input, `yf` copy link URL, `yF` copy link text
+- Hints: `f` open in this tab, `F` open repeatedly in background (`Esc` exits), `i` focus input,
+  `yf` copy link URL, `yF` copy link text
   (hints inside a frame appear only once the frame is focused - cycle onto it with `w` or click into it;
   `j`/`k` and other scrolling keys scroll the page while hints are open (cycle/reset excluded); `g` goes to top)
 - Find: `/` find, `n`/`N` next/prev (smart case, `Esc` hides highlights with `n` to resume, `Enter` follows;
@@ -42,8 +43,7 @@ Bindings chain into sequences of any length.
 - Modes: `I` ignore, `p` passthrough, `ctrl+alt+v` disable on site
 - Help: `?` cheatsheet, `:` command palette, `;e` settings, `;x` extensions page
 
-Unbound by default (bind them in settings): scrollPageDown/Up,
-hintOpenCurrent.
+Unbound by default (bind them in settings): scrollPageDown/Up.
 
 ## Settings (`;e`)
 

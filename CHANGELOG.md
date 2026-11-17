@@ -4,6 +4,21 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Changed
+
+- `F` is now a sticky hint mode: it targets every clickable element like `f`,
+  stays open after each activation, and opens links in a background tab while
+  clicking everything else. Focusing an input, select, or frame closes it.
+- The hint command labels are now "Open in this tab" and
+  "Open repeatedly in background".
+
+### Removed
+
+- The `gf` background-tab hint command and the unbound open-in-this-tab hint
+  command, including their hint modes. Stored bindings to them are dropped.
+
 ## [0.8.0] - 2026-11-15
 
 ### Added

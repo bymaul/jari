@@ -505,14 +505,6 @@ export const commands: Record<string, CommandImpl> = {
 
   hintClick: { ...COMMAND_CATALOG.hintClick, run: () => Hints.open("click") },
   hintOpen: { ...COMMAND_CATALOG.hintOpen, run: () => Hints.open("open") },
-  hintOpenBackground: {
-    ...COMMAND_CATALOG.hintOpenBackground,
-    run: () => Hints.open("openBackground"),
-  },
-  hintOpenCurrent: {
-    ...COMMAND_CATALOG.hintOpenCurrent,
-    run: () => Hints.open("openCurrent"),
-  },
   hintInput: { ...COMMAND_CATALOG.hintInput, run: () => Hints.open("input") },
   hintYank: { ...COMMAND_CATALOG.hintYank, run: () => Hints.open("yank") },
   hintYankText: {

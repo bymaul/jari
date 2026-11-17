@@ -277,7 +277,11 @@ export function collectNewcomers(
   const out = [];
   for (const e of pool) {
     if (known && known.has(e)) continue;
-    if (requestedMode === "click" || requestedMode === "yankText") {
+    if (
+      requestedMode === "click" ||
+      requestedMode === "open" ||
+      requestedMode === "yankText"
+    ) {
       if (!prefilterClickable(e, "", null)) continue;
     } else if (requestedMode === "input") {
       if (!isInputCandidate(e)) continue;
@@ -286,7 +290,11 @@ export function collectNewcomers(
     }
     const measured = measureElement(e);
     if (!measured) continue;
-    if (requestedMode === "click" || requestedMode === "yankText") {
+    if (
+      requestedMode === "click" ||
+      requestedMode === "open" ||
+      requestedMode === "yankText"
+    ) {
       if (!isElementClickable(e, measured.style)) continue;
     } else if (requestedMode !== "input") {
       if (!isOpenableLink(e, location.href)) continue;
@@ -659,14 +667,9 @@ export function getInputElements(): Element[] {
 
 export function collectElements(requestedMode: string): Element[] {
   let raw: Element[] = [];
-  if (requestedMode === "click") raw = getClickableElements();
-  else if (
-    requestedMode === "open" ||
-    requestedMode === "openBackground" ||
-    requestedMode === "openCurrent" ||
-    requestedMode === "yank"
-  )
-    raw = getLinkElements();
+  if (requestedMode === "click" || requestedMode === "open")
+    raw = getClickableElements();
+  else if (requestedMode === "yank") raw = getLinkElements();
   else if (requestedMode === "input") raw = getInputElements();
   else if (requestedMode === "yankText") raw = getClickableElements();
   try {
@@ -819,7 +822,11 @@ export function collectIframeElements(requestedMode: string): Element[] {
       base = doc.URL || doc.baseURI || location.href;
     } catch {}
     eachInnerElement(doc, (el) => {
-      if (requestedMode === "click" || requestedMode === "yankText") {
+      if (
+        requestedMode === "click" ||
+        requestedMode === "open" ||
+        requestedMode === "yankText"
+      ) {
         if (!isElementClickable(el)) return;
       } else if (requestedMode === "input") {
         if (!matchesInnerInput(el)) return;

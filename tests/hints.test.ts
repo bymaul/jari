@@ -91,7 +91,7 @@ test("isElementClickable reuses a passed style for the cursor check", () => {
 test("iframe inners are hinted only for the focused frame", () => {
   const innerLink = {
     tagName: "A",
-    matches: (s: string) => s === "[href]",
+    matches: () => true,
     getAttribute: (n: string) => (n === "href" ? "https://example.com/" : null),
     href: "https://example.com/",
     disabled: false,
@@ -312,6 +312,13 @@ test("collectNewcomers accepts visible clickables and skips the rest", () => {
       root,
     ]);
     assert.deepEqual(collectNewcomers([root], "click", new Set()), [
+      root,
+      good,
+    ]);
+    assert.deepEqual(collectNewcomers([root], "open", new Set([good])), [
+      root,
+    ]);
+    assert.deepEqual(collectNewcomers([root], "open", new Set()), [
       root,
       good,
     ]);

@@ -107,7 +107,6 @@ export const keymapDefaults: Record<string, string> = {
 
   f: "hintClick",
   F: "hintOpen",
-  gf: "hintOpenBackground",
   i: "hintInput",
 
   H: "goBack",
