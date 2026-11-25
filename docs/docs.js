@@ -60,6 +60,7 @@
 
   var CLUE_G = [
     { suffix: "g", label: "scroll to top" },
+    { suffix: "f", label: "open links repeatedly in background" },
     { suffix: "u", label: "go to parent URL" },
     { suffix: "U", label: "go to site root" },
   ];
@@ -268,7 +269,7 @@
     if (!href) return;
     if (isNew) {
       window.open(href, "_blank", "noopener");
-      toast("Opened in a new tab (the demo cannot open background tabs)");
+      toast("Opened in a new tab (the demo cannot control tab focus)");
       return;
     }
     try {
@@ -1121,7 +1122,8 @@
         label: "Hints",
         rows: [
           ["f", "Open in this tab"],
-          ["F", "Open repeatedly in background"],
+          ["F", "Open in a new tab"],
+          ["gf", "Open repeatedly in background"],
         ],
       },
       {
@@ -1332,10 +1334,15 @@
     if (pendingG) {
       pendingG = false;
       countBuf = "";
-      if (e.key === "g" || e.key === "u" || e.key === "U") e.preventDefault();
+      if (e.key === "g" || e.key === "f" || e.key === "u" || e.key === "U")
+        e.preventDefault();
       if (e.key === "g") {
         scrollStep("gg", 1);
         setPill();
+        return;
+      }
+      if (e.key === "f") {
+        openHints(true, true);
         return;
       }
       if (e.key === "u") {
@@ -1411,7 +1418,7 @@
         return;
       case "F":
         e.preventDefault();
-        openHints(true, true);
+        openHints(true, false);
         return;
       case "t":
         e.preventDefault();

@@ -674,6 +674,7 @@ function close(): void {
 const VALID_HINT_MODES: Set<string> = new Set([
   "click",
   "open",
+  "openForeground",
   "input",
   "yank",
   "yankText",
@@ -735,10 +736,13 @@ function activate(el: Element): void {
       ui.dispatchClick(el);
       handleActivationEnd();
     }
-  } else if (mode === "open") {
+  } else if (mode === "open" || mode === "openForeground") {
     const url = isOpenableLink(el) ? getHref(el) : null;
     if (url) {
-      sendMessage("openInBackgroundTab", { url });
+      sendMessage(
+        mode === "open" ? "openInBackgroundTab" : "openInForegroundTab",
+        { url },
+      );
       handleActivationEnd();
     } else if (isFrameElement(el) || isEditable(el)) {
       if (isFrameElement(el)) focusFrame(el);

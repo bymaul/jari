@@ -148,8 +148,10 @@ test("iframe inners are hinted only for the focused frame", () => {
   try {
     doc.activeElement = frame as unknown as Element;
     assert.equal(collectIframeElements("open").length, 1);
+    assert.equal(collectIframeElements("openForeground").length, 1);
     doc.activeElement = null;
     assert.equal(collectIframeElements("open").length, 0);
+    assert.equal(collectIframeElements("openForeground").length, 0);
   } finally {
     globalThis.document.querySelectorAll = prevQsa;
     doc.activeElement = prevActive;
@@ -319,6 +321,10 @@ test("collectNewcomers accepts visible clickables and skips the rest", () => {
       root,
     ]);
     assert.deepEqual(collectNewcomers([root], "open", new Set()), [
+      root,
+      good,
+    ]);
+    assert.deepEqual(collectNewcomers([root], "openForeground", new Set()), [
       root,
       good,
     ]);

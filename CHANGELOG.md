@@ -4,6 +4,19 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Added
+
+- `gf` opens links repeatedly in background tabs while keeping hints open, and
+  `F` opens links in a new tab and switches to it. Both target every clickable
+  element; `F` closes after one activation.
+
+### Changed
+
+- The hint defaults are now `F` for "Open in a new tab" and `gf` for
+  "Open repeatedly in background".
+
 ## [0.8.1] - 2026-11-17
 
 ### Changed

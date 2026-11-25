@@ -280,6 +280,7 @@ export function collectNewcomers(
     if (
       requestedMode === "click" ||
       requestedMode === "open" ||
+      requestedMode === "openForeground" ||
       requestedMode === "yankText"
     ) {
       if (!prefilterClickable(e, "", null)) continue;
@@ -293,6 +294,7 @@ export function collectNewcomers(
     if (
       requestedMode === "click" ||
       requestedMode === "open" ||
+      requestedMode === "openForeground" ||
       requestedMode === "yankText"
     ) {
       if (!isElementClickable(e, measured.style)) continue;
@@ -667,7 +669,11 @@ export function getInputElements(): Element[] {
 
 export function collectElements(requestedMode: string): Element[] {
   let raw: Element[] = [];
-  if (requestedMode === "click" || requestedMode === "open")
+  if (
+    requestedMode === "click" ||
+    requestedMode === "open" ||
+    requestedMode === "openForeground"
+  )
     raw = getClickableElements();
   else if (requestedMode === "yank") raw = getLinkElements();
   else if (requestedMode === "input") raw = getInputElements();
@@ -825,6 +831,7 @@ export function collectIframeElements(requestedMode: string): Element[] {
       if (
         requestedMode === "click" ||
         requestedMode === "open" ||
+        requestedMode === "openForeground" ||
         requestedMode === "yankText"
       ) {
         if (!isElementClickable(el)) return;

@@ -111,6 +111,10 @@ export const COMMAND_CATALOG = {
     category: "hints",
     label: "Open repeatedly in background",
   },
+  hintOpenForeground: {
+    category: "hints",
+    label: "Open in a new tab",
+  },
   hintInput: { category: "hints", label: "Focus input" },
   hintYank: { category: "hints", label: "Copy link URL" },
   hintYankText: { category: "hints", label: "Copy link text" },
