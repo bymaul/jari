@@ -4,6 +4,14 @@ All notable changes to Jari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioned for the extension manifest (`manifest.base.json`).
 
+## [Unreleased]
+
+### Changed
+
+- Visual mode hints now cover long paragraphs and blocks with inline links,
+  label targets in reading order, land on the first non-blank character, and
+  follow scrolling. `V` selects full visual lines.
+
 ## [0.8.2] - 2026-11-25
 
 ### Added

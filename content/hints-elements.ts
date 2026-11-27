@@ -2,12 +2,8 @@ import { deepActiveElement, overlaySelectors, queryAll } from "./keymap.ts";
 import { blockedUrlSchemes } from "../shared/url.ts";
 import { settings } from "./settings.ts";
 
-// NodeFilter.SHOW_ELEMENT is 1 by spec; spelled out so this module also
-// loads where NodeFilter is undefined (unit tests).
 const SHOW_ELEMENT = 1;
 
-/** Rect-shaped plain object; DOMRect is structurally compatible. */
-/** Rect measurements compatible with DOMRect minus offsets. */
 export type RectLike = {
   left: number;
   top: number;
@@ -17,7 +13,6 @@ export type RectLike = {
   height: number;
 };
 
-/** Jari expandos stored on hint targets (see collectIframeElements). */
 export interface JariElement extends Element {
   _jariBase?: string;
   _jariViewportRect?: RectLike;
@@ -101,7 +96,6 @@ export function listElements(
 ): Element[] {
   const out: Element[] = [];
   try {
-    // Numeric codes: NodeFilter may be undefined in unit tests.
     const walker = document.createTreeWalker(root, whatToShow, {
       acceptNode(node) {
         try {
@@ -437,8 +431,8 @@ export function filterAncestors(
   return result;
 }
 
-export function filterOverlapElements(elements: Element[]): Element[] {
-  elements = elements.filter((e) => {
+export function filterOccludedElements(elements: Element[]): Element[] {
+  return elements.filter((e) => {
     const be = getRealRect(e);
     if (
       (e as HTMLInputElement).disabled ||
@@ -467,7 +461,10 @@ export function filterOverlapElements(elements: Element[]): Element[] {
       e.contains(el)
     );
   });
-  return filterAncestors(elements);
+}
+
+export function filterOverlapElements(elements: Element[]): Element[] {
+  return filterAncestors(filterOccludedElements(elements));
 }
 
 function matchesHintSelector(

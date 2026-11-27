@@ -2,12 +2,81 @@ import { overlaySelectors } from "../keymap.ts";
 import {
   getVisibleElements,
   filterInvisibleElements,
-  filterOverlapElements,
-  filterAncestors,
+  filterOccludedElements,
 } from "../hints-elements.ts";
 
+const SHOW_TEXT = 4;
+const FILTER_ACCEPT = 1;
+const FILTER_REJECT = 3;
+
+const MAX_TARGETS = 400;
+
+const BLOCK_DISPLAYS = new Set([
+  "block",
+  "flex",
+  "grid",
+  "list-item",
+  "table-cell",
+  "flow-root",
+]);
+
+export function isBlockDisplay(display: string): boolean {
+  return BLOCK_DISPLAYS.has(display);
+}
+
+export function filterTextTargets(
+  elements: Element[],
+  isBlock: (el: Element) => boolean,
+): Element[] {
+  const kept: Element[] = [];
+  for (const e of elements) {
+    const eBlock = isBlock(e);
+    let skip = false;
+    for (let i = 0; i < kept.length; i++) {
+      const k = kept[i];
+      if (k.contains(e)) {
+        if (eBlock) kept[i] = e;
+        skip = true;
+        break;
+      }
+      if (e.contains(k)) {
+        if (eBlock && !isBlock(k)) {
+          kept.splice(i, 1);
+          i--;
+          continue;
+        }
+        skip = true;
+        break;
+      }
+    }
+    if (!skip) kept.push(e);
+  }
+  return kept;
+}
+
+export function firstNonBlankPosition(
+  el: Element,
+): { node: Text; offset: number } | null {
+  try {
+    const walker = document.createTreeWalker(el, SHOW_TEXT, {
+      acceptNode(node) {
+        const value = node.nodeValue;
+        if (!value || !/\S/.test(value)) return FILTER_REJECT;
+        return FILTER_ACCEPT;
+      },
+    });
+    const node = walker.nextNode() as Text | null;
+    if (node) {
+      const match = /\S/.exec(node.nodeValue || "");
+      if (match) return { node, offset: match.index };
+    }
+  } catch {}
+  return null;
+}
+
 export function collectVisualTextElements(): Element[] {
-  let elements = getVisibleElements((e, v) => {
+  const blockMap = new WeakMap<Element, boolean>();
+  let elements = getVisibleElements((e, v, style) => {
     try {
       if (e.closest && e.closest(overlaySelectors)) return;
       if (
@@ -25,27 +94,12 @@ export function collectVisualTextElements(): Element[] {
       )
         return;
     } catch {}
-    const raw = e.textContent;
-    if (!raw) return;
-    const text = raw.trim();
-    if (!text || text.length < 3 || text.length > 500) return;
-    const tag = e.tagName;
-    if (
-      tag === "HTML" ||
-      tag === "BODY" ||
-      tag === "MAIN" ||
-      tag === "ARTICLE" ||
-      tag === "SECTION"
-    ) {
-      if (text.length > 200) return;
-    }
+    const text = e.textContent?.trim();
+    if (!text) return;
+    if (e.tagName === "HTML" || e.tagName === "BODY") return;
     let hasDirectText = false;
     for (const n of e.childNodes) {
-      if (
-        n.nodeType === Node.TEXT_NODE &&
-        n.nodeValue &&
-        n.nodeValue.trim().length >= 2
-      ) {
+      if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim()) {
         hasDirectText = true;
         break;
       }
@@ -53,66 +107,29 @@ export function collectVisualTextElements(): Element[] {
     const isLeaf = e.children.length === 0;
     let isBlock = false;
     try {
-      const style = window.getComputedStyle(e);
-      isBlock =
-        style.display === "block" ||
-        style.display === "flex" ||
-        style.display === "grid" ||
-        style.display === "list-item" ||
-        style.display === "table-cell";
+      isBlock = isBlockDisplay(style.display);
       if (style.visibility === "hidden" || style.opacity === "0") return;
     } catch {}
     if (!isLeaf && !hasDirectText && !isBlock) return;
     if (!hasDirectText && text.length < 8 && !isLeaf) return;
+    blockMap.set(e, isBlock);
     v.push(e);
   });
   elements = filterInvisibleElements(elements);
   elements = elements.filter((e) => {
     const r = e.getBoundingClientRect();
-    return r.width >= 16 && r.height >= 8 && r.width * r.height >= 80;
+    return r.width >= 8 && r.height >= 6 && r.width * r.height >= 40;
   });
-  elements = filterOverlapElements(elements);
-  elements = filterAncestors(elements);
-  const scored = elements
-    .map((el) => {
-      const text = el.textContent!.trim();
-      const rect = el.getBoundingClientRect();
-      const area = rect.width * rect.height;
-      let score = 0;
-      if (text.length >= 10 && text.length <= 140) score += 12;
-      else if (text.length > 200) score -= 8;
-      if (text.split(/\s+/).length >= 2) score += 4;
-      if (area > 0 && area < 40000) score += 6;
-      else if (area >= 100000) score -= 6;
-      try {
-        if (
-          el.closest &&
-          el.closest(
-            "p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, dt, dd",
-          )
-        )
-          score += 5;
-      } catch {}
-      const hasDirect = Array.from(el.childNodes).some(
-        (n) =>
-          n.nodeType === Node.TEXT_NODE &&
-          n.nodeValue &&
-          n.nodeValue.trim().length >= 3,
-      );
-      if (hasDirect) score += 4;
-      return { el, score, area };
-    })
-    .sort((a, b) => b.score - a.score || a.area - b.area);
-  const seen = new Set<Element>();
-  const out: Element[] = [];
-  for (const { el } of scored) {
-    if (seen.has(el)) continue;
-    seen.add(el);
-    out.push(el);
-    if (out.length >= 350) break;
-  }
-  if (out.length > 250) {
-    return out.filter((e) => e.textContent!.trim().length >= 10).slice(0, 250);
-  }
-  return out;
+  elements = filterTextTargets(elements, (el) => blockMap.get(el) === true);
+  elements = filterOccludedElements(elements);
+
+  const ordered = elements
+    .map((el, index) => ({ el, index, rect: el.getBoundingClientRect() }))
+    .sort(
+      (a, b) =>
+        a.rect.top - b.rect.top ||
+        a.rect.left - b.rect.left ||
+        a.index - b.index,
+    );
+  return ordered.slice(0, MAX_TARGETS).map((entry) => entry.el);
 }

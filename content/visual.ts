@@ -1,15 +1,20 @@
-/* global NodeFilter */
 import { register, touch } from "./overlays.ts";
 import { ui } from "./ui.ts";
+import { getLinkAncestor, isEditable, getRealRect } from "./hints-elements.ts";
+import {
+  collectVisualTextElements,
+  firstNonBlankPosition,
+} from "./visual/collect.ts";
+import { settings } from "./settings.ts";
 import {
   normalizeCharset,
   genLabels,
   updateHintText,
   createHintsHost,
   layoutHints,
+  hintHomeRect,
+  holderOrigin,
 } from "./hint-layer.ts";
-import { getLinkAncestor, isEditable } from "./hints-elements.ts";
-import { collectVisualTextElements } from "./visual/collect.ts";
 import {
   isUsableCaretRect,
   firstUsableRect,
@@ -39,13 +44,12 @@ type PendingFindChar = {
   count: number;
 };
 type LastFindChar = PendingFindChar & { ch: string };
-/** DOM selection.modify() direction/granularity spellings. */
 type SelectionModifyDirection = "forward" | "backward" | "left" | "right";
 type SelectionModifyGranularity =
   "character" | "word" | "line" | "lineboundary" | "documentboundary";
 
 let active = false;
-let mode: VisualMode = "visual"; // "visual" | "line" | "caret"
+let mode: VisualMode = "visual";
 let pillEl: HTMLDivElement | null = null;
 let pendingCount = "";
 let pendingG = false;
@@ -75,8 +79,18 @@ let hintElements: Element[] = [];
 let hintPrefix = "";
 let hintHost: HTMLDivElement | null = null;
 let hintHolder: HTMLElement | null = null;
-const hintMap = new Map<string, { el: Element; hintEl: HintLink }>();
+type HintEntry = {
+  el: Element;
+  hintEl: HintLink;
+  hiddenByViewport: boolean;
+};
+const hintMap = new Map<string, HintEntry>();
 let pendingVisualMode: VisualMode = "visual";
+const HINT_SCROLL_STOP_DELAY = 200;
+let hintRepositionRaf: number | null = null;
+let hintScrollTimer: ReturnType<typeof setTimeout> | null = null;
+let hintScrollHandler: (() => void) | null = null;
+let hintResizeHandler: (() => void) | null = null;
 
 let findOpenHandler: (() => void) | null = null;
 let findNavHandler: ((repeat: number, reverse: boolean) => void) | null = null;
@@ -431,7 +445,8 @@ function renderHints(): void {
     hintHost = null;
     hintHolder = null;
   }
-  const created = createHintsHost("cyan");
+  const fontSize = settings.getHintFontSize();
+  const created = createHintsHost("cyan", fontSize);
   hintHost = created.host;
   hintHolder = created.holder;
 
@@ -439,9 +454,13 @@ function renderHints(): void {
   const labels = genLabels(hintElements.length, charset);
   hintMap.clear();
 
-  const hintEls = layoutHints(hintHolder, hintElements, labels);
+  const hintEls = layoutHints(hintHolder, hintElements, labels, fontSize);
   for (const link of hintEls) {
-    hintMap.set(link.label, { el: link.link, hintEl: link });
+    hintMap.set(link.label, {
+      el: link.link,
+      hintEl: link,
+      hiddenByViewport: false,
+    });
   }
   refreshHints();
 }
@@ -450,19 +469,138 @@ function refreshHints(): void {
   if (!hintActive) return;
   for (const [label, obj] of hintMap.entries()) {
     const hintEl = obj.hintEl;
-    if (!hintPrefix) {
-      hintEl.style.opacity = "1";
-      hintEl.style.display = "";
-      hintEl.classList.remove("jari-hint-hidden");
-      updateHintText(hintEl, label, "");
-    } else if (label.startsWith(hintPrefix)) {
-      hintEl.style.opacity = "1";
-      hintEl.style.display = "";
-      updateHintText(hintEl, label, hintPrefix);
-    } else {
+    const visible =
+      !obj.hiddenByViewport &&
+      (!hintPrefix || label.startsWith(hintPrefix));
+    if (!visible) {
       hintEl.style.opacity = "0";
       hintEl.style.display = "none";
+      continue;
     }
+    hintEl.style.opacity = "1";
+    hintEl.style.display = "";
+    hintEl.classList.remove("jari-hint-hidden");
+    updateHintText(hintEl, label, hintPrefix);
+  }
+}
+
+function repositionHints(): void {
+  if (!hintActive || !hintHolder) return;
+  let origin: { top: number; left: number };
+  try {
+    origin = holderOrigin(hintHolder);
+  } catch {
+    return;
+  }
+  const bof = {
+    top: origin.top + window.pageYOffset,
+    left: origin.left + window.pageXOffset,
+  };
+  const vw = window.innerWidth || 0;
+  const vh = window.innerHeight || 0;
+  for (const obj of hintMap.values()) {
+    const r = getRealRect(obj.el);
+    const home = hintHomeRect(r, bof);
+    obj.hintEl.style.left = `${home.left}px`;
+    obj.hintEl.style.top = `${home.top}px`;
+    obj.hiddenByViewport = !(
+      r.bottom > 0 &&
+      r.top < vh &&
+      r.right > 0 &&
+      r.left < vw
+    );
+  }
+  refreshHints();
+}
+
+function scheduleHintReposition(): void {
+  if (hintRepositionRaf !== null) return;
+  try {
+    hintRepositionRaf = requestAnimationFrame(() => {
+      hintRepositionRaf = null;
+      repositionHints();
+    });
+  } catch {
+    hintRepositionRaf = null;
+  }
+}
+
+function reloadHints(): void {
+  if (!hintActive) return;
+  if (hintPrefix) {
+    repositionHints();
+    return;
+  }
+  const elements = collectVisualTextElements();
+  if (elements.length > 0) hintElements = elements;
+  renderHints();
+}
+
+function onHintScroll(): void {
+  if (!hintActive) return;
+  scheduleHintReposition();
+  if (hintScrollTimer !== null) clearTimeout(hintScrollTimer);
+  hintScrollTimer = setTimeout(() => {
+    hintScrollTimer = null;
+    reloadHints();
+  }, HINT_SCROLL_STOP_DELAY);
+}
+
+function onHintResize(): void {
+  if (!hintActive) return;
+  reloadHints();
+}
+
+function attachHintViewportListeners(): void {
+  if (!hintScrollHandler) {
+    hintScrollHandler = onHintScroll;
+    try {
+      window.addEventListener("scroll", hintScrollHandler, {
+        capture: true,
+        passive: true,
+      });
+    } catch {
+      try {
+        window.addEventListener("scroll", hintScrollHandler, true);
+      } catch {}
+    }
+  }
+  if (!hintResizeHandler) {
+    hintResizeHandler = onHintResize;
+    try {
+      window.addEventListener("resize", hintResizeHandler);
+    } catch {}
+  }
+}
+
+function detachHintViewportListeners(): void {
+  if (hintScrollHandler) {
+    try {
+      window.removeEventListener("scroll", hintScrollHandler, {
+        capture: true,
+      });
+    } catch {
+      try {
+        window.removeEventListener("scroll", hintScrollHandler, true);
+      } catch {}
+    }
+    hintScrollHandler = null;
+  }
+  if (hintResizeHandler) {
+    try {
+      window.removeEventListener("resize", hintResizeHandler);
+    } catch {}
+    hintResizeHandler = null;
+  }
+  if (hintRepositionRaf !== null) {
+    try {
+      cancelAnimationFrame(hintRepositionRaf);
+    } catch {}
+    hintRepositionRaf = null;
+  }
+  if (hintScrollTimer !== null) {
+    clearTimeout(hintScrollTimer);
+    hintScrollTimer = null;
   }
 }
 
@@ -473,12 +611,13 @@ function showVisualHints(requestedMode?: VisualMode): void {
     ui.toast("No text to select");
     return;
   }
-  hintElements = elements.length > 300 ? elements.slice(0, 300) : elements;
+  hintElements = elements;
   hintPrefix = "";
   hintActive = true;
   enableSelectOverride();
   attachMouseListeners();
   renderHints();
+  attachHintViewportListeners();
   if (!pillEl) {
     try {
       pillEl = document.createElement("div");
@@ -489,12 +628,12 @@ function showVisualHints(requestedMode?: VisualMode): void {
   } else {
     pillEl.textContent = "visual hint";
   }
-  ui.toast(`Hints: ${hintElements.length} text targets`);
 }
 
 function closeHints(): void {
   if (!hintActive) return;
   hintActive = false;
+  detachHintViewportListeners();
   hintPrefix = "";
   hintElements = [];
   hintMap.clear();
@@ -529,29 +668,23 @@ function activateHintByLabel(label: string): boolean {
 function enterAtElement(el: Element, newMode?: VisualMode): void {
   if (active) close(false);
   mode = newMode || "visual";
-  let range;
+  const pos = firstNonBlankPosition(el);
+  let range: Range;
   try {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-      acceptNode(node) {
-        if (!node.nodeValue || !node.nodeValue.trim())
-          return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
-    const first = walker.nextNode();
-    if (first) {
-      range = document.createRange();
-      range.setStart(first, 0);
+    range = document.createRange();
+    if (pos) {
+      range.setStart(pos.node, pos.offset);
       range.collapse(true);
     } else {
-      range = document.createRange();
       range.selectNodeContents(el);
       range.collapse(true);
     }
   } catch {
     range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(true);
+    try {
+      range.selectNodeContents(el);
+      range.collapse(true);
+    } catch {}
   }
   const sel = window.getSelection();
   if (!sel) return;
@@ -559,32 +692,21 @@ function enterAtElement(el: Element, newMode?: VisualMode): void {
     sel.removeAllRanges();
     sel.addRange(range);
   } catch {}
-  if (mode !== "line" && sel.isCollapsed) {
-    if (hasModify()) {
-      try {
-        sel.modify("extend", "forward", "character");
-      } catch {}
-    }
-  }
-  if (mode !== "line" && sel.isCollapsed) {
-    ui.toast("No text to select");
-  }
-  if (mode === "line") {
+  if (sel.isCollapsed && hasModify()) {
     try {
-      if (hasModify()) {
-        sel.modify("extend", "forward", "lineboundary");
-      } else {
-        const r2 = document.createRange();
-        r2.selectNodeContents(el);
-        sel.removeAllRanges();
-        sel.addRange(r2);
-      }
-    } catch {
+      sel.modify("extend", "forward", "character");
+    } catch {}
+  }
+  if (mode === "line" && !expandSelectionToFullLines()) {
+    try {
       const r2 = document.createRange();
       r2.selectNodeContents(el);
       sel.removeAllRanges();
       sel.addRange(r2);
-    }
+    } catch {}
+  }
+  if (mode !== "line" && sel.isCollapsed) {
+    ui.toast("No text to select");
   }
   active = true;
   showPill();
@@ -1294,7 +1416,6 @@ function onKeyDown(event: KeyboardEvent): boolean {
   }
 
   if (/^[0-9]$/.test(key)) {
-    // A bare "0" is line-start, not a count, so it falls through to the switch.
     if (key !== "0" || pendingCount !== "") {
       ui.consume(event);
       if (pendingCount.length < 9) pendingCount += key;
@@ -1582,7 +1703,6 @@ function onKeyDown(event: KeyboardEvent): boolean {
         }
         break;
       }
-      // fall through for visual mode: show disabled
       if (
         key.length === 1 &&
         !event.ctrlKey &&
